@@ -1083,6 +1083,586 @@
           "Projets"
         ]
       }
+    },
+    "/admin/v1/auth/login": {
+      "post": {
+        "operationId": "AdminAuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Étape 1 : e-mail et mot de passe → jeton d’étape ; la suite exige un code TOTP",
+        "tags": [
+          "Administration — connexion"
+        ]
+      }
+    },
+    "/admin/v1/auth/totp/enrollment": {
+      "post": {
+        "operationId": "AdminAuthController_enrollment",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Première connexion : secret à scanner dans une application d’authentification",
+        "tags": [
+          "Administration — connexion"
+        ]
+      }
+    },
+    "/admin/v1/auth/totp/verify": {
+      "post": {
+        "operationId": "AdminAuthController_verify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Étape 2 : code à 6 chiffres → session d’administration",
+        "tags": [
+          "Administration — connexion"
+        ]
+      }
+    },
+    "/admin/v1/auth/me": {
+      "get": {
+        "operationId": "AdminAuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — connexion"
+        ]
+      }
+    },
+    "/admin/v1/auth/logout": {
+      "post": {
+        "operationId": "AdminAuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — connexion"
+        ]
+      }
+    },
+    "/admin/v1/settings": {
+      "get": {
+        "operationId": "AdminController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Réglages métier (âges F15, projets…) avec leur statut de décision",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/settings/{key}": {
+      "put": {
+        "operationId": "AdminController_updateSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifier un réglage existant (valeur contrôlée, journalisé avec avant/après)",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/audit-logs": {
+      "get": {
+        "operationId": "AdminController_audit",
+        "parameters": [
+          {
+            "name": "action",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actorId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Journal d’audit (lecture seule), du plus récent au plus ancien",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/users": {
+      "get": {
+        "operationId": "AdminController_users",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rechercher un compte (nom d’utilisateur, nom, téléphone, e-mail) ; journalisé",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/users/{id}": {
+      "get": {
+        "operationId": "AdminController_user",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/users/{id}/status": {
+      "patch": {
+        "operationId": "AdminController_userStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspendre ou réactiver un compte (motif obligatoire ; la suspension ferme les sessions)",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/programs": {
+      "get": {
+        "operationId": "AdminController_programs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Programmes types (C7) : brouillons, publiés, archivés",
+        "tags": [
+          "Administration"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_createProgram",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/programs/{id}": {
+      "put": {
+        "operationId": "AdminController_updateProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/programs/{id}/publish": {
+      "post": {
+        "operationId": "AdminController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publier un brouillon validé par une personne compétente (nom obligatoire)",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/programs/{id}/archive": {
+      "post": {
+        "operationId": "AdminController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/admins": {
+      "get": {
+        "operationId": "AdminController_admins",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_createAdmin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/admins/{id}": {
+      "patch": {
+        "operationId": "AdminController_updateAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
     }
   },
   "info": {
@@ -1505,6 +2085,212 @@
         "required": [
           "days"
         ]
+      },
+      "AdminLoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "AdminLoginTokenDto": {
+        "type": "object",
+        "properties": {
+          "loginToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "loginToken"
+        ]
+      },
+      "AdminTotpDto": {
+        "type": "object",
+        "properties": {
+          "loginToken": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "loginToken",
+          "code"
+        ]
+      },
+      "UpdateSettingDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "object",
+            "description": "Nouvelle valeur JSON (null = non décidé) ; contrôlée par setting-rules.ts"
+          },
+          "decisionStatus": {
+            "type": "string",
+            "enum": [
+              "decided",
+              "provisional",
+              "pending"
+            ]
+          },
+          "decisionRef": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "UserStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "suspended",
+              "active"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Motif, conservé dans le journal d’audit"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ]
+      },
+      "ProgramTaskDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "timeOfDay": {
+            "type": "string",
+            "example": "07:00"
+          },
+          "weekdays": {
+            "type": "number",
+            "example": 127
+          }
+        },
+        "required": [
+          "title",
+          "timeOfDay",
+          "weekdays"
+        ]
+      },
+      "ProgramDto": {
+        "type": "object",
+        "properties": {
+          "categoryCode": {
+            "type": "string"
+          },
+          "goalCode": {
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          },
+          "durationDays": {
+            "type": "number"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgramTaskDto"
+            }
+          }
+        },
+        "required": [
+          "categoryCode",
+          "title",
+          "durationDays",
+          "tasks"
+        ]
+      },
+      "PublishProgramDto": {
+        "type": "object",
+        "properties": {
+          "validatedBy": {
+            "type": "string",
+            "description": "Nom et qualité de la personne compétente qui a validé le contenu (C7)",
+            "example": "Awa Koné, coach sportive diplômée"
+          }
+        },
+        "required": [
+          "validatedBy"
+        ]
+      },
+      "CreateAdminDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "description": "Mot de passe initial (12 caractères minimum), transmis hors de l’app"
+          },
+          "roles": {
+            "example": [
+              "support"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "email",
+          "fullName",
+          "password",
+          "roles"
+        ]
+      },
+      "UpdateAdminDto": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "resetTotp": {
+            "type": "boolean",
+            "description": "Oblige à reconfigurer la double authentification (appareil perdu)"
+          }
+        }
       }
     }
   }

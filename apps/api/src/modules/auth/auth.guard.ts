@@ -5,6 +5,7 @@ import { Errors } from '../../common/errors';
 import { DB, Database } from '../../database/database.module';
 import { users } from '../../database/schema';
 import { SpacesService } from '../spaces/spaces.service';
+import { ADMIN_ROUTE } from '../admin/admin.decorators';
 import { AuthedRequest, IS_PUBLIC, REQUIRED_SPACE, REQUIRED_STEP_UP, StepUpScope } from './auth.decorators';
 import { SessionService, SpaceType } from './session.service';
 import { StepUpService } from './step-up.service';
@@ -28,6 +29,8 @@ export class AuthGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const targets = [ctx.getHandler(), ctx.getClass()];
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
+    // Routes /admin : contrôlées par la garde d'administration (session admin + TOTP), jamais par un jeton de l'app.
+    if (this.reflector.getAllAndOverride<boolean>(ADMIN_ROUTE, targets)) return true;
 
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
     const header = req.headers.authorization;

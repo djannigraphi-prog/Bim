@@ -6,6 +6,7 @@ import request from 'supertest';
 import { Pool } from 'pg';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
+import { ADMIN_CLOCK } from '../src/modules/admin/admin-auth.service';
 import { DeliveryService } from '../src/modules/delivery/delivery.service';
 import { SettingsService } from '../src/modules/settings/settings.service';
 import { STATE_FILE } from './test-db';
@@ -17,6 +18,8 @@ export interface Harness {
   outbox: DeliveryService['testOutbox'];
   settings: SettingsService;
   lastCodeFor: (destination: string) => string;
+  /** Horloge de l'administration, avançable dans les tests (codes TOTP à usage unique). */
+  adminClock: { t: number; now(): number };
   close: () => Promise<void>;
 }
 
@@ -29,13 +32,15 @@ export async function startHarness(extraEnv: Record<string, string> = {}): Promi
     DATABASE_URL: url,
     JWT_ACCESS_SECRET: 'test-access-secret-0123456789-abcdefghij',
     OTP_SECRET: 'test-otp-secret-0123456789-abcdefghijklmn',
+    ADMIN_TOTP_ENCRYPTION_KEY: 'Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=',
     SMS_PROVIDER: 'test',
     EMAIL_PROVIDER: 'test',
     HTTP_THROTTLE_ENABLED: 'false',
     OTP_RESEND_COOLDOWN_SECONDS: '15',
     ...extraEnv,
   });
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const adminClock = { t: Date.now(), now() { return this.t; } };
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(ADMIN_CLOCK).useValue(adminClock).compile();
   const app = moduleRef.createNestApplication({ logger: ['error'] });
   configureApp(app);
   await app.init();
@@ -46,6 +51,7 @@ export async function startHarness(extraEnv: Record<string, string> = {}): Promi
     http: () => request(app.getHttpServer()),
     pool,
     outbox: delivery.testOutbox,
+    adminClock,
     settings: app.get(SettingsService),
     lastCodeFor: (destination: string) => {
       const msg = [...delivery.testOutbox].reverse().find((m) => m.destination === destination && m.code);

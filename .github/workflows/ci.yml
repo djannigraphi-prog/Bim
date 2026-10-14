@@ -41,6 +41,7 @@ jobs:
           DATABASE_URL: postgres://bim:bim@localhost:5432/postgres
           JWT_ACCESS_SECRET: ci-only-secret-0123456789-abcdefghijkl
           OTP_SECRET: ci-only-otp-secret-0123456789-abcdefghij
+          ADMIN_TOTP_ENCRYPTION_KEY: Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=
           LOG_LEVEL: error
         run: npm run openapi:export && git diff --exit-code ../../packages/api-contract/openapi.json
 
@@ -101,6 +102,7 @@ jobs:
       # Secrets jetables, propres à la CI (aucune valeur réelle).
       JWT_ACCESS_SECRET: ci-e2e-access-secret-0123456789-abcdefghij
       OTP_SECRET: ci-e2e-otp-secret-0123456789-abcdefghijklmno
+      ADMIN_TOTP_ENCRYPTION_KEY: Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=
       SMS_PROVIDER: console
       EMAIL_PROVIDER: console
     steps:

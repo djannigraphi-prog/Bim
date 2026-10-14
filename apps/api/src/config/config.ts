@@ -53,6 +53,17 @@ const schema = z
     FACEBOOK_APP_ID: z.string().default(''),
 
     DEFAULT_PHONE_REGION: z.string().length(2).default('CI'),
+
+    /**
+     * Administration (/admin/v1) : clé de chiffrement des secrets TOTP, 32 octets encodés en base64
+     * (générer avec : openssl rand -base64 32). Obligatoire ; à conserver dans AWS Secrets Manager.
+     */
+    ADMIN_TOTP_ENCRYPTION_KEY: z
+      .string()
+      .refine((v) => Buffer.from(v, 'base64').length === 32, 'ADMIN_TOTP_ENCRYPTION_KEY doit faire 32 octets encodés en base64'),
+    ADMIN_SESSION_TTL_MINUTES: z.coerce.number().int().min(15).max(720).default(480),
+    ADMIN_LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(10).default(5),
+    ADMIN_LOCK_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
   })
   .superRefine((cfg, ctx) => {
     const devLike = cfg.NODE_ENV === 'development' || cfg.NODE_ENV === 'test';

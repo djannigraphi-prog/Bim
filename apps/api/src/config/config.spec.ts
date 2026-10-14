@@ -5,6 +5,7 @@ const base = {
   DATABASE_URL: 'postgres://bim:bim@localhost:5432/bim_dev',
   JWT_ACCESS_SECRET: 'a'.repeat(40),
   OTP_SECRET: 'b'.repeat(40),
+  ADMIN_TOTP_ENCRYPTION_KEY: 'Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=',
 };
 
 describe('loadConfig', () => {

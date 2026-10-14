@@ -5,6 +5,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { APP_CONFIG, AppConfig } from './config/config';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { AgePolicyModule } from './modules/age-policy/age-policy.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -55,6 +56,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     InterestsModule,
     AuthModule,
     ProjectsModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
