@@ -34,7 +34,10 @@ jobs:
       - run: npm run test:unit
       - name: Stockage compatible S3 pour les tests (MinIO, local au runner)
         run: |
-          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          for img in minio/minio:latest quay.io/minio/minio:latest; do
+            docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 "$img" server /data && break
+            docker rm -f minio 2>/dev/null || true
+          done
           for i in $(seq 1 30); do curl -sf localhost:9000/minio/health/live && break; sleep 1; done
       - run: npm run test:e2e
         env:
