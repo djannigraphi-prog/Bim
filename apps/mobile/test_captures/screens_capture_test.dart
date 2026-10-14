@@ -91,8 +91,8 @@ final _challenge = Challenge(
   resendAvailableAt: DateTime.now().add(const Duration(seconds: 45)),
 );
 
-Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode mode = ThemeMode.light}) async {
-  tester.view.physicalSize = const Size(1170, 2532);
+Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode mode = ThemeMode.light, Size physical = const Size(1170, 2532)}) async {
+  tester.view.physicalSize = physical;
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final storage = _NoTokens();
@@ -180,6 +180,15 @@ void main() {
   testWidgets('ajout D-UI-03 : mot de passe oublié', (t) async {
     await _show(t, '/forgot');
     await _capture(t, 'x2_mot_de_passe_oublie');
+  });
+  // Petit téléphone Android (360 × 640) : un débordement ferait échouer ce test.
+  testWidgets('04 inscription, petit écran', (t) async {
+    await _show(t, '/register/1', physical: const Size(1080, 1920));
+    await _capture(t, 'x4_inscription_petit_ecran');
+  });
+  testWidgets('03 connexion, petit écran', (t) async {
+    await _show(t, '/login', physical: const Size(1080, 1920));
+    await _capture(t, 'x5_connexion_petit_ecran');
   });
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);

@@ -143,8 +143,13 @@ jobs:
         if: ${{ always() }}
         run: |
           if [ -f "$RUNNER_TEMP/e2e.log" ]; then
-            msg=$(sed -n '/: inscription, code/,$p' "$RUNNER_TEMP/e2e.log" | grep -vE "^\s*$|^(I|D|V)/|\] *[0-9]+%" | head -220 | cut -c1-220 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
-            echo "::warning title=e2e android::$msg"
+            sed -n '/: inscription, code/,$p' "$RUNNER_TEMP/e2e.log" \
+              | grep -vE "^\s*$|^(I|D|V)/|\] *[0-9]+%|^(This is|Consider|The edge|black striped|seen\. If|ClipRect|like a ListView|RenderFlex to fit)" \
+              | cut -c1-200 > "$RUNNER_TEMP/e2e.short"
+            python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "e2e android" "$RUNNER_TEMP/e2e.short" 6
           fi
-          api=$(grep -E "ERROR|\" 5[0-9][0-9]|statusCode\":(4|5)" "$RUNNER_TEMP/api.log" | sed 's/\x1b\[[0-9;]*m//g' | grep -v "ton code est" | tail -15 | cut -c1-300 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
-          [ -n "$api" ] && echo "::warning title=api log::$api" || true
+          # Requêtes reçues par l'API (méthode, adresse, statut), sans les corps ni les codes.
+          sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/api.log" | grep "request completed" \
+            | grep -oE '"method":"[A-Z]+","url":"[^"]+"|"statusCode":[0-9]+' | paste -d' ' - - > "$RUNNER_TEMP/api.short" || true
+          grep -E "ERROR|Error" "$RUNNER_TEMP/api.log" | grep -v "ton code est" | cut -c1-300 >> "$RUNNER_TEMP/api.short" || true
+          python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "api" "$RUNNER_TEMP/api.short" 3

@@ -55,8 +55,18 @@ class BimTextField extends StatelessWidget {
         if (label != null) ...[
           Row(
             children: [
-              Text(label!, style: theme.textTheme.titleMedium),
-              if (required) const Text('  *', style: TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+              // Le libellé passe à la ligne sur les petits écrans au lieu de déborder (relevé sur émulateur Android).
+              Flexible(
+                child: Text.rich(
+                  TextSpan(
+                    text: label,
+                    children: [
+                      if (required) const TextSpan(text: '  *', style: TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
               if (optional) ...[const SizedBox(width: BimSpacing.sm), const OptionalBadge()],
             ],
           ),
