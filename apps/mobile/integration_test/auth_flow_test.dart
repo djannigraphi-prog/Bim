@@ -116,7 +116,7 @@ void main() {
     await _waitFor(tester, find.text('@$username · compte utilisateur'));
 
     // Déconnexion → bienvenue.
-    await _tap(tester, find.text('Se déconnecter'));
+    await _scrollTap(tester, find.text('Se déconnecter'));
     await _waitFor(tester, find.text('Créer un compte'));
 
     // Connexion refusée avec un mauvais mot de passe.
