@@ -37,7 +37,7 @@ class ProjectMapScreen extends ConsumerWidget {
   }
 }
 
-enum _MenuAction { program, mode, pause, resume, delete }
+enum _MenuAction { program, mode, measure, photos, reports, pause, resume, delete }
 
 class _Map extends ConsumerWidget {
   const _Map({required this.project});
@@ -56,6 +56,17 @@ class _Map extends ConsumerWidget {
           if (choice == null) return;
           await api.update(s.id, mode: choice.mode, budget: choice.budget);
           refreshProject(ref, s.id);
+        case _MenuAction.measure:
+          final m = project.measurement!;
+          final v = await askMeasurement(context, unit: m.unit, last: m.latest);
+          if (v == null) return;
+          await api.addMeasurement(s.id, v);
+          refreshProject(ref, s.id);
+          if (context.mounted) showBimSnack(context, 'Mesure enregistrée.');
+        case _MenuAction.photos:
+          await context.push('/projects/${s.id}/transformation');
+        case _MenuAction.reports:
+          await context.push('/projects/${s.id}/reports');
         case _MenuAction.pause:
           final days = await askPause(context, title: s.title, plannedEndDate: s.plannedEndDate);
           if (days == null) return;
@@ -107,6 +118,10 @@ class _Map extends ConsumerWidget {
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: _MenuAction.program, child: Text('Mon programme')),
                   if (!completed) const PopupMenuItem(value: _MenuAction.mode, child: Text('Changer de mode')),
+                  if (project.measurement != null)
+                    PopupMenuItem(value: _MenuAction.measure, child: Text(project.measurement!.unit == 'kg' ? 'Noter mon poids' : 'Noter une mesure')),
+                  const PopupMenuItem(value: _MenuAction.photos, child: Text('Mes photos avant / après')),
+                  const PopupMenuItem(value: _MenuAction.reports, child: Text('Mes signalements')),
                   if (s.status == 'active') const PopupMenuItem(value: _MenuAction.pause, child: Text('Mettre en pause')),
                   if (s.isPaused) const PopupMenuItem(value: _MenuAction.resume, child: Text('Reprendre maintenant')),
                   const PopupMenuItem(value: _MenuAction.delete, child: Text('Supprimer le projet')),
@@ -137,6 +152,30 @@ class _Map extends ConsumerWidget {
         ),
         if (s.isPaused)
           _Banner(text: 'Projet en pause jusqu’au ${shortDay(s.pausedUntil!)} inclus. Fin prévue le ${shortDay(s.plannedEndDate)}.'),
+        if (s.nextTask != null && !s.isPaused)
+          Container(
+            margin: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, 0),
+            padding: const EdgeInsets.all(BimSpacing.md),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(BimRadius.card),
+              boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 12, offset: Offset(0, 4))],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AUJOURD’HUI · ${s.nextTask!.timeOfDay}', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w800, fontSize: 12)),
+                      Text(s.nextTask!.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    ],
+                  ),
+                ),
+                const Text('On y va ?'),
+              ],
+            ),
+          ),
         Expanded(child: _Path(project: project)),
         Padding(
           padding: const EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.lg),

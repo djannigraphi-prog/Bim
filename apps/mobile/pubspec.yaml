@@ -22,6 +22,8 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   # Logos, mascotte Peni et cadeaux fournis en SVG.
   flutter_svg: ^2.0.16
+  # Photos avant / après (appareil photo ou galerie), écrans 22 et 31.
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

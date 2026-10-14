@@ -10,6 +10,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'dart:ui' as ui;
+
+import 'package:bim/features/projects/application/photo_source.dart';
 import 'package:bim/main.dart' as app;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,6 +82,19 @@ Future<String> _codeFor(String digits, {String? email, String? previous}) async 
   fail("Aucun code reçu pour le numéro se terminant par $digits.");
 }
 
+/// Source de photos du test : une image PNG dessinée par le test (le sélecteur du système n'est pas pilotable).
+class _TestPhotoSource implements PhotoSource {
+  @override
+  Future<List<int>?> pick({required bool camera}) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(recorder);
+    canvas.drawRect(const ui.Rect.fromLTWH(0, 0, 600, 800), ui.Paint()..color = camera ? const ui.Color(0xFFF20D3A) : const ui.Color(0xFF101116));
+    final image = await recorder.endRecording().toImage(600, 800);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data!.buffer.asUint8List();
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -89,7 +105,7 @@ void main() {
     final username = 'e2e${DateTime.now().millisecondsSinceEpoch % 100000000}';
     const password = 'Soleil-Abidjan-2026';
 
-    app.main();
+    app.runBim(overrides: [photoSourceProvider.overrideWithValue(_TestPhotoSource())]);
 
     // Écran 02 → inscription, étape 1 (écran 04).
     await _tap(tester, find.text('Créer un compte'));
@@ -147,7 +163,9 @@ void main() {
     await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
     await _tap(tester, find.text('Abdos'));
     await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
-    await _tap(tester, find.text('Passer cette étape'));
+    // Écran 22 : photo « avant » (privée), envoyée après la création du projet.
+    await _tap(tester, find.byTooltip('Choisir dans la galerie'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
     await _scrollTap(tester, find.text('7'));
     await _tap(tester, find.text('Créer mon programme'));
     await _waitFor(tester, find.textContaining('Renforcer mes abdos', findRichText: true));
@@ -156,8 +174,28 @@ void main() {
     await _tap(tester, find.text('Séance · Abdos'));
     await _waitFor(tester, find.text('Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'));
 
-    // Lot 0, partie 2 : ajouter un e-mail (opération protégée : mot de passe + code SMS, puis code reçu par e-mail).
+    // Écran 27 : signaler un problème, transmis au support.
+    await _tap(tester, find.text('Signaler'));
+    await _tap(tester, find.text('Trop difficile pour moi'));
+    await _tap(tester, find.text('Envoyer'));
+    await _waitFor(tester, find.text('Merci, ton signalement est envoyé à l’équipe BIM.'));
+
+    // Écran 31 : la photo « avant » est bien enregistrée et lisible ; ajout de la photo « après ».
     await _tap(tester, find.byTooltip('Retour'));
+    await _tap(tester, find.byTooltip('Plus d’options'));
+    await _tap(tester, find.text('Mes photos avant / après'));
+    await _waitFor(tester, find.textContaining('Avant · '));
+    await _tap(tester, find.text('Ajouter la photo « après »'));
+    await _tap(tester, find.text('Choisir dans la galerie'));
+    await _waitFor(tester, find.textContaining('Après · '));
+    await _waitFor(tester, find.text('Waouh, la différence ! Tu veux partager ton BIM pour motiver les autres ?'));
+    await _tap(tester, find.text('Garder pour moi'));
+    await _tap(tester, find.byTooltip('Plus d’options'));
+    await _tap(tester, find.text('Mes signalements'));
+    await _waitFor(tester, find.text('En cours de traitement'));
+    await _tap(tester, find.byTooltip('Retour'));
+
+    // Lot 0, partie 2 : ajouter un e-mail (opération protégée : mot de passe + code SMS, puis code reçu par e-mail).
     await _tap(tester, find.byTooltip('Retour'));
     await _tap(tester, find.byTooltip('Mon compte'));
     await _scrollTap(tester, find.text('Téléphone et e-mail'));

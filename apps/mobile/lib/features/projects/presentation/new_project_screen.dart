@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import '../../../core/widgets/bim_text_field.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../application/photo_source.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
@@ -27,6 +30,8 @@ class NewProjectScreen extends ConsumerStatefulWidget {
 class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
   int _step = 1;
   bool _loading = false;
+  /// Photo « avant » choisie à l'étape 4 ; envoyée juste après la création du projet.
+  List<int>? _beforePhoto;
   String? _error;
   Map<String, String> _fieldErrors = {};
 
@@ -72,8 +77,17 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
       _fieldErrors = {};
     });
     try {
-      final project = await ref.read(projectsApiProvider).create(draft);
+      final api = ref.read(projectsApiProvider);
+      final project = await api.create(draft);
       ref.invalidate(myProjectsProvider);
+      if (_beforePhoto != null) {
+        try {
+          await api.uploadPhoto(project.summary.id, 'before', _beforePhoto!);
+        } on ApiException catch (e) {
+          // Le projet est créé ; la photo pourra être ajoutée plus tard depuis « Mes photos ».
+          if (mounted) showBimSnack(context, 'Projet créé, mais la photo n’a pas été enregistrée : ${e.message}');
+        }
+      }
       if (mounted) context.pushReplacement('/projects/${project.summary.id}/program');
     } on ApiException catch (e) {
       final fields = <String, String>{};
@@ -133,7 +147,14 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                     1 => _ModeStep(draft: draft, catalog: c, onChanged: _update),
                     2 => _CategoryStep(draft: draft, catalog: c, onChanged: _update),
                     3 => _GoalStep(draft: draft, catalog: c, onChanged: _update),
-                    4 => const _PhotoStep(),
+                    4 => _PhotoStep(
+                        photo: _beforePhoto,
+                        onPick: (camera) async {
+                          final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
+                          if (bytes != null && mounted) setState(() => _beforePhoto = bytes);
+                        },
+                        onClear: () => setState(() => _beforePhoto = null),
+                      ),
                     _ => _QuestionsStep(draft: draft, catalog: c, onChanged: _update, errors: _fieldErrors),
                   },
                 ),
@@ -148,7 +169,9 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                           child: Text(_error!, style: const TextStyle(color: BimColors.red), textAlign: TextAlign.center),
                         ),
                       if (_step == 4)
-                        BimButton(label: 'Passer cette étape', variant: BimButtonVariant.subtle, onPressed: () => setState(() => _step = 5))
+                        _beforePhoto == null
+                            ? BimButton(label: 'Passer cette étape', variant: BimButtonVariant.subtle, onPressed: () => setState(() => _step = 5))
+                            : BimButton(label: 'Continuer', variant: BimButtonVariant.dark, onPressed: () => setState(() => _step = 5))
                       else if (_step == 5)
                         BimButton(label: 'Créer mon programme', loading: _loading, onPressed: () => _create(c))
                       else
@@ -641,7 +664,11 @@ class _GoalStepState extends State<_GoalStep> {
 // ------------------------------------------------------------------ Écran 22
 
 class _PhotoStep extends StatelessWidget {
-  const _PhotoStep();
+  const _PhotoStep({required this.photo, required this.onPick, required this.onClear});
+
+  final List<int>? photo;
+  final ValueChanged<bool> onPick;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -651,25 +678,78 @@ class _PhotoStep extends StatelessWidget {
       subtitle: 'Facultatif · elle reste privée. À la fin, on la compare avec ta photo « après ».',
       children: [
         Container(
-          height: 300,
+          height: 340,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
-          padding: const EdgeInsets.all(BimSpacing.xl),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
             children: [
-              Icon(Icons.lock_outline_rounded, color: scheme.onSurfaceVariant),
-              const SizedBox(height: BimSpacing.sm),
-              Icon(Icons.person_outline_rounded, size: 96, color: scheme.outline),
-              const SizedBox(height: BimSpacing.lg),
-              Text(
-                'La prise de photo arrive dans une prochaine version. Tu pourras l’ajouter à ce projet à ce moment-là.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
+              Positioned.fill(
+                child: photo != null
+                    ? Image.memory(Uint8List.fromList(photo!), fit: BoxFit.cover)
+                    : Icon(Icons.person_outline_rounded, size: 160, color: scheme.outline),
+              ),
+              Positioned(
+                left: BimSpacing.md,
+                top: BimSpacing.md,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: scheme.surface, borderRadius: BorderRadius.circular(10)),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [Icon(Icons.lock_outline, size: 16), SizedBox(width: 4), Text('Privée', style: TextStyle(fontWeight: FontWeight.w700))],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: BimSpacing.lg,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _RoundButton(icon: Icons.photo_library_outlined, tooltip: 'Choisir dans la galerie', onTap: () => onPick(false)),
+                    const SizedBox(width: BimSpacing.xl),
+                    _RoundButton(icon: Icons.photo_camera, tooltip: 'Prendre la photo', onTap: () => onPick(true), primary: true),
+                    const SizedBox(width: BimSpacing.xl),
+                    _RoundButton(icon: Icons.delete_outline, tooltip: 'Retirer la photo', onTap: photo == null ? null : onClear),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({required this.icon, required this.tooltip, required this.onTap, this.primary = false});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = primary ? 76.0 : 52.0;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: primary ? BimColors.red : Theme.of(context).colorScheme.surface,
+        shape: CircleBorder(side: primary ? const BorderSide(color: BimColors.white, width: 4) : BorderSide.none),
+        elevation: 2,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(icon, color: primary ? BimColors.white : (onTap == null ? Theme.of(context).disabledColor : null), size: primary ? 32 : 24),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/util/date_fr.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../application/projects_providers.dart';
@@ -111,16 +112,19 @@ class _TodayCard extends StatelessWidget {
                     Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 14)),
                     const SizedBox(height: 2),
                     Text(
-                      project.title,
+                      project.nextTask == null ? project.title : '${project.nextTask!.title} à ${hourFr(project.nextTask!.timeOfDay)}',
                       style: const TextStyle(color: BimColors.white, fontSize: 18, fontWeight: FontWeight.w700),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (project.streak > 0)
-                      Text(
-                        '${project.streak} jour${project.streak > 1 ? 's' : ''} d’affilée, continue !',
-                        style: const TextStyle(color: BimColors.grey400, fontSize: 14),
-                      ),
+                    Text(
+                      project.nextTask == null
+                          ? 'Tout est fait pour aujourd’hui, bravo !'
+                          : project.streak > 0
+                              ? '${project.title} · ${project.streak} jour${project.streak > 1 ? 's' : ''} d’affilée'
+                              : 'N’abandonne pas, on y va ensemble !',
+                      style: const TextStyle(color: BimColors.grey400, fontSize: 14),
+                    ),
                   ],
                 ),
               ),

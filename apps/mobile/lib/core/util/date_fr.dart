@@ -22,3 +22,11 @@ String shortDay(String day) {
 String addDaysTo(String day, int n) => parseDay(day).add(Duration(days: n)).toIso8601String().substring(0, 10);
 
 String capitalize(String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+/// « 15:00 » → « 15 h » ; « 07:30 » → « 7 h 30 ».
+String hourFr(String hhmm) {
+  final parts = hhmm.split(':');
+  final h = int.tryParse(parts.first) ?? 0;
+  final m = parts.length > 1 ? parts[1] : '00';
+  return m == '00' ? '$h h' : '$h h $m';
+}

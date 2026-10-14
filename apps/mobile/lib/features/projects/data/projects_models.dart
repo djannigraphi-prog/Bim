@@ -80,6 +80,7 @@ class ProjectSummary {
     required this.streak,
     required this.plannedEndDate,
     this.pausedUntil,
+    this.nextTask,
   });
 
   factory ProjectSummary.fromJson(Map<String, dynamic> j) => ProjectSummary(
@@ -96,6 +97,7 @@ class ProjectSummary {
         streak: j['streak'] as int,
         plannedEndDate: j['plannedEndDate'] as String,
         pausedUntil: j['pausedUntil'] as String?,
+        nextTask: j['nextTask'] == null ? null : ProjectTask.fromJson(j['nextTask'] as Map<String, dynamic>),
       );
 
   final String id;
@@ -111,6 +113,8 @@ class ProjectSummary {
   final int streak;
   final String plannedEndDate;
   final String? pausedUntil;
+  /// Prochaine tâche du jour encore à faire (écrans 18 et 26).
+  final ProjectTask? nextTask;
 
   bool get isCompleted => status == 'completed';
   bool get isPaused => status == 'paused';
@@ -140,7 +144,7 @@ class ProjectTask {
         id: j['id'] as String,
         title: j['title'] as String,
         detail: j['detail'] as String?,
-        icon: j['icon'] as String,
+        icon: (j['icon'] ?? 'check') as String,
         timeOfDay: j['timeOfDay'] as String,
         weekdays: (j['weekdays'] ?? 127) as int,
         origin: (j['origin'] ?? 'user') as String,
@@ -184,7 +188,7 @@ class ProjectDay {
 }
 
 class ProjectDetail {
-  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget});
+  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget, this.programTitle, this.validatedBy, this.measurement});
 
   factory ProjectDetail.fromJson(Map<String, dynamic> j) => ProjectDetail(
         summary: ProjectSummary.fromJson(j),
@@ -196,6 +200,9 @@ class ProjectDetail {
         sessionsPerWeek: j['sessionsPerWeek'] as int?,
         healthNote: j['healthNote'] as String?,
         budget: j['budget'] as String?,
+        programTitle: (j['program'] as Map<String, dynamic>?)?['title'] as String?,
+        validatedBy: (j['program'] as Map<String, dynamic>?)?['validatedBy'] as String?,
+        measurement: j['measurement'] == null ? null : Measurement.fromJson(j['measurement'] as Map<String, dynamic>),
         tasks: (j['tasks'] as List<dynamic>).map((e) => ProjectTask.fromJson(e as Map<String, dynamic>)).toList(),
         days: (j['days'] as List<dynamic>).map((e) => ProjectDay.fromJson(e as Map<String, dynamic>)).toList(),
         today: j['today'] as String,
@@ -212,6 +219,11 @@ class ProjectDetail {
   final String? healthNote;
   /// Budget indicatif du projet Premium (aucun paiement).
   final String? budget;
+  /// Programme type validé par BIM (null : programme construit depuis les réponses).
+  final String? programTitle;
+  final String? validatedBy;
+  /// Suivi chiffré (ex. poids) si l'objectif en a un.
+  final Measurement? measurement;
   final List<ProjectTask> tasks;
   final List<ProjectDay> days;
   final String today;
@@ -229,7 +241,7 @@ class ProjectDetail {
 }
 
 class DayPlan {
-  const DayPlan({required this.day, required this.index, required this.durationDays, required this.state, required this.editable, required this.tasks});
+  const DayPlan({required this.day, required this.index, required this.durationDays, required this.state, required this.editable, required this.tasks, this.tipText, this.tipValidatedBy});
 
   factory DayPlan.fromJson(Map<String, dynamic> j) => DayPlan(
         day: j['day'] as String,
@@ -238,11 +250,16 @@ class DayPlan {
         state: j['state'] as String,
         editable: j['editable'] as bool,
         tasks: (j['tasks'] as List<dynamic>).map((e) => ProjectTask.fromJson(e as Map<String, dynamic>)).toList(),
+        tipText: (j['tip'] as Map<String, dynamic>?)?['text'] as String?,
+        tipValidatedBy: (j['tip'] as Map<String, dynamic>?)?['validatedBy'] as String?,
       );
 
   final String day;
   final int? index;
   final int durationDays;
+  /// « Habitude du jour » : uniquement depuis un programme type validé.
+  final String? tipText;
+  final String? tipValidatedBy;
   final String state;
   final bool editable;
   final List<ProjectTask> tasks;
@@ -335,4 +352,67 @@ class ProjectDraft {
         if (healthNote.trim().isNotEmpty) 'healthNote': healthNote.trim(),
         if (durationDays != null) 'durationDays': durationDays,
       };
+}
+
+class Measurement {
+  const Measurement({required this.unit, required this.items, this.start, this.latest, this.change});
+
+  factory Measurement.fromJson(Map<String, dynamic> j) => Measurement(
+        unit: j['unit'] as String,
+        items: (j['items'] as List<dynamic>)
+            .map((e) => (day: (e as Map<String, dynamic>)['day'] as String, value: (e['value'] as num).toDouble()))
+            .toList(),
+        start: (j['start'] as num?)?.toDouble(),
+        latest: (j['latest'] as num?)?.toDouble(),
+        change: (j['change'] as num?)?.toDouble(),
+      );
+
+  final String unit;
+  final List<({String day, double value})> items;
+  final double? start;
+  final double? latest;
+  final double? change;
+}
+
+/// Nombre à la française : 10,4 ; 84.
+String frNumber(double v) => (v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1)).replaceAll('.', ',');
+
+class ProjectPhoto {
+  const ProjectPhoto({required this.id, required this.kind, required this.takenDay, required this.url});
+
+  factory ProjectPhoto.fromJson(Map<String, dynamic> j) =>
+      ProjectPhoto(id: j['id'] as String, kind: j['kind'] as String, takenDay: j['takenDay'] as String, url: j['url'] as String);
+
+  final String id;
+  final String kind;
+  final String takenDay;
+  final String url;
+}
+
+class ProjectReport {
+  const ProjectReport({required this.id, required this.day, required this.reason, this.message, required this.status, this.resolution});
+
+  factory ProjectReport.fromJson(Map<String, dynamic> j) => ProjectReport(
+        id: j['id'] as String,
+        day: j['day'] as String,
+        reason: j['reason'] as String,
+        message: j['message'] as String?,
+        status: j['status'] as String,
+        resolution: j['resolution'] as String?,
+      );
+
+  final String id;
+  final String day;
+  final String reason;
+  final String? message;
+  final String status;
+  final String? resolution;
+
+  static const reasons = {
+    'unavailable': 'Lieu ou intervenant indisponible',
+    'too_hard': 'Trop difficile pour moi',
+    'health': 'Douleur ou malaise',
+    'content': 'Tâche inadaptée',
+    'other': 'Autre problème',
+  };
 }

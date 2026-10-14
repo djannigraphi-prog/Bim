@@ -5,6 +5,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/util/date_fr.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
+import '../data/projects_models.dart';
 import 'project_widgets.dart';
 
 class ProjectLoadError extends StatelessWidget {
@@ -319,4 +320,133 @@ class _ModeSheetState extends State<_ModeSheet> {
       ),
     );
   }
+}
+
+/// Noter une mesure (ex. poids en kg). Renvoie la valeur saisie.
+Future<double?> askMeasurement(BuildContext context, {required String unit, double? last}) async {
+  final controller = TextEditingController(text: last == null ? '' : frNumber(last));
+  final result = await showDialog<double>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(unit == 'kg' ? 'Ton poids aujourd’hui' : 'Ta mesure aujourd’hui'),
+      content: TextField(
+        key: const Key('measurement-field'),
+        controller: controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(suffixText: unit, helperText: 'Privé · une décimale au plus'),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+        TextButton(
+          onPressed: () {
+            final v = double.tryParse(controller.text.trim().replaceAll(',', '.'));
+            if (v != null && v > 0) Navigator.pop(ctx, (v * 10).round() / 10);
+          },
+          child: const Text('Enregistrer'),
+        ),
+      ],
+    ),
+  );
+  controller.dispose();
+  return result;
+}
+
+typedef ReportInput = ({String reason, String? taskId, String message});
+
+/// Écran 27 — « Signaler » : un problème sur la journée ou une tâche, transmis au support.
+Future<ReportInput?> askReport(BuildContext context, {required List<ProjectTask> tasks}) {
+  return showModalBottomSheet<ReportInput>(context: context, isScrollControlled: true, builder: (_) => _ReportSheet(tasks: tasks));
+}
+
+class _ReportSheet extends StatefulWidget {
+  const _ReportSheet({required this.tasks});
+
+  final List<ProjectTask> tasks;
+
+  @override
+  State<_ReportSheet> createState() => _ReportSheetState();
+}
+
+class _ReportSheetState extends State<_ReportSheet> {
+  String? _reason;
+  String? _taskId;
+  final _message = TextEditingController();
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, MediaQuery.viewInsetsOf(context).bottom + BimSpacing.lg),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Signaler un problème', style: theme.textTheme.titleLarge),
+            const SizedBox(height: BimSpacing.xs),
+            Text('L’équipe BIM lit chaque signalement et te répond ici.', style: theme.textTheme.bodyMedium),
+            const SizedBox(height: BimSpacing.md),
+            Wrap(
+              spacing: BimSpacing.sm,
+              runSpacing: BimSpacing.sm,
+              children: [
+                for (final e in ProjectReport.reasons.entries)
+                  ChoiceChipBim(label: e.value, selected: _reason == e.key, onTap: () => setState(() => _reason = e.key)),
+              ],
+            ),
+            if (widget.tasks.isNotEmpty) ...[
+              const SizedBox(height: BimSpacing.md),
+              Text('Tâche concernée (facultatif)', style: theme.textTheme.titleMedium),
+              const SizedBox(height: BimSpacing.sm),
+              Wrap(
+                spacing: BimSpacing.sm,
+                runSpacing: BimSpacing.sm,
+                children: [
+                  for (final t in widget.tasks)
+                    ChoiceChipBim(label: t.title, selected: _taskId == t.id, onTap: () => setState(() => _taskId = _taskId == t.id ? null : t.id)),
+                ],
+              ),
+            ],
+            const SizedBox(height: BimSpacing.md),
+            TextField(
+              key: const Key('report-message'),
+              controller: _message,
+              maxLength: 500,
+              maxLines: 3,
+              decoration: const InputDecoration(hintText: 'Explique en quelques mots (facultatif)'),
+            ),
+            const SizedBox(height: BimSpacing.sm),
+            BimButton(
+              label: 'Envoyer',
+              variant: BimButtonVariant.dark,
+              onPressed: _reason == null ? null : () => Navigator.pop(context, (reason: _reason!, taskId: _taskId, message: _message.text.trim())),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Conseil affiché après un signalement « douleur ou malaise » : BIM ne donne pas d'avis médical.
+Future<void> showHealthAdvice(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      icon: const Icon(Icons.health_and_safety_outlined, color: BimColors.red),
+      title: const Text('Prends soin de toi'),
+      content: const Text(
+        'Arrête l’exercice si tu as mal. BIM ne donne pas d’avis médical : en cas de douleur, de malaise ou de doute, '
+        'demande conseil à un professionnel de santé. Tu peux mettre ton projet en pause.\n\nEn cas d’urgence, appelle le 185 (urgences médicales) ou le 180 (pompiers).',
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('J’ai compris'))],
+    ),
+  );
 }

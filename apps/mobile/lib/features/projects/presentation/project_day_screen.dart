@@ -61,6 +61,22 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
     }
   }
 
+  Future<void> _report(DayPlan plan) async {
+    final input = await askReport(context, tasks: plan.tasks);
+    if (input == null || !mounted) return;
+    try {
+      final health = await ref.read(projectsApiProvider).report(widget.projectId, day: widget.day, taskId: input.taskId, reason: input.reason, message: input.message);
+      if (!mounted) return;
+      if (health) {
+        await showHealthAdvice(context);
+      } else {
+        showBimSnack(context, 'Merci, ton signalement est envoyé à l’équipe BIM.');
+      }
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
   Future<void> _delete() async {
     final detail = await ref.read(projectDetailProvider(widget.projectId).future);
     if (!mounted || !await confirmAbandon(context, detail.summary.title)) return;
@@ -115,11 +131,7 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
                   ),
                   const SizedBox(width: BimSpacing.sm),
                   Expanded(
-                    child: _FooterButton(
-                      icon: Icons.flag_outlined,
-                      label: 'Signaler',
-                      onTap: () => showComingSoon(context, feature: 'Le signalement d’un problème (coach absent, salle fermée…)'),
-                    ),
+                    child: _FooterButton(icon: Icons.flag_outlined, label: 'Signaler', onTap: plan == null ? null : () => _report(plan)),
                   ),
                   const SizedBox(width: BimSpacing.sm),
                   _FooterButton(icon: Icons.delete_outline, color: BimColors.red, tooltip: 'Supprimer le projet', onTap: _delete),
@@ -145,7 +157,7 @@ class _DayBody extends StatelessWidget {
     final theme = Theme.of(context);
     final done = plan.tasks.where((t) => t.done).length;
     final total = plan.tasks.length;
-    final (PeniPose pose, String message) = switch (plan.state) {
+    final (PeniPose pose, String defaultMessage) = switch (plan.state) {
       'paused' => (PeniPose.sad, 'Ton projet est en pause aujourd’hui. Repose-toi bien, je t’attends !'),
       'rest' => (PeniPose.happy, 'Pas de tâche prévue aujourd’hui : journée de repos.'),
       _ when total > 0 && done == total => (PeniPose.cheer, 'Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'),
@@ -162,7 +174,24 @@ class _DayBody extends StatelessWidget {
             children: [
               Peni(pose: pose, size: 56),
               const SizedBox(width: BimSpacing.md),
-              Expanded(child: Text(message, style: const TextStyle(color: BimColors.black, fontSize: 15, fontWeight: FontWeight.w600))),
+              Expanded(
+                child: plan.tipText == null
+                    ? Text(defaultMessage, style: const TextStyle(color: BimColors.black, fontSize: 15, fontWeight: FontWeight.w600))
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text.rich(
+                            TextSpan(children: [
+                              const TextSpan(text: 'Habitude du jour : ', style: TextStyle(fontWeight: FontWeight.w800)),
+                              TextSpan(text: plan.tipText),
+                            ],),
+                            style: const TextStyle(color: BimColors.black, fontSize: 15),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Conseil d’un programme validé par ${plan.tipValidatedBy}', style: const TextStyle(color: BimColors.grey600, fontSize: 12)),
+                        ],
+                      ),
+              ),
             ],
           ),
         ),

@@ -127,6 +127,22 @@ class _Program extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (p.programSource == 'template' && p.validatedBy != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: BimSpacing.sm),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified_outlined, size: 18, color: BimColors.success),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Programme type BIM « ${p.programTitle} », validé par ${p.validatedBy}.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               if (p.programSource == 'answers')
                 Padding(
                   padding: const EdgeInsets.only(bottom: BimSpacing.sm),

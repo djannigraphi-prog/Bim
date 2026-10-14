@@ -1,3 +1,4 @@
+import 'package:bim/core/util/date_fr.dart';
 import 'package:bim/features/projects/data/projects_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,5 +41,23 @@ void main() {
   test('libellé des jours de la semaine', () {
     const t = ProjectTask(id: 'x', title: 'T', icon: 'check', timeOfDay: '07:00', weekdays: 21);
     expect(t.weekdaysLabel, 'lun. · mer. · ven.');
+  });
+
+  test('mesures, nombres et heures à la française', () {
+    final m = Measurement.fromJson({
+      'unit': 'kg',
+      'items': [
+        {'day': '2026-08-14', 'value': 84},
+        {'day': '2026-10-13', 'value': 73.6},
+      ],
+      'start': 84,
+      'latest': 73.6,
+      'change': -10.4,
+    });
+    expect(m.change, -10.4);
+    expect(frNumber(m.change!.abs()), '10,4');
+    expect(frNumber(84), '84');
+    expect(hourFr('15:00'), '15 h');
+    expect(hourFr('07:30'), '7 h 30');
   });
 }

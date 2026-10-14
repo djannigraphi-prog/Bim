@@ -18,6 +18,8 @@ import '../../features/projects/presentation/new_project_screen.dart';
 import '../../features/projects/presentation/program_screen.dart';
 import '../../features/projects/presentation/project_day_screen.dart';
 import '../../features/projects/presentation/project_map_screen.dart';
+import '../../features/projects/presentation/reports_screen.dart';
+import '../../features/projects/presentation/transformation_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 
@@ -68,6 +70,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/projects/:id', builder: (_, s) => ProjectMapScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/program', builder: (_, s) => ProgramScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/done', builder: (_, s) => CelebrationScreen(projectId: s.pathParameters['id']!)),
+      GoRoute(path: '/projects/:id/transformation', builder: (_, s) => TransformationScreen(projectId: s.pathParameters['id']!)),
+      GoRoute(path: '/projects/:id/reports', builder: (_, s) => ReportsScreen(projectId: s.pathParameters['id']!)),
       GoRoute(
         path: '/projects/:id/day/:day',
         builder: (_, s) => ProjectDayScreen(projectId: s.pathParameters['id']!, day: s.pathParameters['day']!),

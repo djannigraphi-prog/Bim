@@ -9,9 +9,10 @@ import '../../../core/widgets/feedback.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_models.dart';
 import 'project_dialogs.dart';
+import 'transformation_screen.dart';
 
-/// Écran 30 — Fin du programme. On célèbre ce qui a été fait, sans affirmer un résultat que BIM ne mesure pas
-/// (ex. kilos perdus) : la photo « après » et la publication arrivent avec les modules médias et social.
+/// Écran 30 — Fin du programme. Les résultats chiffrés viennent uniquement des mesures notées par la personne
+/// (« d'après tes mesures ») ; la publication « J'ai fait mon BIM » arrive avec le module social (lot 4).
 class CelebrationScreen extends ConsumerWidget {
   const CelebrationScreen({super.key, required this.projectId});
 
@@ -32,16 +33,18 @@ class CelebrationScreen extends ConsumerWidget {
   }
 }
 
-class _Body extends StatelessWidget {
+class _Body extends ConsumerWidget {
   const _Body({required this.project});
 
   final ProjectDetail project;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final s = project.summary;
     final finished = s.isCompleted;
+    final m = project.measurement;
+    final measured = m?.change == null ? null : '${m!.change! > 0 ? '+' : '−'}${frNumber(m.change!.abs())}';
     return ListView(
       padding: const EdgeInsets.all(BimSpacing.screen),
       children: [
@@ -62,17 +65,24 @@ class _Body extends StatelessWidget {
         Text(finished ? 'Programme terminé !' : 'Ton bilan', textAlign: TextAlign.center, style: theme.textTheme.headlineLarge),
         const SizedBox(height: BimSpacing.sm),
         Text(
-          finished ? 'Tu es allé·e au bout de « ${s.title} ». Je suis tellement fière de toi ❤️' : 'Voici où tu en es pour « ${s.title} ».',
+          measured != null
+              ? 'D’après tes mesures : $measured ${m!.unit}. ${finished ? 'Je suis tellement fière de toi ❤️' : 'Continue comme ça !'}'
+              : finished
+                  ? 'Tu es allé·e au bout de « ${s.title} ». Je suis tellement fière de toi ❤️'
+                  : 'Voici où tu en es pour « ${s.title} ».',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: BimSpacing.xl),
         Row(
           children: [
+            if (measured != null) ...[
+              _Tile(value: measured, label: m!.unit),
+              const SizedBox(width: BimSpacing.sm),
+            ],
             _Tile(value: '${project.completedSteps}', label: 'étapes faites'),
             const SizedBox(width: BimSpacing.sm),
-            _Tile(value: '${s.progress} %', label: 'du programme'),
-            const SizedBox(width: BimSpacing.sm),
+            if (measured == null) ...[_Tile(value: '${s.progress} %', label: 'du programme'), const SizedBox(width: BimSpacing.sm)],
             _Tile(value: '${project.bestStreak}', label: 'jours d’affilée'),
           ],
         ),
@@ -80,7 +90,11 @@ class _Body extends StatelessWidget {
         BimButton(
           label: 'Prendre ma photo « après »',
           icon: Icons.photo_camera_outlined,
-          onPressed: () => showComingSoon(context, feature: 'La photo « après » et la comparaison avant / après'),
+          onPressed: () async {
+            if (await captureProjectPhoto(context, ref, s.id, 'after') && context.mounted) {
+              await context.push('/projects/${s.id}/transformation');
+            }
+          },
         ),
         const SizedBox(height: BimSpacing.sm),
         BimButton(
@@ -88,6 +102,8 @@ class _Body extends StatelessWidget {
           variant: BimButtonVariant.outline,
           onPressed: () => showComingSoon(context, feature: 'La publication « J’ai fait mon BIM »'),
         ),
+        const SizedBox(height: BimSpacing.sm),
+        BimButton(label: 'Voir ma transformation', variant: BimButtonVariant.subtle, onPressed: () => context.push('/projects/${s.id}/transformation')),
         const SizedBox(height: BimSpacing.sm),
         BimButton(label: 'Plus tard', variant: BimButtonVariant.subtle, onPressed: () => context.go('/home')),
       ],

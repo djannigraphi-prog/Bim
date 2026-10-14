@@ -31,6 +31,8 @@ import 'package:bim/features/projects/presentation/new_project_screen.dart';
 import 'package:bim/features/projects/presentation/program_screen.dart';
 import 'package:bim/features/projects/presentation/project_day_screen.dart';
 import 'package:bim/features/projects/presentation/project_map_screen.dart';
+import 'package:bim/features/projects/presentation/reports_screen.dart';
+import 'package:bim/features/projects/presentation/transformation_screen.dart';
 import 'package:bim/features/shell/presentation/home_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -154,6 +156,7 @@ class _FakeProjectsApi extends ProjectsApi {
         'currentDay': dayN,
         'progress': progress,
         'streak': 3,
+        'nextTask': status == 'active' ? {'id': 't1', 'title': 'Séance · Perte de poids', 'detail': null, 'icon': 'dumbbell', 'timeOfDay': '15:00'} : null,
       };
 
   @override
@@ -175,6 +178,17 @@ class _FakeProjectsApi extends ProjectsApi {
       ..._summary(id, 'Perdre 10 kg', 'Sport', 'dumbbell', 'premium', id == 'p3' ? 'completed' : 'active', 5, 60, 42),
       'goal': {'code': 'sport_perte_poids', 'label': 'Perte de poids', 'quantityUnit': 'kg'},
       'programSource': 'answers',
+      'program': null,
+      'measurement': {
+        'unit': 'kg',
+        'items': [
+          {'day': iso(-60), 'value': 84},
+          {'day': iso(0), 'value': 73.6},
+        ],
+        'start': 84,
+        'latest': 73.6,
+        'change': -10.4,
+      },
       'totalSteps': 48,
       'completedSteps': 20,
       'bestStreak': 9,
@@ -193,12 +207,22 @@ class _FakeProjectsApi extends ProjectsApi {
   }
 
   @override
+  Future<({bool available, List<ProjectPhoto> items})> photos(String id) async => (available: true, items: const <ProjectPhoto>[]);
+
+  @override
+  Future<List<ProjectReport>> reports(String id) async => [
+        ProjectReport(id: 'r1', day: iso(-1), reason: 'unavailable', message: 'Salle fermée (démonstration)', status: 'resolved', resolution: 'Merci, nous avons prévenu le partenaire (démonstration).'),
+        ProjectReport(id: 'r2', day: iso(0), reason: 'too_hard', status: 'open'),
+      ];
+
+  @override
   Future<DayPlan> day(String id, String day) async => DayPlan.fromJson({
         'day': day,
         'index': 5,
         'durationDays': 60,
         'state': 'today',
         'editable': true,
+        'tip': {'text': '2 grands verres d’eau avant chaque repas (texte de démonstration).', 'validatedBy': 'Personne de démonstration'},
         'tasks': [
           {'id': 't0', 'title': 'Marche', 'detail': '10 min', 'icon': 'leaf', 'timeOfDay': '07:00', 'done': true},
           {'id': 't1', 'title': 'Séance · Perte de poids', 'detail': 'Créée à partir de tes réponses.', 'icon': 'dumbbell', 'timeOfDay': '15:00', 'done': false},
@@ -271,6 +295,8 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/projects/p1', builder: (_, __) => const ProjectMapScreen(projectId: 'p1')),
     GoRoute(path: '/projects/p1/program', builder: (_, __) => const ProgramScreen(projectId: 'p1')),
     GoRoute(path: '/projects/p3/done', builder: (_, __) => const CelebrationScreen(projectId: 'p3')),
+    GoRoute(path: '/projects/p1/transformation', builder: (_, __) => const TransformationScreen(projectId: 'p1')),
+    GoRoute(path: '/projects/p1/reports', builder: (_, __) => const ReportsScreen(projectId: 'p1')),
     GoRoute(path: '/projects/p1/today', builder: (_, __) => ProjectDayScreen(projectId: 'p1', day: _FakeProjectsApi.iso(0))),
   ],);
   await tester.pumpWidget(UncontrolledProviderScope(
@@ -422,11 +448,25 @@ void main() {
     await _settle(t);
     await _capture(t, '29_pause');
   });
+  testWidgets('31 transformation (sans photo)', (t) async {
+    await _show(t, '/projects/p1/transformation');
+    await _capture(t, '31_avant_apres');
+  });
+  testWidgets('signalements', (t) async {
+    await _show(t, '/projects/p1/reports');
+    await _capture(t, 'x10_signalements');
+  });
+  testWidgets('27 signaler', (t) async {
+    await _show(t, '/projects/p1/today');
+    await t.tap(find.text('Signaler'));
+    await _settle(t);
+    await _capture(t, 'x11_signaler');
+  });
   testWidgets('30 fin du programme', (t) async {
     await _show(t, '/projects/p3/done');
     await _capture(t, '30_celebration');
   });
-  for (final (route, name) in [('/projects', '18'), ('/projects/new', '19'), ('/projects/p1', '26'), ('/projects/p1/today', '27'), ('/projects/p1/program', '24')]) {
+  for (final (route, name) in [('/projects', '18'), ('/projects/new', '19'), ('/projects/p1', '26'), ('/projects/p1/today', '27'), ('/projects/p1/program', '24'), ('/projects/p3/done', '30'), ('/projects/p1/transformation', '31')]) {
     testWidgets('$name projets, petit écran', (t) async {
       await _show(t, route, physical: const Size(960, 1704));
       await _capture(t, 'x7_petit_ecran_$name');
