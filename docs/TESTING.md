@@ -28,3 +28,10 @@ Les tests e2e démarrent l'API complète (mêmes gardes, filtres et validations 
 | 12 | Un utilisateur supprime son compte | Portée step-up prévue ; fonction au lot 4 |
 
 Règle : un test n'est déclaré réussi que s'il a été exécuté. Les résultats de chaque session sont consignés dans `PROJECT_STATUS.md`.
+
+## C6 — mode de projet indépendant de l'abonnement
+
+- `apps/api/src/modules/projects/mode-independence.spec.ts` : le code du module Projets ne mentionne ni abonnement, ni droit payant, ni paiement, et n'importe que les modules autorisés. Un couplage futur fait échouer la CI.
+- `apps/api/test/projects.e2e-spec.ts` (bloc « mode indépendant de l'abonnement ») : une personne sans abonnement choisit les deux modes ; le mode Premium ne crée aucune table ni donnée de paiement ; on change de mode dans les deux sens ; le mode Premium n'accorde aucun avantage (même limite de projets).
+- Test en attente (`it.todo`) : « une personne abonnée Premium choisit un projet économique ou Premium », à écrire au lot 8, quand l'abonnement existera.
+- `apps/mobile/test/project_draft_test.dart` : la requête de création ne contient aucun champ d'abonnement ou de paiement.

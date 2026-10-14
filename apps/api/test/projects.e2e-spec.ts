@@ -217,3 +217,70 @@ describe('Projets (e2e)', () => {
     }
   });
 });
+
+/**
+ * C6 — Le mode du projet (économique / Premium) ne dépend pas de l'abonnement Premium de la personne.
+ * Le choix est gratuit : il ne crée aucun paiement et n'en exige aucun.
+ */
+describe('Projets — mode indépendant de l’abonnement (C6)', () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await startHarness();
+  });
+  afterAll(async () => h.close());
+
+  const base = { categoryCode: 'sport', goalCode: 'sport_abdos', durationDays: 30, sessionsPerWeek: 3 };
+
+  async function freeUser() {
+    const u = await registerAndActivate(h);
+    return bearer(u.tokens.accessToken);
+  }
+
+  /** Tables où un paiement ou un droit payant pourrait apparaître ; aucune n'existe encore (lots 8 et 9). */
+  async function paymentTables(): Promise<string[]> {
+    const r = await h.pool.query(
+      "select table_name from information_schema.tables where table_schema = 'public' and table_name ~ '(payment|paiement|subscription|abonnement|entitlement|wallet|coin|order)'",
+    );
+    return r.rows.map((x: { table_name: string }) => x.table_name);
+  }
+
+  it('une personne sans abonnement choisit un projet économique ou un projet Premium', async () => {
+    const auth = await freeUser();
+    const eco = await h.http().post('/v1/projects').set(auth).send({ ...base, mode: 'eco' }).expect(201);
+    expect(eco.body.mode).toBe('eco');
+    const premium = await h.http().post('/v1/projects').set(auth).send({ ...base, mode: 'premium', budget: 'small' }).expect(201);
+    expect(premium.body).toMatchObject({ mode: 'premium', budget: 'small' });
+  });
+
+  it('le mode Premium ne crée ni n’exige aucun paiement', async () => {
+    const before = await paymentTables();
+    const auth = await freeUser();
+    const r = await h.http().post('/v1/projects').set(auth).send({ ...base, mode: 'premium', budget: 'boosted' }).expect(201);
+    expect(JSON.stringify(r.body)).not.toMatch(/price|amount|payment|paiement|checkout|subscription|abonnement/i);
+    expect(await paymentTables()).toEqual(before);
+    const audit = await h.pool.query("select action from audit_logs where target_id = $1", [r.body.id]);
+    expect(audit.rows.map((x: { action: string }) => x.action)).toEqual(['project.created']);
+  });
+
+  it('on change de mode plus tard, dans les deux sens, gratuitement (écran 19)', async () => {
+    const auth = await freeUser();
+    const p = (await h.http().post('/v1/projects').set(auth).send({ ...base, mode: 'eco' }).expect(201)).body;
+    await h.http().patch(`/v1/projects/${p.id}`).set(auth).send({ mode: 'premium' }).expect(400); // budget requis
+    const up = (await h.http().patch(`/v1/projects/${p.id}`).set(auth).send({ mode: 'premium', budget: 'medium' }).expect(200)).body;
+    expect(up).toMatchObject({ mode: 'premium', budget: 'medium' });
+    const down = (await h.http().patch(`/v1/projects/${p.id}`).set(auth).send({ mode: 'eco' }).expect(200)).body;
+    expect(down).toMatchObject({ mode: 'eco', budget: null });
+    await h.http().patch(`/v1/projects/${p.id}`).set(auth).send({ mode: 'eco', budget: 'small' }).expect(400);
+  });
+
+  it('le mode Premium d’un projet n’accorde aucun avantage d’abonnement (limite de projets identique)', async () => {
+    const auth = await freeUser();
+    for (let i = 0; i < 5; i++) await h.http().post('/v1/projects').set(auth).send({ ...base, mode: 'premium', budget: 'small' }).expect(201);
+    const r = await h.http().post('/v1/projects').set(auth).send({ ...base, mode: 'premium', budget: 'small' }).expect(409);
+    expect(r.body.error.code).toBe('PROJECT_LIMIT_REACHED');
+  });
+
+  // L'abonnement Premium n'existe pas encore (lot 8). Dès qu'il existera, ce test devra vérifier
+  // qu'une personne abonnée choisit aussi librement un projet économique ou Premium.
+  it.todo('lot 8 : une personne abonnée Premium choisit un projet économique ou un projet Premium');
+});

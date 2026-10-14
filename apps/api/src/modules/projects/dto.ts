@@ -5,7 +5,12 @@ const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
 /** Création d'un projet : réponses des écrans 19 à 23 (la photo « avant » de l'écran 22 arrive avec le module médias). */
 export class CreateProjectDto {
-  @ApiProperty({ enum: ['eco', 'premium'], description: 'Écran 19' }) @IsIn(['eco', 'premium']) mode!: 'eco' | 'premium';
+  @ApiProperty({
+    enum: ['eco', 'premium'],
+    description: 'Écran 19. Projet économique (solutions gratuites) ou Premium (recommandations d’achats). Choix gratuit, ouvert à tous, indépendant de l’abonnement Premium (C6).',
+  })
+  @IsIn(['eco', 'premium'])
+  mode!: 'eco' | 'premium';
   @ApiPropertyOptional({ enum: ['small', 'medium', 'boosted'], description: 'Mode Premium uniquement ; indicatif, aucun paiement (F4)' })
   @IsOptional()
   @IsIn(['small', 'medium', 'boosted'])
@@ -53,6 +58,14 @@ export class CreateProjectDto {
 export class UpdateProjectDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @Length(2, 80) title?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isPublic?: boolean;
+  @ApiPropertyOptional({ enum: ['eco', 'premium'], description: 'Changer de mode (écran 19 : « Tu pourras changer de mode plus tard ») ; gratuit, sans lien avec l’abonnement (C6)' })
+  @IsOptional()
+  @IsIn(['eco', 'premium'])
+  mode?: 'eco' | 'premium';
+  @ApiPropertyOptional({ enum: ['small', 'medium', 'boosted'], description: 'Obligatoire si le mode devient Premium' })
+  @IsOptional()
+  @IsIn(['small', 'medium', 'boosted'])
+  budget?: 'small' | 'medium' | 'boosted';
 }
 
 export class AddTaskDto {

@@ -179,11 +179,12 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
 typedef _Update = void Function(ProjectDraft Function(ProjectDraft d) f);
 
 class _StepBody extends StatelessWidget {
-  const _StepBody({required this.title, this.subtitle, required this.children, this.badge});
+  const _StepBody({required this.title, this.subtitle, required this.children, this.badge, this.footer});
 
   final String title;
   final String? subtitle;
   final Widget? badge;
+  final Widget? footer;
   final List<Widget> children;
 
   @override
@@ -200,6 +201,7 @@ class _StepBody extends StatelessWidget {
         ],
         const SizedBox(height: BimSpacing.xl),
         ...children,
+        if (footer != null) ...[const SizedBox(height: BimSpacing.lg), footer!],
       ],
     );
   }
@@ -220,6 +222,7 @@ class _ModeStep extends StatelessWidget {
     return _StepBody(
       title: 'Comment veux-tu avancer ?',
       subtitle: 'Tu pourras changer de mode plus tard.',
+      footer: const ModeIsFreeNote(),
       children: [
         _ModeCard(
           icon: Icons.eco_outlined,
@@ -235,8 +238,9 @@ class _ModeStep extends StatelessWidget {
           icon: Icons.workspace_premium_outlined,
           iconColor: BimColors.red,
           title: 'Mode Premium',
-          text: 'Produits, salle de sport, coach ou soins recommandés par des marchands vérifiés. '
-              'Les achats se font sur le BimShop, jamais dans le projet.',
+          badge: 'Choix gratuit',
+          text: 'Accessoires, produits ou services adaptés à ton programme, recommandés par des marchands vérifiés. '
+              'Tu n’achètes que ce que tu choisis, sur le BimShop.',
           selected: draft.mode == 'premium',
           onTap: () => onChanged((d) => d.copyWith(mode: 'premium')),
           footer: draft.mode != 'premium'

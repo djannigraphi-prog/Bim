@@ -37,7 +37,7 @@ class ProjectMapScreen extends ConsumerWidget {
   }
 }
 
-enum _MenuAction { program, pause, resume, delete }
+enum _MenuAction { program, mode, pause, resume, delete }
 
 class _Map extends ConsumerWidget {
   const _Map({required this.project});
@@ -51,6 +51,11 @@ class _Map extends ConsumerWidget {
       switch (a) {
         case _MenuAction.program:
           await context.push('/projects/${s.id}/program');
+        case _MenuAction.mode:
+          final choice = await askMode(context, mode: s.mode, budget: project.budget);
+          if (choice == null) return;
+          await api.update(s.id, mode: choice.mode, budget: choice.budget);
+          refreshProject(ref, s.id);
         case _MenuAction.pause:
           final days = await askPause(context, title: s.title, plannedEndDate: s.plannedEndDate);
           if (days == null) return;
@@ -101,6 +106,7 @@ class _Map extends ConsumerWidget {
                 onSelected: (a) => _onMenu(context, ref, a),
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: _MenuAction.program, child: Text('Mon programme')),
+                  if (!completed) const PopupMenuItem(value: _MenuAction.mode, child: Text('Changer de mode')),
                   if (s.status == 'active') const PopupMenuItem(value: _MenuAction.pause, child: Text('Mettre en pause')),
                   if (s.isPaused) const PopupMenuItem(value: _MenuAction.resume, child: Text('Reprendre maintenant')),
                   const PopupMenuItem(value: _MenuAction.delete, child: Text('Supprimer le projet')),

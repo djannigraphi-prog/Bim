@@ -249,3 +249,74 @@ class _PauseSheetState extends State<_PauseSheet> {
     );
   }
 }
+
+/// Changer le mode du projet (écran 19 : « Tu pourras changer de mode plus tard »). Gratuit, sans lien avec l'abonnement (C6).
+Future<({String mode, String? budget})?> askMode(BuildContext context, {required String mode, String? budget}) {
+  return showModalBottomSheet<({String mode, String? budget})>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => _ModeSheet(mode: mode, budget: budget),
+  );
+}
+
+class _ModeSheet extends StatefulWidget {
+  const _ModeSheet({required this.mode, this.budget});
+
+  final String mode;
+  final String? budget;
+
+  @override
+  State<_ModeSheet> createState() => _ModeSheetState();
+}
+
+class _ModeSheetState extends State<_ModeSheet> {
+  late String _mode = widget.mode;
+  late String? _budget = widget.budget;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const budgets = [('small', 'Petit'), ('medium', 'Moyen'), ('boosted', 'Boosté')];
+    final valid = _mode == 'eco' || _budget != null;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, BimSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Mode du projet', style: theme.textTheme.titleLarge),
+            const SizedBox(height: BimSpacing.md),
+            Wrap(
+              spacing: BimSpacing.sm,
+              children: [
+                ChoiceChipBim(label: 'Économique', selected: _mode == 'eco', onTap: () => setState(() => _mode = 'eco')),
+                ChoiceChipBim(label: 'Premium', selected: _mode == 'premium', onTap: () => setState(() => _mode = 'premium')),
+              ],
+            ),
+            if (_mode == 'premium') ...[
+              const SizedBox(height: BimSpacing.md),
+              Text('Budget indicatif', style: theme.textTheme.titleMedium),
+              const SizedBox(height: BimSpacing.sm),
+              Wrap(
+                spacing: BimSpacing.sm,
+                children: [
+                  for (final (code, label) in budgets)
+                    ChoiceChipBim(label: label, selected: _budget == code, onTap: () => setState(() => _budget = code)),
+                ],
+              ),
+            ],
+            const SizedBox(height: BimSpacing.md),
+            const ModeIsFreeNote(),
+            const SizedBox(height: BimSpacing.lg),
+            BimButton(
+              label: 'Enregistrer',
+              variant: BimButtonVariant.dark,
+              onPressed: valid ? () => Navigator.pop(context, (mode: _mode, budget: _mode == 'premium' ? _budget : null)) : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

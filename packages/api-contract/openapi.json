@@ -1355,7 +1355,7 @@
               "eco",
               "premium"
             ],
-            "description": "Écran 19"
+            "description": "Écran 19. Projet économique (solutions gratuites) ou Premium (recommandations d’achats). Choix gratuit, ouvert à tous, indépendant de l’abonnement Premium (C6)."
           },
           "budget": {
             "type": "string",
@@ -1446,6 +1446,23 @@
           },
           "isPublic": {
             "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "eco",
+              "premium"
+            ],
+            "description": "Changer de mode (écran 19 : « Tu pourras changer de mode plus tard ») ; gratuit, sans lien avec l’abonnement (C6)"
+          },
+          "budget": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "boosted"
+            ],
+            "description": "Obligatoire si le mode devient Premium"
           }
         }
       },

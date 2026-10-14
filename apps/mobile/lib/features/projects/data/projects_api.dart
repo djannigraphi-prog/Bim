@@ -16,8 +16,13 @@ class ProjectsApi {
 
   Future<ProjectDetail> detail(String id) async => ProjectDetail.fromJson(await _api.get('/v1/projects/$id'));
 
-  Future<ProjectDetail> update(String id, {String? title, bool? isPublic}) async => ProjectDetail.fromJson(
-        await _api.patch('/v1/projects/$id', body: {if (title != null) 'title': title, if (isPublic != null) 'isPublic': isPublic}),
+  Future<ProjectDetail> update(String id, {String? title, bool? isPublic, String? mode, String? budget}) async => ProjectDetail.fromJson(
+        await _api.patch('/v1/projects/$id', body: {
+          if (title != null) 'title': title,
+          if (isPublic != null) 'isPublic': isPublic,
+          if (mode != null) 'mode': mode,
+          if (budget != null) 'budget': budget,
+        },),
       );
 
   Future<void> abandon(String id) => _api.delete('/v1/projects/$id');

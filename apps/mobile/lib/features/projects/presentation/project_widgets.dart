@@ -193,3 +193,27 @@ class ChoiceChipBim extends StatelessWidget {
     );
   }
 }
+
+/// C6 : le mode d'un projet est gratuit et ouvert à tous, avec ou sans abonnement Premium BIM.
+class ModeIsFreeNote extends StatelessWidget {
+  const ModeIsFreeNote({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline, size: 18, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: BimSpacing.sm),
+        Expanded(
+          child: Text(
+            'Les deux modes sont gratuits et ouverts à tous, avec ou sans abonnement Premium BIM. '
+            'Tu ne paies que les produits ou services que tu décides d’acheter.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -125,8 +125,14 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 
 ---
 
-### C6 — Le « Mode Premium » d'un projet (écran 19) exige-t-il l'abonnement Premium ? · Question au fondateur
-L'écran 19 présente le mode Premium comme des recommandations de produits et services (avec un budget) ; l'abonnement Premium est décrit ailleurs (écran 61). Dans le code actuel, le mode Premium d'un projet est **libre** et n'implique aucun paiement. À confirmer.
+### C6 — Mode d'un projet et abonnement Premium : deux notions indépendantes · Fondateur · décidé (14/10/2026)
+- **Projet économique** : atteindre l'objectif avec des solutions gratuites ou économiques (exercices à la maison, astuces, conseils, méthodes pratiques, solutions à fabriquer soi-même). Exemple, prise de muscle : 10 pompes chaque matin et exercices à domicile.
+- **Projet Premium** : la personne accepte d'envisager des achats ; BIM peut lui recommander des accessoires, produits ou services adaptés, vendus par des marchands. Exemple, prise de muscle : haltères, bandes élastiques, tapis de sport.
+- **Choisir le mode Premium d'un projet est gratuit** : aucun paiement à BIM. La personne ne paie que les produits ou services qu'elle décide d'acheter, dans le parcours commercial normal (BimShop, commandes).
+- **L'abonnement Premium de BIM** est une offre commerciale distincte (avantages sur la plateforme, écran 61, lot 8). Il ne doit jamais être confondu avec le mode Premium d'un projet.
+- **Règle fondamentale** : toute personne, gratuite ou abonnée, peut choisir un projet économique ou un projet Premium, et changer de mode plus tard.
+
+Effet sur le code (vérifié le 14/10/2026) : le module Projets ne lisait déjà aucun abonnement et ne créait aucun paiement ; rien n'a dû être retiré. Ajouts : changement de mode après création (écran 19 : « Tu pourras changer de mode plus tard »), libellés « Projet économique » / « Projet Premium », mention « choix gratuit, avec ou sans abonnement » sur l'écran 19, et tests qui empêchent tout couplage futur (voir `docs/TESTING.md`).
 
 ### C7 — Programmes types à rédiger · Action du fondateur
 Pour chaque catégorie (et objectif), un programme type : durée, tâches, heures, jours, conseils, validé par une personne compétente (coach, esthéticienne…). Il peut être saisi en base dès maintenant ; l'écran d'administration arrive avec le lot 0 partie 2.

@@ -104,7 +104,7 @@ export class ProjectsService {
       }
     }
     if (dto.mode === 'premium' && !dto.budget) errors.budget = ['Choisis un budget.'];
-    if (dto.mode === 'eco' && dto.budget) errors.budget = ['Le mode Éco ne comporte pas de budget.'];
+    if (dto.mode === 'eco' && dto.budget) errors.budget = ['Le projet économique ne comporte pas de budget.'];
 
     // Modèle validé et publié pour cette catégorie (et cet objectif s'il y en a un), sinon programme construit depuis les réponses.
     const template = category ? await this.findTemplate(dto.categoryCode, dto.goalCode ?? null) : null;
@@ -379,11 +379,23 @@ export class ProjectsService {
     return this.day(userId, projectId, day);
   }
 
+  /**
+   * Le mode du projet (économique / Premium) est un choix gratuit, ouvert à toute personne, abonnée ou non (C6) :
+   * il ne lit aucun droit d'abonnement et ne crée aucun paiement. Il change seulement le type de recommandations.
+   */
   async update(userId: string, projectId: string, dto: UpdateProjectDto) {
-    await this.load(userId, projectId);
+    const p = await this.load(userId, projectId);
     const set: Partial<ProjectRow> = { updatedAt: new Date() };
     if (dto.title !== undefined) set.title = dto.title.trim();
     if (dto.isPublic !== undefined) set.isPublic = dto.isPublic;
+    if (dto.mode !== undefined || dto.budget !== undefined) {
+      const mode = dto.mode ?? p.mode;
+      const budget = mode === 'premium' ? (dto.budget ?? p.budget) : null;
+      if (mode === 'eco' && dto.budget) throw Errors.validation({ fields: { budget: ['Le projet économique ne comporte pas de budget.'] } });
+      if (mode === 'premium' && !budget) throw Errors.validation({ fields: { budget: ['Choisis un budget.'] } });
+      set.mode = mode;
+      set.budget = budget;
+    }
     await this.db.update(projects).set(set).where(eq(projects.id, projectId));
     return this.detail(userId, projectId);
   }

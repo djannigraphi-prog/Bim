@@ -38,7 +38,7 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 | Build de production + migrations compilées | `npm run build` puis `node dist/database/migrate.js` | réussi |
 | Mobile (CI GitHub) | `flutter analyze`, `flutter test` (7 tests), 29 captures, `flutter build apk --debug` | réussis (exécution 38636192504) |
 | Android ↔ API (émulateur) | `flutter test integration_test` | réussi (exécution 38636192504) |
-| API (CI) | unitaires 25, e2e 50 | réussis |
+| API (local, 14/10 soir) | unitaires 37, e2e 54 + 1 à écrire au lot 8 (abonné Premium) | réussis |
 
 ## Relectures indépendantes (session 1)
 
@@ -95,7 +95,7 @@ Moyens de vérification possibles :
 
 - Prises : voir `DECISIONS.md` (F15 provisoire, F16, corrections du 14/10, T-001 à T-013, D-UI-01 à 03).
 - Réponses F1 à F17 reçues le 14/10/2026 et enregistrées (orientations retenues ou validations requises). **Aucun changement de code** : rien de ce qui est programmé n'était concerné ; aucune fonction financière n'a été programmée.
-- En attente du fondateur : C6 (mode Premium d'un projet = abonnement ?), C7 (programmes types) ; points à clarifier C1 à C5 (`DECISIONS.md`) ; validation des écarts de maquettes D-UI-03 ; police D-UI-02 ; décision sur la simulation des frais (`docs/SIMULATION_FRAIS.md`).
+- C6 décidé le 14/10 : mode de projet gratuit et indépendant de l'abonnement (tests ajoutés). En attente du fondateur : C7 (programmes types) ; points à clarifier C1 à C5 (`DECISIONS.md`) ; validation des écarts de maquettes D-UI-03 ; police D-UI-02 ; décision sur la simulation des frais (`docs/SIMULATION_FRAIS.md`).
 
 ## Commandes
 

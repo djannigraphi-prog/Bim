@@ -114,7 +114,7 @@ class ProjectSummary {
 
   bool get isCompleted => status == 'completed';
   bool get isPaused => status == 'paused';
-  String get modeLabel => mode == 'premium' ? 'Mode Premium' : 'Mode Éco';
+  String get modeLabel => mode == 'premium' ? 'Projet Premium' : 'Projet économique';
 }
 
 class ProjectList {
@@ -184,7 +184,7 @@ class ProjectDay {
 }
 
 class ProjectDetail {
-  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote});
+  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget});
 
   factory ProjectDetail.fromJson(Map<String, dynamic> j) => ProjectDetail(
         summary: ProjectSummary.fromJson(j),
@@ -195,6 +195,7 @@ class ProjectDetail {
         bestStreak: j['bestStreak'] as int,
         sessionsPerWeek: j['sessionsPerWeek'] as int?,
         healthNote: j['healthNote'] as String?,
+        budget: j['budget'] as String?,
         tasks: (j['tasks'] as List<dynamic>).map((e) => ProjectTask.fromJson(e as Map<String, dynamic>)).toList(),
         days: (j['days'] as List<dynamic>).map((e) => ProjectDay.fromJson(e as Map<String, dynamic>)).toList(),
         today: j['today'] as String,
@@ -209,6 +210,8 @@ class ProjectDetail {
   final int bestStreak;
   final int? sessionsPerWeek;
   final String? healthNote;
+  /// Budget indicatif du projet Premium (aucun paiement).
+  final String? budget;
   final List<ProjectTask> tasks;
   final List<ProjectDay> days;
   final String today;
