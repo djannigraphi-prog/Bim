@@ -91,11 +91,15 @@ test('programme type : brouillon puis publication avec le nom du validateur', as
   await editor.getByLabel('Catégorie du programme').selectOption({ label: 'Maquillage' });
   await editor.getByLabel('Titre du programme').fill('Programme de test navigateur');
   await editor.getByLabel('Durée (jours)').fill('14');
+  await editor.getByLabel('Mode de projet visé').selectOption({ label: 'Projet économique' });
+  await editor.getByLabel('Habitudes du jour').fill('1: Conseil de test du premier jour\nConseil général de test');
   await editor.getByLabel('Titre de la tâche 1').fill('Tâche de test');
   await editor.getByLabel('Heure de la tâche 1').fill('08:30');
   await editor.getByRole('button', { name: 'Enregistrer le brouillon' }).click();
   const row = page.getByRole('row', { name: /Programme de test navigateur/ });
   await expect(row).toContainText('Brouillon');
+  await expect(row).toContainText('Projet économique');
+  await expect(row).toContainText('2 habitude(s) du jour');
   page.once('dialog', (d) => d.accept('Personne de test, maquilleuse'));
   await row.getByRole('button', { name: 'Publier' }).click();
   await expect(row).toContainText('Publié');
@@ -127,6 +131,44 @@ test('utilisateurs : recherche, fiche masquée, suspension motivée, puis audit'
   await expect(page.getByRole('cell', { name: 'admin.user_suspended' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'admin.user_reactivated' })).toBeVisible();
   await page.screenshot({ path: 'test-results/captures/audit.png', fullPage: true });
+});
+
+test('catégories : création d’une catégorie et d’un objectif chiffré, contrôles', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Catégories et objectifs' }).click();
+  await expect(page.getByRole('row', { name: /Sport/ }).first()).toBeVisible();
+  const code = `test_${Date.now() % 100000}`;
+  const cat = page.getByLabel('Nouvelle catégorie');
+  await cat.getByLabel('Code').fill(code);
+  await cat.getByLabel('Libellé').fill('Catégorie navigateur');
+  await cat.getByRole('button', { name: 'Créer la catégorie' }).click();
+  await expect(page.getByRole('row', { name: /Catégorie navigateur/ })).toBeVisible();
+  const goal = page.getByLabel('Nouvel objectif');
+  await goal.getByLabel('Catégorie').selectOption({ label: 'Catégorie navigateur' });
+  await goal.getByLabel('Code').fill(`${code}_g`);
+  await goal.getByLabel('Libellé').fill('Objectif navigateur');
+  await goal.getByLabel('Unité (facultatif, ex. kg)').fill('cm');
+  await goal.getByLabel('Minimum').fill('1');
+  await goal.getByLabel('Maximum').fill('20');
+  await goal.getByLabel(/Nom de projet généré/).fill('Gagner des cm');
+  await goal.getByRole('button', { name: "Créer l'objectif" }).click();
+  await expect(page.getByRole('alert')).toContainText('{q}');
+  await goal.getByLabel(/Nom de projet généré/).fill('Gagner {q} cm');
+  await goal.getByRole('button', { name: "Créer l'objectif" }).click();
+  await expect(page.getByRole('row', { name: /Catégorie navigateur/ })).toContainText('Objectif navigateur · 1–20 cm');
+});
+
+test('signalements : réponse à la personne puis clôture', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Signalements' }).click();
+  const card = page.getByLabel(`Signalement de @${APP_USERNAME}`);
+  await expect(card).toContainText('Lieu ou intervenant indisponible');
+  await expect(card).toContainText('Salle fermée (test)');
+  await card.getByLabel('Réponse à la personne').fill('Merci, nous avons prévenu la salle (test).');
+  await card.getByRole('button', { name: 'Répondre et clore' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('button', { name: 'Traités' }).click();
+  await expect(page.getByLabel(`Signalement de @${APP_USERNAME}`)).toContainText('Réponse : Merci, nous avons prévenu la salle (test).');
 });
 
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {

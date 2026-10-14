@@ -24,6 +24,10 @@ const { uuidv7 } = require('./dist/common/uuid');
   await c.query('begin'); // F16 : compte actif et coordonnée vérifiée dans la même transaction
   await c.query(\"insert into users (id, status, full_name, username, birth_date, city) values (\$1, 'active', 'Utilisateur Test', \$2, '2000-01-01', 'Cocody')\", [id, process.env.ADMIN_E2E_APP_USERNAME]);
   await c.query(\"insert into user_contacts (id, user_id, type, value, verified_at) values (\$1, \$2, 'phone', \$3, now())\", [uuidv7(), id, '+22507' + String(Date.now()).slice(-8)]);
+  // Un projet et un signalement de test, pour la page « Signalements ».
+  const pid = uuidv7();
+  await c.query(\"insert into projects (id, user_id, category_code, title, mode, start_date, duration_days, planned_end_date) values (\$1, \$2, 'sport', 'Projet de test', 'eco', current_date, 30, current_date + 29)\", [pid, id]);
+  await c.query(\"insert into project_reports (id, project_id, user_id, day, reason, message) values (\$1, \$2, \$3, current_date, 'unavailable', 'Salle fermée (test)')\", [uuidv7(), pid, id]);
   await c.query('commit');
   c.release();
   await p.end();

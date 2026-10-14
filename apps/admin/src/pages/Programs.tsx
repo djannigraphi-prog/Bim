@@ -8,10 +8,16 @@ interface Task {
   timeOfDay: string;
   weekdays: number;
 }
+interface Tip {
+  day?: number | null;
+  text: string;
+}
 interface Program {
   id: string;
   categoryCode: string;
   goalCode: string | null;
+  mode: 'any' | 'eco' | 'premium';
+  tips: Tip[];
   title: string;
   durationDays: number;
   status: 'draft' | 'published' | 'archived';
@@ -25,6 +31,7 @@ interface Category {
 }
 
 const STATUS = { draft: 'Brouillon', published: 'Publié', archived: 'Archivé' };
+const MODES = { any: 'Économique et Premium', eco: 'Projet économique', premium: 'Projet Premium' };
 
 /**
  * Programmes types (C7). Rédigés par l'équipe BIM, publiés seulement avec le nom de la personne compétente
@@ -77,7 +84,7 @@ export function Programs({ canWrite, canPublish }: { canWrite: boolean; canPubli
     <section>
       <h2>Programmes types</h2>
       <p className="muted">
-        Sans programme publié pour une catégorie, l'app construit le programme à partir des réponses de la personne (séances par semaine, disponibilité).
+        Sans programme publié pour une catégorie, l'app construit le programme à partir des réponses de la personne (séances par semaine, disponibilité). Projet économique : exercices, astuces, conseils sans achat nécessaire. Projet Premium : peut intégrer des produits, accessoires ou services. Le mode d'un projet est gratuit et indépendant de l'abonnement.
       </p>
       {error && <p className="error" role="alert">{error}</p>}
       {canWrite && !editing && <button onClick={() => setEditing('new')}>Nouveau programme</button>}
@@ -97,6 +104,7 @@ export function Programs({ canWrite, canPublish }: { canWrite: boolean; canPubli
           <tr>
             <th>Programme</th>
             <th>Catégorie</th>
+            <th>Mode</th>
             <th>Durée</th>
             <th>Tâches</th>
             <th>Statut</th>
@@ -108,6 +116,7 @@ export function Programs({ canWrite, canPublish }: { canWrite: boolean; canPubli
             <tr key={p.id}>
               <td>{p.title}</td>
               <td>{label(p)}</td>
+              <td>{MODES[p.mode]}</td>
               <td>{p.durationDays} j</td>
               <td>
                 {p.tasks.map((t, i) => (
@@ -115,6 +124,7 @@ export function Programs({ canWrite, canPublish }: { canWrite: boolean; canPubli
                     {t.timeOfDay} — {t.title} <small className="muted">({weekdaysLabel(t.weekdays)})</small>
                   </div>
                 ))}
+                {p.tips.length > 0 && <small className="muted">{p.tips.length} habitude(s) du jour</small>}
               </td>
               <td>
                 <span className={`badge ${p.status}`}>{STATUS[p.status]}</span>
@@ -138,6 +148,8 @@ function ProgramEditor({ categories, program, onClose, onSaved }: { categories: 
   const [goalCode, setGoal] = useState<string>(program?.goalCode ?? '');
   const [title, setTitle] = useState(program?.title ?? '');
   const [durationDays, setDuration] = useState(program?.durationDays ?? 30);
+  const [mode, setMode] = useState<Program['mode']>(program?.mode ?? 'any');
+  const [tipsText, setTipsText] = useState((program?.tips ?? []).map((t) => (t.day ? `${t.day}: ${t.text}` : t.text)).join('\n'));
   const [tasks, setTasks] = useState<Task[]>(program?.tasks ?? [{ title: '', timeOfDay: '07:00', weekdays: 127 }]);
   const [error, setError] = useState<string | null>(null);
   const goals = categories.find((c) => c.code === categoryCode)?.goals ?? [];
@@ -145,9 +157,19 @@ function ProgramEditor({ categories, program, onClose, onSaved }: { categories: 
   const setTask = (i: number, patch: Partial<Task>) => setTasks((ts) => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)));
 
   async function save() {
+    const tips = tipsText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const m = /^(\d{1,3})\s*:\s*(.+)$/.exec(l);
+        return m ? { day: Number(m[1]), text: m[2] } : { text: l };
+      });
     const body = {
       categoryCode,
       goalCode: goalCode || null,
+      mode,
+      tips,
       title,
       durationDays,
       tasks: tasks.map((t) => ({ title: t.title, detail: t.detail || undefined, timeOfDay: t.timeOfDay, weekdays: t.weekdays })),
@@ -176,6 +198,12 @@ function ProgramEditor({ categories, program, onClose, onSaved }: { categories: 
           <select aria-label="Objectif du programme" value={goalCode} onChange={(e) => setGoal(e.target.value)}>
             <option value="">Tous les objectifs de la catégorie</option>
             {goals.map((g) => <option key={g.code} value={g.code}>{g.label}</option>)}
+          </select>
+        </label>
+        <label>
+          Mode de projet visé
+          <select aria-label="Mode de projet visé" value={mode} onChange={(e) => setMode(e.target.value as Program['mode'])}>
+            {Object.entries(MODES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
         <label>
@@ -209,6 +237,9 @@ function ProgramEditor({ categories, program, onClose, onSaved }: { categories: 
       <button className="small secondary" onClick={() => setTasks((ts) => [...ts, { title: '', timeOfDay: '07:00', weekdays: 127 }])}>
         Ajouter une tâche
       </button>
+      <h4>Habitudes du jour (facultatif)</h4>
+      <p className="muted">Une ligne par conseil. « 5: texte » = conseil du jour 5 ; sans numéro = conseil général, affiché en alternance.</p>
+      <textarea aria-label="Habitudes du jour" rows={4} value={tipsText} onChange={(e) => setTipsText(e.target.value)} />
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions">
         <button onClick={save}>Enregistrer le brouillon</button>

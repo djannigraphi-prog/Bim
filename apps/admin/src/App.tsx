@@ -7,10 +7,14 @@ import { Programs } from './pages/Programs';
 import { Users } from './pages/Users';
 import { Audit } from './pages/Audit';
 import { Admins } from './pages/Admins';
+import { Catalog } from './pages/Catalog';
+import { Reports } from './pages/Reports';
 
 const NAV: Array<{ to: string; label: string; perm: Permission }> = [
   { to: '/reglages', label: 'Réglages', perm: 'settings.read' },
   { to: '/programmes', label: 'Programmes types', perm: 'programs.read' },
+  { to: '/categories', label: 'Catégories et objectifs', perm: 'programs.read' },
+  { to: '/signalements', label: 'Signalements', perm: 'reports.read' },
   { to: '/utilisateurs', label: 'Utilisateurs', perm: 'users.read' },
   { to: '/audit', label: "Journal d'audit", perm: 'audit.read' },
   { to: '/administrateurs', label: 'Administrateurs', perm: 'admins.manage' },
@@ -69,6 +73,8 @@ export function App() {
         <Routes>
           {can('settings.read') && <Route path="/reglages" element={<Settings canWrite={can('settings.write')} />} />}
           {can('programs.read') && <Route path="/programmes" element={<Programs canWrite={can('programs.write')} canPublish={can('programs.publish')} />} />}
+          {can('programs.read') && <Route path="/categories" element={<Catalog canWrite={can('catalog.write')} />} />}
+          {can('reports.read') && <Route path="/signalements" element={<Reports canResolve={can('reports.resolve')} />} />}
           {can('users.read') && <Route path="/utilisateurs" element={<Users canSuspend={can('users.suspend')} />} />}
           {can('audit.read') && <Route path="/audit" element={<Audit />} />}
           {can('admins.manage') && <Route path="/administrateurs" element={<Admins me={me} />} />}

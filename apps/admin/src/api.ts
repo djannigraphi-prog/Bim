@@ -72,7 +72,10 @@ export type Permission =
   | 'programs.read'
   | 'programs.write'
   | 'programs.publish'
-  | 'admins.manage';
+  | 'admins.manage'
+  | 'catalog.write'
+  | 'reports.read'
+  | 'reports.resolve';
 
 export interface AdminProfile {
   id: string;
