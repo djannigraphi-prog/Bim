@@ -143,7 +143,7 @@ jobs:
         if: ${{ always() }}
         run: |
           if [ -f "$RUNNER_TEMP/e2e.log" ]; then
-            msg=$(grep -E "✓|✗|\+[0-9]+|EXCEPTION|Expected|Actual|Délai|Aucun code|fail|Error" "$RUNNER_TEMP/e2e.log" | tail -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            msg=$(grep -vE "^\s*$|^(I|D|V)/" "$RUNNER_TEMP/e2e.log" | head -220 | cut -c1-220 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::warning title=e2e android::$msg"
           fi
           api=$(grep -E "ERROR|\" 5[0-9][0-9]|statusCode\":(4|5)" "$RUNNER_TEMP/api.log" | sed 's/\x1b\[[0-9;]*m//g' | grep -v "ton code est" | tail -15 | cut -c1-300 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
