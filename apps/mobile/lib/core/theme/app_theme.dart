@@ -1,3 +1,5 @@
+// Depuis Flutter 3.35, CupertinoPageTransitionsBuilder n'est plus exporté par material.dart.
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'tokens.dart';

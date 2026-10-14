@@ -1,5 +1,6 @@
 /// Modèles de l'authentification, alignés sur packages/api-contract/openapi.json.
 /// Les valeurs métier (âges, règles) viennent toujours du serveur.
+library;
 
 class Challenge {
   const Challenge({required this.challengeId, required this.channel, this.destination, required this.expiresAt, required this.resendAvailableAt});
