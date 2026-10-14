@@ -33,6 +33,12 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+/// Fait défiler l'écran jusqu'à l'élément (les listes ne construisent que la partie visible), puis le touche.
+Future<void> _scrollTap(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 150, scrollable: find.byType(Scrollable).first);
+  await _tap(tester, finder);
+}
+
 Future<void> _type(WidgetTester tester, String hint, String text) async {
   final field = find.widgetWithText(TextField, hint);
   await _waitFor(tester, field);
@@ -134,7 +140,7 @@ void main() {
     await _tap(tester, find.text('Abdos'));
     await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
     await _tap(tester, find.text('Passer cette étape'));
-    await _tap(tester, find.text('7'));
+    await _scrollTap(tester, find.text('7'));
     await _tap(tester, find.text('Créer mon programme'));
     await _waitFor(tester, find.textContaining('Renforcer mes abdos', findRichText: true));
     await _tap(tester, find.text('Lancer mon programme'));

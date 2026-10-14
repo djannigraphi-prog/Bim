@@ -415,13 +415,16 @@ class _CategoryStep extends StatelessWidget {
       title: 'Sur quoi veux-tu travailler ?',
       subtitle: 'Choisis une catégorie.',
       children: [
-        GridView.count(
-          crossAxisCount: 2,
+        GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: BimSpacing.md,
-          crossAxisSpacing: BimSpacing.md,
-          childAspectRatio: 1.3,
+          // Hauteur fixe : la tuile reste lisible sur les petits écrans (débordement relevé sur émulateur à 320 dp).
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: BimSpacing.md,
+            crossAxisSpacing: BimSpacing.md,
+            mainAxisExtent: 128,
+          ),
           children: [
             for (final c in catalog.categories)
               _CategoryTile(

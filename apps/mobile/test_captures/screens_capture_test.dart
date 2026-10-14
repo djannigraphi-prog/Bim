@@ -349,6 +349,25 @@ void main() {
     await _settle(t);
     await _capture(t, '23_np_questions');
   });
+  testWidgets('20 et 23, petit écran', (t) async {
+    await _show(t, '/projects/new', physical: const Size(960, 1704));
+    await t.tap(find.text('Mode Éco'));
+    await t.pump();
+    await t.tap(find.text('Continuer'));
+    await t.pump();
+    await t.tap(find.text('Sport'));
+    await _settle(t);
+    await _capture(t, 'x8_petit_ecran_20');
+    await t.tap(find.text('Continuer'));
+    await t.pump();
+    await t.tap(find.text('Abdos'));
+    await t.pump();
+    await t.tap(find.text('Continuer'));
+    await t.pump();
+    await t.tap(find.text('Passer cette étape'));
+    await _settle(t);
+    await _capture(t, 'x8_petit_ecran_23');
+  });
   testWidgets('24 programme', (t) async {
     await _show(t, '/projects/p1/program');
     await _capture(t, '24_np_plan');
