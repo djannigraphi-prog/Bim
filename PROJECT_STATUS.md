@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 14/10/2026 (nuit), session 1 — lot 0 partie 1 vérifié en CI (GitHub Actions).
+Dernière mise à jour : 14/10/2026 (nuit), session 1 — lot 0 vérifié sur Android réel (émulateur) ; lot 1 partie 1 (projets) livré et testé.
 
 ## Résumé
 
@@ -23,7 +23,8 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Connexions Google / Apple / Facebook | Terminée | Préparées, **désactivées** (`NOT_CONFIGURED`) | Boutons affichés, « Bientôt disponible » | — | Exécutés (indisponibilité honnête) | Comptes développeur + clés |
 | Thème clair / sombre | Terminée | Préférence enregistrée | Compilé, capture sombre vérifiée | Écrit | — | — |
 | Administration web | Esquissée | Tables et rôles seulement | — | — | — | Lot 0 partie 2 |
-| Lots 1 à 12 (projets, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
+| Lot 1 — Projets BIM, partie 1 (écrans 18-24, 26, 27, 29, 30) | Terminée | Fait : référentiels, création, programme, journée, pause, fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création + séance cochée) | API : 6 unitaires + 13 e2e ; mobile : captures | Programmes types à rédiger (C7) ; photos avant/après (médias, lot 4) ; rappels (lot 2) ; Peni (lot 3) |
+| Lots 2 à 12 (rappels, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
 ## Tests exécutés (session 1, 14/10/2026)
 
@@ -35,12 +36,21 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 | Bout en bout API (base vierge, migrations réelles) | `npm run test:e2e` | 37 / 37 réussis (dont 10 tests de non-régression issus de la relecture de sécurité) |
 | Compilation TypeScript stricte | `npm run lint` | sans erreur |
 | Build de production + migrations compilées | `npm run build` puis `node dist/database/migrate.js` | réussi |
-| Mobile (CI GitHub) | `flutter analyze`, `flutter test`, captures, `flutter build apk --debug` | réussis (exécution 38620641623) |
+| Mobile (CI GitHub) | `flutter analyze`, `flutter test` (7 tests), 29 captures, `flutter build apk --debug` | réussis (exécution 38636192504) |
+| Android ↔ API (émulateur) | `flutter test integration_test` | réussi (exécution 38636192504) |
+| API (CI) | unitaires 25, e2e 50 | réussis |
 
 ## Relectures indépendantes (session 1)
 
 - **Sécurité de l'API** : 2 problèmes graves, 5 moyens, 8 mineurs signalés ; tous les graves et moyens sont corrigés et couverts par un test (suppression simultanée de coordonnées, IP falsifiable derrière un proxy, énumération de comptes par « mot de passe oublié », force brute des codes, rafraîchissement concurrent d'une réinitialisation, bombardement de SMS, configuration permissive). Mineurs corrigés : identifiants mal formés (500 → 400), paramètres SQL dans les journaux, comptage des essais par compte et en HMAC, autorisation step-up liée à la session, TRUNCATE de l'audit, audits manquants. Risques acceptés : `DECISIONS.md`, T-015.
 - **Code Flutter (lecture statique, sans compilateur)** : aucune erreur de compilation certaine trouvée ; corrigés : dépendance `intl` incompatible avec les Flutter récents, requêtes pouvant rester bloquées et déconnexion intempestive dans l'intercepteur réseau, démarrage pouvant rester bloqué, appels après fermeture d'écran, double envoi du code, quelques avertissements de l'analyseur.
+
+## Communication réelle Android ↔ API (job CI « android-e2e », 14/10/2026)
+
+L'application Android (APK debug) tourne sur un émulateur Android 14 (320 dp de large) et parle à l'API réelle (PostgreSQL neuf, migrations réelles, mode développement). Le code de vérification est lu dans le journal de l'API par un relais propre à la CI, comme une personne lirait son SMS.
+Parcours réussi (exécution 38636192504) : bienvenue → inscription en 2 étapes → code → accueil → déconnexion → mauvais mot de passe refusé (401, message affiché) → connexion → création d'un projet en 5 étapes → programme → journée → séance cochée. Requêtes reçues par l'API : interests 200, register 201, register/verify 200, logout 204, login 401 puis 200, projects/catalog 200, projects 201, journée 200, case cochée 200.
+Défauts réels trouvés par ce test et corrigés : libellés de champs et pied de l'écran de connexion qui débordaient à 320 dp, tuiles de catégories trop petites, migrations absentes de `npm run build` (l'API compilée ne pouvait pas migrer sans Docker).
+Non vérifié : un vrai téléphone, un vrai fournisseur SMS, iOS.
 
 ## Vérification en CI GitHub (dépôt privé djannigraphi-prog/Bim, 14/10/2026)
 
@@ -85,7 +95,7 @@ Moyens de vérification possibles :
 
 - Prises : voir `DECISIONS.md` (F15 provisoire, F16, corrections du 14/10, T-001 à T-013, D-UI-01 à 03).
 - Réponses F1 à F17 reçues le 14/10/2026 et enregistrées (orientations retenues ou validations requises). **Aucun changement de code** : rien de ce qui est programmé n'était concerné ; aucune fonction financière n'a été programmée.
-- En attente du fondateur : points à clarifier C1 à C5 (`DECISIONS.md`) ; validation des écarts de maquettes D-UI-03 ; police D-UI-02 ; décision sur la simulation des frais (`docs/SIMULATION_FRAIS.md`).
+- En attente du fondateur : C6 (mode Premium d'un projet = abonnement ?), C7 (programmes types) ; points à clarifier C1 à C5 (`DECISIONS.md`) ; validation des écarts de maquettes D-UI-03 ; police D-UI-02 ; décision sur la simulation des frais (`docs/SIMULATION_FRAIS.md`).
 
 ## Commandes
 
@@ -100,8 +110,8 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Fait : analyse, tests, compilation Android et captures en CI. Reste : parcours complet inscription → code → accueil sur un téléphone Android contre une API de test, et compilation iOS (macOS).
-2. Lot 0, partie 2 : écran 53 (changer de profil), écrans de gestion des coordonnées et des appareils, connexion administrateur avec TOTP et écran des réglages `age.*`.
-3. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
-4. Lot 1 (projets BIM) : catégories administrables, création en 5 étapes, carte et journée du projet ; rédiger les programmes types avec le fondateur.
+1. Lot 1, partie 2 : écran 25 (chat Peni) → lot 3 ; écran 28 (rappels, alarme) → lot 2 ; écran 31 (avant / après) → médias. Saisie des programmes types (C7) dès qu'ils sont rédigés.
+2. Lot 0, partie 2 : écran 53 (changer de profil), écrans de gestion des coordonnées et des appareils, administration (connexion avec TOTP, réglages `age.*` et `projects.*`, programmes types).
+3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
+4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
 5. Avant les lots 7 à 9 : réponses C1 à C5, vérifications juridiques (F3, F7, F8, F10, F11, F14, F15, ARTCI, BCEAO) et validation de la simulation F13. Écrans 24 et 38 à redessiner selon F4 (lot 1 / lot 7).

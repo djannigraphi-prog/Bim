@@ -505,7 +505,12 @@ class _CategoryTile extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              Text(category.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
+              Text(
+                category.label,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),

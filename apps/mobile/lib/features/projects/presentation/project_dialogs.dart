@@ -233,7 +233,7 @@ class _PauseSheetState extends State<_PauseSheet> {
                 Expanded(
                   child: Text(
                     'Ton programme sera réajusté : fin prévue le ${shortDay(addDaysTo(widget.plannedEndDate, _days))} '
-                    'au lieu du ${shortDay(widget.plannedEndDate)}.',
+                    'au lieu du ${shortDay(widget.plannedEndDate)}',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ),
