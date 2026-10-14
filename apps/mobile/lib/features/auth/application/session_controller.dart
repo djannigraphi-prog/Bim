@@ -60,6 +60,13 @@ class SessionController extends Notifier<SessionState> {
     _signedIn(result.me);
   }
 
+  /// Profil mis à jour par le serveur (ex. après l'ajout d'une coordonnée).
+  void updateMe(Me me) {
+    if (state is SessionSignedIn) state = SessionSignedIn(me);
+  }
+
+  Future<void> refreshMe() async => updateMe(await _api.me());
+
   void continueAsVisitor() => state = const SessionSignedOut(visitor: true);
 
   void leaveVisitor() => state = const SessionSignedOut();

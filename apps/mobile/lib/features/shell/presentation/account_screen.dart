@@ -7,9 +7,10 @@ import '../../../core/theme/theme_controller.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../account/presentation/account_security_screens.dart';
 import '../../auth/application/session_controller.dart';
 
-/// Version minimale de l'écran 62 (Paramètres) pour le lot 0 : identité, thème clair / sombre, déconnexion.
+/// Écran 62 (Paramètres), version du lot 0 : identité, profils (53), coordonnées, mot de passe, appareils, thème, déconnexion.
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
 
@@ -49,6 +50,33 @@ class AccountScreen extends ConsumerWidget {
                 title: Text(me.fullName, style: theme.textTheme.titleMedium),
                 subtitle: Text('@${me.username} · compte utilisateur'),
               ),
+            const SizedBox(height: BimSpacing.lg),
+            Text('SÉCURITÉ ET PROFILS', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.swap_horiz),
+              title: const Text('Changer de profil'),
+              subtitle: const Text('Utilisateur, boutiques, compte livreur'),
+              onTap: () => showSpacesSheet(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.contact_phone_outlined),
+              title: const Text('Téléphone et e-mail'),
+              onTap: () => context.push('/account/contacts'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Mot de passe'),
+              onTap: () => context.push('/account/password'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.devices_outlined),
+              title: const Text('Appareils connectés'),
+              onTap: () => context.push('/account/devices'),
+            ),
             const SizedBox(height: BimSpacing.lg),
             Text('APPARENCE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: BimSpacing.sm),

@@ -61,7 +61,7 @@ class Me {
         theme: ((j['preferences'] as Map<String, dynamic>?)?['theme'] ?? 'system') as String,
         contacts: ((j['contacts'] as List<dynamic>?) ?? const [])
             .map((c) => (c as Map<String, dynamic>))
-            .map((c) => (type: c['type'] as String, value: c['value'] as String, verified: c['verified'] as bool))
+            .map((c) => (id: (c['id'] ?? '') as String, type: c['type'] as String, value: c['value'] as String, verified: c['verified'] as bool))
             .toList(),
       );
 
@@ -70,7 +70,7 @@ class Me {
   final String username;
   final String city;
   final String theme;
-  final List<({String type, String value, bool verified})> contacts;
+  final List<({String id, String type, String value, bool verified})> contacts;
 }
 
 /// Données saisies sur les écrans 04 puis 05, envoyées ensemble à la fin de l'inscription.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account/presentation/account_security_screens.dart';
 import '../../features/auth/application/session_controller.dart';
 import '../../features/auth/data/models.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
@@ -41,7 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return switch (session) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc)) ? '/home' : null,
-        SessionSignedOut(visitor: true) => (loc == '/splash' || loc == '/account' || loc.startsWith('/projects')) ? '/home' : null,
+        SessionSignedOut(visitor: true) => (loc == '/splash' || loc.startsWith('/account') || loc.startsWith('/projects')) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -58,6 +59,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/forgot', builder: (_, __) => const ForgotPasswordScreen()),
       GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
       GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
+      GoRoute(path: '/account/contacts', builder: (_, __) => const ContactsScreen()),
+      GoRoute(path: '/account/password', builder: (_, __) => const ChangePasswordScreen()),
+      GoRoute(path: '/account/devices', builder: (_, __) => const DevicesScreen()),
       // Lot 1 — projets BIM (écrans 18 à 30).
       GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
       GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),

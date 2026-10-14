@@ -10,7 +10,10 @@ import 'dart:io';
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/features/account/data/account_api.dart';
+import 'package:bim/features/account/presentation/account_security_screens.dart';
 import 'package:bim/features/auth/application/session_controller.dart';
+import 'package:bim/features/shell/presentation/account_screen.dart';
 import 'package:bim/features/auth/data/auth_api.dart';
 import 'package:bim/features/auth/data/models.dart';
 import 'package:bim/features/auth/presentation/forgot_password_screen.dart';
@@ -43,7 +46,35 @@ class _NoTokens extends TokenStorage {
   Future<String?> refreshToken() async => null;
   @override
   Future<void> clear() async {}
+  @override
+  Future<void> save({required String accessToken, required String refreshToken}) async {}
 }
+
+/// Données de démonstration POUR LES CAPTURES UNIQUEMENT.
+class _FakeAccountApi extends AccountApi {
+  _FakeAccountApi(super.api);
+
+  @override
+  Future<List<DeviceSession>> sessions() async => [
+        DeviceSession(id: 's1', userAgent: 'Dart/3.13 (dart:io)', lastUsedAt: DateTime.now(), current: true),
+        DeviceSession(id: 's2', userAgent: 'Mozilla/5.0 (Linux; Android 14)', lastUsedAt: DateTime.now().subtract(const Duration(days: 2)), current: false),
+      ];
+
+  @override
+  Future<List<SpaceItem>> spaces() async => const [SpaceItem(type: 'user', id: 'u1', label: 'Awa Koné', status: 'active', usable: true, active: true)];
+}
+
+const _demoMe = {
+  'id': 'u1',
+  'fullName': 'Awa Koné',
+  'username': 'awa.kone',
+  'city': 'Cocody',
+  'preferences': {'theme': 'light'},
+  'contacts': [
+    {'id': 'c1', 'type': 'phone', 'value': '+2250700000000', 'verified': true},
+    {'id': 'c2', 'type': 'email', 'value': 'awa@exemple.com', 'verified': true},
+  ],
+};
 
 class _FakeAuthApi extends AuthApi {
   _FakeAuthApi(super.api);
@@ -219,6 +250,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     apiClientProvider.overrideWithValue(client),
     authApiProvider.overrideWithValue(_FakeAuthApi(client)),
     projectsApiProvider.overrideWithValue(_FakeProjectsApi(client)),
+    accountApiProvider.overrideWithValue(_FakeAccountApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -230,6 +262,10 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/verify', builder: (_, __) => VerifyCodeScreen(challenge: _challenge)),
     GoRoute(path: '/forgot', builder: (_, __) => const ForgotPasswordScreen()),
     GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
+    GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
+    GoRoute(path: '/account/contacts', builder: (_, __) => const ContactsScreen()),
+    GoRoute(path: '/account/password', builder: (_, __) => const ChangePasswordScreen()),
+    GoRoute(path: '/account/devices', builder: (_, __) => const DevicesScreen()),
     GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
     GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),
     GoRoute(path: '/projects/p1', builder: (_, __) => const ProjectMapScreen(projectId: 'p1')),
@@ -396,6 +432,31 @@ void main() {
       await _capture(t, 'x7_petit_ecran_$name');
     });
   }
+
+  Future<void> signedIn(WidgetTester t, String route, {Size physical = const Size(1170, 2532)}) async {
+    final c = await _show(t, route, physical: physical);
+    await c.read(sessionProvider.notifier).completeSignIn(
+      (tokens: const Tokens(accessToken: 'a', refreshToken: 'r'), me: Me.fromJson(_demoMe)),
+    );
+    await _settle(t);
+  }
+
+  for (final (route, name) in [('/account', '62_parametres'), ('/account/contacts', 'x9_coordonnees'), ('/account/password', 'x9_mot_de_passe'), ('/account/devices', 'x9_appareils')]) {
+    testWidgets('compte : $name', (t) async {
+      await signedIn(t, route);
+      await _capture(t, name);
+    });
+    testWidgets('compte : $name, petit écran', (t) async {
+      await signedIn(t, route, physical: const Size(960, 1704));
+      await _capture(t, '${name}_petit');
+    });
+  }
+  testWidgets('53 changer de profil', (t) async {
+    await signedIn(t, '/account');
+    await t.tap(find.text('Changer de profil'));
+    await _settle(t);
+    await _capture(t, '53_changer_profil');
+  });
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);
     c.read(sessionProvider.notifier).continueAsVisitor();

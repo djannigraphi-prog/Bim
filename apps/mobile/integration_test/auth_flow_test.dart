@@ -3,7 +3,8 @@
 //
 // Parcours : bienvenue → inscription (2 étapes) → code reçu → accueil → déconnexion
 //            → connexion avec un mauvais mot de passe (refusée) → connexion correcte → accueil
-//            → nouveau projet (5 étapes) → programme → journée → séance cochée.
+//            → nouveau projet (5 étapes) → programme → journée → séance cochée
+//            → ajout d'un e-mail vérifié (opération protégée) → appareils → nouveau mot de passe → connexion par e-mail.
 // Le code est lu par un relais de la CI dans les journaux de l'API de développement, comme une personne lirait son SMS.
 import 'dart:convert';
 import 'dart:io';
@@ -56,14 +57,16 @@ Future<void> _typePassword(WidgetTester tester, String text) async {
   await tester.pump(const Duration(milliseconds: 200));
 }
 
-Future<String> _codeFor(String digits) async {
+/// Dernier code envoyé à un numéro (8 derniers chiffres) ou à une adresse e-mail ; [previous] = code déjà utilisé.
+Future<String> _codeFor(String digits, {String? email, String? previous}) async {
   final client = HttpClient();
+  final query = email != null ? 'to=${Uri.encodeQueryComponent(email)}' : 'digits=$digits';
   try {
     for (var i = 0; i < 40; i++) {
-      final req = await client.getUrl(Uri.parse('$_codeRelay/code?digits=$digits'));
+      final req = await client.getUrl(Uri.parse('$_codeRelay/code?$query'));
       final res = await req.close();
       final body = await res.transform(utf8.decoder).join();
-      if (res.statusCode == 200 && body.length == 6) return body;
+      if (res.statusCode == 200 && body.length == 6 && body != previous) return body;
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
   } finally {
@@ -104,6 +107,7 @@ void main() {
     // Code reçu « par SMS » (journal de l'API de développement) ; 6 chiffres = validation automatique.
     await _waitFor(tester, find.text('Entre ton code'));
     final code = await _codeFor(digits);
+    var lastPhoneCode = code;
     await tester.enterText(find.byType(TextField).first, code);
 
     // Accueil : la session est ouverte.
@@ -147,5 +151,50 @@ void main() {
     await _tap(tester, find.text('Voir l’étape du jour'));
     await _tap(tester, find.text('Séance · Abdos'));
     await _waitFor(tester, find.text('Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'));
+
+    // Lot 0, partie 2 : ajouter un e-mail (opération protégée : mot de passe + code SMS, puis code reçu par e-mail).
+    await _tap(tester, find.byTooltip('Retour'));
+    await _tap(tester, find.byTooltip('Retour'));
+    await _tap(tester, find.byTooltip('Mon compte'));
+    await _scrollTap(tester, find.text('Téléphone et e-mail'));
+    await _tap(tester, find.text('Ajouter un téléphone ou un e-mail'));
+    await _tap(tester, find.text('E-mail'));
+    final email = '$username@exemple.com';
+    await tester.enterText(find.byKey(const Key('new-contact-value')), email);
+    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
+    await tester.enterText(find.byKey(const Key('stepup-password')), password);
+    await _tap(tester, find.text('Recevoir un code'));
+    await _waitFor(tester, find.byKey(const Key('code-field')));
+    lastPhoneCode = await _codeFor(digits, previous: lastPhoneCode);
+    await tester.enterText(find.byKey(const Key('code-field')), lastPhoneCode);
+    await _waitFor(tester, find.text('Vérifie cette adresse'));
+    await tester.enterText(find.byKey(const Key('code-field')), await _codeFor('', email: email));
+    await _waitFor(tester, find.text(email));
+    expect(find.text('Non vérifié'), findsNothing);
+
+    // Appareils connectés : la session en cours est reconnue.
+    await _tap(tester, find.byTooltip('Retour'));
+    await _scrollTap(tester, find.text('Appareils connectés'));
+    await _waitFor(tester, find.textContaining('cet appareil'));
+    await _tap(tester, find.byTooltip('Retour'));
+
+    // Changer de mot de passe (opération protégée), puis se reconnecter avec le nouveau.
+    const newPassword = 'Lagune-Ebrie-2027';
+    await _scrollTap(tester, find.text('Mot de passe'));
+    await tester.enterText(find.byKey(const Key('new-password')), newPassword);
+    await tester.enterText(find.byKey(const Key('new-password-2')), newPassword);
+    await _tap(tester, find.text('Changer le mot de passe'));
+    await tester.enterText(find.byKey(const Key('stepup-password')), password);
+    await _tap(tester, find.text('Recevoir un code'));
+    await _waitFor(tester, find.byKey(const Key('code-field')));
+    lastPhoneCode = await _codeFor(digits, previous: lastPhoneCode);
+    await tester.enterText(find.byKey(const Key('code-field')), lastPhoneCode);
+    await _waitFor(tester, find.text('Paramètres'));
+    await _scrollTap(tester, find.text('Se déconnecter'));
+    await _tap(tester, find.text('Se connecter'));
+    await _type(tester, 'E-mail, téléphone ou @nom d’utilisateur', email);
+    await _typePassword(tester, newPassword);
+    await _tap(tester, find.widgetWithText(FilledButton, 'Se connecter'));
+    await _waitFor(tester, find.byTooltip('Mon compte'));
   });
 }
