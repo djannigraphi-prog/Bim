@@ -27,9 +27,6 @@ Future<void> _waitFor(WidgetTester tester, Finder finder, {Duration timeout = co
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
-  // Ferme le clavier avant de toucher un bouton (comme une personne le ferait) : sinon la mise en page bouge pendant le tap.
-  FocusManager.instance.primaryFocus?.unfocus();
-  await tester.pump(const Duration(milliseconds: 400));
   await _waitFor(tester, finder);
   await tester.ensureVisible(finder.first);
   await tester.pump(const Duration(milliseconds: 300));
@@ -188,7 +185,8 @@ void main() {
     await _scrollTap(tester, find.text('Mot de passe'));
     await tester.enterText(find.byKey(const Key('new-password')), newPassword);
     await tester.enterText(find.byKey(const Key('new-password-2')), newPassword);
-    await _tap(tester, find.text('Changer le mot de passe'));
+    // Le clavier réduit l'écran : on fait défiler jusqu'au bouton lui-même avant de le toucher.
+    await _scrollTap(tester, find.widgetWithText(FilledButton, 'Changer le mot de passe'));
     await tester.enterText(find.byKey(const Key('stepup-password')), password);
     await _tap(tester, find.text('Recevoir un code'));
     await _waitFor(tester, find.byKey(const Key('code-field')));
