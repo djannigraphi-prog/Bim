@@ -74,8 +74,77 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ../../.github/scripts/publish-captures.sh
-      - name: Compilation Android (debug, dossiers de plateforme générés pour la CI uniquement)
+      - name: Compilation Android (debug)
         if: ${{ !cancelled() }}
+        run: flutter build apk --debug --dart-define=BIM_API_URL=https://api.invalid
+
+  # Application Android réelle (émulateur) contre l'API réelle (PostgreSQL neuf, migrations, mode développement).
+  android-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bim
+          POSTGRES_PASSWORD: bim
+          POSTGRES_DB: bim_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bim" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: development
+      PORT: 3000
+      LOG_LEVEL: info
+      TRUST_PROXY: 0
+      DATABASE_URL: postgres://bim:bim@localhost:5432/bim_e2e
+      # Secrets jetables, propres à la CI (aucune valeur réelle).
+      JWT_ACCESS_SECRET: ci-e2e-access-secret-0123456789-abcdefghij
+      OTP_SECRET: ci-e2e-otp-secret-0123456789-abcdefghijklmno
+      SMS_PROVIDER: console
+      EMAIL_PROVIDER: console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - name: Démarrer l'API
+        working-directory: apps/api
         run: |
-          flutter create --platforms=android --org ci.bim.placeholder --project-name bim .
-          flutter build apk --debug --dart-define=BIM_API_URL=https://api.invalid
+          npm ci
+          npm run build
+          node dist/database/migrate.js
+          nohup node dist/main.js > "$RUNNER_TEMP/api.log" 2>&1 &
+          nohup python3 ../../.github/scripts/otp-relay.py "$RUNNER_TEMP/api.log" 3999 > /dev/null 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3000/health && break; sleep 1; done
+          curl -sf localhost:3000/health
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Activer KVM (émulateur accéléré)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - name: Parcours inscription / connexion sur émulateur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: apps/mobile
+          script: bash ../../.github/scripts/run-android-e2e.sh
+      - name: Résumé (annotations lisibles hors des journaux)
+        if: ${{ always() }}
+        run: |
+          if [ -f "$RUNNER_TEMP/e2e.log" ]; then
+            msg=$(grep -E "✓|✗|\+[0-9]+|EXCEPTION|Expected|Actual|Délai|Aucun code|fail|Error" "$RUNNER_TEMP/e2e.log" | tail -40 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::warning title=e2e android::$msg"
+          fi
+          api=$(grep -E "ERROR|\" 5[0-9][0-9]|statusCode\":(4|5)" "$RUNNER_TEMP/api.log" | sed 's/\x1b\[[0-9;]*m//g' | grep -v "ton code est" | tail -15 | cut -c1-300 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          [ -n "$api" ] && echo "::warning title=api log::$api" || true

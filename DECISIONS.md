@@ -179,13 +179,19 @@ Chaque exécution crée une base PostgreSQL vierge, applique toutes les migratio
 ### D-UI-01 — Flutter : Riverpod 2, go_router 14, Dio 5 · Technique · décidé
 Un seul style de gestion d'état (Notifier / FutureProvider). Découpage `features/<nom>/{data,application,presentation}`.
 
-### D-UI-02 — Police · Technique · provisoire
+### D-UI-02 — Police · Technique · provisoire (confirmé par le fondateur le 14/10/2026)
+Le fondateur conserve provisoirement la police actuelle.
 Police sans empattement du système (SF Pro sur iOS, Roboto sur Android) en attendant le choix d'une police de marque embarquée (ex. Inter), à valider par le fondateur.
 
-### D-UI-03 — Écarts assumés avec les maquettes (lot 0) · Technique · à valider par le fondateur
+### D-UI-03 — Écarts assumés avec les maquettes (lot 0) · Technique · validé le 14/10/2026
+Le fondateur conserve les écrans et champs ajoutés pour la sécurité et l'expérience ; les autres différences sont documentées sans bloquer la suite.
 - Écran 04 : ajout du champ **Mot de passe**, absent de la maquette mais nécessaire à la connexion (écran 03).
 - Écran 04 : téléphone et e-mail marqués « Facultatif » comme dans Q13, avec la mention « au moins l'un des deux » (F16).
 - Écrans ajoutés dans le style BIM : **saisie du code**, **mot de passe oublié**, **paramètres minimaux** (thème, déconnexion).
 - Écran 02 : les photos de personnes de la maquette sont remplacées par des cartes aux couleurs de la marque, en attendant des visuels dont BIM détient les droits.
 - Écran 05 : le texte de Peni dit « Ils serviront à personnaliser ton fil » au lieu de « Je prépare ton fil », le fil n'existant pas encore.
 - Écran 03 : Google, Apple et Facebook sont affichés mais annoncent « Bientôt disponible » ; aucune connexion sociale n'est simulée.
+- Différences mineures relevées par les captures de la CI (non bloquantes) : logo Google simplifié (« G ») ; « Pas encore de compte ? » placé sous les boutons sociaux au lieu du bas de l'écran 03 ; fond de l'écran 06 vide tant que le fil d'actualité n'existe pas (lot 3).
+
+### D-APP-01 — Identifiant de l'application · provisoire (fondateur, 14/10/2026)
+Identifiant Android `ci.bim.app` (et futur identifiant iOS identique), utilisé provisoirement. **Non définitif avant la publication** : une fois l'app publiée, il ne pourra plus changer. Nom affiché : « BIM ». Signature de production non configurée (clé à conserver hors du dépôt).
