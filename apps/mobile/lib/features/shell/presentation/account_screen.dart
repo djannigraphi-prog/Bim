@@ -81,6 +81,7 @@ class AccountScreen extends ConsumerWidget {
             Text('APPARENCE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: BimSpacing.sm),
             SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
               segments: const [
                 ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text('Clair')),
                 ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text('Sombre')),

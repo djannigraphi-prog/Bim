@@ -109,7 +109,7 @@ class ContactsScreen extends ConsumerWidget {
             ),
           ),
         const SizedBox(height: BimSpacing.md),
-        BimButton(label: 'Ajouter un téléphone ou un e-mail', icon: Icons.add, variant: BimButtonVariant.dark, onPressed: () => _add(context, ref)),
+        BimButton(label: 'Ajouter une coordonnée', icon: Icons.add, variant: BimButtonVariant.dark, onPressed: () => _add(context, ref)),
       ],
     );
   }
@@ -317,8 +317,8 @@ class _SpacesSheet extends ConsumerWidget {
               children: [
                 Expanded(
                   child: BimButton(
-                    label: 'Nouvelle boutique',
-                    icon: Icons.storefront_outlined,
+                    label: 'Boutique',
+                    icon: Icons.add_business_outlined,
                     variant: BimButtonVariant.subtle,
                     onPressed: () => showComingSoon(context, feature: 'La création de boutique (avec vérification d’identité)'),
                   ),
@@ -326,7 +326,7 @@ class _SpacesSheet extends ConsumerWidget {
                 const SizedBox(width: BimSpacing.sm),
                 Expanded(
                   child: BimButton(
-                    label: 'Livreur (1 max)',
+                    label: 'Livreur',
                     icon: Icons.pedal_bike,
                     variant: BimButtonVariant.subtle,
                     onPressed: () => showComingSoon(context, feature: 'Le compte livreur'),

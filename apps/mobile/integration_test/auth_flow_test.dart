@@ -161,7 +161,7 @@ void main() {
     await _tap(tester, find.byTooltip('Retour'));
     await _tap(tester, find.byTooltip('Mon compte'));
     await _scrollTap(tester, find.text('Téléphone et e-mail'));
-    await _tap(tester, find.text('Ajouter un téléphone ou un e-mail'));
+    await _tap(tester, find.text('Ajouter une coordonnée'));
     await _tap(tester, find.text('E-mail'));
     final email = '$username@exemple.com';
     await tester.enterText(find.byKey(const Key('new-contact-value')), email);
