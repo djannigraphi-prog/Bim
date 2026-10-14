@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | API + worker | ECS Fargate derrière un Application Load Balancer (HTTPS, ACM) | 2 tâches API (0,5 vCPU / 1 Go), 1 worker |
 | Base | RDS PostgreSQL 16 | db.t4g.small, 50 Go gp3, sauvegardes 14 jours, Multi-AZ en production |
-| Fichiers | S3 (privé) + CloudFront | lot 4 |
+| Photos privées (avant / après) | S3 privé, chiffrement au repos, accès bloqué au public, liens présignés de 5 min ; rôle IAM de l'API limité au compartiment | lot 1 (code prêt et testé avec MinIO) |
+| Fichiers publics (publications) | S3 + CloudFront | lot 4 |
 | Secrets | Secrets Manager | une entrée par environnement |
 | Journaux, métriques, alertes | CloudWatch | alarmes 5xx, latence, CPU, connexions base |
 | E-mails | SES | lot 2 |

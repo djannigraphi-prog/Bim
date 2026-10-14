@@ -34,4 +34,6 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `PROJECT_NOT_ACTIVE` · `PROJECT_NOT_PAUSED` · `PROJECT_COMPLETED` · `LAST_TASK` | 409 | action impossible dans l'état du projet |
 | `PROGRAM_NOT_DRAFT` | 409 | seul un brouillon de programme type se modifie ou se publie |
 | `ADMIN_EXISTS` · `SELF_LOCKOUT` · `LAST_SUPER_ADMIN` · `INVALID_STATUS` | 409 | gestion des comptes d'administration et des statuts de compte |
+| `NO_MEASURE` | 409 | l'objectif du projet ne se mesure pas en chiffres |
+| `REPORT_NOT_OPEN` · `CODE_TAKEN` | 409 | signalement déjà traité ; code de catégorie ou d'objectif déjà utilisé |
 | `INTERNAL_ERROR` | 500 | erreur inattendue (détail uniquement dans les journaux) |

@@ -137,6 +137,11 @@ Effet sur le code (vérifié le 14/10/2026) : le module Projets ne lisait déjà
 ### C7 — Programmes types à rédiger · Action du fondateur
 Pour chaque catégorie (et objectif), un programme type : durée, tâches, heures, jours, conseils, validé par une personne compétente (coach, esthéticienne…). Il peut être saisi en base dès maintenant ; l'écran d'administration arrive avec le lot 0 partie 2.
 
+### C8 — Éléments des maquettes sans règle définie · Questions au fondateur
+- Écran 26 : le **coffre** sur le chemin des jours (récompense ? laquelle, à quel moment ?) — non affiché tant qu'il n'est pas défini.
+- Écran 21 : le lien **« Résoudre un problème »** (objectif de type problème à résoudre, ex. acné ? ou aide ?) — non affiché.
+- Écran 29 : l'avertissement « selon Fitness Club, une pause de plus de 5 jours peut ralentir tes résultats » vient d'un marchand ou d'un programme validé : affiché quand ces contenus existeront (lots 5 et C7).
+
 ## Décisions techniques
 
 ### T-001 — Dépôt unique (monorepo) · Technique · décidé
@@ -203,6 +208,13 @@ Jours calculés à l'heure d'Abidjan (UTC+0). On peut cocher le jour même et ra
 
 ### T-018 — Projets : écran 24 sans paiement (F4, C4) · Technique · décidé
 Le bouton « Payer et lancer » devient « Lancer mon programme ». En mode Premium, la zone « Recommandé pour toi » annonce les recommandations des marchands vérifiés (lot 5) ; les achats se feront sur le BimShop, jamais dans le projet.
+
+### T-020 — Photos avant / après (lot 1) · Technique · décidé (stockage AWS à valider)
+Photos strictement privées : ré-encodées en JPEG (1600 px max), métadonnées et position GPS supprimées, rangées dans un stockage privé, servies seulement par des liens de 5 minutes ; une nouvelle photo remplace l'ancienne (effacée) ; tout est effacé avec le projet. En production : compartiment S3 privé (dépense AWS et autorisation ARTCI à valider, données sensibles). Tant que le stockage n'est pas configuré, l'app l'indique (« pas encore disponible »).
+
+### T-021 — Signalements et mesures (lot 1) · Technique · décidé
+« Signaler » (écran 27) : raison (lieu ou intervenant indisponible, trop difficile, douleur ou malaise, tâche inadaptée, autre), tâche, message ; traité par le support dans l'administration ; la réponse est visible dans « Mes signalements ». Douleur ou malaise : l'app conseille d'arrêter et de consulter un professionnel (urgences : 185, pompiers : 180), sans avis médical. Les signalements liés à un marchand (salle, coach) lui seront transmis au lot 5.
+Mesures (poids) : déclarées par la personne, privées ; le bilan (écran 30) affiche « d'après tes mesures », jamais un résultat inventé.
 
 ### D-UI-01 — Flutter : Riverpod 2, go_router 14, Dio 5 · Technique · décidé
 Un seul style de gestion d'état (Notifier / FutureProvider). Découpage `features/<nom>/{data,application,presentation}`.

@@ -26,6 +26,11 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `EMAIL_PROVIDER` | none | idem | idem |
 | `GOOGLE_CLIENT_IDS`, `APPLE_CLIENT_IDS`, `FACEBOOK_APP_ID` | (vide) | connexions sociales (pas encore intégrées) | |
 | `DEFAULT_PHONE_REGION` | CI | région pour lire un numéro sans indicatif | |
+| `MEDIA_STORAGE` | none | stockage des photos privées : `local` (développement/tests), `s3`, `none` (fonction fermée) | `local` refusé hors development/test |
+| `MEDIA_LOCAL_DIR` | ./.media | dossier du stockage local | |
+| `MEDIA_URL_TTL_SECONDS` | 300 | durée de validité d'un lien de photo | 30 à 3600 |
+| `MEDIA_MAX_UPLOAD_MB` | 10 | taille maximale d'une photo envoyée | 1 à 25 |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | — , eu-west-3, — | compartiment privé (S3_ENDPOINT seulement pour un stockage compatible, ex. MinIO en test) ; identifiants par le rôle IAM de la tâche ECS | `S3_BUCKET` obligatoire si `s3` |
 | `ADMIN_TOTP_ENCRYPTION_KEY` | — | clé de chiffrement des secrets de double authentification des administrateurs | **obligatoire**, 32 octets en base64 (`openssl rand -base64 32`) ; ne jamais la changer sans réenrôler les admins |
 | `ADMIN_SESSION_TTL_MINUTES` | 480 | durée d'une session d'administration | 15 à 720 |
 | `ADMIN_LOGIN_MAX_FAILURES` | 5 | échecs (mot de passe ou code) avant verrouillage | 3 à 10 |
