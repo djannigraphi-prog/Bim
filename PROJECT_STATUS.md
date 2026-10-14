@@ -42,6 +42,20 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 - **Sécurité de l'API** : 2 problèmes graves, 5 moyens, 8 mineurs signalés ; tous les graves et moyens sont corrigés et couverts par un test (suppression simultanée de coordonnées, IP falsifiable derrière un proxy, énumération de comptes par « mot de passe oublié », force brute des codes, rafraîchissement concurrent d'une réinitialisation, bombardement de SMS, configuration permissive). Mineurs corrigés : identifiants mal formés (500 → 400), paramètres SQL dans les journaux, comptage des essais par compte et en HMAC, autorisation step-up liée à la session, TRUNCATE de l'audit, audits manquants. Risques acceptés : `DECISIONS.md`, T-015.
 - **Code Flutter (lecture statique, sans compilateur)** : aucune erreur de compilation certaine trouvée ; corrigés : dépendance `intl` incompatible avec les Flutter récents, requêtes pouvant rester bloquées et déconnexion intempestive dans l'intercepteur réseau, démarrage pouvant rester bloqué, appels après fermeture d'écran, double envoi du code, quelques avertissements de l'analyseur.
 
+## Vérification de l'app mobile : bloquée dans l'environnement de travail (14/10/2026, 18 h 30)
+
+Tentatives faites, toutes refusées par le filtre réseau de l'environnement (réponse 403 ou absence de réponse) :
+- SDK Flutter et Dart officiels (`storage.googleapis.com`), miroirs (`storage.flutter-io.cn`, `mirrors.tuna.tsinghua.edu.cn`) ;
+- dépôt `github.com/flutter/flutter` et `codeload.github.com` ;
+- paquets Dart (`pub.dev`, `pub.flutter-io.cn`) et Android SDK (`dl.google.com`) ;
+- Docker Hub (image Flutter).
+Seuls les registres npm et PyPI sont accessibles : aucun ne fournit Flutter. Un analyseur de syntaxe Dart disponible sur npm (tree-sitter) a été essayé : il ne se charge pas et ne connaît pas la syntaxe Dart 3, son verdict n'aurait pas été fiable.
+
+Moyens de vérification possibles :
+1. **GitHub Actions** (recommandé) : la CI du dépôt (`.github/workflows/ci.yml`) installe Flutter et lance `flutter analyze` et `flutter test` à chaque envoi. Il suffit d'un dépôt GitHub (privé) auquel cette session peut envoyer le code.
+2. **Un ordinateur avec Flutter** : suivre `docs/INSTALLATION.md`, section 3, et envoyer le résultat de `flutter analyze` et `flutter test`.
+3. Pour vérifier les écrans eux-mêmes : lancer l'app sur un émulateur Android et un simulateur iOS (option 2), ou ajouter des tests de capture d'écran (« golden tests ») exécutés par la CI (option 1) pour comparer avec les maquettes 01 à 06.
+
 ## Erreurs et limites connues
 
 - Application mobile non compilée : à faire en priorité dès qu'un poste avec Flutter est disponible (`docs/INSTALLATION.md`, section 3). Des erreurs de compilation mineures restent possibles malgré une relecture.
