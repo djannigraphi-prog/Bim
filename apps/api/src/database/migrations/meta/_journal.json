@@ -29,6 +29,20 @@
       "when": 1792000953737,
       "tag": "0003_recovery_contact_invariant",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792008598327,
+      "tag": "0004_projects",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792008599235,
+      "tag": "0005_projects_reference_data",
+      "breakpoints": true
     }
   ]
 }

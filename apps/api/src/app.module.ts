@@ -11,13 +11,14 @@ import { AuthModule } from './modules/auth/auth.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { InterestsModule } from './modules/interests/interests.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
 
 /**
  * Monolithe modulaire : un module par domaine. Les modules transverses (configuration, base, réglages, audit,
  * envoi des messages, politique d'âge, espaces) sont globaux ; les modules métier n'importent jamais un contrôleur d'un autre.
- * Les lots suivants ajouteront ici : projects, reminders, peni, social, catalog, orders, deliveries, payments, wallet, live, messaging…
+ * Les lots suivants ajouteront ici : reminders, peni, social, catalog, orders, deliveries, payments, wallet, live, messaging…
  */
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     HealthModule,
     InterestsModule,
     AuthModule,
+    ProjectsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

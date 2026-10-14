@@ -653,6 +653,436 @@
           "Mon compte"
         ]
       }
+    },
+    "/v1/projects/catalog": {
+      "get": {
+        "operationId": "ProjectsController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catégories, objectifs, durées, budgets indicatifs et limite (écrans 19 à 23)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "operationId": "ProjectsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes projets (écran 18)",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "post": {
+        "operationId": "ProjectsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créer un projet et son programme (écrans 19 à 24) ; aucun paiement (F4)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}": {
+      "get": {
+        "operationId": "ProjectsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Projet, programme et carte des jours (écrans 24 et 26)",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "patch": {
+        "operationId": "ProjectsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renommer le projet ou le rendre public / privé",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "delete": {
+        "operationId": "ProjectsController_abandon",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprimer (abandonner) le projet ; historique conservé (E6)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/days/{day}": {
+      "get": {
+        "operationId": "ProjectsController_day",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "day",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Journée du projet (écran 27)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/days/{day}/tasks/{taskId}/done": {
+      "put": {
+        "operationId": "ProjectsController_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "day",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cocher une tâche du jour",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "delete": {
+        "operationId": "ProjectsController_uncheck",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "day",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Décocher une tâche du jour",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/tasks": {
+      "post": {
+        "operationId": "ProjectsController_addTask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter une tâche au programme",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/tasks/{taskId}": {
+      "delete": {
+        "operationId": "ProjectsController_removeTask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer une tâche du programme (les jours déjà cochés restent)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/pause": {
+      "post": {
+        "operationId": "ProjectsController_pause",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PauseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mettre en pause (écran 29) ; la fin prévue est décalée",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/resume": {
+      "post": {
+        "operationId": "ProjectsController_resume",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reprendre avant la fin de la pause",
+        "tags": [
+          "Projets"
+        ]
+      }
     }
   },
   "info": {
@@ -914,6 +1344,149 @@
         },
         "required": [
           "newPassword"
+        ]
+      },
+      "CreateProjectDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "eco",
+              "premium"
+            ],
+            "description": "Écran 19"
+          },
+          "budget": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "boosted"
+            ],
+            "description": "Mode Premium uniquement ; indicatif, aucun paiement (F4)"
+          },
+          "categoryCode": {
+            "type": "string",
+            "example": "sport",
+            "description": "Écran 20"
+          },
+          "goalCode": {
+            "type": "string",
+            "example": "sport_perte_poids",
+            "description": "Écran 21"
+          },
+          "targetQuantity": {
+            "type": "number",
+            "example": 10,
+            "description": "Quantité (ex. kilos) si l’objectif en a une"
+          },
+          "description": {
+            "type": "string",
+            "example": "Perdre du ventre avant mon mariage en décembre"
+          },
+          "receiveMerchantOffers": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enregistré ; les offres arrivent avec le lot 5"
+          },
+          "heightCm": {
+            "type": "number",
+            "example": 172
+          },
+          "weightKg": {
+            "type": "number",
+            "example": 84
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced"
+            ]
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "morning",
+              "noon",
+              "afternoon"
+            ]
+          },
+          "sessionsPerWeek": {
+            "type": "number",
+            "example": 3
+          },
+          "healthNote": {
+            "type": "string",
+            "example": "Douleur au genou",
+            "description": "Privé ; BIM ne donne aucun avis médical"
+          },
+          "durationDays": {
+            "type": "number",
+            "example": 60,
+            "description": "Si aucun modèle validé n’existe : une des durées de projects.durations_days"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "mode",
+          "categoryCode"
+        ]
+      },
+      "UpdateProjectDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "isPublic": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AddTaskDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Étirements"
+          },
+          "detail": {
+            "type": "string",
+            "example": "15 min"
+          },
+          "timeOfDay": {
+            "type": "string",
+            "example": "21:00"
+          },
+          "weekdays": {
+            "type": "number",
+            "example": 127,
+            "description": "Jours : bit 0 = lundi … bit 6 = dimanche ; 127 = tous les jours"
+          }
+        },
+        "required": [
+          "title",
+          "timeOfDay",
+          "weekdays"
+        ]
+      },
+      "PauseDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "example": 3,
+            "description": "Écran 29 : 1 jour, 3 jours, 1 semaine ou autre"
+          }
+        },
+        "required": [
+          "days"
         ]
       }
     }
