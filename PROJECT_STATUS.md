@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 14/10/2026 (nuit), session 1 — lot 0 vérifié sur Android réel (émulateur) ; lot 1 partie 1 (projets) livré et testé.
+Dernière mise à jour : 14/10/2026 (nuit), session 1 — lot 0 terminé (partie 2 : administration, coordonnées, appareils, écran 53) ; lot 1 partie 1 livrée.
 
 ## Résumé
 
@@ -14,15 +14,16 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 
 | Module | Conception | Backend | Interface mobile | Intégration | Tests | Bloqué par |
 | --- | --- | --- | --- | --- | --- | --- |
-| Socle API (config, journaux, santé, erreurs, OpenAPI, limitation) | Terminée | Fait | — | — | Exécutés, réussis | — |
-| Base + migrations (20 tables, 4 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
-| Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Compilée (Android), captures vérifiées | Écrite, **pas encore exécutée sur un téléphone contre l'API** | API : exécutés, réussis | Fournisseur SMS réel (lot 2) |
+| Socle API (config, journaux, santé, erreurs, OpenAPI, limitation) | Terminée | Fait | — | Image Docker de production démarrée en CI | Exécutés, réussis | — |
+| Environnements staging et production (AWS) | Plan écrit (`docs/DEPLOYMENT.md`) | — | — | **Non déployés** | Image testée en CI | Validation des dépenses AWS, autorisation ARTCI, nom de domaine |
+| Base + migrations (8 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
+| Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel (lot 2) |
 | F15 — âges par capacité | Terminée | Fait (réglages `age.*`) | — | — | Exécutés, réussis | Vérifications légales (DECISIONS.md) |
-| F16 — récupération vérifiée, step-up | Terminée | Fait | Écran « code » écrit ; écrans de gestion des coordonnées à faire | Partielle | API : exécutés, réussis | — |
-| Espaces (utilisateur / boutique / livreur) | Terminée | Contrôle d'accès et bascule faits ; création de boutique et de compte livreur : lots 5 et 7 | Écran 53 à faire | — | Exécutés (accès refusé) | KYC (lot 5) |
+| F16 — récupération vérifiée, step-up | Terminée | Fait | Coordonnées, mot de passe, appareils | **Testée sur Android** (ajout d'un e-mail vérifié, nouveau mot de passe) | API + Android : réussis | — |
+| Espaces (utilisateur / boutique / livreur) | Terminée | Contrôle d'accès et bascule faits ; création de boutique et de compte livreur : lots 5 et 7 | Écran 53 fait | Bascule vers l'espace utilisateur seulement (aucune boutique ni compte livreur avant les lots 5 et 7) | API : réussis ; capture | KYC (lot 5), `age.min_merchant` / `age.min_courier` |
 | Connexions Google / Apple / Facebook | Terminée | Préparées, **désactivées** (`NOT_CONFIGURED`) | Boutons affichés, « Bientôt disponible » | — | Exécutés (indisponibilité honnête) | Comptes développeur + clés |
 | Thème clair / sombre | Terminée | Préférence enregistrée | Compilé, capture sombre vérifiée | Écrit | — | — |
-| Administration web | Esquissée | Tables et rôles seulement | — | — | — | Lot 0 partie 2 |
+| Administration (API `/admin/v1` + application web React) | Terminée | Fait : connexion + TOTP, rôles, réglages, audit, utilisateurs, programmes types, comptes admin | Web : fait | **Testée dans Chromium contre l'API** | API : 8 unitaires + 13 e2e ; web : unitaires + 5 scénarios navigateur | Rôles à valider (T-019) ; hébergement AWS |
 | Lot 1 — Projets BIM, partie 1 (écrans 18-24, 26, 27, 29, 30) | Terminée | Fait : référentiels, création, programme, journée, pause, fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création + séance cochée) | API : 6 unitaires + 13 e2e ; mobile : captures | Programmes types à rédiger (C7) ; photos avant/après (médias, lot 4) ; rappels (lot 2) ; Peni (lot 3) |
 | Lots 2 à 12 (rappels, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
@@ -38,9 +39,13 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 | Build de production + migrations compilées | `npm run build` puis `node dist/database/migrate.js` | réussi |
 | Mobile (CI GitHub) | `flutter analyze`, `flutter test` (7 tests), 29 captures, `flutter build apk --debug` | réussis (exécution 38636192504) |
 | Android ↔ API (émulateur) | `flutter test integration_test` | réussi (exécution 38636192504) |
-| API (local, 14/10 soir) | unitaires 37, e2e 54 + 1 à écrire au lot 8 (abonné Premium) | réussis |
+| API | unitaires 45, e2e 67 + 1 à écrire au lot 8 (abonné Premium) | réussis (local et CI) |
+| Administration web | Vitest + Playwright/Chromium contre l'API (5 scénarios) | réussis (local et CI, job `admin`) |
+| Image Docker de l'API | build, migrations, démarrage en production, santé | en CI (job `api`) |
 
 ## Relectures indépendantes (session 1)
+
+- **Administration (lot 0, partie 2)** : 1 problème grave et 3 moyens trouvés puis corrigés et couverts par des tests : force brute du code TOTP en recommençant la connexion, verrouillage contournable par requêtes parallèles, ancienne étape d'enrôlement pouvant remplacer l'appareil configuré, réponse de verrouillage révélant les comptes admin. Mineur corrigé : jeton d'étape masqué dans les journaux. Risque restant accepté (T-015) : verrouillage déclenchable par qui connaît l'e-mail d'un admin → admin limité aux adresses de l'équipe en production.
 
 - **Sécurité de l'API** : 2 problèmes graves, 5 moyens, 8 mineurs signalés ; tous les graves et moyens sont corrigés et couverts par un test (suppression simultanée de coordonnées, IP falsifiable derrière un proxy, énumération de comptes par « mot de passe oublié », force brute des codes, rafraîchissement concurrent d'une réinitialisation, bombardement de SMS, configuration permissive). Mineurs corrigés : identifiants mal formés (500 → 400), paramètres SQL dans les journaux, comptage des essais par compte et en HMAC, autorisation step-up liée à la session, TRUNCATE de l'audit, audits manquants. Risques acceptés : `DECISIONS.md`, T-015.
 - **Code Flutter (lecture statique, sans compilateur)** : aucune erreur de compilation certaine trouvée ; corrigés : dépendance `intl` incompatible avec les Flutter récents, requêtes pouvant rester bloquées et déconnexion intempestive dans l'intercepteur réseau, démarrage pouvant rester bloqué, appels après fermeture d'écran, double envoi du code, quelques avertissements de l'analyseur.
@@ -110,8 +115,8 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Lot 1, partie 2 : écran 25 (chat Peni) → lot 3 ; écran 28 (rappels, alarme) → lot 2 ; écran 31 (avant / après) → médias. Saisie des programmes types (C7) dès qu'ils sont rédigés.
-2. Lot 0, partie 2 : écran 53 (changer de profil), écrans de gestion des coordonnées et des appareils, administration (connexion avec TOTP, réglages `age.*` et `projects.*`, programmes types).
+1. Lot 1, suite (sans programmes types) : catégories et objectifs modifiables dans l'administration ; signalement d'un problème sur une tâche (écran 27) ; photos avant / après (écrans 22 et 31, stockage privé : choix S3 à valider) ; profil public d'un projet (écran 52). Écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
+2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
 4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
 5. Avant les lots 7 à 9 : réponses C1 à C5, vérifications juridiques (F3, F7, F8, F10, F11, F14, F15, ARTCI, BCEAO) et validation de la simulation F13. Écrans 24 et 38 à redessiner selon F4 (lot 1 / lot 7).
