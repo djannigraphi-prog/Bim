@@ -1,0 +1,36 @@
+name: bim
+description: "BIM — Beauté, Image et Motivation. Application mobile Android et iOS."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  # État : Riverpod, utilisé partout de la même façon (Notifier / AsyncNotifier). Voir docs/CONVENTIONS.md.
+  flutter_riverpod: ^2.6.1
+  # Navigation déclarative avec redirections selon la session.
+  go_router: ^14.8.1
+  # HTTP + intercepteur de session.
+  dio: ^5.7.0
+  # Jetons stockés dans le trousseau (iOS Keychain / Android Keystore), jamais en clair.
+  flutter_secure_storage: ^9.2.4
+  # Logos, mascotte Peni et cadeaux fournis en SVG.
+  flutter_svg: ^2.0.16
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/
+    - assets/peni/
+    - assets/gifts/
