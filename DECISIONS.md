@@ -56,7 +56,7 @@ Mise en œuvre :
 - Impossible de retirer la dernière coordonnée vérifiée (`LAST_RECOVERY_CONTACT`).
 - Alerte envoyée sur les coordonnées existantes à chaque ajout ou retrait de coordonnée et à chaque changement de mot de passe.
 
-### Corrections du 14/10/2026 (paiements, pièces, commission) · Fondateur · **décidé**
+### Corrections du 14/10/2026 (paiements, pièces, commission) · Fondateur · **décidé** (complétées par les réponses F1-F17 ci-dessous)
 
 - Le paiement de l'article et celui de la livraison sont **séparés** (Q39). Seuls les **livreurs partenaires** d'un marchand, dans le programme de partenariat BIM, encaissent le paiement des articles. Aucune autre organisation ne doit être programmée sans accord.
 - Principe **0 % de commission BIM** sur les pièces reçues : conservé. Les frais d'opérateur sont étudiés séparément (question F13).
@@ -65,9 +65,63 @@ Mise en œuvre :
 
 Prise en compte dans le lot 0 : la table `courier_shop_partnerships` porte le droit `can_collect_article_payment` (faux par défaut, accordé par le marchand) et un encours maximal facultatif. Aucune logique de paiement n'existe encore.
 
-### Questions en attente du fondateur
+### Réponses du fondateur du 14/10/2026 (F1 à F14, F17) · Fondateur
 
-F1 à F14 et F17 : voir la section 6.6 de l'analyse. Lot bloqué par chacune : F1-F3 → lot 7 ; F4-F6, F17 → lot 8 ; F7-F14 → lot 9 ; F10 → lot 10.
+Statuts utilisés ci-dessous :
+- **orientation retenue** : la règle guide la conception technique ;
+- **validation requise** : la règle ne sera pas activée en production avant la vérification indiquée (juridique, financière ou prestataire) ;
+- **à clarifier** : contradiction avec un document BIM, présentée au fondateur avant toute modification.
+
+Aucune fonctionnalité financière n'est programmée de façon définitive : l'architecture est préparée, les fonctions restent fermées.
+
+#### A. Commandes et livraisons
+
+| N° | Règle retenue | Statut | Ce qui doit encore être validé |
+| --- | --- | --- | --- |
+| F1 | Livreur indépendant (non partenaire) : l'article est payé **directement au marchand** en Mobile Money, de préférence **avant l'expédition** ; le livreur indépendant n'encaisse jamais l'article. Article et livraison restent deux paiements distincts. | Orientation retenue | C1 : paiement au marchand à la livraison également permis ? (Q38 prévoyait le paiement à la livraison) |
+| F2 | Les frais de livraison **appartiennent au livreur** ; le client les lui paie à la livraison. BIM enregistre séparément montant de l'article, frais de livraison, statut et confirmation de chaque paiement. | Orientation retenue | C2 : cas du livreur salarié d'une boutique (Q52) |
+| F3 | Les livreurs **partenaires** peuvent encaisser l'article **en espèces ou en Mobile Money**. BIM enregistre montant encaissé, boutique bénéficiaire et reversement dû. Aucun paiement déclaré sans confirmation ou preuve. | Validation requise : procédures de contrôle des espèces | Précision de Q39 (« sur un opérateur mobile ») : les espèces sont désormais ajoutées |
+
+#### B. Paiements et abonnements
+
+| N° | Règle retenue | Statut | Ce qui doit encore être validé |
+| --- | --- | --- | --- |
+| F4 | Un projet **recommande** des articles ou services et **met en relation** avec le marchand ; **aucun paiement dans le projet**. Les achats se font comme sur BimShop. **BIM ne reçoit aucun paiement commercial** ; il est intermédiaire. | Orientation retenue (remplace Q38 « paiement en ligne dans le projet » et l'écran 24 « Payer et lancer ») | C3 : abonnements Premium et publicité sont aussi des revenus de BIM ; C4 : l'écran 24 doit être redessiné |
+| F5 | Carte bancaire (Visa) **prévue mais pas en première version**, après validation du Mobile Money. L'architecture permet de l'ajouter sans reconstruction. | Orientation retenue | — |
+| F6 | Pièces et abonnements Premium achetés **dans l'app** : **achat intégré Apple / Google**. Biens physiques et livraisons : **Mobile Money**. | Orientation retenue | Confirmation des règles avant implémentation (lot 8), devise et paliers de prix des magasins en Côte d'Ivoire |
+| F7 | Site web BIM pour acheter pièces et abonnements en Mobile Money, avec son propre circuit sécurisé. **Aucun lien, bouton ni message de l'app vers ce site** (règles Apple et Google vérifiées le 14/10/2026). | Validation requise : juridique et magasins | Communication autorisée uniquement hors de l'app |
+
+#### C. Pièces et retraits
+
+| N° | Règle retenue | Statut | Ce qui doit encore être validé |
+| --- | --- | --- | --- |
+| F8 | **Pièces achetées** : servent aux cadeaux, **jamais retirables ni convertibles**. **Pièces reçues** (interactions éligibles) : solde **retirable** selon les règles BIM. Le système garde séparément pièces achetées, reçues, envoyées, retirées et opérations annulées. | Validation requise : juridique (pièces convertibles en argent) | — |
+| F9 | Recevoir des pièces **monétisables** est réservé aux **utilisateurs Premium**. Le système distingue pièces reçues et pièces effectivement retirables ; la condition est expliquée clairement. | Orientation retenue | Texte d'explication à valider |
+| F10 | Les **marchands** pourront recevoir des pièces **pendant leurs Lives**, distinctes du paiement des articles ; jamais utilisées pour payer un article physique. **Prévu dans l'architecture, désactivé.** | Validation requise : règles financières et juridiques | Conditions par type de compte à définir |
+| F11 | Fin du Premium : les pièces **valablement acquises restent sur le compte**, aucune suppression automatique. | Validation requise : juridique (accès aux retraits et aux nouvelles pièces après la fin) | — |
+| F12 | **Vérification d'identité obligatoire avant le premier retrait**, adaptée à la taille du projet (revue manuelle d'abord, prestataire spécialisé ensuite), données minimales, accès strictement contrôlés. | Orientation retenue | Choix du prestataire (dépense : validation explicite du fondateur) |
+| F13 | Frais d'opérateur : **S2** (frais affichés à part à l'achat Mobile Money), **S3** (frais de retrait affichés à part, payés par le créateur), **S4** (meilleurs tarifs, pas de prestataire unique imposé), **S6** (minimum de retrait si nécessaire). **S1** étudiée après simulation ; **S5** écartée pour l'instant. **BIM ne prélève aucune commission sur les pièces reçues** ; les frais d'opérateur ne sont jamais présentés comme une commission BIM. | Validation requise : financière (simulation `docs/SIMULATION_FRAIS.md`) | S2 ne s'applique pas aux achats intégrés (le prix est fixé par le magasin) |
+| F14 | **5 000 000 FCFA = plafond de retrait par jour**. Minimum et maximum sont deux paramètres distincts ; le minimum sera fixé après examen des frais réels. Retraits rapides mais **pas automatiquement instantanés** : un retrait à risque peut être suspendu pour contrôle. | Validation requise : prestataires et réglementation | — |
+
+#### D. Comptes et sécurité
+
+F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F15, « autres paiements et abonnements » suivent les règles légales et les exigences des prestataires (seuils toujours `null` en base).
+
+#### E. Livreurs Premium
+
+| N° | Règle retenue | Statut |
+| --- | --- | --- |
+| F17 | Le Livreur Premium obtient une **priorité de présentation** des commandes éligibles, **jamais une garantie** : disponibilité, zone, distance, statut et capacité sont vérifiés d'abord. Critères transparents, cohérents et administrables ; aucun livreur ne reçoit une commande qu'il ne peut pas assurer. | Orientation retenue |
+
+#### Points à clarifier par le fondateur (contradictions avec les documents)
+
+- **C1 (F1 / Q38)** — Q38 dit « le paiement du produit se fait à la livraison ». F1 privilégie le paiement au marchand avant l'expédition. Avec un livreur indépendant, le client peut-il aussi payer le marchand **au moment de la remise** (le marchand confirme alors la réception dans l'app avant que le livreur ne remette le colis) ?
+- **C2 (F2 / Q52)** — F2 : les frais de livraison appartiennent au livreur. Q52 : le livreur **employé** d'une boutique travaille « sous une base salariale ». Pour un livreur salarié, les frais de livraison reviennent-ils au livreur ou à la boutique ?
+- **C3 (F4 / Présentation p. 13, Q58)** — F4 : « les seuls paiements que BIM reçoit sont l'achat des cadeaux ». Mais BIM reçoit aussi les **abonnements Premium** (2 000 / 5 000 / 1 000 FCFA, Présentation p. 13) et la **publicité** (Q58). Lecture retenue en attendant : BIM ne reçoit **aucun paiement commercial** (articles, services, livraisons) ; il reçoit les achats de pièces, les abonnements et la publicité.
+- **C4 (F4 / écrans 24 et 38)** — L'écran 24 affiche « Payer et lancer · 33 500 FCFA » et l'écran 38 « payé en ligne » pour un projet. Avec F4, ces écrans doivent devenir « Voir l'offre / Contacter le marchand », et le paiement se fait comme un achat BimShop.
+- **C5 (F8 / F4 — fonds détenus par BIM)** — Quand un utilisateur achète des pièces, BIM encaisse l'argent puis, plus tard, paie les créateurs qui retirent leurs pièces reçues. Entre les deux, BIM **détient des fonds** destinés à des tiers. C'est précisément le point que l'avis juridique (BCEAO, monnaie électronique) doit trancher avant toute mise en production des pièces.
+
+---
 
 ---
 

@@ -174,6 +174,8 @@ Matrice proposée (O = oui, P = si Premium, — = non, ? = décision du fondateu
 
 Version corrigée le 14/10/2026 à ta demande. La première version remplaçait plusieurs règles déjà définies (paiement à la livraison, pièces, commission, 5 millions) par mes propres choix ; c'était une erreur. Pour chaque sujet, cette section sépare désormais : **règle définie** (avec sa source), **contradiction** entre documents, **recommandation technique** (qui ne change pas la règle) et **question** au fondateur. Rien de ce qui est en question n'est programmé avant ta réponse.
 
+> **Mise à jour du 14/10/2026 (soir) — réponses du fondateur F1 à F17.** Elles sont enregistrées dans `DECISIONS.md`, avec leur statut et cinq points à clarifier (C1 à C5), et prévalent sur la section 6.6. Changement principal : **aucun paiement dans un projet** (F4) ; les passages qui prévoyaient un paiement en ligne dans le projet (sections 2 et 6.1) sont remplacés. Simulation des frais : `docs/SIMULATION_FRAIS.md`.
+
 ### 6.1 Paiement de l'article et paiement de la livraison
 
 Règles définies :

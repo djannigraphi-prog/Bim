@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 14/10/2026, fin de la session 1 (lot 0, partie 1).
+Dernière mise à jour : 14/10/2026 (soir), session 1 — lot 0 partie 1 + enregistrement des décisions F1 à F17.
 
 ## Résumé
 
@@ -55,7 +55,8 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 ## Décisions
 
 - Prises : voir `DECISIONS.md` (F15 provisoire, F16, corrections du 14/10, T-001 à T-013, D-UI-01 à 03).
-- En attente du fondateur : F1 à F14 et F17 ; validation des écarts de maquettes D-UI-03 ; police D-UI-02.
+- Réponses F1 à F17 reçues le 14/10/2026 et enregistrées (orientations retenues ou validations requises). **Aucun changement de code** : rien de ce qui est programmé n'était concerné ; aucune fonction financière n'a été programmée.
+- En attente du fondateur : points à clarifier C1 à C5 (`DECISIONS.md`) ; validation des écarts de maquettes D-UI-03 ; police D-UI-02 ; décision sur la simulation des frais (`docs/SIMULATION_FRAIS.md`).
 
 ## Commandes
 
@@ -74,4 +75,4 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 2. Lot 0, partie 2 : écran 53 (changer de profil), écrans de gestion des coordonnées et des appareils, connexion administrateur avec TOTP et écran des réglages `age.*`.
 3. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
 4. Lot 1 (projets BIM) : catégories administrables, création en 5 étapes, carte et journée du projet ; rédiger les programmes types avec le fondateur.
-5. Obtenir les réponses F1 à F14 et F17 avant les lots 7 à 9 ; lancer les vérifications légales F15 et ARTCI.
+5. Avant les lots 7 à 9 : réponses C1 à C5, vérifications juridiques (F3, F7, F8, F10, F11, F14, F15, ARTCI, BCEAO) et validation de la simulation F13. Écrans 24 et 38 à redessiner selon F4 (lot 1 / lot 7).
