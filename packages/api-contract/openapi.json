@@ -1,0 +1,921 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Santé"
+        ]
+      }
+    },
+    "/v1/interests": {
+      "get": {
+        "operationId": "InterestsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Liste ordonnée des centres d’intérêt actifs"
+          }
+        },
+        "tags": [
+          "Référentiels"
+        ]
+      }
+    },
+    "/v1/auth/username-availability": {
+      "get": {
+        "operationId": "AuthController_usernameAvailability",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Disponibilité d'un nom d'utilisateur (écran 04)",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Inscription (Q13, écrans 04-05) ; envoie un code sur le téléphone (privilégié) ou l’e-mail",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/register/verify": {
+      "post": {
+        "operationId": "AuthController_verifySignup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirme le code d'inscription, active le compte et ouvre une session",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/codes/resend": {
+      "post": {
+        "operationId": "AuthController_resend",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Renvoie un code (délai minimal entre deux envois, 5 envois maximum)",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Connexion par e-mail, téléphone ou @nom d’utilisateur + mot de passe (écran 03)",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Échange le jeton de rafraîchissement contre une nouvelle paire (rotation)",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/password/forgot": {
+      "post": {
+        "operationId": "AuthController_forgot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Mot de passe oublié : réponse identique que le compte existe ou non",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/password/reset": {
+      "post": {
+        "operationId": "AuthController_reset",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Nouveau mot de passe avec le code reçu ; déconnecte tous les appareils",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/step-up": {
+      "post": {
+        "operationId": "AuthController_startStepUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepUpStartDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Opération sensible, étape 1 : mot de passe, puis code envoyé sur une coordonnée vérifiée",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/step-up/verify": {
+      "post": {
+        "operationId": "AuthController_completeStepUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Opération sensible, étape 2 : code → autorisation à usage unique (en-tête X-Step-Up-Token)",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/switch-space": {
+      "post": {
+        "operationId": "AuthController_switchSpace",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchSpaceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Changer d'espace (utilisateur, boutique, livreur) — écran 53",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/providers": {
+      "get": {
+        "operationId": "AuthController_providers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Méthodes de connexion sociale réellement disponibles",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/auth/oauth/{provider}": {
+      "post": {
+        "operationId": "AuthController_oauth",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Connexion Google / Apple / Facebook — pas encore disponible",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "operationId": "MeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mon profil privé complet",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/capabilities": {
+      "get": {
+        "operationId": "MeController_capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ce que l'âge permet (F15), calculé par le serveur",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/preferences": {
+      "patch": {
+        "operationId": "MeController_preferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thème clair / sombre / système (écran 62)",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/contacts": {
+      "post": {
+        "operationId": "MeController_addContact",
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Autorisation obtenue via /v1/auth/step-up/verify",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddContactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter un téléphone ou un e-mail (opération sensible) ; un code y est envoyé",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/contacts/verify": {
+      "post": {
+        "operationId": "MeController_verifyContact",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmer la nouvelle coordonnée avec le code reçu",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/contacts/{id}": {
+      "delete": {
+        "operationId": "MeController_removeContact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Autorisation obtenue via /v1/auth/step-up/verify",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer une coordonnée (jamais la dernière vérifiée)",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/password": {
+      "post": {
+        "operationId": "MeController_changePassword",
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Autorisation obtenue via /v1/auth/step-up/verify",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Changer de mot de passe ; les autres appareils sont déconnectés",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/sessions": {
+      "get": {
+        "operationId": "MeController_listSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Appareils connectés",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/sessions/{id}": {
+      "delete": {
+        "operationId": "MeController_revokeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Déconnecter un appareil",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    },
+    "/v1/me/spaces": {
+      "get": {
+        "operationId": "MeController_listSpaces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes espaces : utilisateur, boutiques, compte livreur (écran 53)",
+        "tags": [
+          "Mon compte"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "API BIM",
+    "description": "API de l’application BIM (Beauté, Image, Motivation). Erreurs au format { error: { code, message, details } } — voir docs/API_ERRORS.md.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "Doho Yannick"
+          },
+          "username": {
+            "type": "string",
+            "example": "yannick.doho",
+            "description": "Sans « @ » ; 3 à 30 caractères : lettres, chiffres, point, tiret bas"
+          },
+          "birthDate": {
+            "type": "string",
+            "example": "1998-03-12",
+            "description": "AAAA-MM-JJ ; privée par défaut"
+          },
+          "city": {
+            "type": "string",
+            "example": "Cocody"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+2250700000000",
+            "description": "Téléphone ou e-mail : au moins un des deux (F16)"
+          },
+          "email": {
+            "type": "string",
+            "example": "nom@exemple.com"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male",
+              "undisclosed"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "interests": {
+            "example": [
+              "mode",
+              "sport_coaching",
+              "coiffure"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "fullName",
+          "username",
+          "birthDate",
+          "city",
+          "password",
+          "interests"
+        ]
+      },
+      "VerifyCodeDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          },
+          "deviceName": {
+            "type": "string",
+            "example": "iPhone de Yannick"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
+        ]
+      },
+      "ChallengeRefDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "challengeId"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "example": "yannick.doho",
+            "description": "E-mail, téléphone ou nom d’utilisateur"
+          },
+          "password": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "identifier",
+          "password"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "E-mail, téléphone ou nom d’utilisateur"
+          }
+        },
+        "required": [
+          "identifier"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code",
+          "newPassword"
+        ]
+      },
+      "StepUpStartDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "contact_change",
+              "password_change",
+              "account_deletion",
+              "withdrawal"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "Obligatoire si le compte a un mot de passe"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "SwitchSpaceDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "merchant",
+              "courier"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ]
+      },
+      "UpdatePreferencesDto": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "enum": [
+              "system",
+              "light",
+              "dark"
+            ]
+          }
+        }
+      },
+      "AddContactDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "email"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "newPassword"
+        ]
+      }
+    }
+  }
+}

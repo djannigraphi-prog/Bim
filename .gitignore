@@ -1,0 +1,32 @@
+# Secrets et configuration locale — ne jamais commiter
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist
+
+# Node
+node_modules/
+dist/
+coverage/
+*.log
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+apps/mobile/android/local.properties
+apps/mobile/ios/Flutter/Generated.xcconfig
+apps/mobile/ios/Pods/
+
+# Éditeurs et système
+.idea/
+.vscode/
+.DS_Store

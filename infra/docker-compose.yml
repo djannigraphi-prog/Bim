@@ -1,0 +1,20 @@
+# Environnement de développement local : PostgreSQL 16.
+# Usage : docker compose -f infra/docker-compose.yml up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bim-postgres
+    environment:
+      POSTGRES_USER: bim
+      POSTGRES_PASSWORD: bim          # développement uniquement
+      POSTGRES_DB: bim_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - bim-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bim -d bim_dev"]
+      interval: 5s
+      retries: 10
+volumes:
+  bim-pgdata:
