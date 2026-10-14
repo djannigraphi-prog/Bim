@@ -30,6 +30,8 @@ class ApiClient {
   Future<Map<String, dynamic>> post(String path, {Object? body, Map<String, String>? headers}) =>
       _run(() => dio.post<dynamic>(path, data: body, options: Options(headers: headers)));
 
+  Future<Map<String, dynamic>> put(String path, {Object? body}) => _run(() => dio.put<dynamic>(path, data: body));
+
   Future<Map<String, dynamic>> patch(String path, {Object? body}) => _run(() => dio.patch<dynamic>(path, data: body));
 
   Future<Map<String, dynamic>> delete(String path, {Map<String, String>? headers}) =>

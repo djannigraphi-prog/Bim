@@ -7,6 +7,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
+import '../../projects/presentation/my_projects_screen.dart';
 
 /// Barre du bas des maquettes (Q8) : Accueil · Messages · « + » (nouveau projet, Q9) · Live · BimShop.
 /// Lot 0 : la navigation et le mode visiteur sont en place ; le contenu de chaque onglet arrive avec son lot
@@ -37,7 +38,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       if (_visitor) {
         showVisitorGate(context, ref);
       } else {
-        showComingSoon(context, feature: 'La création de projet BIM');
+        context.push('/projects/new');
       }
       return;
     }
@@ -73,7 +74,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           const SizedBox(width: BimSpacing.sm),
         ],
       ),
-      body: Center(
+      // Lot 1 : tant que le fil d'actualité n'existe pas (lot 4), l'Accueil d'une personne connectée montre ses projets (écran 18).
+      body: _tab == 0 && session is SessionSignedIn
+          ? const MyProjectsView()
+          : Center(
         child: Padding(
           padding: const EdgeInsets.all(BimSpacing.xl),
           child: Column(

@@ -2,7 +2,8 @@
 // (base PostgreSQL neuve, migrations réelles). Exécuté par la CI (job « android-e2e »).
 //
 // Parcours : bienvenue → inscription (2 étapes) → code reçu → accueil → déconnexion
-//            → connexion avec un mauvais mot de passe (refusée) → connexion correcte → accueil.
+//            → connexion avec un mauvais mot de passe (refusée) → connexion correcte → accueil
+//            → nouveau projet (5 étapes) → programme → journée → séance cochée.
 // Le code est lu par un relais de la CI dans les journaux de l'API de développement, comme une personne lirait son SMS.
 import 'dart:convert';
 import 'dart:io';
@@ -122,5 +123,23 @@ void main() {
     await _typePassword(tester, password);
     await _tap(tester, find.widgetWithText(FilledButton, 'Se connecter'));
     await _waitFor(tester, find.byTooltip('Mon compte'));
+
+    // Lot 1 : créer un projet (écrans 19 à 24), ouvrir la journée (27) et cocher la séance.
+    await _waitFor(tester, find.text('Ton premier projet t’attend'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Nouveau projet'));
+    await _tap(tester, find.text('Mode Éco'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
+    await _tap(tester, find.text('Sport'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
+    await _tap(tester, find.text('Abdos'));
+    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
+    await _tap(tester, find.text('Passer cette étape'));
+    await _tap(tester, find.text('7'));
+    await _tap(tester, find.text('Créer mon programme'));
+    await _waitFor(tester, find.textContaining('Renforcer mes abdos', findRichText: true));
+    await _tap(tester, find.text('Lancer mon programme'));
+    await _tap(tester, find.text('Voir l’étape du jour'));
+    await _tap(tester, find.text('Séance · Abdos'));
+    await _waitFor(tester, find.text('Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'));
   });
 }

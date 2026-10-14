@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
+import '../../../core/widgets/bim_icons.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
@@ -135,19 +136,6 @@ class _RegisterStep2ScreenState extends ConsumerState<RegisterStep2Screen> {
   }
 }
 
-IconData _iconFor(String icon) => switch (icon) {
-      'shirt' => Icons.checkroom_outlined,
-      'dumbbell' => Icons.fitness_center,
-      'sparkles' => Icons.auto_awesome_outlined,
-      'flower' => Icons.local_florist_outlined,
-      'scissors' => Icons.content_cut,
-      'brush' => Icons.brush_outlined,
-      'hand' => Icons.back_hand_outlined,
-      'leaf' => Icons.eco_outlined,
-      'camera' => Icons.photo_camera_outlined,
-      'glasses' => Icons.diamond_outlined,
-      _ => Icons.star_outline,
-    };
 
 class _InterestChip extends StatelessWidget {
   const _InterestChip({required this.interest, required this.selected, required this.onTap});
@@ -177,7 +165,7 @@ class _InterestChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_iconFor(interest.icon), size: 20, color: selected ? BimColors.white : scheme.onSurface),
+              Icon(bimIcon(interest.icon), size: 20, color: selected ? BimColors.white : scheme.onSurface),
               const SizedBox(width: BimSpacing.sm),
               Text(
                 interest.label,

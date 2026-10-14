@@ -1,0 +1,251 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/network/api_exception.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/util/date_fr.dart';
+import '../../../core/widgets/bim_button.dart';
+import '../../../core/widgets/brand.dart';
+import 'project_widgets.dart';
+
+class ProjectLoadError extends StatelessWidget {
+  const ProjectLoadError({super.key, required this.error, required this.onRetry});
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(BimSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Peni(pose: PeniPose.sad, size: 96),
+            const SizedBox(height: BimSpacing.lg),
+            Text(error is ApiException ? (error as ApiException).message : ApiException.unknown.message, textAlign: TextAlign.center),
+            const SizedBox(height: BimSpacing.lg),
+            BimButton(label: 'Réessayer', variant: BimButtonVariant.outline, onPressed: onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<String?> askProjectTitle(BuildContext context, String current) async {
+  final controller = TextEditingController(text: current);
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Nom du projet'),
+      content: TextField(controller: controller, maxLength: 80, autofocus: true),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+        TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Enregistrer')),
+      ],
+    ),
+  );
+  controller.dispose();
+  return (result == null || result.length < 2) ? null : result;
+}
+
+typedef NewTask = ({String title, String? detail, String time, int weekdays});
+
+/// Ajout d'une tâche au programme : titre, précision, heure, jours.
+Future<NewTask?> askNewTask(BuildContext context) {
+  return showModalBottomSheet<NewTask>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => const _NewTaskSheet(),
+  );
+}
+
+class _NewTaskSheet extends StatefulWidget {
+  const _NewTaskSheet();
+
+  @override
+  State<_NewTaskSheet> createState() => _NewTaskSheetState();
+}
+
+class _NewTaskSheetState extends State<_NewTaskSheet> {
+  final _title = TextEditingController();
+  final _detail = TextEditingController();
+  TimeOfDay _time = const TimeOfDay(hour: 7, minute: 0);
+  int _weekdays = 127;
+  static const _labels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  static const _names = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _detail.dispose();
+    super.dispose();
+  }
+
+  String get _hhmm => '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, MediaQuery.viewInsetsOf(context).bottom + BimSpacing.lg),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Nouvelle tâche', style: theme.textTheme.titleLarge),
+            const SizedBox(height: BimSpacing.md),
+            TextField(controller: _title, maxLength: 80, decoration: const InputDecoration(hintText: 'Ex. : Étirements', counterText: '')),
+            const SizedBox(height: BimSpacing.sm),
+            TextField(controller: _detail, maxLength: 200, decoration: const InputDecoration(hintText: 'Précision (facultatif)', counterText: '')),
+            const SizedBox(height: BimSpacing.md),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final t = await showTimePicker(context: context, initialTime: _time);
+                if (t != null) setState(() => _time = t);
+              },
+              icon: const Icon(Icons.schedule),
+              label: Text('Heure : $_hhmm'),
+            ),
+            const SizedBox(height: BimSpacing.md),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Semantics(
+                    label: _names[i],
+                    child: ChoiceChipBim(
+                      label: _labels[i],
+                      selected: _weekdays & (1 << i) != 0,
+                      onTap: () => setState(() {
+                        final next = _weekdays ^ (1 << i);
+                        if (next != 0) _weekdays = next;
+                      }),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: BimSpacing.lg),
+            BimButton(
+              label: 'Ajouter',
+              onPressed: () {
+                if (_title.text.trim().length < 2) return;
+                Navigator.pop<NewTask>(context, (title: _title.text.trim(), detail: _detail.text.trim(), time: _hhmm, weekdays: _weekdays));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<bool> confirmAbandon(BuildContext context, String title) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Supprimer « $title » ?'),
+      content: const Text('Le projet disparaîtra de ta liste. Tu pourras en créer un nouveau à tout moment.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Garder')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: TextButton.styleFrom(foregroundColor: BimColors.red),
+          child: const Text('Supprimer'),
+        ),
+      ],
+    ),
+  );
+  return ok ?? false;
+}
+
+/// Écran 29 — Mettre en pause : durée, nouvelle fin prévue. Renvoie le nombre de jours, ou null.
+Future<int?> askPause(BuildContext context, {required String title, required String plannedEndDate}) {
+  return showModalBottomSheet<int>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => _PauseSheet(title: title, plannedEndDate: plannedEndDate),
+  );
+}
+
+class _PauseSheet extends StatefulWidget {
+  const _PauseSheet({required this.title, required this.plannedEndDate});
+
+  final String title;
+  final String plannedEndDate;
+
+  @override
+  State<_PauseSheet> createState() => _PauseSheetState();
+}
+
+class _PauseSheetState extends State<_PauseSheet> {
+  int _days = 3;
+  bool _custom = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const presets = [(1, '1 jour'), (3, '3 jours'), (7, '1 semaine')];
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, BimSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(child: Peni(pose: PeniPose.sad, size: 96)),
+            const SizedBox(height: BimSpacing.md),
+            Text('Mettre en pause « ${widget.title} » ?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            const SizedBox(height: BimSpacing.lg),
+            Text('Durée de la pause', style: theme.textTheme.titleMedium),
+            const SizedBox(height: BimSpacing.sm),
+            Wrap(
+              spacing: BimSpacing.sm,
+              runSpacing: BimSpacing.sm,
+              children: [
+                for (final (n, label) in presets)
+                  ChoiceChipBim(label: label, selected: !_custom && _days == n, onTap: () => setState(() {
+                    _custom = false;
+                    _days = n;
+                  }),
+                ),
+                ChoiceChipBim(label: _custom ? '$_days jours' : 'Autre', selected: _custom, onTap: () => setState(() => _custom = true)),
+              ],
+            ),
+            if (_custom)
+              Slider(
+                value: _days.toDouble(),
+                min: 1,
+                max: 30,
+                divisions: 29,
+                label: '$_days jours',
+                activeColor: BimColors.red,
+                onChanged: (v) => setState(() => _days = v.round()),
+              ),
+            const SizedBox(height: BimSpacing.sm),
+            Row(
+              children: [
+                const Icon(Icons.sync, size: 20),
+                const SizedBox(width: BimSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Ton programme sera réajusté : fin prévue le ${shortDay(addDaysTo(widget.plannedEndDate, _days))} '
+                    'au lieu du ${shortDay(widget.plannedEndDate)}.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: BimSpacing.lg),
+            BimButton(label: 'Confirmer la pause', variant: BimButtonVariant.dark, onPressed: () => Navigator.pop(context, _days)),
+            const SizedBox(height: BimSpacing.sm),
+            BimButton(label: 'Non, je continue 💪', variant: BimButtonVariant.subtle, onPressed: () => Navigator.pop(context)),
+          ],
+        ),
+      ),
+    );
+  }
+}

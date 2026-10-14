@@ -11,6 +11,12 @@ import '../../features/auth/presentation/register_step2_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/verify_code_screen.dart';
 import '../../features/auth/presentation/welcome_screen.dart';
+import '../../features/projects/presentation/celebration_screen.dart';
+import '../../features/projects/presentation/my_projects_screen.dart';
+import '../../features/projects/presentation/new_project_screen.dart';
+import '../../features/projects/presentation/program_screen.dart';
+import '../../features/projects/presentation/project_day_screen.dart';
+import '../../features/projects/presentation/project_map_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 
@@ -35,7 +41,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return switch (session) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc)) ? '/home' : null,
-        SessionSignedOut(visitor: true) => (loc == '/splash' || loc == '/account') ? '/home' : null,
+        SessionSignedOut(visitor: true) => (loc == '/splash' || loc == '/account' || loc.startsWith('/projects')) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -52,6 +58,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/forgot', builder: (_, __) => const ForgotPasswordScreen()),
       GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
       GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
+      // Lot 1 — projets BIM (écrans 18 à 30).
+      GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
+      GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),
+      GoRoute(path: '/projects/:id', builder: (_, s) => ProjectMapScreen(projectId: s.pathParameters['id']!)),
+      GoRoute(path: '/projects/:id/program', builder: (_, s) => ProgramScreen(projectId: s.pathParameters['id']!)),
+      GoRoute(path: '/projects/:id/done', builder: (_, s) => CelebrationScreen(projectId: s.pathParameters['id']!)),
+      GoRoute(
+        path: '/projects/:id/day/:day',
+        builder: (_, s) => ProjectDayScreen(projectId: s.pathParameters['id']!, day: s.pathParameters['day']!),
+      ),
     ],
   );
 });

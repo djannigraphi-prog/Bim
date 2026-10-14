@@ -30,12 +30,14 @@ class BimBackButton extends StatelessWidget {
 
 /// En-tête des parcours en plusieurs étapes (écrans 04, 05, 19-23) : retour, « Étape x sur y », barre segmentée.
 class StepHeader extends StatelessWidget {
-  const StepHeader({super.key, required this.step, required this.total, this.title, this.onBack});
+  const StepHeader({super.key, required this.step, required this.total, this.title, this.onBack, this.trailing});
 
   final int step;
   final int total;
   final String? title;
   final VoidCallback? onBack;
+  /// Bouton à droite (ex. fermer le parcours « Nouveau projet »).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +54,7 @@ class StepHeader extends StatelessWidget {
                 style: TextStyle(fontSize: 17, color: scheme.onSurfaceVariant),
               ),
             ),
-            const SizedBox(width: kBimMinTouch),
+            trailing ?? const SizedBox(width: kBimMinTouch),
           ],
         ),
         const SizedBox(height: BimSpacing.lg),

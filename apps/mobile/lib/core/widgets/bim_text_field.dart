@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
 
@@ -25,6 +26,7 @@ class BimTextField extends StatelessWidget {
     this.onTap,
     this.maxLength,
     this.prefixText,
+    this.inputFormatters,
   });
 
   final String? label;
@@ -45,6 +47,7 @@ class BimTextField extends StatelessWidget {
   final VoidCallback? onTap;
   final int? maxLength;
   final String? prefixText;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +86,7 @@ class BimTextField extends StatelessWidget {
           readOnly: readOnly,
           onTap: onTap,
           maxLength: maxLength,
+          inputFormatters: inputFormatters,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: hint,
