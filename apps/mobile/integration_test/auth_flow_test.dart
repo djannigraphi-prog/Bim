@@ -166,9 +166,11 @@ void main() {
     await _tap(tester, find.text('Recevoir un code'));
     await _waitFor(tester, find.byKey(const Key('code-field')));
     lastPhoneCode = await _codeFor(digits, previous: lastPhoneCode);
-    await tester.enterText(find.byKey(const Key('code-field')), lastPhoneCode);
+    await tester.enterText(find.byKey(const Key('code-field')).last, lastPhoneCode);
     await _waitFor(tester, find.text('Vérifie cette adresse'));
-    await tester.enterText(find.byKey(const Key('code-field')), await _codeFor('', email: email));
+    // Laisse la feuille précédente se fermer (sinon deux champs « code » coexistent un instant).
+    await tester.pump(const Duration(seconds: 1));
+    await tester.enterText(find.byKey(const Key('code-field')).last, await _codeFor('', email: email));
     await _waitFor(tester, find.text(email));
     expect(find.text('Non vérifié'), findsNothing);
 
@@ -188,7 +190,7 @@ void main() {
     await _tap(tester, find.text('Recevoir un code'));
     await _waitFor(tester, find.byKey(const Key('code-field')));
     lastPhoneCode = await _codeFor(digits, previous: lastPhoneCode);
-    await tester.enterText(find.byKey(const Key('code-field')), lastPhoneCode);
+    await tester.enterText(find.byKey(const Key('code-field')).last, lastPhoneCode);
     await _waitFor(tester, find.text('Paramètres'));
     await _scrollTap(tester, find.text('Se déconnecter'));
     await _tap(tester, find.text('Se connecter'));
