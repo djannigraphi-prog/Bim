@@ -27,6 +27,9 @@ Future<void> _waitFor(WidgetTester tester, Finder finder, {Duration timeout = co
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
+  // Ferme le clavier avant de toucher un bouton (comme une personne le ferait) : sinon la mise en page bouge pendant le tap.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump(const Duration(milliseconds: 400));
   await _waitFor(tester, finder);
   await tester.ensureVisible(finder.first);
   await tester.pump(const Duration(milliseconds: 300));
