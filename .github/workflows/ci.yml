@@ -44,6 +44,26 @@ jobs:
           ADMIN_TOTP_ENCRYPTION_KEY: Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=
           LOG_LEVEL: error
         run: npm run openapi:export && git diff --exit-code ../../packages/api-contract/openapi.json
+      - name: Image Docker de production (build, migrations, démarrage, santé)
+        run: |
+          docker build -t bim-api:ci .
+          docker run --rm --network host -e NODE_ENV=production -e DATABASE_URL=postgres://bim:bim@localhost:5432/bim_docker \
+            bim-api:ci node -e "const {Pool}=require('pg');new Pool({connectionString:'postgres://bim:bim@localhost:5432/postgres'}).query('create database bim_docker').then(()=>process.exit(0))"
+          docker run --rm --network host -e DATABASE_URL=postgres://bim:bim@localhost:5432/bim_docker bim-api:ci node dist/database/migrate.js
+          docker run -d --name bim-api --network host -e NODE_ENV=production -e TRUST_PROXY=1 \
+            -e DATABASE_URL=postgres://bim:bim@localhost:5432/bim_docker \
+            -e JWT_ACCESS_SECRET=ci-docker-access-secret-0123456789-abcd -e OTP_SECRET=ci-docker-otp-secret-0123456789-abcdefgh \
+            -e ADMIN_TOTP_ENCRYPTION_KEY=Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE= bim-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:3000/health && break; sleep 1; done
+          curl -sf localhost:3000/health
+          # En production : documentation désactivée, SMS factices refusés.
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/docs)" = "404"
+          docker rm -f bim-api
+          if docker run --rm -e NODE_ENV=production -e SMS_PROVIDER=console -e DATABASE_URL=postgres://x:y@localhost/z \
+               -e JWT_ACCESS_SECRET=ci-docker-access-secret-0123456789-abcd -e OTP_SECRET=ci-docker-otp-secret-0123456789-abcdefgh \
+               -e ADMIN_TOTP_ENCRYPTION_KEY=Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE= bim-api:ci; then
+            echo "La production a démarré avec des SMS factices" && exit 1
+          fi
 
   mobile:
     runs-on: ubuntu-latest

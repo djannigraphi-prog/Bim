@@ -52,6 +52,14 @@ flutter run --dart-define=BIM_API_URL=http://10.0.2.2:3000     # émulateur Andr
 
 Ensuite : remplacer l'icône par `assets/brand/app_icon.svg` (exportée en PNG aux tailles requises), nommer l'application « BIM ».
 
+## 3 bis. Administration web
+
+```bash
+cd apps/api && ADMIN_PASSWORD='un-mot-de-passe-long' npm run admin:create -- --email toi@exemple.ci --name "Ton nom" --roles super_admin
+cd ../admin && npm ci && VITE_API_URL=http://localhost:3000 npm run dev    # http://localhost:5173
+```
+À la première connexion, scanne le QR code avec une application d'authentification (double authentification obligatoire). Voir `apps/admin/README.md`.
+
 ## 4. Vérifier que tout fonctionne
 
 ```bash

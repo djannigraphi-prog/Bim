@@ -35,3 +35,11 @@ Règle : un test n'est déclaré réussi que s'il a été exécuté. Les résult
 - `apps/api/test/projects.e2e-spec.ts` (bloc « mode indépendant de l'abonnement ») : une personne sans abonnement choisit les deux modes ; le mode Premium ne crée aucune table ni donnée de paiement ; on change de mode dans les deux sens ; le mode Premium n'accorde aucun avantage (même limite de projets).
 - Test en attente (`it.todo`) : « une personne abonnée Premium choisit un projet économique ou Premium », à écrire au lot 8, quand l'abonnement existera.
 - `apps/mobile/test/project_draft_test.dart` : la requête de création ne contient aucun champ d'abonnement ou de paiement.
+
+## Lot 0, partie 2 — administration et compte
+
+- `apps/api/src/common/totp.spec.ts` : codes TOTP (vecteurs de la RFC 6238), chiffrement des secrets.
+- `apps/api/src/modules/admin/setting-rules.spec.ts` : contrôle des valeurs de réglages.
+- `apps/api/test/admin.e2e-spec.ts` (13 tests) : connexion + TOTP, enrôlement, réutilisation de code refusée, verrouillage (y compris requêtes parallèles et force brute du code), ancienne étape d'enrôlement sans effet, séparation des jetons app / admin, permissions par rôle, réglages appliqués et journalisés, recherche et suspension d'un compte, programmes types publiés puis utilisés par un nouveau projet, comptes admin.
+- `apps/admin/src/api.test.ts` (Vitest) et `apps/admin/e2e/admin.spec.ts` : parcours réel dans Chromium contre l'API (`.github/scripts/run-admin-e2e.sh`, job CI `admin`).
+- `apps/mobile/integration_test/auth_flow_test.dart` : sur émulateur Android contre l'API réelle — inscription, connexion, projet, ajout d'un e-mail vérifié (opération protégée), appareils connectés, nouveau mot de passe, connexion par e-mail.

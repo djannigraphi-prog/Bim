@@ -11,6 +11,7 @@
 | Journaux, métriques, alertes | CloudWatch | alarmes 5xx, latence, CPU, connexions base |
 | E-mails | SES | lot 2 |
 | Images Docker | ECR | balayage de vulnérabilités activé |
+| Administration web | S3 (privé) + CloudFront, accès limité par AWS WAF (adresses IP de l'équipe ou VPN) | fichiers statiques (`apps/admin/dist`) |
 
 L'infrastructure sera décrite en Terraform dans `infra/terraform/` (à écrire), un état par environnement (`staging`, `production`).
 
@@ -28,6 +29,7 @@ L'infrastructure sera décrite en Terraform dans `infra/terraform/` (à écrire)
 - `TRUST_PROXY=1` derrière l'ALB (un nombre, jamais `true`) ; documentation `/docs` désactivée (automatique en production).
 - Deux rôles PostgreSQL : un rôle « migrations » propriétaire des tables, et un rôle « application » sans droit UPDATE, DELETE ni TRUNCATE sur `audit_logs`.
 - Restauration de sauvegarde testée (`docs/BACKUP_RESTORE.md`).
+- Administration : `ADMIN_TOTP_ENCRYPTION_KEY` dans Secrets Manager ; routes `/admin/*` de l'API et site d'administration limités aux adresses de l'équipe (WAF) ; premier administrateur principal créé par une tâche ECS ponctuelle : `ADMIN_PASSWORD=… node dist/admin-cli.js --email … --name … --roles super_admin` (mot de passe transmis hors de tout dépôt, double authentification configurée à la première connexion).
 - Vérifications légales de `DECISIONS.md` (F15) et autorisations ARTCI obtenues.
 
 La publication sur Google Play et l'App Store est une étape distincte, avec les comptes du fondateur ; elle n'est jamais automatique.

@@ -26,7 +26,13 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `EMAIL_PROVIDER` | none | idem | idem |
 | `GOOGLE_CLIENT_IDS`, `APPLE_CLIENT_IDS`, `FACEBOOK_APP_ID` | (vide) | connexions sociales (pas encore intégrées) | |
 | `DEFAULT_PHONE_REGION` | CI | région pour lire un numéro sans indicatif | |
+| `ADMIN_TOTP_ENCRYPTION_KEY` | — | clé de chiffrement des secrets de double authentification des administrateurs | **obligatoire**, 32 octets en base64 (`openssl rand -base64 32`) ; ne jamais la changer sans réenrôler les admins |
+| `ADMIN_SESSION_TTL_MINUTES` | 480 | durée d'une session d'administration | 15 à 720 |
+| `ADMIN_LOGIN_MAX_FAILURES` | 5 | échecs (mot de passe ou code) avant verrouillage | 3 à 10 |
+| `ADMIN_LOCK_MINUTES` | 15 | durée du verrouillage et de la fenêtre de comptage | 5 à 1440 |
 
 Tests e2e uniquement : `TEST_DATABASE_ADMIN_URL` (défaut `postgres://bim:bim@localhost:5432/postgres`), `KEEP_TEST_DB=1` pour garder la base après les tests.
+
+Administration web : `VITE_API_URL` (adresse de l'API) ; l'origine de l'administration doit figurer dans `CORS_ORIGINS` de l'API.
 
 Application mobile : `--dart-define=BIM_API_URL=…` et `--dart-define=BIM_ENV=dev|staging|production`. Aucun secret dans l'application.

@@ -186,7 +186,14 @@ Chaque exécution crée une base PostgreSQL vierge, applique toutes les migratio
 ### T-015 — Risques acceptés (à réévaluer) · Technique · provisoire
 - L'inscription indique qu'un téléphone ou un e-mail est déjà utilisé (`CONTACT_TAKEN`), comme la plupart des services : risque d'énumération limité par la limitation de débit.
 - Une autorisation step-up est consommée par la garde avant le traitement : si la requête échoue ensuite (coordonnée invalide), il faut en redemander une.
+- Administration : le verrouillage après 5 échecs (réponses identiques, sans révéler si le compte existe) peut être déclenché par une personne qui connaît l'e-mail d'un administrateur (blocage de 15 min). Mesure prévue en production : n'ouvrir `/admin/*` et le site d'administration qu'aux adresses de l'équipe (WAF ou VPN).
 - La création d'une boutique ou d'un compte livreur (lots 5 et 7) devra appliquer `age.min_merchant` et `age.min_courier` ; tant qu'ils valent null, la création restera fermée.
+
+### T-019 — Administration : double authentification et rôles (lot 0, partie 2) · Technique · proposition à valider
+- Application web séparée (React + Vite), mêmes données via `/admin/v1`, jetons d'administration distincts de ceux de l'app.
+- Connexion : mot de passe (Argon2id) puis code TOTP obligatoire (application d'authentification) ; secret chiffré (AES-256-GCM) ; code à usage unique ; verrouillage après 5 échecs ; sessions de 8 h révocables ; toute action journalisée.
+- Permissions proposées (`apps/api/src/modules/admin/permissions.ts`) : réglages en lecture pour tous, en écriture pour l'administrateur principal seul ; journal d'audit : principal, support, technique ; comptes utilisateurs (recherche, suspension) : principal, support, modération ; programmes types : rédaction par principal et commercial, **publication par l'administrateur principal seul**, avec le nom de la personne compétente qui a validé ; comptes d'administration : principal seul. Les rôles financier et modération n'ont pas encore d'écran propre (lots 5 à 9).
+- Le support voit les coordonnées masquées (ex. `+22507••••12`) ; chaque recherche et chaque fiche consultée sont journalisées.
 
 ### T-016 — Projets : programmes types et programme « construit depuis les réponses » (lot 1) · Technique · provisoire
 Les programmes types (contenu de coaching) doivent être rédigés et validés par l'équipe BIM : la base refuse de publier un modèle sans validateur, et **aucun modèle n'est livré**. Tant qu'il n'existe pas de modèle publié pour une catégorie, le programme contient une seule routine construite à partir des réponses de l'écran 23 (séances par semaine, disponibilité), que la personne complète avec ses propres tâches. Aucun conseil de santé, d'alimentation ou de sport n'est inventé par l'app.

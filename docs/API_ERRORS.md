@@ -27,4 +27,11 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `RATE_LIMITED` | 429 | limitation de débit HTTP |
 | `NOT_CONFIGURED` | 503 | fonction dépendant d'un service externe non configuré (SMS, connexion sociale…) |
 | `RULE_NOT_DECIDED` | 503 | règle métier non encore décidée par le fondateur ; `details.rule` |
+| `LOGIN_EXPIRED` | 401 | administration : étape de connexion expirée, déjà utilisée ou 5 essais atteints |
+| `INVALID_CODE` | 401 | administration : code TOTP incorrect, expiré ou déjà utilisé |
+| `PROJECT_LIMIT_REACHED` | 409 | limite de projets en cours atteinte (`projects.max_active`) |
+| `DAY_NOT_EDITABLE` · `TASK_NOT_DUE` | 409 | case d'un jour futur, en pause, hors programme ; tâche non prévue ce jour-là |
+| `PROJECT_NOT_ACTIVE` · `PROJECT_NOT_PAUSED` · `PROJECT_COMPLETED` · `LAST_TASK` | 409 | action impossible dans l'état du projet |
+| `PROGRAM_NOT_DRAFT` | 409 | seul un brouillon de programme type se modifie ou se publie |
+| `ADMIN_EXISTS` · `SELF_LOCKOUT` · `LAST_SUPER_ADMIN` · `INVALID_STATUS` | 409 | gestion des comptes d'administration et des statuts de compte |
 | `INTERNAL_ERROR` | 500 | erreur inattendue (détail uniquement dans les journaux) |
