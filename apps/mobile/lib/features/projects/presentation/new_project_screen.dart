@@ -423,7 +423,7 @@ class _CategoryStep extends StatelessWidget {
             crossAxisCount: 2,
             mainAxisSpacing: BimSpacing.md,
             crossAxisSpacing: BimSpacing.md,
-            mainAxisExtent: 128,
+            mainAxisExtent: 136,
           ),
           children: [
             for (final c in catalog.categories)
@@ -445,9 +445,17 @@ class _CategoryStep extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Peni(pose: PeniPose.think, size: 44),
+                    const Peni(pose: PeniPose.think, size: 40),
                     const SizedBox(height: BimSpacing.xs),
-                    Text('Pas sûr ? Demande à Peni', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                    Flexible(
+                      child: Text(
+                        'Pas sûr ? Demande à Peni',
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -497,7 +505,7 @@ class _CategoryTile extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              Text(category.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), maxLines: 2),
+              Text(category.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
