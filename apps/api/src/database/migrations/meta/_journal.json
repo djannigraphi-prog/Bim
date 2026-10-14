@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791999568142,
+      "tag": "0000_init_identity_profiles_spaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791999598283,
+      "tag": "0001_reference_data_and_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792000941341,
+      "tag": "0002_step_up_session_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792000953737,
+      "tag": "0003_recovery_contact_invariant",
+      "breakpoints": true
+    }
+  ]
+}
