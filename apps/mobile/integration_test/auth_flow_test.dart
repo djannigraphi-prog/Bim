@@ -27,6 +27,10 @@ Future<void> _waitFor(WidgetTester tester, Finder finder, {Duration timeout = co
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
+  // Un message temporaire (SnackBar) peut recouvrir le bouton, comme pour une vraie personne : on attend qu'il disparaisse.
+  for (var i = 0; i < 40 && find.byType(SnackBar).evaluate().isNotEmpty; i++) {
+    await tester.pump(const Duration(milliseconds: 250));
+  }
   await _waitFor(tester, finder);
   await tester.ensureVisible(finder.first);
   await tester.pump(const Duration(milliseconds: 300));
