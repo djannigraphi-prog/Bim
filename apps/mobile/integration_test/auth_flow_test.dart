@@ -114,9 +114,9 @@ void main() {
     await _type(tester, 'E-mail, téléphone ou @nom d’utilisateur', username);
     await _typePassword(tester, 'Mauvais-mot-de-passe-1');
     await _tap(tester, find.widgetWithText(FilledButton, 'Se connecter'));
-    await tester.pump(const Duration(seconds: 3));
+    // Le message du serveur s'affiche sous le champ et la session reste fermée.
+    await _waitFor(tester, find.text('Identifiant ou mot de passe incorrect.'));
     expect(find.byTooltip('Mon compte'), findsNothing);
-    expect(find.text('Content de te revoir'), findsOneWidget);
 
     // Connexion correcte.
     await _typePassword(tester, password);

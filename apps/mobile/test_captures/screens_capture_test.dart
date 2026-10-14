@@ -181,15 +181,21 @@ void main() {
     await _show(t, '/forgot');
     await _capture(t, 'x2_mot_de_passe_oublie');
   });
-  // Petit téléphone Android (360 × 640) : un débordement ferait échouer ce test.
+  // Petit téléphone (320 × 568, la largeur de l'émulateur de la CI) : un débordement ferait échouer ce test.
   testWidgets('04 inscription, petit écran', (t) async {
-    await _show(t, '/register/1', physical: const Size(1080, 1920));
+    await _show(t, '/register/1', physical: const Size(960, 1704));
     await _capture(t, 'x4_inscription_petit_ecran');
   });
   testWidgets('03 connexion, petit écran', (t) async {
-    await _show(t, '/login', physical: const Size(1080, 1920));
+    await _show(t, '/login', physical: const Size(960, 1704));
     await _capture(t, 'x5_connexion_petit_ecran');
   });
+  for (final (route, name) in [('/welcome', '02'), ('/register/2', '05'), ('/verify', 'code'), ('/forgot', 'oubli'), ('/home', 'accueil')]) {
+    testWidgets('$name, petit écran', (t) async {
+      await _show(t, route, physical: const Size(960, 1704));
+      await _capture(t, 'x6_petit_ecran_$name');
+    });
+  }
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);
     c.read(sessionProvider.notifier).continueAsVisitor();

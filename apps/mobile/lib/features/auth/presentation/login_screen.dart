@@ -148,8 +148,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
               const SizedBox(height: BimSpacing.xxl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // Wrap : passe à la ligne sur les écrans étroits (débordement relevé sur émulateur Android 320 dp).
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text('Pas encore de compte ?', style: theme.textTheme.bodyMedium),
                   TextButton(
