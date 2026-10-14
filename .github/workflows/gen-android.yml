@@ -1,0 +1,29 @@
+name: Génération du dossier Android (ponctuel)
+on:
+  push:
+    branches: [tooling/gen-android]
+permissions:
+  contents: write
+jobs:
+  gen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: flutter create (Android uniquement)
+        working-directory: apps/mobile
+        run: |
+          rm -rf /tmp/gen && mkdir /tmp/gen && cd /tmp/gen
+          flutter create --platforms=android --org ci.bim --project-name bim --no-pub bim
+          cd "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan gen/android-platform
+          git rm -rfq .
+          cp -r /tmp/gen/bim/android ./android
+          flutter --version > FLUTTER_VERSION.txt
+          git add android FLUTTER_VERSION.txt
+          git commit -qm "Dossier android généré par flutter create"
+          git push -q origin gen/android-platform
