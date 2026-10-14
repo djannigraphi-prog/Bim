@@ -39,12 +39,18 @@ jobs:
             docker rm -f minio 2>/dev/null || true
           done
           for i in $(seq 1 30); do curl -sf localhost:9000/minio/health/live && break; sleep 1; done
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --json --outputFile="$RUNNER_TEMP/e2e.json"
         env:
           TEST_DATABASE_ADMIN_URL: postgres://bim:bim@localhost:5432/postgres
           S3_TEST_ENDPOINT: http://localhost:9000
           AWS_ACCESS_KEY_ID: bimtest
           AWS_SECRET_ACCESS_KEY: bimtest-secret-123
+      - name: Détail des tests en échec (annotations)
+        if: ${{ failure() }}
+        run: |
+          python3 "$GITHUB_WORKSPACE/.github/scripts/jest-failures.py" "$RUNNER_TEMP/e2e.json" "$RUNNER_TEMP/e2e.short" || echo "rapport absent" > "$RUNNER_TEMP/e2e.short"
+          docker logs minio 2>&1 | tail -20 >> "$RUNNER_TEMP/e2e.short" || true
+          python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "api e2e" "$RUNNER_TEMP/e2e.short" 6
       - name: Contrat OpenAPI à jour
         env:
           NODE_ENV: test
