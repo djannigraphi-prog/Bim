@@ -46,6 +46,8 @@ jobs:
 
   mobile:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # uniquement pour publier les captures sur la branche ci-captures
     defaults:
       run:
         working-directory: apps/mobile
@@ -62,3 +64,18 @@ jobs:
       - name: Tests (exécutés même si l'analyse échoue, pour connaître leur état réel)
         if: ${{ !cancelled() }}
         run: flutter test
+      - name: Captures des écrans (comparaison avec les maquettes)
+        if: ${{ !cancelled() }}
+        run: |
+          export FLUTTER_ROOT="$(dirname "$(dirname "$(command -v flutter)")")"
+          flutter test test_captures --update-goldens
+      - name: Publier les captures (branche ci-captures)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ../../.github/scripts/publish-captures.sh
+      - name: Compilation Android (debug, dossiers de plateforme générés pour la CI uniquement)
+        if: ${{ !cancelled() }}
+        run: |
+          flutter create --platforms=android --org ci.bim.placeholder --project-name bim .
+          flutter build apk --debug --dart-define=BIM_API_URL=https://api.invalid

@@ -30,3 +30,6 @@ apps/mobile/ios/Pods/
 .idea/
 .vscode/
 .DS_Store
+
+# Captures générées par la CI (publiées sur la branche ci-captures)
+apps/mobile/test_captures/captures/
