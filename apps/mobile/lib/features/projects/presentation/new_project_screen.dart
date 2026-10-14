@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,7 +74,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
     try {
       final project = await ref.read(projectsApiProvider).create(draft);
       ref.invalidate(myProjectsProvider);
-      if (mounted) unawaited(context.pushReplacement('/projects/${project.summary.id}/program'));
+      if (mounted) context.pushReplacement('/projects/${project.summary.id}/program');
     } on ApiException catch (e) {
       final fields = <String, String>{};
       for (final f in ['budget', 'categoryCode', 'goalCode', 'targetQuantity', 'description', 'durationDays', 'heightCm', 'weightKg', 'healthNote']) {

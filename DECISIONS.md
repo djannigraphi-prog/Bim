@@ -125,6 +125,12 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 
 ---
 
+### C6 — Le « Mode Premium » d'un projet (écran 19) exige-t-il l'abonnement Premium ? · Question au fondateur
+L'écran 19 présente le mode Premium comme des recommandations de produits et services (avec un budget) ; l'abonnement Premium est décrit ailleurs (écran 61). Dans le code actuel, le mode Premium d'un projet est **libre** et n'implique aucun paiement. À confirmer.
+
+### C7 — Programmes types à rédiger · Action du fondateur
+Pour chaque catégorie (et objectif), un programme type : durée, tâches, heures, jours, conseils, validé par une personne compétente (coach, esthéticienne…). Il peut être saisi en base dès maintenant ; l'écran d'administration arrive avec le lot 0 partie 2.
+
 ## Décisions techniques
 
 ### T-001 — Dépôt unique (monorepo) · Technique · décidé
@@ -175,6 +181,15 @@ Chaque exécution crée une base PostgreSQL vierge, applique toutes les migratio
 - L'inscription indique qu'un téléphone ou un e-mail est déjà utilisé (`CONTACT_TAKEN`), comme la plupart des services : risque d'énumération limité par la limitation de débit.
 - Une autorisation step-up est consommée par la garde avant le traitement : si la requête échoue ensuite (coordonnée invalide), il faut en redemander une.
 - La création d'une boutique ou d'un compte livreur (lots 5 et 7) devra appliquer `age.min_merchant` et `age.min_courier` ; tant qu'ils valent null, la création restera fermée.
+
+### T-016 — Projets : programmes types et programme « construit depuis les réponses » (lot 1) · Technique · provisoire
+Les programmes types (contenu de coaching) doivent être rédigés et validés par l'équipe BIM : la base refuse de publier un modèle sans validateur, et **aucun modèle n'est livré**. Tant qu'il n'existe pas de modèle publié pour une catégorie, le programme contient une seule routine construite à partir des réponses de l'écran 23 (séances par semaine, disponibilité), que la personne complète avec ses propres tâches. Aucun conseil de santé, d'alimentation ou de sport n'est inventé par l'app.
+
+### T-017 — Projets : calendrier, pause, fin · Technique · provisoire
+Jours calculés à l'heure d'Abidjan (UTC+0). On peut cocher le jour même et rattraper un jour passé, jamais un jour futur. Une pause commence le jour même, aucune tâche n'est due pendant la pause et la fin prévue est décalée d'autant ; une reprise anticipée rend les jours non utilisés. Le projet passe « terminé » le lendemain de la fin prévue. Le bilan (écran 30) affiche les étapes faites, la progression et la meilleure série, sans affirmer un résultat que BIM ne mesure pas (ex. kilos perdus). Réglages : `projects.max_active` (5), `projects.durations_days` (30/60/90), `projects.budget_tiers`, `projects.availability_times`, `projects.pause_max_days` (non décidé).
+
+### T-018 — Projets : écran 24 sans paiement (F4, C4) · Technique · décidé
+Le bouton « Payer et lancer » devient « Lancer mon programme ». En mode Premium, la zone « Recommandé pour toi » annonce les recommandations des marchands vérifiés (lot 5) ; les achats se feront sur le BimShop, jamais dans le projet.
 
 ### D-UI-01 — Flutter : Riverpod 2, go_router 14, Dio 5 · Technique · décidé
 Un seul style de gestion d'état (Notifier / FutureProvider). Découpage `features/<nom>/{data,application,presentation}`.
