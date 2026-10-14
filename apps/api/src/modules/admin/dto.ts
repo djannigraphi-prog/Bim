@@ -51,8 +51,24 @@ export class ProgramTaskDto {
   @ApiProperty({ example: 127 }) @IsInt() @Min(1) @Max(127) weekdays!: number;
 }
 
+export class ProgramTipDto {
+  @ApiPropertyOptional({ description: 'Jour de programme (1 = premier jour) ; vide = conseil général' }) @IsOptional() @IsInt() @Min(1) @Max(365) day?: number | null;
+  @ApiProperty() @IsString() @Length(3, 240) text!: string;
+}
+
 export class ProgramDto {
   @ApiProperty() @IsString() @Length(1, 40) categoryCode!: string;
+  @ApiPropertyOptional({ enum: ['any', 'eco', 'premium'], description: 'Mode de projet visé (C6) ; « any » = les deux' })
+  @IsOptional()
+  @IsIn(['any', 'eco', 'premium'])
+  mode?: 'any' | 'eco' | 'premium';
+  @ApiPropertyOptional({ type: [ProgramTipDto], description: 'Habitudes du jour (écran 27)' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(400)
+  @ValidateNested({ each: true })
+  @Type(() => ProgramTipDto)
+  tips?: ProgramTipDto[];
   @ApiPropertyOptional() @IsOptional() @IsString() @Length(1, 40) goalCode?: string | null;
   @ApiProperty() @IsString() @Length(3, 120) title!: string;
   @ApiProperty() @IsInt() @Min(7) @Max(365) durationDays!: number;
@@ -82,4 +98,29 @@ export class UpdateAdminDto {
   @ApiPropertyOptional() @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) roles?: string[];
   @ApiPropertyOptional({ enum: ['active', 'disabled'] }) @IsOptional() @IsIn(['active', 'disabled']) status?: 'active' | 'disabled';
   @ApiPropertyOptional({ description: 'Oblige à reconfigurer la double authentification (appareil perdu)' }) @IsOptional() @IsBoolean() resetTotp?: boolean;
+}
+
+export class CategoryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(2, 40) code?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(2, 60) label?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) icon?: string;
+  @ApiPropertyOptional({ example: '#FDECEF' }) @IsOptional() @IsString() @MaxLength(7) tint?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(10000) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean;
+}
+
+export class GoalDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(2, 40) code?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(1, 40) categoryCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(2, 60) label?: string;
+  @ApiPropertyOptional({ example: 'kg' }) @IsOptional() @IsString() @MaxLength(12) quantityUnit?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsInt() quantityMin?: number | null;
+  @ApiPropertyOptional() @IsOptional() @IsInt() quantityMax?: number | null;
+  @ApiPropertyOptional({ example: 'Perdre {q} kg' }) @IsOptional() @IsString() @MaxLength(80) titlePattern?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(10000) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean;
+}
+
+export class ResolveReportDto {
+  @ApiProperty({ description: 'Réponse ou suite donnée (conservée)' }) @IsString() @Length(3, 500) resolution!: string;
 }

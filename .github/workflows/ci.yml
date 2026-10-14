@@ -32,9 +32,16 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:unit
+      - name: Stockage compatible S3 pour les tests (MinIO, local au runner)
+        run: |
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          for i in $(seq 1 30); do curl -sf localhost:9000/minio/health/live && break; sleep 1; done
       - run: npm run test:e2e
         env:
           TEST_DATABASE_ADMIN_URL: postgres://bim:bim@localhost:5432/postgres
+          S3_TEST_ENDPOINT: http://localhost:9000
+          AWS_ACCESS_KEY_ID: bimtest
+          AWS_SECRET_ACCESS_KEY: bimtest-secret-123
       - name: Contrat OpenAPI à jour
         env:
           NODE_ENV: test
@@ -125,6 +132,8 @@ jobs:
       ADMIN_TOTP_ENCRYPTION_KEY: Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=
       SMS_PROVIDER: console
       EMAIL_PROVIDER: console
+      MEDIA_STORAGE: local
+      MEDIA_LOCAL_DIR: /tmp/bim-media
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

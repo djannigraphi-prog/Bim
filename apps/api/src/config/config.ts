@@ -64,6 +64,19 @@ const schema = z
     ADMIN_SESSION_TTL_MINUTES: z.coerce.number().int().min(15).max(720).default(480),
     ADMIN_LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(10).default(5),
     ADMIN_LOCK_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
+
+    /**
+     * Stockage des photos privées (avant / après). « local » : dossier sur le disque, développement et tests uniquement.
+     * « s3 » : compartiment privé (AWS S3 ou compatible) ; « none » : fonction fermée (NOT_CONFIGURED).
+     */
+    MEDIA_STORAGE: z.enum(['local', 's3', 'none']).default('none'),
+    MEDIA_LOCAL_DIR: z.string().default('./.media'),
+    MEDIA_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+    MEDIA_MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(25).default(10),
+    S3_BUCKET: z.string().default(''),
+    S3_REGION: z.string().default('eu-west-3'),
+    /** Uniquement pour un stockage compatible S3 (ex. MinIO en test) ; vide pour AWS. */
+    S3_ENDPOINT: z.string().default(''),
   })
   .superRefine((cfg, ctx) => {
     const devLike = cfg.NODE_ENV === 'development' || cfg.NODE_ENV === 'test';
@@ -83,6 +96,12 @@ const schema = z
     }
     if (!devLike && !cfg.HTTP_THROTTLE_ENABLED) {
       ctx.addIssue({ code: 'custom', path: ['HTTP_THROTTLE_ENABLED'], message: 'La limitation de débit ne peut pas être désactivée hors développement' });
+    }
+    if (!devLike && cfg.MEDIA_STORAGE === 'local') {
+      ctx.addIssue({ code: 'custom', path: ['MEDIA_STORAGE'], message: 'Le stockage « local » est interdit hors développement (utiliser s3)' });
+    }
+    if (cfg.MEDIA_STORAGE === 's3' && !cfg.S3_BUCKET) {
+      ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'S3_BUCKET est obligatoire avec MEDIA_STORAGE=s3' });
     }
     if (cfg.JWT_ACCESS_SECRET === cfg.OTP_SECRET) {
       ctx.addIssue({ code: 'custom', path: ['OTP_SECRET'], message: 'OTP_SECRET doit différer de JWT_ACCESS_SECRET' });

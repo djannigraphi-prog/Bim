@@ -57,6 +57,13 @@
       "when": 1792015105369,
       "tag": "0007_admin_login_throttle",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792020466455,
+      "tag": "0008_projects_lot1_part2",
+      "breakpoints": true
     }
   ]
 }

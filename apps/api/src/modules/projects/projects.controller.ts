@@ -1,8 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put } from '@nestjs/common';
+/// <reference types="multer" />
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { ProjectPhotosService } from './photos.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
-import { AddTaskDto, CreateProjectDto, PauseDto, UpdateProjectDto } from './dto';
+import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, ReportDto, UpdateProjectDto } from './dto';
 import { ProjectsService } from './projects.service';
 
 /** Projets BIM (lot 1). Réservé à l'espace utilisateur : dans l'espace marchand, « + » ajoute un article (E15). */
@@ -11,7 +16,10 @@ import { ProjectsService } from './projects.service';
 @RequireSpace('user')
 @Controller('v1/projects')
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly photos: ProjectPhotosService,
+  ) {}
 
   @Get('catalog')
   @ApiOperation({ summary: 'Catégories, objectifs, durées, budgets indicatifs et limite (écrans 19 à 23)' })
@@ -93,4 +101,54 @@ export class ProjectsController {
   resume(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
     return this.projects.resume(a.userId, id);
   }
+
+  @Post(':id/measurements')
+  @ApiOperation({ summary: 'Noter une mesure (ex. poids) pour un objectif chiffré ; privée' })
+  measure(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: MeasurementDto) {
+    return this.projects.addMeasurement(a.userId, id, dto);
+  }
+
+  @Post(':id/reports')
+  @ApiOperation({ summary: 'Signaler un problème sur une journée ou une tâche (écran 27) ; traité par le support' })
+  report(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReportDto, @ReqMeta() meta: RequestMeta) {
+    return this.projects.report(a.userId, id, dto, meta);
+  }
+
+  @Get(':id/reports')
+  @ApiOperation({ summary: 'Mes signalements et les réponses du support' })
+  reports(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.myReports(a.userId, id);
+  }
+
+  @Post(':id/photos')
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { photo: { type: 'string', format: 'binary' } } } })
+  @ApiOperation({ summary: 'Photo « avant » ou « après » (écrans 22 et 31), privée ; ?kind=before|after' })
+  addPhoto(
+    @CurrentAuth() a: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('kind') kind: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @ReqMeta() meta: RequestMeta,
+    @Req() req: Request,
+  ) {
+    return this.photos.upload(a.userId, id, kind, file, meta, apiBase(req));
+  }
+
+  @Get(':id/photos')
+  @ApiOperation({ summary: 'Mes photos du projet, avec des liens temporaires' })
+  listPhotos(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.photos.list(a.userId, id, apiBase(req));
+  }
+
+  @Delete(':id/photos/:photoId')
+  @HttpCode(204)
+  async deletePhoto(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Param('photoId', ParseUUIDPipe) photoId: string, @ReqMeta() meta: RequestMeta) {
+    await this.photos.remove(a.userId, id, photoId, meta);
+  }
+}
+
+function apiBase(req: Request): string {
+  return `${req.protocol}://${req.get('host')}`;
 }

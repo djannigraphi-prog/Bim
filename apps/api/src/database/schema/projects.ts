@@ -67,6 +67,11 @@ export const programTemplates = pgTable(
     goalCode: varchar('goal_code', { length: 40 }).references(() => projectGoals.code),
     title: varchar('title', { length: 120 }).notNull(),
     durationDays: smallint('duration_days').notNull(),
+    /**
+     * Mode de projet auquel le programme s'adresse : eco (exercices, astuces, conseils, sans achat nécessaire),
+     * premium (peut intégrer des produits, accessoires ou services), any (les deux). Sans lien avec l'abonnement (C6).
+     */
+    mode: varchar('mode', { length: 8 }).notNull().default('any'),
     status: templateStatus('status').notNull().default('draft'),
     /** Qui a validé le contenu (obligatoire pour publier). */
     validatedBy: varchar('validated_by', { length: 120 }),
@@ -77,6 +82,7 @@ export const programTemplates = pgTable(
     index('program_templates_lookup_idx').on(t.categoryCode, t.goalCode, t.status),
     check('program_templates_duration_ck', sql`${t.durationDays} BETWEEN 7 AND 365`),
     check('program_templates_published_validated_ck', sql`${t.status} <> 'published' OR ${t.validatedBy} IS NOT NULL`),
+    check('program_templates_mode_ck', sql`${t.mode} IN ('any', 'eco', 'premium')`),
   ],
 );
 
@@ -94,6 +100,25 @@ export const programTemplateTasks = pgTable('program_template_tasks', {
   weekdays: smallint('weekdays').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
 });
+
+/**
+ * « Habitude du jour » (écran 27) : conseils rédigés dans un programme type validé. Jamais affichés pour un programme
+ * construit depuis les réponses (aucun conseil n'est inventé par l'app). day = jour de programme (1 = premier jour) ;
+ * un conseil sans jour précis (null) sert de conseil général, choisi selon le jour.
+ */
+export const programTemplateTips = pgTable(
+  'program_template_tips',
+  {
+    id: uuid('id').primaryKey(),
+    templateId: uuid('template_id')
+      .notNull()
+      .references(() => programTemplates.id, { onDelete: 'cascade' }),
+    day: smallint('day'),
+    text: varchar('text', { length: 240 }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [index('program_template_tips_template_idx').on(t.templateId)],
+);
 
 export const projectMode = pgEnum('project_mode', ['eco', 'premium']);
 export const projectBudget = pgEnum('project_budget', ['small', 'medium', 'boosted']);
@@ -222,3 +247,75 @@ export const projectEvents = pgTable(
   (t) => [index('project_events_project_idx').on(t.projectId, t.createdAt)],
 );
 
+
+/** Signalement d'un problème depuis la journée (écran 27), traité par le support dans l'administration. */
+export const projectReports = pgTable(
+  'project_reports',
+  {
+    id: uuid('id').primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    day: date('day', { mode: 'string' }).notNull(),
+    taskId: uuid('task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
+    /** unavailable (salle fermée, coach absent…) · too_hard · health (douleur, malaise) · content (tâche inadaptée) · other */
+    reason: varchar('reason', { length: 16 }).notNull(),
+    message: varchar('message', { length: 500 }),
+    status: varchar('status', { length: 10 }).notNull().default('open'),
+    resolution: varchar('resolution', { length: 500 }),
+    resolvedBy: uuid('resolved_by'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('project_reports_status_idx').on(t.status, t.createdAt),
+    check('project_reports_reason_ck', sql`${t.reason} IN ('unavailable', 'too_hard', 'health', 'content', 'other')`),
+    check('project_reports_status_ck', sql`${t.status} IN ('open', 'resolved')`),
+  ],
+);
+
+/** Mesures déclarées par la personne (ex. poids) pour suivre un objectif chiffré ; jamais publiques. */
+export const projectMeasurements = pgTable(
+  'project_measurements',
+  {
+    id: uuid('id').primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    /** Valeur en dixièmes d'unité (84,5 kg → 845), pour éviter les arrondis. */
+    valueTenths: integer('value_tenths').notNull(),
+    unit: varchar('unit', { length: 12 }).notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('project_measurements_project_idx').on(t.projectId, t.day), check('project_measurements_value_ck', sql`${t.valueTenths} > 0`)],
+);
+
+/**
+ * Photos privées d'un projet (avant / après, écrans 22 et 31). Le fichier est ré-encodé (métadonnées et position GPS
+ * supprimées) puis rangé dans un stockage privé ; il n'est servi que par des liens temporaires.
+ */
+export const projectPhotos = pgTable(
+  'project_photos',
+  {
+    id: uuid('id').primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: varchar('kind', { length: 8 }).notNull(),
+    storageKey: varchar('storage_key', { length: 200 }).notNull().unique(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    bytes: integer('bytes').notNull(),
+    takenDay: date('taken_day', { mode: 'string' }).notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('project_photos_project_idx').on(t.projectId, t.kind), check('project_photos_kind_ck', sql`${t.kind} IN ('before', 'after')`)],
+);

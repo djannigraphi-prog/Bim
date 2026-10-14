@@ -1084,6 +1084,227 @@
         ]
       }
     },
+    "/v1/projects/{id}/measurements": {
+      "post": {
+        "operationId": "ProjectsController_measure",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeasurementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Noter une mesure (ex. poids) pour un objectif chiffré ; privée",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/reports": {
+      "post": {
+        "operationId": "ProjectsController_report",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Signaler un problème sur une journée ou une tâche (écran 27) ; traité par le support",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "get": {
+        "operationId": "ProjectsController_reports",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes signalements et les réponses du support",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/photos": {
+      "post": {
+        "operationId": "ProjectsController_addPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Photo « avant » ou « après » (écrans 22 et 31), privée ; ?kind=before|after",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "get": {
+        "operationId": "ProjectsController_listPhotos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes photos du projet, avec des liens temporaires",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/photos/{photoId}": {
+      "delete": {
+        "operationId": "ProjectsController_deletePhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -1565,6 +1786,228 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/reports": {
+      "get": {
+        "operationId": "AdminController_reports",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Signalements des projets (écran 27), à traiter ou traités",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/reports/{id}/resolve": {
+      "post": {
+        "operationId": "AdminController_resolveReport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clore un signalement avec la réponse donnée à la personne",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/catalog": {
+      "get": {
+        "operationId": "AdminController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catégories et objectifs de projet, y compris inactifs (écrans 20 et 21)",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/categories": {
+      "post": {
+        "operationId": "AdminController_createCategory",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/categories/{code}": {
+      "patch": {
+        "operationId": "AdminController_updateCategory",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/goals": {
+      "post": {
+        "operationId": "AdminController_createGoal",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/goals/{code}": {
+      "patch": {
+        "operationId": "AdminController_updateGoal",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": ""
@@ -2086,6 +2529,49 @@
           "days"
         ]
       },
+      "MeasurementDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "example": 82.5,
+            "description": "Valeur dans l’unité de l’objectif (ex. kg), une décimale au plus"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "ReportDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "example": "2026-10-14"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "unavailable",
+              "too_hard",
+              "health",
+              "content",
+              "other"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "reason"
+        ]
+      },
       "AdminLoginDto": {
         "type": "object",
         "properties": {
@@ -2171,6 +2657,21 @@
           "reason"
         ]
       },
+      "ProgramTipDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "object",
+            "description": "Jour de programme (1 = premier jour) ; vide = conseil général"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
       "ProgramTaskDto": {
         "type": "object",
         "properties": {
@@ -2203,6 +2704,22 @@
         "properties": {
           "categoryCode": {
             "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "eco",
+              "premium"
+            ],
+            "description": "Mode de projet visé (C6) ; « any » = les deux"
+          },
+          "tips": {
+            "description": "Habitudes du jour (écran 27)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgramTipDto"
+            }
           },
           "goalCode": {
             "type": "object"
@@ -2239,6 +2756,76 @@
         "required": [
           "validatedBy"
         ]
+      },
+      "ResolveReportDto": {
+        "type": "object",
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "description": "Réponse ou suite donnée (conservée)"
+          }
+        },
+        "required": [
+          "resolution"
+        ]
+      },
+      "CategoryDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "tint": {
+            "type": "string",
+            "example": "#FDECEF"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GoalDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "categoryCode": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "quantityUnit": {
+            "type": "object",
+            "example": "kg"
+          },
+          "quantityMin": {
+            "type": "object"
+          },
+          "quantityMax": {
+            "type": "object"
+          },
+          "titlePattern": {
+            "type": "string",
+            "example": "Perdre {q} kg"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
       },
       "CreateAdminDto": {
         "type": "object",

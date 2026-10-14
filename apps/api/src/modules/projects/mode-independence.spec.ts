@@ -31,7 +31,7 @@ describe('C6 — mode de projet indépendant de l’abonnement', () => {
 
   it.each(files)('%s n’importe que les modules autorisés', (file) => {
     const imports = [...readFileSync(file, 'utf8').matchAll(/from '([^']+)'/g)].map((m) => m[1]).filter((m) => m.startsWith('.'));
-    const allowed = /^(\.\/|\.\.\/\.\.\/common\/|\.\.\/\.\.\/database\/|\.\.\/audit\/|\.\.\/settings\/|\.\.\/auth\/auth\.decorators$|\.\/identity$)/;
+    const allowed = /^(\.\/|\.\.\/\.\.\/config\/|\.\.\/media\/|\.\.\/\.\.\/common\/|\.\.\/\.\.\/database\/|\.\.\/audit\/|\.\.\/settings\/|\.\.\/auth\/auth\.decorators$|\.\/identity$)/;
     for (const i of imports) expect(i).toMatch(allowed);
   });
 });

@@ -14,7 +14,11 @@ import {
   auditLogs,
   programTemplates,
   programTemplateTasks,
+  programTemplateTips,
   projectCategories,
+  projectReports,
+  projects,
+  projectTasks,
   projectGoals,
   userContacts,
   users,
@@ -149,15 +153,16 @@ export class AdminService {
   // ------------------------------------------------------------------ Programmes types (C7)
 
   async listPrograms() {
-    const [tpls, tasks, cats, goals] = await Promise.all([
+    const [tpls, tasks, tips, cats, goals] = await Promise.all([
       this.db.select().from(programTemplates).orderBy(asc(programTemplates.categoryCode), desc(programTemplates.createdAt)),
       this.db.select().from(programTemplateTasks).orderBy(asc(programTemplateTasks.sortOrder)),
+      this.db.select().from(programTemplateTips).orderBy(asc(programTemplateTips.sortOrder)),
       this.db.select().from(projectCategories).orderBy(asc(projectCategories.sortOrder)),
       this.db.select().from(projectGoals).orderBy(asc(projectGoals.sortOrder)),
     ]);
     return {
       categories: cats.map((c) => ({ code: c.code, label: c.label, goals: goals.filter((g) => g.categoryCode === c.code).map((g) => ({ code: g.code, label: g.label })) })),
-      items: tpls.map((t) => ({ ...t, tasks: tasks.filter((x) => x.templateId === t.id) })),
+      items: tpls.map((t) => ({ ...t, tasks: tasks.filter((x) => x.templateId === t.id), tips: tips.filter((x) => x.templateId === t.id) })),
     };
   }
 
@@ -165,8 +170,9 @@ export class AdminService {
     await this.checkProgramRefs(body.categoryCode, body.goalCode ?? null);
     const id = uuidv7();
     await this.db.transaction(async (tx) => {
-      await tx.insert(programTemplates).values({ id, categoryCode: body.categoryCode, goalCode: body.goalCode ?? null, title: body.title.trim(), durationDays: body.durationDays });
+      await tx.insert(programTemplates).values({ id, categoryCode: body.categoryCode, goalCode: body.goalCode ?? null, mode: body.mode ?? 'any', title: body.title.trim(), durationDays: body.durationDays });
       if (body.tasks.length) await tx.insert(programTemplateTasks).values(body.tasks.map((t, i) => ({ id: uuidv7(), templateId: id, ...taskRow(t), sortOrder: i })));
+      if (body.tips?.length) await tx.insert(programTemplateTips).values(body.tips.map((t, i) => ({ id: uuidv7(), templateId: id, day: t.day ?? null, text: t.text.trim(), sortOrder: i })));
       await this.log(a, meta, 'admin.program_created', 'program_template', id, { category: body.categoryCode }, tx);
     });
     return this.program(id);
@@ -180,10 +186,12 @@ export class AdminService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(programTemplates)
-        .set({ categoryCode: body.categoryCode, goalCode: body.goalCode ?? null, title: body.title.trim(), durationDays: body.durationDays, updatedAt: new Date() })
+        .set({ categoryCode: body.categoryCode, goalCode: body.goalCode ?? null, mode: body.mode ?? 'any', title: body.title.trim(), durationDays: body.durationDays, updatedAt: new Date() })
         .where(eq(programTemplates.id, id));
       await tx.delete(programTemplateTasks).where(eq(programTemplateTasks.templateId, id));
+      await tx.delete(programTemplateTips).where(eq(programTemplateTips.templateId, id));
       if (body.tasks.length) await tx.insert(programTemplateTasks).values(body.tasks.map((x, i) => ({ id: uuidv7(), templateId: id, ...taskRow(x), sortOrder: i })));
+      if (body.tips?.length) await tx.insert(programTemplateTips).values(body.tips.map((x, i) => ({ id: uuidv7(), templateId: id, day: x.day ?? null, text: x.text.trim(), sortOrder: i })));
       await this.log(a, meta, 'admin.program_updated', 'program_template', id, {}, tx);
     });
     return this.program(id);
@@ -199,10 +207,10 @@ export class AdminService {
     if (!t.tasks.length) throw Errors.validation({ fields: { tasks: ['Ajoute au moins une tâche avant de publier.'] } });
     await this.db.transaction(async (tx) => {
       const previous = await tx
-        .select({ id: programTemplates.id, goalCode: programTemplates.goalCode })
+        .select({ id: programTemplates.id, goalCode: programTemplates.goalCode, mode: programTemplates.mode })
         .from(programTemplates)
         .where(and(eq(programTemplates.categoryCode, t.categoryCode), eq(programTemplates.status, 'published')));
-      const same = previous.filter((p) => p.goalCode === t.goalCode).map((p) => p.id);
+      const same = previous.filter((p) => p.goalCode === t.goalCode && p.mode === t.mode).map((p) => p.id);
       if (same.length) await tx.update(programTemplates).set({ status: 'archived', updatedAt: new Date() }).where(inArray(programTemplates.id, same));
       await tx.update(programTemplates).set({ status: 'published', validatedBy: validatedBy.trim(), updatedAt: new Date() }).where(eq(programTemplates.id, id));
       await this.log(a, meta, 'admin.program_published', 'program_template', id, { validatedBy: validatedBy.trim(), archived: same }, tx);
@@ -222,7 +230,8 @@ export class AdminService {
     const [t] = await this.db.select().from(programTemplates).where(eq(programTemplates.id, id)).limit(1);
     if (!t) throw Errors.notFound('Programme');
     const tasks = await this.db.select().from(programTemplateTasks).where(eq(programTemplateTasks.templateId, id)).orderBy(asc(programTemplateTasks.sortOrder));
-    return { ...t, tasks };
+    const tips = await this.db.select().from(programTemplateTips).where(eq(programTemplateTips.templateId, id)).orderBy(asc(programTemplateTips.sortOrder));
+    return { ...t, tasks, tips };
   }
 
   private async checkProgramRefs(categoryCode: string, goalCode: string | null) {
@@ -232,6 +241,118 @@ export class AdminService {
       const [g] = await this.db.select().from(projectGoals).where(eq(projectGoals.code, goalCode)).limit(1);
       if (!g || g.categoryCode !== categoryCode) throw Errors.validation({ fields: { goalCode: ["Cet objectif n'appartient pas à la catégorie."] } });
     }
+  }
+
+  // ------------------------------------------------------------------ Signalements des projets (écran 27)
+
+  async listReports(status: 'open' | 'resolved' = 'open') {
+    const rows = await this.db
+      .select({
+        id: projectReports.id,
+        day: projectReports.day,
+        reason: projectReports.reason,
+        message: projectReports.message,
+        status: projectReports.status,
+        resolution: projectReports.resolution,
+        createdAt: projectReports.createdAt,
+        resolvedAt: projectReports.resolvedAt,
+        projectId: projects.id,
+        projectTitle: projects.title,
+        categoryCode: projects.categoryCode,
+        templateId: projects.templateId,
+        username: users.username,
+        userId: users.id,
+        taskTitle: projectTasks.title,
+      })
+      .from(projectReports)
+      .innerJoin(projects, eq(projects.id, projectReports.projectId))
+      .innerJoin(users, eq(users.id, projectReports.userId))
+      .leftJoin(projectTasks, eq(projectTasks.id, projectReports.taskId))
+      .where(eq(projectReports.status, status))
+      .orderBy(status === 'open' ? asc(projectReports.createdAt) : desc(projectReports.resolvedAt))
+      .limit(200);
+    return { items: rows };
+  }
+
+  async resolveReport(a: AdminContext, id: string, resolution: string, meta: RequestMeta) {
+    const [r] = await this.db
+      .update(projectReports)
+      .set({ status: 'resolved', resolution: resolution.trim(), resolvedBy: a.adminId, resolvedAt: new Date() })
+      .where(and(eq(projectReports.id, id), eq(projectReports.status, 'open')))
+      .returning({ id: projectReports.id });
+    if (!r) throw Errors.conflict('REPORT_NOT_OPEN', 'Ce signalement est introuvable ou déjà traité.');
+    await this.log(a, meta, 'admin.report_resolved', 'project_report', id);
+    return { id, status: 'resolved' };
+  }
+
+  // ------------------------------------------------------------------ Catégories et objectifs (écrans 20 et 21)
+
+  async adminCatalog() {
+    const [cats, goals] = await Promise.all([
+      this.db.select().from(projectCategories).orderBy(asc(projectCategories.sortOrder)),
+      this.db.select().from(projectGoals).orderBy(asc(projectGoals.sortOrder)),
+    ]);
+    return { icons: CATALOG_ICONS, categories: cats.map((c) => ({ ...c, goals: goals.filter((g) => g.categoryCode === c.code) })) };
+  }
+
+  async createCategory(a: AdminContext, body: CategoryInput, meta: RequestMeta) {
+    checkCategory(body);
+    const [exists] = await this.db.select({ code: projectCategories.code }).from(projectCategories).where(eq(projectCategories.code, body.code!)).limit(1);
+    if (exists) throw Errors.conflict('CODE_TAKEN', 'Ce code existe déjà.');
+    await this.db.insert(projectCategories).values({ code: body.code!, label: body.label!.trim(), icon: body.icon!, tint: body.tint!, sortOrder: body.sortOrder ?? 0 });
+    await this.log(a, meta, 'admin.category_created', 'category', undefined, { code: body.code });
+    return this.adminCatalog();
+  }
+
+  async updateCategory(a: AdminContext, code: string, body: CategoryInput, meta: RequestMeta) {
+    const [c] = await this.db.select().from(projectCategories).where(eq(projectCategories.code, code)).limit(1);
+    if (!c) throw Errors.notFound('Catégorie');
+    const next = { ...c, ...strip(body), code };
+    checkCategory(next);
+    await this.db.update(projectCategories).set({ label: next.label.trim(), icon: next.icon, tint: next.tint, sortOrder: next.sortOrder, active: next.active }).where(eq(projectCategories.code, code));
+    await this.log(a, meta, 'admin.category_updated', 'category', undefined, { code, changes: strip(body) });
+    return this.adminCatalog();
+  }
+
+  async createGoal(a: AdminContext, body: GoalInput, meta: RequestMeta) {
+    checkGoal(body);
+    const [cat] = await this.db.select({ code: projectCategories.code }).from(projectCategories).where(eq(projectCategories.code, body.categoryCode!)).limit(1);
+    if (!cat) throw Errors.validation({ fields: { categoryCode: ['Catégorie inconnue.'] } });
+    const [exists] = await this.db.select({ code: projectGoals.code }).from(projectGoals).where(eq(projectGoals.code, body.code!)).limit(1);
+    if (exists) throw Errors.conflict('CODE_TAKEN', 'Ce code existe déjà.');
+    await this.db.insert(projectGoals).values({
+      code: body.code!,
+      categoryCode: body.categoryCode!,
+      label: body.label!.trim(),
+      quantityUnit: body.quantityUnit ?? null,
+      quantityMin: body.quantityUnit ? body.quantityMin! : null,
+      quantityMax: body.quantityUnit ? body.quantityMax! : null,
+      titlePattern: body.titlePattern!.trim(),
+      sortOrder: body.sortOrder ?? 0,
+    });
+    await this.log(a, meta, 'admin.goal_created', 'goal', undefined, { code: body.code });
+    return this.adminCatalog();
+  }
+
+  async updateGoal(a: AdminContext, code: string, body: GoalInput, meta: RequestMeta) {
+    const [g] = await this.db.select().from(projectGoals).where(eq(projectGoals.code, code)).limit(1);
+    if (!g) throw Errors.notFound('Objectif');
+    const next = { ...g, ...strip(body), code, categoryCode: g.categoryCode };
+    checkGoal(next);
+    await this.db
+      .update(projectGoals)
+      .set({
+        label: next.label.trim(),
+        quantityUnit: next.quantityUnit ?? null,
+        quantityMin: next.quantityUnit ? next.quantityMin : null,
+        quantityMax: next.quantityUnit ? next.quantityMax : null,
+        titlePattern: next.titlePattern.trim(),
+        sortOrder: next.sortOrder,
+        active: next.active,
+      })
+      .where(eq(projectGoals.code, code));
+    await this.log(a, meta, 'admin.goal_updated', 'goal', undefined, { code, changes: strip(body) });
+    return this.adminCatalog();
   }
 
   // ------------------------------------------------------------------ Comptes d'administration
@@ -319,6 +440,8 @@ export interface ProgramTaskInput {
 export interface ProgramInput {
   categoryCode: string;
   goalCode?: string | null;
+  mode?: 'any' | 'eco' | 'premium';
+  tips?: Array<{ day?: number | null; text: string }>;
   title: string;
   durationDays: number;
   tasks: ProgramTaskInput[];
@@ -337,4 +460,58 @@ function mask(type: 'phone' | 'email', value: string): string {
 /** Échappe les jokers de LIKE (%, _ et \\) : la saisie est cherchée telle quelle. */
 function likeEscape(v: string): string {
   return v.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/** Icônes connues de l'application mobile (lib/core/widgets/bim_icons.dart). */
+export const CATALOG_ICONS = ['dumbbell', 'shirt', 'sparkles', 'scissors', 'hand', 'brush', 'flower', 'leaf', 'camera', 'glasses', 'water', 'stretch', 'check'];
+
+export interface CategoryInput {
+  code?: string;
+  label?: string;
+  icon?: string;
+  tint?: string;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export interface GoalInput {
+  code?: string;
+  categoryCode?: string;
+  label?: string;
+  quantityUnit?: string | null;
+  quantityMin?: number | null;
+  quantityMax?: number | null;
+  titlePattern?: string;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+function strip<T extends object>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+function checkCategory(c: CategoryInput) {
+  const f: Record<string, string[]> = {};
+  if (!c.code || !/^[a-z0-9_]{2,40}$/.test(c.code)) f.code = ['Code : 2 à 40 caractères a-z, 0-9 ou _.'];
+  if (!c.label || c.label.trim().length < 2) f.label = ['Libellé obligatoire.'];
+  if (!c.icon || !CATALOG_ICONS.includes(c.icon)) f.icon = [`Icône parmi : ${CATALOG_ICONS.join(', ')}.`];
+  if (!c.tint || !/^#[0-9A-Fa-f]{6}$/.test(c.tint)) f.tint = ['Couleur au format #RRGGBB.'];
+  if (Object.keys(f).length) throw Errors.validation({ fields: f });
+}
+
+function checkGoal(g: GoalInput) {
+  const f: Record<string, string[]> = {};
+  if (!g.code || !/^[a-z0-9_]{2,40}$/.test(g.code)) f.code = ['Code : 2 à 40 caractères a-z, 0-9 ou _.'];
+  if (!g.categoryCode) f.categoryCode = ['Catégorie obligatoire.'];
+  if (!g.label || g.label.trim().length < 2) f.label = ['Libellé obligatoire.'];
+  if (!g.titlePattern || g.titlePattern.trim().length < 2) f.titlePattern = ['Titre généré obligatoire (ex. « Perdre {q} kg »).'];
+  if (g.quantityUnit) {
+    if (!Number.isInteger(g.quantityMin) || !Number.isInteger(g.quantityMax) || g.quantityMin! < 1 || g.quantityMax! <= g.quantityMin!) {
+      f.quantityMin = ['Bornes entières, minimum ≥ 1 et maximum supérieur au minimum.'];
+    }
+    if (!g.titlePattern?.includes('{q}')) f.titlePattern = ['Avec une quantité, le titre doit contenir {q} (ex. « Perdre {q} kg »).'];
+  } else if (g.titlePattern?.includes('{q}')) {
+    f.titlePattern = ['{q} n’est possible qu’avec une quantité.'];
+  }
+  if (Object.keys(f).length) throw Errors.validation({ fields: f });
 }

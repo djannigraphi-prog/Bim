@@ -11,6 +11,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
+import { MediaModule } from './modules/media/media.module';
 import { InterestsModule } from './modules/interests/interests.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -55,6 +56,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     HealthModule,
     InterestsModule,
     AuthModule,
+    MediaModule,
     ProjectsModule,
     AdminModule,
   ],

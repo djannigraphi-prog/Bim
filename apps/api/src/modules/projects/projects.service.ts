@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
@@ -7,6 +7,9 @@ import { DB, Database } from '../../database/database.module';
 import {
   programTemplates,
   programTemplateTasks,
+  programTemplateTips,
+  projectMeasurements,
+  projectReports,
   projectCategories,
   projectEvents,
   projectGoals,
@@ -17,7 +20,8 @@ import {
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
-import { AddTaskDto, CreateProjectDto, PauseDto, UpdateProjectDto } from './dto';
+import { ProjectPhotosService } from './photos.service';
+import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, ReportDto, UpdateProjectDto } from './dto';
 import { addDays, computePlan, diffDays, dueTasks, generateTitle, isPaused, isValidDay, spreadWeekdays, today } from './plan';
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -39,6 +43,7 @@ export class ProjectsService {
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly photos: ProjectPhotosService,
   ) {}
 
   private today(): string {
@@ -107,7 +112,7 @@ export class ProjectsService {
     if (dto.mode === 'eco' && dto.budget) errors.budget = ['Le projet économique ne comporte pas de budget.'];
 
     // Modèle validé et publié pour cette catégorie (et cet objectif s'il y en a un), sinon programme construit depuis les réponses.
-    const template = category ? await this.findTemplate(dto.categoryCode, dto.goalCode ?? null) : null;
+    const template = category ? await this.findTemplate(dto.categoryCode, dto.goalCode ?? null, dto.mode) : null;
     let durationDays: number;
     if (template) {
       durationDays = template.durationDays;
@@ -197,6 +202,10 @@ export class ProjectsService {
         });
       }
       await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'created', payload: template ? `template:${template.id}` : 'answers' });
+      // Point de départ du suivi : le poids donné à l'écran 23, si l'objectif se mesure en kg.
+      if (goal?.quantityUnit === 'kg' && dto.weightKg) {
+        await tx.insert(projectMeasurements).values({ id: uuidv7(), projectId, valueTenths: dto.weightKg * 10, unit: 'kg', day: start });
+      }
       await this.audit.log(
         { actorType: 'user', actorId: userId, action: 'project.created', targetType: 'project', targetId: projectId, ip: meta.ip, userAgent: meta.userAgent, metadata: { category: dto.categoryCode, mode: dto.mode } },
         tx,
@@ -205,12 +214,20 @@ export class ProjectsService {
     return this.detail(userId, projectId);
   }
 
-  private async findTemplate(categoryCode: string, goalCode: string | null) {
-    const published = await this.db
-      .select()
-      .from(programTemplates)
-      .where(and(eq(programTemplates.categoryCode, categoryCode), eq(programTemplates.status, 'published')));
-    return published.find((t) => t.goalCode === goalCode) ?? published.find((t) => t.goalCode === null) ?? null;
+  /**
+   * Programme type publié (donc validé) le plus précis : même objectif avant « tous objectifs », puis même mode
+   * (économique / Premium) avant « les deux ». Un programme réservé à l'autre mode n'est jamais utilisé.
+   */
+  private async findTemplate(categoryCode: string, goalCode: string | null, mode: 'eco' | 'premium') {
+    const published = (
+      await this.db
+        .select()
+        .from(programTemplates)
+        .where(and(eq(programTemplates.categoryCode, categoryCode), eq(programTemplates.status, 'published')))
+    ).filter((t) => t.mode === 'any' || t.mode === mode);
+    const rank = (t: (typeof published)[number]) => (t.goalCode === goalCode ? 0 : 2) + (t.mode === mode ? 0 : 1);
+    const candidates = published.filter((t) => t.goalCode === goalCode || t.goalCode === null).sort((a, b) => rank(a) - rank(b));
+    return candidates[0] ?? null;
   }
 
   // ---------------------------------------------------------------- Lecture
@@ -267,7 +284,20 @@ export class ProjectsService {
     });
   }
 
-  private summary(p: ProjectRow, category: { label: string; icon: string } | undefined, s: ReturnType<ProjectsService['stats']>) {
+  /** Prochaine tâche du jour encore à faire (carte « Aujourd'hui » de l'écran 18, bulle de l'écran 26). */
+  private nextTask(p: ProjectRow, parts: { tasks: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
+    const t = this.today();
+    if (p.status !== 'active' || t < p.startDate || t > p.plannedEndDate) return null;
+    const next = dueTasks(t, parts.tasks, parts.pauses).find((x) => !parts.completions.has(`${x.id}|${t}`));
+    return next ? { id: next.id, title: next.title, detail: next.detail, timeOfDay: next.timeOfDay } : null;
+  }
+
+  private summary(
+    p: ProjectRow,
+    category: { label: string; icon: string } | undefined,
+    s: ReturnType<ProjectsService['stats']>,
+    parts: { tasks: TaskRow[]; pauses: PauseRow[]; completions: Set<string> },
+  ) {
     return {
       id: p.id,
       title: p.title,
@@ -284,6 +314,7 @@ export class ProjectsService {
       currentDay: Math.min(s.currentDayIndex, p.durationDays),
       progress: s.progress,
       streak: s.streak,
+      nextTask: this.nextTask(p, parts),
     };
   }
 
@@ -297,7 +328,8 @@ export class ProjectsService {
     const items = [];
     for (const { id } of ids) {
       const p = await this.load(userId, id);
-      items.push(this.summary(p, cats.find((c) => c.code === p.categoryCode), this.stats(p, await this.parts(p.id))));
+      const parts = await this.parts(p.id);
+      items.push(this.summary(p, cats.find((c) => c.code === p.categoryCode), this.stats(p, parts), parts));
     }
     // Écran 18 : projets en cours d'abord, puis terminés.
     items.sort((a, b) => Number(a.status === 'completed') - Number(b.status === 'completed'));
@@ -312,8 +344,14 @@ export class ProjectsService {
     const [category] = await this.db.select().from(projectCategories).where(eq(projectCategories.code, p.categoryCode));
     const [goal] = p.goalCode ? await this.db.select().from(projectGoals).where(eq(projectGoals.code, p.goalCode)) : [];
     const doneSessions = s.completedOccurrences;
+    const [template] = p.templateId
+      ? await this.db.select({ title: programTemplates.title, validatedBy: programTemplates.validatedBy }).from(programTemplates).where(eq(programTemplates.id, p.templateId))
+      : [];
     return {
-      ...this.summary(p, category, s),
+      ...this.summary(p, category, s, parts),
+      /** Programme type validé (titre et personne qui l'a validé) ; null si le programme vient des réponses. */
+      program: template ? { title: template.title, validatedBy: template.validatedBy } : null,
+      measurement: goal?.quantityUnit ? await this.measurementSummary(p.id, goal.quantityUnit) : null,
       goal: goal ? { code: goal.code, label: goal.label, quantityUnit: goal.quantityUnit } : null,
       targetQuantity: p.targetQuantity,
       description: p.description,
@@ -350,8 +388,85 @@ export class ProjectsService {
       state: summary.state,
       paused: summary.state === 'paused',
       editable: this.canCheck(p, day, parts.pauses),
+      tip: summary.index === null ? null : await this.tipFor(p, summary.index),
       tasks: due.map((t) => ({ id: t.id, title: t.title, detail: t.detail, icon: t.icon, timeOfDay: t.timeOfDay, done: parts.completions.has(`${t.id}|${day}`) })),
     };
+  }
+
+  // ---------------------------------------------------------------- Mesures (objectif chiffré, écran 30)
+
+  private async measurementSummary(projectId: string, unit: string) {
+    const rows = await this.db.select().from(projectMeasurements).where(eq(projectMeasurements.projectId, projectId)).orderBy(asc(projectMeasurements.day), asc(projectMeasurements.createdAt));
+    const items = rows.map((r) => ({ day: r.day, value: r.valueTenths / 10 }));
+    const first = items[0];
+    const last = items[items.length - 1];
+    return {
+      unit,
+      items,
+      start: first?.value ?? null,
+      latest: last?.value ?? null,
+      // Variation déclarée par la personne (ex. −10,4 kg) ; null tant qu'il n'y a pas deux mesures.
+      change: items.length >= 2 ? Math.round((last.value - first.value) * 10) / 10 : null,
+    };
+  }
+
+  async addMeasurement(userId: string, projectId: string, dto: MeasurementDto) {
+    const p = await this.load(userId, projectId);
+    const [goal] = p.goalCode ? await this.db.select().from(projectGoals).where(eq(projectGoals.code, p.goalCode)) : [];
+    if (!goal?.quantityUnit) throw Errors.conflict('NO_MEASURE', "Cet objectif ne se mesure pas en chiffres.");
+    const day = this.today();
+    // Une mesure par jour : la nouvelle remplace celle du jour.
+    await this.db.transaction(async (tx) => {
+      await tx.delete(projectMeasurements).where(and(eq(projectMeasurements.projectId, p.id), eq(projectMeasurements.day, day)));
+      await tx.insert(projectMeasurements).values({ id: uuidv7(), projectId: p.id, valueTenths: Math.round(dto.value * 10), unit: goal.quantityUnit!, day });
+    });
+    return this.measurementSummary(p.id, goal.quantityUnit);
+  }
+
+  // ---------------------------------------------------------------- Signalements (écran 27)
+
+  async report(userId: string, projectId: string, dto: ReportDto, meta: RequestMeta) {
+    if (!isValidDay(dto.day)) throw Errors.validation({ fields: { day: ['Date invalide.'] } });
+    const p = await this.load(userId, projectId);
+    if (dto.day < p.startDate || dto.day > p.plannedEndDate || dto.day > this.today()) {
+      throw Errors.validation({ fields: { day: ['Ce jour ne fait pas partie du programme ou n’est pas encore arrivé.'] } });
+    }
+    if (dto.taskId) {
+      const [t] = await this.db.select({ id: projectTasks.id }).from(projectTasks).where(and(eq(projectTasks.id, dto.taskId), eq(projectTasks.projectId, p.id)));
+      if (!t) throw Errors.notFound('Tâche');
+    }
+    const id = uuidv7();
+    await this.db.transaction(async (tx) => {
+      await tx.insert(projectReports).values({ id, projectId: p.id, userId, day: dto.day, taskId: dto.taskId ?? null, reason: dto.reason, message: dto.message?.trim() || null });
+      await this.audit.log({ actorType: 'user', actorId: userId, action: 'project.reported', targetType: 'project', targetId: p.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { reason: dto.reason } }, tx);
+    });
+    return {
+      id,
+      status: 'open',
+      // Pour une douleur ou un malaise : BIM ne donne pas d'avis médical, la personne est orientée vers un professionnel.
+      healthAdvice: dto.reason === 'health',
+    };
+  }
+
+  async myReports(userId: string, projectId: string) {
+    const p = await this.load(userId, projectId);
+    const rows = await this.db.select().from(projectReports).where(eq(projectReports.projectId, p.id)).orderBy(desc(projectReports.createdAt));
+    return { items: rows.map((r) => ({ id: r.id, day: r.day, taskId: r.taskId, reason: r.reason, message: r.message, status: r.status, resolution: r.resolution, createdAt: r.createdAt })) };
+  }
+
+  /**
+   * « Habitude du jour » (écran 27) : uniquement depuis un programme type validé. Conseil du jour précis s'il existe,
+   * sinon un conseil général choisi en tournant selon le jour. Rien pour un programme construit depuis les réponses.
+   */
+  private async tipFor(p: ProjectRow, dayIndex: number): Promise<{ text: string; validatedBy: string | null } | null> {
+    if (!p.templateId) return null;
+    const [tpl] = await this.db.select({ validatedBy: programTemplates.validatedBy }).from(programTemplates).where(eq(programTemplates.id, p.templateId));
+    if (!tpl?.validatedBy) return null;
+    const tips = await this.db.select().from(programTemplateTips).where(eq(programTemplateTips.templateId, p.templateId)).orderBy(asc(programTemplateTips.sortOrder));
+    const exact = tips.find((t) => t.day === dayIndex);
+    const general = tips.filter((t) => t.day === null);
+    const tip = exact ?? (general.length ? general[(dayIndex - 1) % general.length] : undefined);
+    return tip ? { text: tip.text, validatedBy: tpl.validatedBy } : null;
   }
 
   /** On coche le jour même ou un jour passé du programme (pas l'avenir), hors pause, sur un projet en cours. */
@@ -483,5 +598,7 @@ export class ProjectsService {
       await tx.insert(projectEvents).values({ id: uuidv7(), projectId: p.id, type: 'abandoned' });
       await this.audit.log({ actorType: 'user', actorId: userId, action: 'project.abandoned', targetType: 'project', targetId: p.id, ip: meta.ip, userAgent: meta.userAgent }, tx);
     });
+    // Les photos avant / après (données sensibles) sont effacées avec le projet.
+    await this.photos.purgeProject(p.id);
   }
 }

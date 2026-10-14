@@ -9,8 +9,11 @@ import {
   AdminLoginDto,
   AdminLoginTokenDto,
   AdminTotpDto,
+  CategoryDto,
+  GoalDto,
   CreateAdminDto,
   ProgramDto,
+  ResolveReportDto,
   PublishProgramDto,
   UpdateAdminDto,
   UpdateSettingDto,
@@ -141,6 +144,52 @@ export class AdminController {
   @AdminRoute('programs.write')
   archive(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
     return this.admin.archiveProgram(a, id, meta);
+  }
+
+  @Get('reports')
+  @AdminRoute('reports.read')
+  @ApiOperation({ summary: 'Signalements des projets (écran 27), à traiter ou traités' })
+  reports(@Query('status') status?: string) {
+    return this.admin.listReports(status === 'resolved' ? 'resolved' : 'open');
+  }
+
+  @Post('reports/:id/resolve')
+  @HttpCode(200)
+  @AdminRoute('reports.resolve')
+  @ApiOperation({ summary: 'Clore un signalement avec la réponse donnée à la personne' })
+  resolveReport(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ResolveReportDto, @ReqMeta() meta: RequestMeta) {
+    return this.admin.resolveReport(a, id, dto.resolution, meta);
+  }
+
+  @Get('catalog')
+  @AdminRoute('programs.read')
+  @ApiOperation({ summary: 'Catégories et objectifs de projet, y compris inactifs (écrans 20 et 21)' })
+  catalog() {
+    return this.admin.adminCatalog();
+  }
+
+  @Post('categories')
+  @AdminRoute('catalog.write')
+  createCategory(@CurrentAdmin() a: AdminContext, @Body() dto: CategoryDto, @ReqMeta() meta: RequestMeta) {
+    return this.admin.createCategory(a, dto, meta);
+  }
+
+  @Patch('categories/:code')
+  @AdminRoute('catalog.write')
+  updateCategory(@CurrentAdmin() a: AdminContext, @Param('code') code: string, @Body() dto: CategoryDto, @ReqMeta() meta: RequestMeta) {
+    return this.admin.updateCategory(a, code, dto, meta);
+  }
+
+  @Post('goals')
+  @AdminRoute('catalog.write')
+  createGoal(@CurrentAdmin() a: AdminContext, @Body() dto: GoalDto, @ReqMeta() meta: RequestMeta) {
+    return this.admin.createGoal(a, dto, meta);
+  }
+
+  @Patch('goals/:code')
+  @AdminRoute('catalog.write')
+  updateGoal(@CurrentAdmin() a: AdminContext, @Param('code') code: string, @Body() dto: GoalDto, @ReqMeta() meta: RequestMeta) {
+    return this.admin.updateGoal(a, code, dto, meta);
   }
 
   @Get('admins')

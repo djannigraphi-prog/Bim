@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 
 const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -81,4 +81,17 @@ export class AddTaskDto {
 
 export class PauseDto {
   @ApiProperty({ example: 3, description: 'Écran 29 : 1 jour, 3 jours, 1 semaine ou autre' }) @IsInt() @Min(1) @Max(365) days!: number;
+}
+
+export class ReportDto {
+  @ApiProperty({ example: '2026-10-14' }) @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date au format AAAA-MM-JJ.' }) day!: string;
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() taskId?: string;
+  @ApiProperty({ enum: ['unavailable', 'too_hard', 'health', 'content', 'other'] })
+  @IsIn(['unavailable', 'too_hard', 'health', 'content', 'other'])
+  reason!: 'unavailable' | 'too_hard' | 'health' | 'content' | 'other';
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) message?: string;
+}
+
+export class MeasurementDto {
+  @ApiProperty({ example: 82.5, description: 'Valeur dans l’unité de l’objectif (ex. kg), une décimale au plus' }) @IsNumber({ maxDecimalPlaces: 1 }) @Min(1) @Max(1000) value!: number;
 }

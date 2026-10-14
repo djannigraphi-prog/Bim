@@ -11,6 +11,9 @@ export const ADMIN_PERMISSIONS = {
   'programs.read': ['super_admin', 'commercial', 'support'],
   'programs.write': ['super_admin', 'commercial'],
   'programs.publish': ['super_admin'],
+  'catalog.write': ['super_admin', 'commercial'],
+  'reports.read': ['super_admin', 'support', 'moderator'],
+  'reports.resolve': ['super_admin', 'support', 'moderator'],
   'admins.manage': ['super_admin'],
 } as const;
 

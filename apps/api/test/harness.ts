@@ -1,5 +1,7 @@
 import 'reflect-metadata';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -25,6 +27,7 @@ export interface Harness {
 
 /** Démarre l'API complète (mêmes modules, gardes et filtres qu'en production) sur la base de test. */
 export async function startHarness(extraEnv: Record<string, string> = {}): Promise<Harness> {
+  const mediaDir = mkdtempSync(join(tmpdir(), 'bim-media-'));
   const { url } = JSON.parse(readFileSync(STATE_FILE, 'utf8')) as { url: string };
   Object.assign(process.env, {
     NODE_ENV: 'test',
@@ -36,6 +39,8 @@ export async function startHarness(extraEnv: Record<string, string> = {}): Promi
     SMS_PROVIDER: 'test',
     EMAIL_PROVIDER: 'test',
     HTTP_THROTTLE_ENABLED: 'false',
+    MEDIA_STORAGE: 'local',
+    MEDIA_LOCAL_DIR: mediaDir,
     OTP_RESEND_COOLDOWN_SECONDS: '15',
     ...extraEnv,
   });
