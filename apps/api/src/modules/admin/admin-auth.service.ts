@@ -1,13 +1,13 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
-import { randomToken, sha256 } from '../../common/crypto';
+import { hmacSha256, randomToken, sha256 } from '../../common/crypto';
 import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { decryptSecret, encryptSecret, newTotpSecret, otpauthUri, verifyTotp } from '../../common/totp';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { adminLoginChallenges, adminSessions, adminUserRoles, adminUsers } from '../../database/schema';
+import { adminLoginChallenges, adminLoginThrottle, adminSessions, adminUserRoles, adminUsers } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/password.service';
 import type { AdminContext } from './admin.decorators';
@@ -42,25 +42,56 @@ export class AdminAuthService {
     return new AppError('INVALID_CREDENTIALS', 'E-mail ou mot de passe incorrect.', HttpStatus.UNAUTHORIZED);
   }
 
+  /** Clé de limitation : e-mail haché, identique qu'un compte existe ou non. */
+  private throttleKey(email: string): string {
+    return hmacSha256(this.cfg.OTP_SECRET, `admin-login:${email.trim().toLowerCase()}`);
+  }
+
+  private async isLocked(key: string): Promise<boolean> {
+    const [t] = await this.db.select({ lockedUntil: adminLoginThrottle.lockedUntil }).from(adminLoginThrottle).where(eq(adminLoginThrottle.keyHash, key)).limit(1);
+    return !!t?.lockedUntil && t.lockedUntil.getTime() > this.clock.now();
+  }
+
+  /**
+   * Compte un échec (mot de passe ou code TOTP) en une seule requête atomique : des requêtes parallèles ne peuvent pas
+   * dépasser le plafond. La fenêtre repart de zéro après ADMIN_LOCK_MINUTES sans échec. Renvoie vrai si le compte se verrouille.
+   */
+  private async recordFailure(key: string): Promise<boolean> {
+    const now = new Date(this.clock.now());
+    const windowStart = new Date(this.clock.now() - this.cfg.ADMIN_LOCK_MINUTES * 60_000);
+    const lockUntil = new Date(this.clock.now() + this.cfg.ADMIN_LOCK_MINUTES * 60_000);
+    const max = this.cfg.ADMIN_LOGIN_MAX_FAILURES;
+    const [row] = await this.db
+      .insert(adminLoginThrottle)
+      .values({ keyHash: key, failures: 1, lastFailureAt: now, lockedUntil: max <= 1 ? lockUntil : null })
+      .onConflictDoUpdate({
+        target: adminLoginThrottle.keyHash,
+        set: {
+          failures: sql`case when ${adminLoginThrottle.lastFailureAt} < ${windowStart} then 1 else ${adminLoginThrottle.failures} + 1 end`,
+          lastFailureAt: now,
+          lockedUntil: sql`case when (case when ${adminLoginThrottle.lastFailureAt} < ${windowStart} then 1 else ${adminLoginThrottle.failures} + 1 end) >= ${max} then ${lockUntil}::timestamptz else ${adminLoginThrottle.lockedUntil} end`,
+        },
+      })
+      .returning({ failures: adminLoginThrottle.failures });
+    return row.failures === max;
+  }
+
+  /**
+   * Étape 1. Les réponses sont identiques pour un e-mail inconnu, un mauvais mot de passe ou un compte verrouillé
+   * (pas d'énumération des comptes d'administration).
+   */
   async login(email: string, password: string, meta: RequestMeta) {
     const normalized = email.trim().toLowerCase();
+    const key = this.throttleKey(normalized);
     const [admin] = await this.db.select().from(adminUsers).where(eq(adminUsers.email, normalized)).limit(1);
-    const now = this.clock.now();
-    if (admin?.lockedUntil && admin.lockedUntil.getTime() > now) {
+    if (await this.isLocked(key)) {
       await this.passwords.verify(null, password); // même durée de réponse
-      throw Errors.tooMany('Compte temporairement verrouillé après plusieurs échecs. Réessaie plus tard.');
+      throw this.invalidCredentials();
     }
     const ok = await this.passwords.verify(admin?.passwordHash ?? null, password);
     if (!admin || !ok || admin.status !== 'active') {
-      if (admin) {
-        const failures = admin.failedLoginCount + 1;
-        const lock = failures >= this.cfg.ADMIN_LOGIN_MAX_FAILURES;
-        await this.db
-          .update(adminUsers)
-          .set({ failedLoginCount: lock ? 0 : failures, lockedUntil: lock ? new Date(now + this.cfg.ADMIN_LOCK_MINUTES * 60_000) : admin.lockedUntil })
-          .where(eq(adminUsers.id, admin.id));
-        await this.audit.log({ actorType: 'admin', actorId: admin.id, action: lock ? 'admin.locked' : 'admin.login_failed', ip: meta.ip, userAgent: meta.userAgent });
-      }
+      const locked = await this.recordFailure(key);
+      if (admin) await this.audit.log({ actorType: 'admin', actorId: admin.id, action: locked ? 'admin.locked' : 'admin.login_failed', ip: meta.ip, userAgent: meta.userAgent });
       throw this.invalidCredentials();
     }
     const token = randomToken();
@@ -70,7 +101,7 @@ export class AdminAuthService {
       adminId: admin.id,
       tokenHash: sha256(token),
       pendingTotpSecretEncrypted: enrolled ? null : encryptSecret(newTotpSecret(), this.cfg.ADMIN_TOTP_ENCRYPTION_KEY),
-      expiresAt: new Date(now + CHALLENGE_TTL_MS),
+      expiresAt: new Date(this.clock.now() + CHALLENGE_TTL_MS),
     });
     return { loginToken: token, next: enrolled ? ('totp' as const) : ('totp_enrollment' as const) };
   }
@@ -99,14 +130,26 @@ export class AdminAuthService {
 
   async verify(loginToken: string, code: string, meta: RequestMeta) {
     const { c, admin } = await this.challenge(loginToken);
+    const key = this.throttleKey(admin.email);
+    if (await this.isLocked(key)) throw this.invalidCredentials();
+    // Réserve un essai de façon atomique : des requêtes parallèles ne dépassent jamais 5 essais par étape.
+    const [reserved] = await this.db
+      .update(adminLoginChallenges)
+      .set({ attempts: sql`${adminLoginChallenges.attempts} + 1` })
+      .where(and(eq(adminLoginChallenges.id, c.id), isNull(adminLoginChallenges.consumedAt), sql`${adminLoginChallenges.attempts} < ${CHALLENGE_MAX_ATTEMPTS}`))
+      .returning({ id: adminLoginChallenges.id });
+    if (!reserved) throw new AppError('LOGIN_EXPIRED', 'Étape de connexion expirée. Recommence avec ton e-mail et ton mot de passe.', HttpStatus.UNAUTHORIZED);
+
     const enrolling = !!c.pendingTotpSecretEncrypted;
     const encrypted = enrolling ? c.pendingTotpSecretEncrypted! : admin.totpSecretEncrypted;
     if (!encrypted) throw this.invalidCredentials();
     const secret = decryptSecret(encrypted, this.cfg.ADMIN_TOTP_ENCRYPTION_KEY);
     const step = verifyTotp(secret, code, this.clock.now(), enrolling ? null : admin.totpLastStep);
     if (step === null) {
-      await this.db.update(adminLoginChallenges).set({ attempts: sql`${adminLoginChallenges.attempts} + 1` }).where(eq(adminLoginChallenges.id, c.id));
-      await this.audit.log({ actorType: 'admin', actorId: admin.id, action: 'admin.totp_failed', ip: meta.ip, userAgent: meta.userAgent });
+      // Les échecs de code comptent pour le compte entier (pas seulement pour cette étape) : pas de force brute
+      // en recommençant la connexion.
+      const locked = await this.recordFailure(key);
+      await this.audit.log({ actorType: 'admin', actorId: admin.id, action: locked ? 'admin.locked' : 'admin.totp_failed', ip: meta.ip, userAgent: meta.userAgent });
       throw new AppError('INVALID_CODE', 'Code incorrect ou expiré.', HttpStatus.UNAUTHORIZED);
     }
     const token = randomToken();
@@ -119,19 +162,29 @@ export class AdminAuthService {
         .where(and(eq(adminLoginChallenges.id, c.id), isNull(adminLoginChallenges.consumedAt)))
         .returning({ id: adminLoginChallenges.id });
       if (!consumed) throw new AppError('LOGIN_EXPIRED', 'Étape de connexion déjà utilisée.', HttpStatus.UNAUTHORIZED);
-      // Le pas TOTP ne peut servir qu'une fois, même en cas de deux connexions simultanées.
+      // Le pas TOTP ne sert qu'une fois ; un enrôlement n'est possible que si aucun secret n'est actif
+      // (une ancienne étape d'enrôlement ne peut pas remplacer l'appareil déjà configuré).
       const [updated] = await tx
         .update(adminUsers)
         .set({
           totpLastStep: step,
-          failedLoginCount: 0,
-          lockedUntil: null,
           lastLoginAt: new Date(),
           ...(enrolling ? { totpSecretEncrypted: encrypted, totpEnabledAt: new Date() } : {}),
         })
-        .where(and(eq(adminUsers.id, admin.id), sql`coalesce(${adminUsers.totpLastStep}, -1) < ${step}`))
+        .where(
+          and(
+            eq(adminUsers.id, admin.id),
+            sql`coalesce(${adminUsers.totpLastStep}, -1) < ${step}`,
+            enrolling ? isNull(adminUsers.totpEnabledAt) : sql`${adminUsers.totpEnabledAt} is not null`,
+          ),
+        )
         .returning({ id: adminUsers.id });
-      if (!updated) throw new AppError('INVALID_CODE', 'Ce code a déjà été utilisé. Attends le suivant.', HttpStatus.UNAUTHORIZED);
+      if (!updated) throw new AppError('INVALID_CODE', 'Ce code a déjà été utilisé ou cette étape n’est plus valable. Recommence.', HttpStatus.UNAUTHORIZED);
+      if (enrolling) {
+        // Les autres étapes d'enrôlement ouvertes deviennent inutilisables.
+        await tx.update(adminLoginChallenges).set({ consumedAt: new Date() }).where(and(eq(adminLoginChallenges.adminId, admin.id), isNull(adminLoginChallenges.consumedAt)));
+      }
+      await tx.delete(adminLoginThrottle).where(eq(adminLoginThrottle.keyHash, key));
       await tx.insert(adminSessions).values({ id: sessionId, adminId: admin.id, tokenHash: sha256(token), ip: meta.ip, userAgent: meta.userAgent, expiresAt });
       await this.audit.log(
         { actorType: 'admin', actorId: admin.id, action: enrolling ? 'admin.totp_enrolled' : 'admin.login', targetType: 'admin_session', targetId: sessionId, ip: meta.ip, userAgent: meta.userAgent },

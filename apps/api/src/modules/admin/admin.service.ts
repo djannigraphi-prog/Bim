@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, ilike, inArray, lt, or, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, lt, or, SQL } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
 import {
+  adminLoginChallenges,
   adminRoles,
   adminSessions,
   adminUserRoles,
@@ -286,6 +287,8 @@ export class AdminService {
       if (body.resetTotp) await tx.update(adminUsers).set({ totpSecretEncrypted: null, totpEnabledAt: null, totpLastStep: null }).where(eq(adminUsers.id, id));
       if (body.status === 'disabled' || body.resetTotp || body.roles) {
         await tx.update(adminSessions).set({ revokedAt: new Date() }).where(eq(adminSessions.adminId, id));
+        // Les étapes de connexion en cours (dont les enrôlements) sont annulées.
+        await tx.update(adminLoginChallenges).set({ consumedAt: new Date() }).where(and(eq(adminLoginChallenges.adminId, id), isNull(adminLoginChallenges.consumedAt)));
       }
       // Il doit toujours rester au moins un administrateur principal actif.
       const [{ n }] = await tx

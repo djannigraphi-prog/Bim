@@ -52,11 +52,20 @@ export const adminUsers = pgTable('admin_users', {
   totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }),
   /** Dernier pas de temps TOTP accepté : un code ne peut pas servir deux fois. */
   totpLastStep: bigint('totp_last_step', { mode: 'number' }),
-  failedLoginCount: integer('failed_login_count').notNull().default(0),
-  lockedUntil: timestamp('locked_until', { withTimezone: true }),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   status: adminStatus('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Limitation des échecs de connexion admin (mot de passe ou code), par e-mail haché (HMAC) : les e-mails inconnus
+ * sont comptés comme les autres, pour que les réponses ne révèlent pas quels comptes existent.
+ */
+export const adminLoginThrottle = pgTable('admin_login_throttle', {
+  keyHash: varchar('key_hash', { length: 64 }).primaryKey(),
+  failures: integer('failures').notNull().default(0),
+  lastFailureAt: timestamp('last_failure_at', { withTimezone: true }).notNull(),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
 });
 
 /** Étape intermédiaire de connexion (mot de passe accepté, code TOTP attendu). Jeton stocké haché. */

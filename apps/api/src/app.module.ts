@@ -31,7 +31,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
           level: cfg.LOG_LEVEL,
           // Journaux structurés (JSON) ; jamais d'en-tête d'autorisation, de mot de passe ni de code dans les journaux.
           redact: {
-            paths: ['req.headers.authorization', 'req.headers["x-step-up-token"]', 'req.headers.cookie', 'req.body.password', 'req.body.newPassword', 'req.body.code', 'req.body.refreshToken'],
+            paths: ['req.headers.authorization', 'req.headers["x-step-up-token"]', 'req.headers.cookie', 'req.body.password', 'req.body.newPassword', 'req.body.code', 'req.body.refreshToken', 'req.body.loginToken', 'req.body.secret'],
             censor: '[masqué]',
           },
           transport: cfg.NODE_ENV === 'development' ? { target: 'pino-pretty', options: { singleLine: true } } : undefined,

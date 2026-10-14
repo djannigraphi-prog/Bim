@@ -77,19 +77,54 @@ describe('Administration (e2e)', () => {
       expect(late.body.error.code).toBe('LOGIN_EXPIRED');
     });
 
-    it('verrouille le compte après 5 mots de passe faux, sans révéler si l’e-mail existe', async () => {
+    it('verrouille après 5 échecs, avec la même réponse qu’un e-mail inconnu ou verrouillé', async () => {
       const a = await createAdmin(['support']);
       const unknown = await h.http().post('/admin/v1/auth/login').send({ email: 'personne@bim.test', password: 'x' }).expect(401);
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 5; i++) {
         const r = await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: 'mauvais' }).expect(401);
         expect(r.body.error).toEqual(unknown.body.error);
       }
-      await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: 'mauvais' }).expect(401);
-      await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD }).expect(429);
+      // Verrouillé : même le bon mot de passe reçoit la réponse habituelle (pas de 429 révélateur).
+      const locked = await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD }).expect(401);
+      expect(locked.body.error).toEqual(unknown.body.error);
       h.adminClock.t += 16 * 60_000;
       await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD }).expect(200);
       const audit = await h.pool.query("select action from audit_logs where actor_id = $1 and action = 'admin.locked'", [a.id]);
       expect(audit.rowCount).toBe(1);
+    });
+
+    it('sécurité : des mots de passe faux envoyés en parallèle verrouillent quand même le compte', async () => {
+      const a = await createAdmin(['support']);
+      await Promise.all(Array.from({ length: 20 }, () => h.http().post('/admin/v1/auth/login').send({ email: a.email, password: 'mauvais' })));
+      await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD }).expect(401);
+    });
+
+    it('sécurité : les codes faux comptent pour le compte entier (pas de force brute en recommençant la connexion)', async () => {
+      const a = await createAdmin(['support']);
+      await signIn(a);
+      for (let round = 0; round < 3; round++) {
+        tick();
+        const l = await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD });
+        if (l.status !== 200) break;
+        for (let i = 0; i < 2; i++) await h.http().post('/admin/v1/auth/totp/verify').send({ loginToken: l.body.loginToken, code: '000000' });
+      }
+      // 5 codes faux au total : le compte est verrouillé, même avec le bon mot de passe et le bon code.
+      tick();
+      await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD }).expect(401);
+      // Et une étape déjà obtenue ne permet plus d'essayer.
+      const row = await h.pool.query('select count(*)::int as n from admin_login_challenges where admin_id = $1', [a.id]);
+      expect(row.rows[0].n).toBeGreaterThan(1);
+    });
+
+    it('sécurité : une ancienne étape d’enrôlement ne remplace pas l’appareil déjà configuré', async () => {
+      const a = await createAdmin(['super_admin']);
+      tick();
+      const stale = await h.http().post('/admin/v1/auth/login').send({ email: a.email, password: PASSWORD }).expect(200);
+      const staleSecret = (await h.http().post('/admin/v1/auth/totp/enrollment').send({ loginToken: stale.body.loginToken }).expect(200)).body.secret;
+      await signIn(a); // la vraie personne configure son appareil
+      tick();
+      await h.http().post('/admin/v1/auth/totp/verify').send({ loginToken: stale.body.loginToken, code: code(staleSecret) }).expect(401);
+      await signIn(a); // son appareil fonctionne toujours
     });
 
     it('un jeton de l’app ne donne jamais accès à l’administration, et inversement', async () => {
