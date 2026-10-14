@@ -6,7 +6,6 @@
 // Aucune donnée fictive n'est présentée comme réelle : le serveur est remplacé par un faux qui renvoie
 // la liste des centres d'intérêt de la migration 0001 et « connexions sociales non configurées ».
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
@@ -102,7 +101,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     tokenStorageProvider.overrideWithValue(storage),
     apiClientProvider.overrideWithValue(client),
     authApiProvider.overrideWithValue(_FakeAuthApi(client)),
-  ]);
+  ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
     GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
@@ -113,7 +112,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/verify', builder: (_, __) => VerifyCodeScreen(challenge: _challenge)),
     GoRoute(path: '/forgot', builder: (_, __) => const ForgotPasswordScreen()),
     GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
-  ]);
+  ],);
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
     child: MaterialApp.router(
@@ -126,7 +125,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
       supportedLocales: const [Locale('fr')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
     ),
-  ));
+  ),);
   await _settle(tester);
   return container;
 }

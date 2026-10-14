@@ -29,11 +29,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           children: [
             const Spacer(),
-            const Center(child: BimLogo(height: 110)),
+            const Center(child: BimLogo(height: 92)),
             const Spacer(),
             Text(
               'Beauté · Image · Motivation',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: BimColors.grey600, fontWeight: FontWeight.w600),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: BimColors.grey600, fontWeight: FontWeight.w600, fontSize: 13),
             ),
             const SizedBox(height: BimSpacing.xxl),
           ],

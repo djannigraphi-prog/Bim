@@ -24,7 +24,8 @@ class BimButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final (Color bg, Color fg, BorderSide side) = switch (variant) {
       BimButtonVariant.primary => (BimColors.red, BimColors.white, BorderSide.none),
       BimButtonVariant.dark => (scheme.onSurface, scheme.surface, BorderSide.none),
@@ -38,7 +39,7 @@ class BimButton extends StatelessWidget {
       label: label,
       child: SizedBox(
         width: double.infinity,
-        height: 58,
+        height: 52,
         child: FilledButton(
           onPressed: enabled ? onPressed : null,
           style: FilledButton.styleFrom(
@@ -48,7 +49,8 @@ class BimButton extends StatelessWidget {
             disabledForegroundColor: variant == BimButtonVariant.primary ? BimColors.white : fg.withValues(alpha: 0.6),
             side: side,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BimRadius.button)),
-            textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            // Hérite de la police du thème (police de marque à venir, D-UI-02).
+            textStyle: theme.textTheme.labelLarge,
           ),
           child: AnimatedSwitcher(
             duration: BimDurations.fast,

@@ -167,8 +167,8 @@ class _InterestChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(BimRadius.chip),
         child: AnimatedContainer(
           duration: BimDurations.fast,
-          constraints: const BoxConstraints(minHeight: kBimMinTouch + 6),
-          padding: const EdgeInsets.symmetric(horizontal: BimSpacing.lg, vertical: BimSpacing.md),
+          constraints: const BoxConstraints(minHeight: kBimMinTouch),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: selected ? BimColors.red : scheme.surface,
             borderRadius: BorderRadius.circular(BimRadius.chip),
@@ -181,7 +181,7 @@ class _InterestChip extends StatelessWidget {
               const SizedBox(width: BimSpacing.sm),
               Text(
                 interest.label,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: selected ? BimColors.white : scheme.onSurface),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? BimColors.white : scheme.onSurface),
               ),
             ],
           ),

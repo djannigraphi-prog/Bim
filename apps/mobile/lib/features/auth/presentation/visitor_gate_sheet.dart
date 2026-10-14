@@ -27,7 +27,7 @@ Future<void> showVisitorGate(BuildContext context, WidgetRef ref) {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Peni(pose: PeniPose.happy, size: 120),
+              const Peni(pose: PeniPose.wave, size: 120),
               const SizedBox(height: BimSpacing.lg),
               Text('Rejoins BIM pour réagir', style: theme.textTheme.headlineMedium, textAlign: TextAlign.center),
               const SizedBox(height: BimSpacing.sm),

@@ -69,10 +69,11 @@ abstract final class BimTheme {
         headlineLarge: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8, fontSize: 32),
         headlineMedium: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.6, fontSize: 28),
         titleLarge: text.titleLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 20),
-        titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 17),
-        bodyLarge: text.bodyLarge?.copyWith(fontSize: 17),
-        bodyMedium: text.bodyMedium?.copyWith(fontSize: 15, color: muted),
-        labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 17),
+        // Pas d'espacement entre les lettres : les maquettes n'en ont pas (Material en ajoute par défaut).
+        titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 17, letterSpacing: 0),
+        bodyLarge: text.bodyLarge?.copyWith(fontSize: 16, letterSpacing: 0),
+        bodyMedium: text.bodyMedium?.copyWith(fontSize: 15, color: muted, letterSpacing: 0),
+        labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
@@ -85,7 +86,7 @@ abstract final class BimTheme {
         filled: true,
         fillColor: surface,
         hintStyle: TextStyle(color: muted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: BimSpacing.lg, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: BimSpacing.lg, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(BimRadius.field), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(BimRadius.field), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(

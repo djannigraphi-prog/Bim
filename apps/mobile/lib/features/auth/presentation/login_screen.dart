@@ -86,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             children: [
               const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
               const SizedBox(height: BimSpacing.lg),
-              const Align(alignment: Alignment.centerLeft, child: BimLogo(height: 64)),
+              const Align(alignment: Alignment.centerLeft, child: BimLogo(height: 48)),
               const SizedBox(height: BimSpacing.lg),
               Text('Content de te revoir', style: theme.textTheme.headlineMedium),
               const SizedBox(height: BimSpacing.xs),
