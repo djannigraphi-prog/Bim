@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 commencé pour la partie sans dépense (rappels : étapes A à F développées et testées, dont l'écran « Rappels » de l'app ; rien d'activé) ; activation en attente de l'accord du fondateur.
+Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 : étapes A à K développées et testées sans dépense (préférences, notifications programmées et leurs actions, centre de notifications, envoi serveur prêt mais inactif) ; rien d'activé ; activation en attente de l'accord du fondateur.
 
 ## Résumé
 
@@ -88,7 +88,13 @@ Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'a
 | E | Envoi FCM HTTP v1 prêt, inactif | 5 tests contre un faux serveur ; 1 test de configuration | verte (run 38703183336 : API, admin, mobile, Android) |
 | F | Écran « Rappels » dans l'app (Paramètres → Rappels) : recevoir ou non les rappels de Peni, heures calmes personnelles ou par défaut ; relié à `GET/PATCH /v1/me/notification-preferences` ; avertissement « pas encore en service » tant que le réglage de la plateforme est coupé | 10 tests Flutter (modèle, requêtes, écran) ; captures `x15_rappels` (normal, petit écran, sombre) ; parcours Android contre l'API réelle (choix enregistré puis relu, capture `a28_rappels`) ; e2e API complété | verte (run 38719370532) |
 
-Suite API locale : 180 tests réussis (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
+| G | **Rappels désactivés par défaut** (décision du 15/10) ; préférence distincte de l'autorisation d'Android | e2e API (défaut, heures calmes sans activation, rien sans activation puis envoi après activation) ; Flutter ; Android | verte (run 38723547646) |
+| H | Firebase préparé sans projet : source de jeton inactive, inscription de l'appareil prête ; étapes de création (`docs/FIREBASE_PROJET.md`) | Flutter (aucune source simulée, routes d'inscription) | verte (run 38732970768) |
+| I | **Notifications programmées classiques** (maquette 28) : rappels des 48 h calculés par l'API, programmés par le téléphone en mode non exact ; actions « J'y vais ! » (ouvre la journée) et « Plus tard » (ferme) ; autorisation d'Android demandée à l'activation ; synchronisation à l'ouverture, au retour, après un changement ; un seul canal par appareil | e2e API ; Flutter (programmation, autorisation accordée ou refusée) ; **Android réel** : vraie fenêtre d'autorisation acceptée, deux vraies notifications affichées par Android avec leurs actions, « Plus tard » les ferme, « J'y vais ! » ouvre la journée du projet (captures `a28_rappels`, `a28_notifications`, `a28_jy_vais`) | verte (run 38732970768) |
+| J | **Centre de notifications** (écran 17) : coffres, réponses du support, rappels envoyés par le serveur ; filtres Tout / Projets ; non lues en évidence ; pastille sur la cloche | e2e API (sources, ordre, textes, filtres, pages, « vu », cloisonnement, 30 jours) ; Flutter ; captures `17_notifications` ; Android (réponses réelles du support, pastille, marquées vues, capture `a17_notifications`) | verte (run 38732970768) |
+| K | Enquête sur la perte de l'émulateur (sonde à la demande, 8 situations) | voir `docs/TESTING.md` | — |
+
+Suite API locale : 184 tests réussis (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
 ## Tests exécutés (session 1, 14/10/2026)
 
@@ -152,9 +158,11 @@ Moyens de vérification possibles :
 ## Erreurs et limites connues
 
 - Application mobile : compilée pour Android en CI ; iOS non compilé ; pas encore testée sur un téléphone contre l'API.
-- Émulateur Android de la CI (15/10, écran Rappels) : un glissement du test au-delà du haut d'une liste (effet d'étirement d'Android) a été suivi, à chaque essai, de la perte de l'émulateur entier (« offline »). Le test fait maintenant un retour exact en haut, sans glissement. Cause non prouvée ; à vérifier sur un vrai téléphone (simple geste de l'utilisateur).
+- Émulateur Android de la CI : un glissement au-delà du haut d'une liste fait perdre l'émulateur entier **quand trois éléments sont réunis** : un dessin SVG à l'écran (Peni), l'effet d'étirement d'Android et le moteur de rendu Impeller. Retirer l'un des trois suffit (sonde, 8 situations, `docs/TESTING.md`). Origine probable : le rendu graphique simulé de l'émulateur, déclenché par un contenu de BIM. **À vérifier sur de vrais téléphones** ; si le problème s'y produit, deux corrections possibles (Peni en image PNG, ou effet d'étirement remplacé), à décider. Le parcours de bout en bout évite ce geste ; aucun test supprimé.
+- Maquette 28, écarts restants : petite icône de notification = icône par défaut de l'app (pas encore l'avatar de Peni) ; pas de notification « ALARME » (pas d'alarme exacte en version 1) ; textes = modèles v1 de l'API (plus courts que la maquette) ; écran verrouillé non capturé ; iOS non compilé ; envoi par le serveur (Firebase) en attente.
+- Notifications programmées par le téléphone : couvrent les 48 h suivant la dernière ouverture de l'app ; une tâche cochée sur un autre appareil ne retire le rappel qu'à la synchronisation suivante ; Android peut décaler l'affichage de quelques minutes (mode non exact).
 - Diagnostic CI : les tests Flutter en échec et le journal système Android (en cas d'arrêt de l'app) sont publiés en annotations, lisibles même quand les journaux bruts ne sont pas téléchargeables.
-- Dossiers `android/` et `ios/` non versionnés : à générer une fois l'identifiant de l'app (ex. `ci.bim.app`) choisi par le fondateur.
+- Dossier `ios/` non versionné (le dossier `android/` l'est, avec l'identifiant provisoire `ci.bim.app`, D-APP-01).
 - Envoi réel des SMS et e-mails absent : en développement, les codes s'affichent dans la console de l'API. Le démarrage en staging ou en production est refusé tant qu'un vrai fournisseur n'est pas configuré.
 - Photo de profil (écran 05) : non disponible (module médias, lot 4).
 - Police de marque non choisie (police du système en attendant).
@@ -180,8 +188,8 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Lot 2 : réponses du fondateur aux 4 décisions de `docs/LOT2_RAPPELS_ETUDE.md` (section 9) avant toute activation ; aucune dépense sans accord. L'écran des préférences de rappel est fait (étape F) ; la maquette 28 (notifications sur l'écran verrouillé, « alarme ») attend Firebase (décision 2) et la décision sur l'alarme (4).
-1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (notifications de rappel) → lot 2, après Firebase.
+1. Lot 2 : bilan présenté au fondateur (étapes A à K) ; restent soumis à son accord : service séparé payant, création du projet Firebase, valeurs du rythme et des heures calmes, ouverture du service (`notifications.reminders_enabled`). Aucune dépense sans accord.
+1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 : notifications programmées faites ; envoi par le serveur après Firebase.
 2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
 4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.

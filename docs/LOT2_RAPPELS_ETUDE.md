@@ -209,6 +209,10 @@ Alertes à créer au déploiement (CloudWatch, gratuites dans les 10 alarmes) : 
 | D | Worker : file PostgreSQL, reprise, anti-doublon, surveillance, point d'entrée séparé | Fait, testé |
 | E | Envoi FCM (API HTTP v1) prêt mais inactif ; testé contre un faux serveur | Fait, testé |
 | F | Écran « Rappels » dans l'app (Paramètres → Rappels) : recevoir ou non les rappels, heures calmes ; relié à l'API ; avertit tant que le service est fermé ; n'active rien | Fait, testé (Flutter, captures, Android contre l'API réelle) |
+| G | Rappels désactivés par défaut ; préférence distincte de l'autorisation d'Android | Fait, testé |
+| H | Firebase préparé sans projet ; étapes de création (`docs/FIREBASE_PROJET.md`) | Fait, testé |
+| I | Notifications programmées classiques sur le téléphone, actions « J'y vais ! / Plus tard », un seul canal par appareil | Fait, testé (dont Android réel) |
+| J | Centre de notifications (écran 17) | Fait, testé |
 | — | Notifications de la maquette 28 (écran verrouillé, boutons « J'y vais ! / Plus tard », « alarme ») et inscription du téléphone | Attendent le projet Firebase (décision 2) et la décision sur l'alarme (4). La maquette 28 montre les notifications elles-mêmes, pas un écran de réglages : l'écran F n'a pas de maquette et reprend le style des Paramètres |
 
 **Changement technique (pour information)** : la file prévue avec pg-boss a été remplacée par une table dédiée (`notification_deliveries`). Même coût (0), même base ; avantages : contrôle exact de la clé anti-doublon, des reprises et des états, une dépendance de moins, et un passage à SQS toujours possible derrière la même interface.

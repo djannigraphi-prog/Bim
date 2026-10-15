@@ -59,3 +59,25 @@ Règle : un test n'est déclaré réussi que s'il a été exécuté. Les résult
 - Android : image jointe au signalement d'une journée ; « Résoudre un problème » depuis le compte (description + capture) puis « Mes signalements » ; images réellement téléchargées et affichées (vérifié dans l'arbre de rendu, aucune icône d'image cassée).
 - **Captures réelles de l'émulateur** (rendu Android véritable : polices et émojis du système, images chargées par le réseau) : prises par le test via le relais de la CI (`adb screencap`), publiées sur la branche `ci-captures-android` (`a31_avant_apres`, `a27_mes_signalements_projet`, `a30_bilan_emoji`, `a21_mes_signalements`). Les captures de la branche `ci-captures` restent des rendus de test (sans émojis ni images réseau).
 
+## Lot 2 — rappels, notifications, centre de notifications (15/10/2026)
+
+- API : `lot2.e2e-spec.ts` (fuseau, appareils, préférences, désactivés par défaut), `reminders.e2e-spec.ts` (worker : doublons, panne, péremption, jeton, erreurs passagères, revérification, surveillance ; rappels à venir pour le téléphone), `inbox.e2e-spec.ts` (centre de notifications), tests unitaires du calcul et de l'envoi FCM (faux serveur).
+- Flutter : `reminder_preferences_test.dart`, `reminder_scheduler_test.dart`, `notifications_screen_test.dart` ; captures `x15_rappels`, `17_notifications`.
+- Android réel (job `android-e2e`) : autorisation d'Android acceptée dans sa vraie fenêtre, service ouvert **dans la base de test de la CI uniquement**, deux tâches ajoutées quelques minutes plus tard, deux vraies notifications affichées par Android (titre, texte, actions lus dans le rapport d'Android), « Plus tard » puis « J'y vais ! » touchés dans le volet des notifications, journée du projet ouverte ; centre de notifications avec de vraies réponses du support. Le relais de la CI (`.github/scripts/otp-relay.py`) pilote le système (uiautomator, dumpsys) ; il n'agit que sur l'émulateur et la base jetable de la CI.
+
+## Perte de l'émulateur (enquête du 15/10/2026)
+
+Constat : dans le parcours Android, un glissement du test au-delà du haut de l'écran Rappels faisait perdre l'émulateur entier (« offline »), à chaque essai. Sonde à la demande (workflow « Sonde émulateur », `integration_test/overscroll_probe_test.dart`), même geste, émulateur neuf à chaque fois :
+
+| Situation | Moteur de rendu | Émulateur après le geste |
+| --- | --- | --- |
+| Témoin, sans geste | Impeller | en ligne |
+| Liste Flutter simple | Impeller | en ligne |
+| Liste Flutter simple | sans Impeller | en ligne |
+| Liste simple + Peni (dessin SVG) | Impeller | **hors ligne** |
+| Écran Rappels sans l'avertissement (sans Peni) | Impeller | en ligne |
+| Écran Rappels complet | Impeller | **hors ligne** (deux fois) |
+| Écran Rappels complet | sans Impeller | en ligne |
+
+Conclusion : l'émulateur tombe seulement avec la combinaison dessin SVG + effet d'étirement + Impeller. Le plantage touche l'émulateur entier, pas seulement l'app : l'origine la plus probable est le rendu graphique simulé de l'émulateur, déclenché par un contenu ordinaire de BIM. Ce n'est pas prouvé pour de vrais téléphones : **à vérifier sur 3 à 5 téléphones courants** (geste banal pour une personne). Corrections possibles si le problème s'y produit (à décider) : Peni en image PNG plutôt qu'en SVG, ou effet d'étirement remplacé. Le parcours de bout en bout remonte en haut de l'écran sans ce geste ; la sonde reste disponible.
+
