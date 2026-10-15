@@ -431,7 +431,7 @@
             "bearer": []
           }
         ],
-        "summary": "Thème clair / sombre / système (écran 62)",
+        "summary": "Thème clair / sombre / système (écran 62) et fuseau horaire",
         "tags": [
           "Mon compte"
         ]
@@ -2474,6 +2474,11 @@
               "light",
               "dark"
             ]
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Africa/Abidjan",
+            "description": "Fuseau horaire IANA (jour du programme, heure des rappels)"
           }
         }
       },

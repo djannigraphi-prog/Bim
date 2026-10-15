@@ -1,0 +1,1 @@
+ALTER TABLE "user_preferences" ADD COLUMN "timezone" varchar(64) DEFAULT 'Africa/Abidjan' NOT NULL;

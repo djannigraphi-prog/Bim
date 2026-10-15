@@ -1,6 +1,7 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import { AppError, Errors } from '../../common/errors';
+import { DEFAULT_TIMEZONE, isValidTimeZone } from '../../common/timezone';
 import { DB, Database, DbOrTx } from '../../database/database.module';
 import { interests, privacySettings, userContacts, userInterests, userPreferences, users } from '../../database/schema';
 import { AgePolicyService } from '../age-policy/age-policy.service';
@@ -68,7 +69,7 @@ export class UsersService {
       hasPassword: user.passwordHash !== null,
       contacts: contacts.map((c) => ({ id: c.id, type: c.type, value: c.value, verified: c.verifiedAt !== null })),
       interests: myInterests,
-      preferences: { theme: prefs[0]?.theme ?? 'system', language: prefs[0]?.language ?? 'fr' },
+      preferences: { theme: prefs[0]?.theme ?? 'system', language: prefs[0]?.language ?? 'fr', timezone: prefs[0]?.timezone ?? DEFAULT_TIMEZONE },
       privacy: {
         birthDatePublic: privacy[0]?.birthDatePublic ?? false,
         genderPublic: privacy[0]?.genderPublic ?? false,
@@ -85,15 +86,19 @@ export class UsersService {
     return { age: await this.agePolicy.all(user.birthDate) };
   }
 
-  async updatePreferences(userId: string, theme?: 'system' | 'light' | 'dark') {
-    if (theme) {
+  async updatePreferences(userId: string, changes: { theme?: 'system' | 'light' | 'dark'; timezone?: string }) {
+    if (changes.timezone !== undefined && !isValidTimeZone(changes.timezone)) {
+      throw Errors.validation({ fields: { timezone: ['Fuseau horaire inconnu (ex. Africa/Abidjan).'] } });
+    }
+    const set = { ...(changes.theme ? { theme: changes.theme } : {}), ...(changes.timezone ? { timezone: changes.timezone } : {}) };
+    if (Object.keys(set).length) {
       await this.db
         .insert(userPreferences)
-        .values({ userId, theme })
-        .onConflictDoUpdate({ target: userPreferences.userId, set: { theme, updatedAt: new Date() } });
+        .values({ userId, ...set })
+        .onConflictDoUpdate({ target: userPreferences.userId, set: { ...set, updatedAt: new Date() } });
     }
     const rows = await this.db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
-    return { theme: rows[0]?.theme ?? 'system', language: rows[0]?.language ?? 'fr' };
+    return { theme: rows[0]?.theme ?? 'system', language: rows[0]?.language ?? 'fr', timezone: rows[0]?.timezone ?? DEFAULT_TIMEZONE };
   }
 
   assertActive(user: { status: string } | null): asserts user {

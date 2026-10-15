@@ -1,8 +1,10 @@
 /**
  * Calendrier d'un projet : fonctions pures (sans base), testées unitairement.
- * Les jours sont des dates « AAAA-MM-JJ » à l'heure d'Abidjan (UTC+0, sans heure d'été).
+ * Les jours sont des dates « AAAA-MM-JJ » à l'heure locale de la personne (préférence `timezone`, Abidjan par défaut).
  * Jours de la semaine : bit 0 = lundi … bit 6 = dimanche.
  */
+
+import { DEFAULT_TIMEZONE, localDay } from '../../common/timezone';
 
 export type Day = string;
 
@@ -27,8 +29,11 @@ export interface PauseRange {
 
 export type DayState = 'done' | 'missed' | 'partial' | 'today' | 'upcoming' | 'rest' | 'paused';
 
-export function today(now: Date = new Date()): Day {
-  return now.toISOString().slice(0, 10);
+export { DEFAULT_TIMEZONE, isValidTimeZone } from '../../common/timezone';
+
+/** Jour « AAAA-MM-JJ » à l'heure locale du fuseau donné (par défaut Abidjan, identique à UTC). */
+export function today(now: Date = new Date(), timeZone: string = DEFAULT_TIMEZONE): Day {
+  return localDay(now, timeZone);
 }
 
 export function addDays(day: Day, n: number): Day {

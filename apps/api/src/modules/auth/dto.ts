@@ -92,4 +92,9 @@ export class ChangePasswordDto {
 
 export class UpdatePreferencesDto {
   @ApiPropertyOptional({ enum: ['system', 'light', 'dark'] }) @IsOptional() @IsIn(['system', 'light', 'dark']) theme?: 'system' | 'light' | 'dark';
+  @ApiPropertyOptional({ example: 'Africa/Abidjan', description: 'Fuseau horaire IANA (jour du programme, heure des rappels)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
 }

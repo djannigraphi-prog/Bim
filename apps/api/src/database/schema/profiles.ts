@@ -47,5 +47,7 @@ export const userPreferences = pgTable('user_preferences', {
     .references(() => users.id, { onDelete: 'cascade' }),
   theme: themePreference('theme').notNull().default('system'),
   language: varchar('language', { length: 5 }).notNull().default('fr'),
+  /** Fuseau horaire IANA (lot 2) : jour du programme et heure des rappels à l'heure locale. Lancement : Côte d'Ivoire. */
+  timezone: varchar('timezone', { length: 64 }).notNull().default('Africa/Abidjan'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { today } from './plan';
+import { userTimezone } from './timezone';
 
 /**
  * Photos « avant » et « après » (écrans 22 et 31) : privées, visibles seulement par la personne.
@@ -46,7 +47,7 @@ export class ProjectPhotosService {
       .from(projectPhotos)
       .where(and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.kind, kind), isNull(projectPhotos.deletedAt)));
     await this.db.transaction(async (tx) => {
-      await tx.insert(projectPhotos).values({ id, projectId, userId, kind, storageKey: key, width: out.width, height: out.height, bytes: out.bytes, takenDay: today() });
+      await tx.insert(projectPhotos).values({ id, projectId, userId, kind, storageKey: key, width: out.width, height: out.height, bytes: out.bytes, takenDay: today(new Date(), await userTimezone(this.db, userId)) });
       for (const p of previous) await tx.update(projectPhotos).set({ deletedAt: new Date() }).where(eq(projectPhotos.id, p.id));
       await this.audit.log({ actorType: 'user', actorId: userId, action: 'project.photo_added', targetType: 'project', targetId: projectId, ip: meta.ip, userAgent: meta.userAgent, metadata: { kind } }, tx);
     });

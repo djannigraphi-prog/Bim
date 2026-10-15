@@ -20,10 +20,13 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
 import { ProjectPhotosService } from './photos.service';
+import { userTimezone } from './timezone';
 import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, UpdateProjectDto } from './dto';
 import { addDays, Chest, computePlan, diffDays, dueTasks, generateTitle, isPaused, isValidDay, spreadWeekdays, today } from './plan';
 
 type ProjectRow = typeof projects.$inferSelect;
+/** Projet chargé avec le fuseau horaire de sa propriétaire : « aujourd'hui » se calcule à son heure locale. */
+type LoadedProject = ProjectRow & { tz: string };
 type TaskRow = typeof projectTasks.$inferSelect;
 type PauseRow = typeof projectPauses.$inferSelect;
 
@@ -45,8 +48,13 @@ export class ProjectsService {
     private readonly photos: ProjectPhotosService,
   ) {}
 
-  private today(): string {
-    return today(this.clock.now());
+  private today(tz: string): string {
+    return today(this.clock.now(), tz);
+  }
+
+  /** Fuseau horaire de la personne (préférence), Abidjan par défaut. */
+  private tzOf(userId: string): Promise<string> {
+    return userTimezone(this.db, userId);
   }
 
   private async setting<T>(key: string, fallback: T): Promise<T> {
@@ -124,7 +132,7 @@ export class ProjectsService {
 
     const maxActive = await this.setting<number | null>('projects.max_active', null);
     const times = await this.setting<Record<string, string>>('projects.availability_times', {});
-    const start = this.today();
+    const start = this.today(await this.tzOf(userId));
     const projectId = uuidv7();
     const title = generateTitle({
       pattern: goal?.titlePattern,
@@ -232,10 +240,11 @@ export class ProjectsService {
   // ---------------------------------------------------------------- Lecture
 
   /** Charge un projet de la personne (404 sinon) et applique les transitions dues au temps (fin de pause, fin du programme). */
-  private async load(userId: string, projectId: string): Promise<ProjectRow> {
-    const [p] = await this.db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
-    if (!p || p.status === 'abandoned') throw Errors.notFound('Projet');
-    const t = this.today();
+  private async load(userId: string, projectId: string): Promise<LoadedProject> {
+    const [row] = await this.db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
+    if (!row || row.status === 'abandoned') throw Errors.notFound('Projet');
+    const p: LoadedProject = { ...row, tz: await this.tzOf(userId) };
+    const t = this.today(p.tz);
     if (p.status === 'paused' && p.pausedUntil && t > p.pausedUntil) {
       const [u] = await this.db
         .update(projects)
@@ -276,27 +285,27 @@ export class ProjectsService {
     return { tasks: history.filter((t) => !t.removedAt), history, pauses, completions: new Set(completions.map((c) => `${c.taskId}|${c.day}`)) };
   }
 
-  private stats(p: ProjectRow, parts: { history: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
+  private stats(p: LoadedProject, parts: { history: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
     return computePlan({
       startDate: p.startDate,
       plannedEndDate: p.plannedEndDate,
       tasks: parts.history,
       pauses: parts.pauses,
       completions: parts.completions,
-      today: this.today(),
+      today: this.today(p.tz),
     });
   }
 
   /** Prochaine tâche du jour encore à faire (carte « Aujourd'hui » de l'écran 18, bulle de l'écran 26). */
-  private nextTask(p: ProjectRow, parts: { tasks: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
-    const t = this.today();
+  private nextTask(p: LoadedProject, parts: { tasks: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
+    const t = this.today(p.tz);
     if (p.status !== 'active' || t < p.startDate || t > p.plannedEndDate) return null;
     const next = dueTasks(t, parts.tasks, parts.pauses).find((x) => !parts.completions.has(`${x.id}|${t}`));
     return next ? { id: next.id, title: next.title, detail: next.detail, timeOfDay: next.timeOfDay } : null;
   }
 
   private summary(
-    p: ProjectRow,
+    p: LoadedProject,
     category: { label: string; icon: string } | undefined,
     s: ReturnType<ProjectsService['stats']>,
     parts: { tasks: TaskRow[]; pauses: PauseRow[]; completions: Set<string> },
@@ -337,7 +346,7 @@ export class ProjectsService {
     // Écran 18 : projets en cours d'abord, puis terminés.
     items.sort((a, b) => Number(a.status === 'completed') - Number(b.status === 'completed'));
     const maxActive = await this.setting<number | null>('projects.max_active', null);
-    return { items, activeCount: items.filter((i) => i.status !== 'completed').length, maxActive, today: this.today() };
+    return { items, activeCount: items.filter((i) => i.status !== 'completed').length, maxActive, today: this.today(await this.tzOf(userId)) };
   }
 
   async detail(userId: string, projectId: string) {
@@ -374,7 +383,7 @@ export class ProjectsService {
       chests: s.chests,
       tasks: parts.tasks.map((t) => ({ id: t.id, title: t.title, detail: t.detail, icon: t.icon, timeOfDay: t.timeOfDay, weekdays: t.weekdays, origin: t.origin })),
       days: s.days,
-      today: this.today(),
+      today: this.today(p.tz),
     };
   }
 
@@ -420,7 +429,7 @@ export class ProjectsService {
     const p = await this.load(userId, projectId);
     const [goal] = p.goalCode ? await this.db.select().from(projectGoals).where(eq(projectGoals.code, p.goalCode)) : [];
     if (!goal?.quantityUnit) throw Errors.conflict('NO_MEASURE', "Cet objectif ne se mesure pas en chiffres.");
-    const day = this.today();
+    const day = this.today(p.tz);
     // Une mesure par jour : la nouvelle remplace celle du jour.
     await this.db.transaction(async (tx) => {
       await tx.delete(projectMeasurements).where(and(eq(projectMeasurements.projectId, p.id), eq(projectMeasurements.day, day)));
@@ -448,8 +457,8 @@ export class ProjectsService {
   }
 
   /** On coche le jour même ou un jour passé du programme (pas l'avenir), hors pause, sur un projet en cours. */
-  private canCheck(p: ProjectRow, day: string, pauses: PauseRow[]): boolean {
-    return p.status === 'active' && day >= p.startDate && day <= this.today() && day <= p.plannedEndDate && !isPaused(day, pauses);
+  private canCheck(p: LoadedProject, day: string, pauses: PauseRow[]): boolean {
+    return p.status === 'active' && day >= p.startDate && day <= this.today(p.tz) && day <= p.plannedEndDate && !isPaused(day, pauses);
   }
 
   // ---------------------------------------------------------------- Actions
@@ -522,7 +531,7 @@ export class ProjectsService {
         origin: 'user',
         sortOrder: 100,
         // Compte à partir d'aujourd'hui : les jours passés ne deviennent pas « manqués ».
-        activeFrom: this.today(),
+        activeFrom: this.today(p.tz),
       });
       await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'task_added', payload: taskId });
     });
@@ -538,7 +547,7 @@ export class ProjectsService {
     if (parts.tasks.length <= 1) throw Errors.conflict('LAST_TASK', 'Un programme garde au moins une tâche.');
     await this.db.transaction(async (tx) => {
       // Ne compte plus à partir d'aujourd'hui ; les jours passés gardent leur historique.
-      await tx.update(projectTasks).set({ removedAt: new Date(), activeUntil: this.today() }).where(eq(projectTasks.id, taskId));
+      await tx.update(projectTasks).set({ removedAt: new Date(), activeUntil: this.today(p.tz) }).where(eq(projectTasks.id, taskId));
       await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'task_removed', payload: taskId });
     });
     return this.detail(userId, projectId);
@@ -550,7 +559,7 @@ export class ProjectsService {
     if (p.status !== 'active') throw Errors.conflict('PROJECT_NOT_ACTIVE', p.status === 'paused' ? 'Ton projet est déjà en pause.' : "Ce projet n'est pas en cours.");
     const max = await this.setting<number | null>('projects.pause_max_days', null);
     if (max != null && dto.days > max) throw Errors.validation({ fields: { days: [`Une pause dure au plus ${max} jours.`] } });
-    const start = this.today();
+    const start = this.today(p.tz);
     const end = addDays(start, dto.days - 1);
     await this.db.transaction(async (tx) => {
       const [u] = await tx
@@ -570,7 +579,7 @@ export class ProjectsService {
   async resume(userId: string, projectId: string) {
     const p = await this.load(userId, projectId);
     if (p.status !== 'paused' || !p.pausedUntil) throw Errors.conflict('PROJECT_NOT_PAUSED', "Ce projet n'est pas en pause.");
-    const t = this.today();
+    const t = this.today(p.tz);
     await this.db.transaction(async (tx) => {
       const [pause] = await tx
         .select()

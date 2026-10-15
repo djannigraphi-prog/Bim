@@ -13,6 +13,7 @@ import { StorageService } from '../media/storage';
 import { SendReportDto } from './dto';
 import { isValidDay, today } from './plan';
 import { CLOCK, Clock } from './projects.service';
+import { userTimezone } from './timezone';
 
 export const PROJECT_REASONS = ['unavailable', 'too_hard', 'health', 'content', 'other'] as const;
 export const GENERAL_REASONS = ['app', 'product', 'health', 'other'] as const;
@@ -48,7 +49,7 @@ export class ReportsService {
         .from(projects)
         .where(and(eq(projects.id, dto.projectId!), eq(projects.userId, userId)));
       if (!p || p.status === 'abandoned') throw Errors.notFound('Projet');
-      if (dto.day < p.startDate || dto.day > p.plannedEndDate || dto.day > today(this.clock.now())) {
+      if (dto.day < p.startDate || dto.day > p.plannedEndDate || dto.day > today(this.clock.now(), await userTimezone(this.db, userId))) {
         throw Errors.validation({ fields: { day: ['Ce jour ne fait pas partie du programme ou n’est pas encore arrivé.'] } });
       }
       if (dto.taskId) {

@@ -34,9 +34,9 @@ export class MeController {
   }
 
   @Patch('preferences')
-  @ApiOperation({ summary: 'Thème clair / sombre / système (écran 62)' })
+  @ApiOperation({ summary: 'Thème clair / sombre / système (écran 62) et fuseau horaire' })
   preferences(@CurrentAuth() a: AuthContext, @Body() dto: UpdatePreferencesDto) {
-    return this.users.updatePreferences(a.userId, dto.theme);
+    return this.users.updatePreferences(a.userId, { theme: dto.theme, timezone: dto.timezone });
   }
 
   @Post('contacts')
