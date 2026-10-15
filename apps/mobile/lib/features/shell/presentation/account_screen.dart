@@ -49,7 +49,9 @@ class AccountScreen extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const CircleAvatar(radius: 28, child: Icon(Icons.person_outline)),
                 title: Text(me.fullName, style: theme.textTheme.titleMedium),
-                subtitle: Text('@${me.username} · compte utilisateur'),
+                subtitle: Text('@${me.username} · voir mon profil'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => context.push('/people/${me.username}'),
               ),
             const SizedBox(height: BimSpacing.lg),
             Text('SÉCURITÉ ET PROFILS', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
@@ -65,6 +67,12 @@ class AccountScreen extends ConsumerWidget {
               leading: const Icon(Icons.contact_phone_outlined),
               title: const Text('Téléphone et e-mail'),
               onTap: () => context.push('/account/contacts'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.block_rounded),
+              title: const Text('Personnes bloquées'),
+              onTap: () => context.push('/account/blocked'),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,

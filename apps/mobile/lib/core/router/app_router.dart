@@ -25,6 +25,9 @@ import '../../features/projects/presentation/reports_screen.dart';
 import '../../features/projects/presentation/transformation_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
+import '../../features/social/presentation/composer_screen.dart';
+import '../../features/social/presentation/post_detail_screen.dart';
+import '../../features/social/presentation/profile_screen.dart';
 
 /// Fait réévaluer les redirections du routeur à chaque changement de session.
 class _SessionListenable extends ChangeNotifier {
@@ -48,7 +51,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc)) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || loc.startsWith('/account') || loc.startsWith('/projects') || loc.startsWith('/notifications') || loc.startsWith('/peni')) ? '/home' : null,
+          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search'].any(loc.startsWith)) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -89,6 +92,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/projects/:id/transformation', builder: (_, s) => TransformationScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/reports', builder: (_, s) => ReportsScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
+      // Lot 4 — social (écrans 10, 11, 12, 16, 52).
+      GoRoute(path: '/social/new', builder: (_, s) => ComposerScreen(projectId: s.extra is String ? s.extra! as String : null)),
+      GoRoute(path: '/posts/:id', builder: (_, s) => PostDetailScreen(postId: s.pathParameters['id']!)),
+      GoRoute(path: '/people/:username', builder: (_, s) => ProfileScreen(username: s.pathParameters['username']!)),
+      GoRoute(path: '/search', builder: (_, __) => const PeopleSearchScreen()),
+      GoRoute(path: '/account/blocked', builder: (_, __) => const BlockedPeopleScreen()),
       GoRoute(
         path: '/projects/:id/day/:day',
         builder: (_, s) => ProjectDayScreen(projectId: s.pathParameters['id']!, day: s.pathParameters['day']!),

@@ -33,11 +33,12 @@ class ApiClient {
   Future<Map<String, dynamic>> put(String path, {Object? body}) => _run(() => dio.put<dynamic>(path, data: body));
 
   /// Envoi d'un fichier (photo) en multipart/form-data.
-  Future<Map<String, dynamic>> upload(String path, {required String field, required List<int> bytes, required String filename, required String contentType}) =>
-      _run(() => dio.post<dynamic>(
+  /// `method` : POST par défaut, PUT pour remplacer une ressource (photo de profil, lot 4).
+  Future<Map<String, dynamic>> upload(String path, {required String field, required List<int> bytes, required String filename, required String contentType, String method = 'POST'}) =>
+      _run(() => dio.request<dynamic>(
             path,
             data: FormData.fromMap({field: MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(contentType))}),
-            options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
+            options: Options(method: method, contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
           ),);
 
   /// Formulaire multipart : champs texte et, si fourni, un fichier (signalement avec image).
@@ -50,6 +51,22 @@ class ApiClient {
             }),
             options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
           ),);
+
+  /// Formulaire multipart avec plusieurs fichiers dans le même champ (publication avec photos, lot 4).
+  Future<Map<String, dynamic>> postFiles(String path, {required Map<String, String> fields, required String fileField, required List<List<int>> files}) =>
+      _run(() => dio.post<dynamic>(
+            path,
+            data: FormData.fromMap({
+              ...fields,
+              fileField: [
+                for (final (i, b) in files.indexed)
+                  MultipartFile.fromBytes(b, filename: _isPng(b) ? 'photo$i.png' : 'photo$i.jpg', contentType: DioMediaType.parse(_isPng(b) ? 'image/png' : 'image/jpeg')),
+              ],
+            }),
+            options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 90)),
+          ),);
+
+  static bool _isPng(List<int> b) => b.length > 4 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47;
 
   Future<Map<String, dynamic>> patch(String path, {Object? body}) => _run(() => dio.patch<dynamic>(path, data: body));
 

@@ -120,7 +120,10 @@ class TransformationScreen extends ConsumerWidget {
                       BimButton(
                         label: 'Publier « J’ai fait mon BIM »',
                         icon: Icons.auto_awesome,
-                        onPressed: () => showComingSoon(context, feature: 'La publication « J’ai fait mon BIM »'),
+                        key: const ValueKey('publish-bim'),
+                        onPressed: before != null && after != null
+                            ? () => context.push('/social/new', extra: projectId)
+                            : () => showBimSnack(context, 'Ajoute tes photos « avant » et « après » pour publier ton BIM.'),
                       ),
                       const SizedBox(height: BimSpacing.sm),
                       BimButton(label: 'Garder pour moi', variant: BimButtonVariant.subtle, onPressed: () => context.pop()),

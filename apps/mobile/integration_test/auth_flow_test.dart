@@ -318,6 +318,16 @@ void main() {
     // Les deux photos sont réellement téléchargées par leur lien temporaire et affichées.
     await _expectLoadedImages(tester, 2);
     await _shot(tester, 'a31_avant_apres');
+    // Lot 4 (écrans 31 et 16) : publier « J'ai fait mon BIM » contre l'API réelle (photos avant / après copiées dans
+    // la publication, le projet reste privé), puis retour à l'écran 31.
+    await _tap(tester, find.byKey(const ValueKey('publish-bim')));
+    await _waitFor(tester, find.text('Nouveau Bim'));
+    await tester.enterText(find.byKey(const ValueKey('composer-text')), 'Premier mois terminé (test automatique)');
+    await tester.pump();
+    await _shot(tester, 'a16_publication');
+    await _tap(tester, find.byKey(const ValueKey('composer-publish')));
+    await _waitFor(tester, find.text('Ton BIM est publié 🎉'));
+    await _waitFor(tester, find.text('Garder pour moi'));
     await _tap(tester, find.text('Garder pour moi'));
     await _tap(tester, find.byTooltip('Plus d’options'));
     await _tap(tester, find.text('Mes signalements'));
@@ -338,6 +348,9 @@ void main() {
 
     // Lot 0, partie 2 : ajouter un e-mail (opération protégée : mot de passe + code SMS, puis code reçu par e-mail).
     await _tap(tester, find.byTooltip('Retour'));
+    // Lot 4 (écran 10) : le BIM publié plus haut apparaît dans le fil de l'Accueil, lu dans les vraies données.
+    await _waitFor(tester, find.textContaining('a partagé un Bim'));
+    await _shot(tester, 'a10_fil');
     await _tap(tester, find.byTooltip('Mon compte'));
 
     // « Résoudre un problème » (C8) : problème général, description et capture jointe, puis suivi du statut.

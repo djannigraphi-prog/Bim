@@ -76,7 +76,9 @@ export type Permission =
   | 'system.health'
   | 'catalog.write'
   | 'reports.read'
-  | 'reports.resolve';
+  | 'reports.resolve'
+  | 'content.read'
+  | 'content.moderate';
 
 export interface AdminProfile {
   id: string;

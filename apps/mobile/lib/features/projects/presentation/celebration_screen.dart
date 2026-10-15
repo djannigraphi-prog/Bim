@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
-import '../../../core/widgets/feedback.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_models.dart';
 import 'project_dialogs.dart';
@@ -118,7 +117,7 @@ class _Body extends ConsumerWidget {
         BimButton(
           label: 'Publier « J’ai fait mon BIM »',
           variant: BimButtonVariant.outline,
-          onPressed: () => showComingSoon(context, feature: 'La publication « J’ai fait mon BIM »'),
+          onPressed: () => context.push('/social/new', extra: s.id),
         ),
         const SizedBox(height: BimSpacing.sm),
         BimButton(label: 'Voir ma transformation', variant: BimButtonVariant.subtle, onPressed: () => context.push('/projects/${s.id}/transformation')),

@@ -178,6 +178,28 @@ test('signalements : réponse à la personne puis clôture', async ({ page }) =>
   await expect(page.getByLabel(`Signalement de @${APP_USERNAME} sur « Projet de test »`)).toContainText('Réponse : Merci, nous avons prévenu la salle (test).');
 });
 
+test('modération (lot 4) : publication signalée, photo affichée, masquée puis rétablie', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Modération' }).click();
+  const card = page.getByLabel(`Publication signalée : Spam ou publicité, de @${APP_USERNAME}`);
+  await expect(card).toContainText('Achetez mes produits miracles (test)');
+  await expect(card).toContainText('« Publicité (test) »');
+  await expect(card).toContainText('État du contenu : en ligne');
+  const img = card.getByRole('img', { name: 'Image de la publication signalée' });
+  await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(240);
+  await expect(card.getByRole('button', { name: 'Masquer le contenu' })).toBeDisabled();
+  await card.getByLabel('Motif de la décision (journal d’audit)').fill('Spam commercial (test)');
+  await card.getByRole('button', { name: 'Masquer le contenu' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('button', { name: 'Traités' }).click();
+  const done = page.getByLabel(`Publication signalée : Spam ou publicité, de @${APP_USERNAME}`);
+  await expect(done).toContainText('Décision : contenu masqué — Spam commercial (test)');
+  await expect(done).toContainText('État du contenu : masqué');
+  await page.screenshot({ path: 'test-results/captures/moderation.png' });
+  await done.getByRole('button', { name: 'Rétablir le contenu' }).click();
+  await expect(done).toContainText('État du contenu : en ligne');
+});
+
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Administrateurs' }).click();

@@ -11,7 +11,8 @@ import '../application/projects_providers.dart';
 import '../data/projects_models.dart';
 import 'project_widgets.dart';
 
-/// Écran 18 — Mes projets. Affiché dans l'onglet Accueil tant que le fil d'actualité (lot 4) n'existe pas.
+/// Écran 18 — Mes projets. Depuis le lot 4, l'Accueil montre le fil et, en tête, la carte du jour (TodayCard) ou
+/// l'invitation à créer un premier projet (ProjectsEmptyState) ; la liste complète reste ici.
 class MyProjectsView extends ConsumerWidget {
   const MyProjectsView({super.key});
 
@@ -58,9 +59,9 @@ class _ProjectsList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: BimSpacing.lg),
-        if (list.items.isEmpty) const _EmptyState(),
+        if (list.items.isEmpty) const ProjectsEmptyState(),
         if (today != null) ...[
-          _TodayCard(project: today, today: list.today),
+          TodayCard(project: today, today: list.today),
           const SizedBox(height: BimSpacing.lg),
         ],
         for (final p in list.items) ...[
@@ -87,8 +88,8 @@ class _ProjectsList extends StatelessWidget {
 }
 
 /// Carte sombre « Aujourd'hui » (écran 18) : le projet du jour et l'accès direct à la journée.
-class _TodayCard extends StatelessWidget {
-  const _TodayCard({required this.project, required this.today});
+class TodayCard extends StatelessWidget {
+  const TodayCard({super.key, required this.project, required this.today});
 
   final ProjectSummary project;
   final String today;
@@ -138,8 +139,8 @@ class _TodayCard extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class ProjectsEmptyState extends StatelessWidget {
+  const ProjectsEmptyState({super.key});
 
   @override
   Widget build(BuildContext context) {

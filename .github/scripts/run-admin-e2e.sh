@@ -38,6 +38,17 @@ const fs = require('fs');
   fs.mkdirSync(process.env.MEDIA_LOCAL_DIR + '/reports/' + id, { recursive: true });
   fs.writeFileSync(process.env.MEDIA_LOCAL_DIR + '/' + key, await sharp({ create: { width: 320, height: 200, channels: 3, background: 'orange' } }).jpeg().toBuffer());
   await c.query(\"insert into project_reports (id, context, user_id, reason, message, attachment_key, attachment_width, attachment_height, attachment_bytes) values (\$1, 'general', \$2, 'app', 'Le bouton Continuer ne réagit pas (test)', \$3, 320, 200, 1000)\", [rid, id, key]);
+  // Lot 4 : une publication avec une photo, signalée par une autre personne, pour la page « Modération ».
+  const rep = uuidv7();
+  await c.query(\"insert into users (id, status, full_name, username, birth_date, city) values (\$1, 'active', 'Signaleur Test', \$2, '2000-01-01', 'Yopougon')\", [rep, 'signal.' + String(Date.now()).slice(-7)]);
+  await c.query(\"insert into user_contacts (id, user_id, type, value, verified_at) values (\$1, \$2, 'phone', \$3, now())\", [uuidv7(), rep, '+22501' + String(Date.now()).slice(-8)]);
+  const post = uuidv7();
+  const pkey = 'posts/' + post + '/' + uuidv7() + '.jpg';
+  fs.mkdirSync(process.env.MEDIA_LOCAL_DIR + '/posts/' + post, { recursive: true });
+  fs.writeFileSync(process.env.MEDIA_LOCAL_DIR + '/' + pkey, await sharp({ create: { width: 240, height: 300, channels: 3, background: 'purple' } }).jpeg().toBuffer());
+  await c.query(\"insert into posts (id, user_id, kind, text, visibility) values (\$1, \$2, 'post', 'Achetez mes produits miracles (test)', 'public')\", [post, id]);
+  await c.query(\"insert into post_media (id, post_id, position, kind, storage_key, width, height, bytes) values (\$1, \$2, 0, 'image', \$3, 240, 300, 1000)\", [uuidv7(), post, pkey]);
+  await c.query(\"insert into content_reports (id, reporter_id, target_type, target_id, target_user_id, reason, message) values (\$1, \$2, 'post', \$3, \$4, 'spam', 'Publicité (test)')\", [uuidv7(), rep, post, id]);
   await c.query('commit');
   c.release();
   await p.end();

@@ -1,0 +1,311 @@
+/// Modèles du social (lot 4). Lecture tolérante : un champ absent ne fait pas planter l'écran.
+library;
+
+class PersonRef {
+  const PersonRef({required this.id, required this.username, required this.fullName, this.avatarUrl});
+
+  final String id;
+  final String username;
+  final String fullName;
+  final String? avatarUrl;
+
+  factory PersonRef.fromJson(Map<String, dynamic> j) => PersonRef(
+        id: j['id'] as String,
+        username: (j['username'] ?? '') as String,
+        fullName: (j['fullName'] ?? '') as String,
+        avatarUrl: j['avatarUrl'] as String?,
+      );
+
+  /// Initiales affichées quand la personne n'a pas de photo.
+  String get initials {
+    final parts = fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return username.isEmpty ? '?' : username[0].toUpperCase();
+    return parts.take(2).map((p) => p[0].toUpperCase()).join();
+  }
+}
+
+class PostMedia {
+  const PostMedia({required this.id, required this.kind, required this.width, required this.height, this.url, this.takenDay});
+
+  final String id;
+
+  /// image · before · after
+  final String kind;
+  final int width;
+  final int height;
+  final String? url;
+  final String? takenDay;
+
+  factory PostMedia.fromJson(Map<String, dynamic> j) => PostMedia(
+        id: j['id'] as String,
+        kind: (j['kind'] ?? 'image') as String,
+        width: (j['width'] ?? 1) as int,
+        height: (j['height'] ?? 1) as int,
+        url: j['url'] as String?,
+        takenDay: j['takenDay'] as String?,
+      );
+}
+
+/// Résumé du parcours d'un « J'ai fait mon BIM » (figé à la publication, rien de privé).
+class Journey {
+  const Journey({this.category, this.goal, this.days, this.stepsDone});
+
+  final String? category;
+  final String? goal;
+  final int? days;
+  final int? stepsDone;
+
+  factory Journey.fromJson(Map<String, dynamic> j) =>
+      Journey(category: j['category'] as String?, goal: j['goal'] as String?, days: j['days'] as int?, stepsDone: j['stepsDone'] as int?);
+
+  /// « Sport · Abdos »
+  String get subject => [category, goal].whereType<String>().where((s) => s.isNotEmpty).join(' · ');
+
+  /// « 30 jours · 24 étapes validées »
+  String get summary => [
+        if (days != null) '$days jours',
+        if (stepsDone != null) '$stepsDone étape${stepsDone == 1 ? '' : 's'} validée${stepsDone == 1 ? '' : 's'}',
+      ].join(' · ');
+}
+
+class FeedPost {
+  const FeedPost({
+    required this.id,
+    required this.kind,
+    required this.visibility,
+    required this.createdAt,
+    required this.author,
+    required this.media,
+    required this.likeCount,
+    required this.commentCount,
+    required this.likedByMe,
+    required this.isMine,
+    required this.followingAuthor,
+    this.text,
+    this.journey,
+  });
+
+  final String id;
+
+  /// post · bim
+  final String kind;
+  final String? text;
+
+  /// public · followers · private
+  final String visibility;
+  final DateTime createdAt;
+  final PersonRef author;
+  final List<PostMedia> media;
+  final Journey? journey;
+  final int likeCount;
+  final int commentCount;
+  final bool likedByMe;
+  final bool isMine;
+  final bool followingAuthor;
+
+  bool get isBim => kind == 'bim';
+  PostMedia? get before => media.where((m) => m.kind == 'before').firstOrNull;
+  PostMedia? get after => media.where((m) => m.kind == 'after').firstOrNull;
+
+  FeedPost copyWith({int? likeCount, bool? likedByMe, int? commentCount, bool? followingAuthor}) => FeedPost(
+        id: id,
+        kind: kind,
+        text: text,
+        visibility: visibility,
+        createdAt: createdAt,
+        author: author,
+        media: media,
+        journey: journey,
+        likeCount: likeCount ?? this.likeCount,
+        commentCount: commentCount ?? this.commentCount,
+        likedByMe: likedByMe ?? this.likedByMe,
+        isMine: isMine,
+        followingAuthor: followingAuthor ?? this.followingAuthor,
+      );
+
+  factory FeedPost.fromJson(Map<String, dynamic> j) => FeedPost(
+        id: j['id'] as String,
+        kind: (j['kind'] ?? 'post') as String,
+        text: j['text'] as String?,
+        visibility: (j['visibility'] ?? 'public') as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        author: PersonRef.fromJson(j['author'] as Map<String, dynamic>),
+        media: ((j['media'] ?? const <dynamic>[]) as List<dynamic>).map((e) => PostMedia.fromJson(e as Map<String, dynamic>)).toList(),
+        journey: j['journey'] is Map<String, dynamic> ? Journey.fromJson(j['journey'] as Map<String, dynamic>) : null,
+        likeCount: (j['likeCount'] ?? 0) as int,
+        commentCount: (j['commentCount'] ?? 0) as int,
+        likedByMe: (j['likedByMe'] ?? false) as bool,
+        isMine: (j['isMine'] ?? false) as bool,
+        followingAuthor: (j['followingAuthor'] ?? false) as bool,
+      );
+}
+
+class FeedPage {
+  const FeedPage({required this.items, this.nextCursor});
+
+  final List<FeedPost> items;
+  final String? nextCursor;
+
+  factory FeedPage.fromJson(Map<String, dynamic> j) => FeedPage(
+        items: ((j['items'] ?? const <dynamic>[]) as List<dynamic>).map((e) => FeedPost.fromJson(e as Map<String, dynamic>)).toList(),
+        nextCursor: j['nextCursor'] as String?,
+      );
+}
+
+class PostComment {
+  const PostComment({
+    required this.id,
+    required this.text,
+    required this.createdAt,
+    required this.author,
+    required this.likeCount,
+    required this.likedByMe,
+    required this.canDelete,
+    required this.isMine,
+    this.parentId,
+  });
+
+  final String id;
+  final String? parentId;
+  final String text;
+  final DateTime createdAt;
+  final PersonRef author;
+  final int likeCount;
+  final bool likedByMe;
+  final bool canDelete;
+  final bool isMine;
+
+  bool get isReply => parentId != null;
+
+  PostComment copyWith({int? likeCount, bool? likedByMe}) => PostComment(
+        id: id,
+        parentId: parentId,
+        text: text,
+        createdAt: createdAt,
+        author: author,
+        likeCount: likeCount ?? this.likeCount,
+        likedByMe: likedByMe ?? this.likedByMe,
+        canDelete: canDelete,
+        isMine: isMine,
+      );
+
+  factory PostComment.fromJson(Map<String, dynamic> j) => PostComment(
+        id: j['id'] as String,
+        parentId: j['parentId'] as String?,
+        text: (j['text'] ?? '') as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        author: PersonRef.fromJson(j['author'] as Map<String, dynamic>),
+        likeCount: (j['likeCount'] ?? 0) as int,
+        likedByMe: (j['likedByMe'] ?? false) as bool,
+        canDelete: (j['canDelete'] ?? false) as bool,
+        isMine: (j['isMine'] ?? false) as bool,
+      );
+}
+
+class CommentsPage {
+  const CommentsPage({required this.total, required this.items, this.nextCursor});
+
+  final int total;
+  final List<PostComment> items;
+  final String? nextCursor;
+
+  factory CommentsPage.fromJson(Map<String, dynamic> j) => CommentsPage(
+        total: (j['total'] ?? 0) as int,
+        items: ((j['items'] ?? const <dynamic>[]) as List<dynamic>).map((e) => PostComment.fromJson(e as Map<String, dynamic>)).toList(),
+        nextCursor: j['nextCursor'] as String?,
+      );
+}
+
+class PublicProfile {
+  const PublicProfile({
+    required this.person,
+    required this.bims,
+    required this.followers,
+    required this.following,
+    required this.isMe,
+    required this.followedByMe,
+    required this.followsMe,
+    required this.blockedByMe,
+    this.projects,
+    this.city,
+  });
+
+  final PersonRef person;
+  final int bims;
+  final int followers;
+  final int following;
+
+  /// Seulement sur son propre profil (privé).
+  final int? projects;
+  final String? city;
+  final bool isMe;
+  final bool followedByMe;
+  final bool followsMe;
+  final bool blockedByMe;
+
+  factory PublicProfile.fromJson(Map<String, dynamic> j) {
+    final c = (j['counts'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    return PublicProfile(
+      person: PersonRef.fromJson(j),
+      bims: (c['bims'] ?? 0) as int,
+      followers: (c['followers'] ?? 0) as int,
+      following: (c['following'] ?? 0) as int,
+      projects: c['projects'] as int?,
+      city: j['city'] as String?,
+      isMe: (j['isMe'] ?? false) as bool,
+      followedByMe: (j['followedByMe'] ?? false) as bool,
+      followsMe: (j['followsMe'] ?? false) as bool,
+      blockedByMe: (j['blockedByMe'] ?? false) as bool,
+    );
+  }
+}
+
+class PersonResult {
+  const PersonResult({required this.person, required this.followedByMe});
+
+  final PersonRef person;
+  final bool followedByMe;
+
+  factory PersonResult.fromJson(Map<String, dynamic> j) => PersonResult(person: PersonRef.fromJson(j), followedByMe: (j['followedByMe'] ?? false) as bool);
+}
+
+/// Motifs de signalement d'un contenu (identiques à l'API).
+const contentReportReasons = <(String, String)>[
+  ('spam', 'Spam ou publicité'),
+  ('harassment', 'Harcèlement'),
+  ('nudity', 'Nudité'),
+  ('violence', 'Violence'),
+  ('hate', 'Propos haineux'),
+  ('self_harm', 'Automutilation ou suicide'),
+  ('false_info', 'Fausse information'),
+  ('other', 'Autre chose'),
+];
+
+/// Visibilité d'une publication (écran 16).
+const postVisibilities = <(String, String, String)>[
+  ('public', 'Tout le monde', 'Visible par toutes les personnes de BIM'),
+  ('followers', 'Mes abonnés', 'Visible seulement par les personnes qui te suivent'),
+  ('private', 'Moi seul', 'Gardée pour toi'),
+];
+
+String visibilityLabel(String v) => postVisibilities.where((x) => x.$1 == v).map((x) => x.$2).firstOrNull ?? 'Tout le monde';
+
+/// « à l'instant », « il y a 3 h », « il y a 2 j », puis la date.
+String timeAgo(DateTime t, {DateTime? now}) {
+  final d = (now ?? DateTime.now()).difference(t);
+  if (d.inMinutes < 1) return 'à l’instant';
+  if (d.inMinutes < 60) return 'il y a ${d.inMinutes} min';
+  if (d.inHours < 24) return 'il y a ${d.inHours} h';
+  if (d.inDays < 7) return 'il y a ${d.inDays} j';
+  const months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  final l = t.toLocal();
+  return '${l.day} ${months[l.month - 1]}';
+}
+
+/// 950 → « 950 », 10 200 → « 10,2 k », 2 800 000 → « 2,8 M ».
+String compactCount(int n) {
+  String one(double v) => (v >= 100 ? v.toStringAsFixed(0) : v.toStringAsFixed(1)).replaceAll(RegExp(r'[.,]0$'), '').replaceAll('.', ',');
+  if (n < 10000) return '$n';
+  if (n < 1000000) return '${one(n / 1000)} k';
+  return '${one(n / 1000000)} M';
+}

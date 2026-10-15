@@ -4,11 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/brand.dart';
-import '../../../core/widgets/feedback.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../notifications/data/inbox_api.dart';
-import '../../projects/presentation/my_projects_screen.dart';
+import '../../social/presentation/feed_view.dart';
 
 /// Barre du bas des maquettes (Q8) : Accueil · Messages · « + » (nouveau projet, Q9) · Live · BimShop.
 /// Lot 0 : la navigation et le mode visiteur sont en place ; le contenu de chaque onglet arrive avec son lot
@@ -63,7 +62,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         titleSpacing: BimSpacing.screen,
         title: BimLogo(height: 36, color: Theme.of(context).brightness == Brightness.dark ? BimLogoColor.white : BimLogoColor.red),
         actions: [
-          IconButton(tooltip: 'Rechercher', icon: const Icon(Icons.search_rounded), onPressed: () => showComingSoon(context, feature: 'La recherche')),
+          IconButton(
+            tooltip: 'Rechercher',
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () => _visitor ? showVisitorGate(context, ref) : context.push('/search'),
+          ),
           IconButton(
             tooltip: 'Notifications',
             icon: Badge(
@@ -82,9 +85,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           const SizedBox(width: BimSpacing.sm),
         ],
       ),
-      // Lot 1 : tant que le fil d'actualité n'existe pas (lot 4), l'Accueil d'une personne connectée montre ses projets (écran 18).
+      // Lot 4 : l'Accueil d'une personne connectée est le fil (écran 10), avec ses projets en tête.
       body: _tab == 0 && session is SessionSignedIn
-          ? const MyProjectsView()
+          ? const FeedView()
           : Center(
         child: Padding(
           padding: const EdgeInsets.all(BimSpacing.xl),
