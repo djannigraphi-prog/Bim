@@ -5,12 +5,16 @@
 // trois situations, lancées séparément (workflow « Sonde émulateur ») :
 //   PROBE=plain  liste Flutter simple, sans aucun code de BIM ;
 //   PROBE=bim    écran « Rappels » de BIM (données simulées, sans réseau) ;
-//   PROBE=none   témoin : même écran simple, même durée, sans le geste.
+//   PROBE=none   témoin : même écran simple, même durée, sans le geste ;
+//   PROBE=svg    liste simple avec la mascotte Peni (dessin SVG) en haut ;
+//   PROBE=bimopen écran « Rappels » sans l'avertissement (donc sans Peni).
+// Première série (15/10/2026) : seul « bim » fait tomber l'émulateur ; cette seconde série isole l'élément en cause.
 // Si « plain » fait aussi tomber l'émulateur, l'origine est l'environnement (émulateur, rendu graphique), pas BIM.
 // Ce n'est pas un test de l'application : il ne remplace ni n'affaiblit le parcours de bout en bout.
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/core/widgets/brand.dart';
 import 'package:bim/features/notifications/data/notification_preferences_api.dart';
 import 'package:bim/features/notifications/presentation/reminder_preferences_screen.dart';
 import 'package:flutter/material.dart';
@@ -29,27 +33,33 @@ class _NoTokens extends TokenStorage {
 
 /// Préférences simulées (aucun appel réseau) pour afficher l'écran Rappels.
 class _OfflinePrefs extends NotificationPreferencesApi {
-  _OfflinePrefs() : super(ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9'));
+  _OfflinePrefs({this.open = false}) : super(ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9'));
 
   @override
   Future<NotificationPreferences> load() async => const NotificationPreferences(
         remindersEnabled: false,
         quietHours: QuietHours(start: '22:00', end: '06:00'),
         quietHoursArePersonal: false,
-        remindersAvailable: false,
+        remindersAvailable: open,
       );
+
+  final bool open;
 }
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('sonde : glissement au-delà du haut d’une liste ($_probe)', (tester) async {
-    final Widget home = _probe == 'bim'
-        ? const ReminderPreferencesScreen()
-        : Scaffold(body: ListView(children: [for (var i = 0; i < 60; i++) ListTile(title: Text('Ligne $i'))]));
+    final Widget home = switch (_probe) {
+      'bim' || 'bimopen' => const ReminderPreferencesScreen(),
+      'svg' => Scaffold(
+          body: ListView(children: [const Peni(pose: PeniPose.think, size: 48), for (var i = 0; i < 60; i++) ListTile(title: Text('Ligne $i'))]),
+        ),
+      _ => Scaffold(body: ListView(children: [for (var i = 0; i < 60; i++) ListTile(title: Text('Ligne $i'))])),
+    };
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [notificationPreferencesApiProvider.overrideWithValue(_OfflinePrefs())],
+        overrides: [notificationPreferencesApiProvider.overrideWithValue(_OfflinePrefs(open: _probe == 'bimopen'))],
         child: MaterialApp(theme: BimTheme.light(), home: home),
       ),
     );

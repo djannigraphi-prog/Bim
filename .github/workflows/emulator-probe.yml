@@ -13,15 +13,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Seconde série : isoler l'élément de l'écran BIM en cause (première série : seul « bim » fait tomber l'émulateur).
         include:
-          - probe: none
+          - probe: svg
             impeller: "true"
-          - probe: plain
+          - probe: bimopen
             impeller: "true"
           - probe: bim
-            impeller: "true"
-          - probe: plain
             impeller: "false"
+          - probe: bim
+            impeller: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
