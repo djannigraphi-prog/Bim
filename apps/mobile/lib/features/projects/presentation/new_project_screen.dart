@@ -931,14 +931,17 @@ class _Segmented extends StatelessWidget {
                       borderRadius: BorderRadius.circular(BimRadius.chip - 2),
                       boxShadow: selected == code ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2))] : null,
                     ),
-                    child: Text(
-                      text,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: selected == code ? FontWeight.w700 : FontWeight.w500,
-                        color: selected == code ? scheme.onSurface : scheme.onSurfaceVariant,
+                    // Sur un petit écran, le libellé est réduit plutôt que coupé (« Intermédi… »).
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        text,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: selected == code ? FontWeight.w700 : FontWeight.w500,
+                          color: selected == code ? scheme.onSurface : scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
