@@ -12,6 +12,7 @@ import '../../features/auth/presentation/register_step2_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/verify_code_screen.dart';
 import '../../features/auth/presentation/welcome_screen.dart';
+import '../../features/notifications/presentation/reminder_preferences_screen.dart';
 import '../../features/projects/presentation/celebration_screen.dart';
 import '../../features/projects/presentation/my_projects_screen.dart';
 import '../../features/projects/presentation/new_project_screen.dart';
@@ -64,6 +65,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/account/contacts', builder: (_, __) => const ContactsScreen()),
       GoRoute(path: '/account/password', builder: (_, __) => const ChangePasswordScreen()),
       GoRoute(path: '/account/devices', builder: (_, __) => const DevicesScreen()),
+      // Lot 2 — préférences de rappel (choix de la personne ; le service des rappels n'est pas encore en service).
+      GoRoute(path: '/account/reminders', builder: (_, __) => const ReminderPreferencesScreen()),
       // Lot 1 — projets BIM (écrans 18 à 30).
       GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
       GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),

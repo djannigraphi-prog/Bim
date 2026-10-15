@@ -23,6 +23,8 @@ import 'package:bim/features/auth/presentation/register_step2_screen.dart';
 import 'package:bim/features/auth/presentation/splash_screen.dart';
 import 'package:bim/features/auth/presentation/verify_code_screen.dart';
 import 'package:bim/features/auth/presentation/welcome_screen.dart';
+import 'package:bim/features/notifications/data/notification_preferences_api.dart';
+import 'package:bim/features/notifications/presentation/reminder_preferences_screen.dart';
 import 'package:bim/features/projects/data/projects_api.dart';
 import 'package:bim/features/projects/data/projects_models.dart';
 import 'package:bim/features/projects/presentation/celebration_screen.dart';
@@ -64,6 +66,20 @@ class _FakeAccountApi extends AccountApi {
 
   @override
   Future<List<SpaceItem>> spaces() async => const [SpaceItem(type: 'user', id: 'u1', label: 'Awa Koné', status: 'active', usable: true, active: true)];
+}
+
+/// Préférences de rappel POUR LES CAPTURES UNIQUEMENT : état réel d'un nouveau compte aujourd'hui
+/// (service des rappels fermé ; heures calmes = valeur par défaut de la migration 0012, non validée).
+class _FakeNotificationPreferencesApi extends NotificationPreferencesApi {
+  _FakeNotificationPreferencesApi(super.api);
+
+  @override
+  Future<NotificationPreferences> load() async => const NotificationPreferences(
+        remindersEnabled: true,
+        quietHours: QuietHours(start: '22:00', end: '06:00'),
+        quietHoursArePersonal: false,
+        remindersAvailable: false,
+      );
 }
 
 const _demoMe = {
@@ -283,6 +299,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     authApiProvider.overrideWithValue(_FakeAuthApi(client)),
     projectsApiProvider.overrideWithValue(_FakeProjectsApi(client)),
     accountApiProvider.overrideWithValue(_FakeAccountApi(client)),
+    notificationPreferencesApiProvider.overrideWithValue(_FakeNotificationPreferencesApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -298,6 +315,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/account/contacts', builder: (_, __) => const ContactsScreen()),
     GoRoute(path: '/account/password', builder: (_, __) => const ChangePasswordScreen()),
     GoRoute(path: '/account/devices', builder: (_, __) => const DevicesScreen()),
+    GoRoute(path: '/account/reminders', builder: (_, __) => const ReminderPreferencesScreen()),
     GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
     GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),
     GoRoute(path: '/projects/p1', builder: (_, __) => const ProjectMapScreen(projectId: 'p1')),
@@ -506,7 +524,7 @@ void main() {
     await _settle(t);
   }
 
-  for (final (route, name) in [('/account', '62_parametres'), ('/account/contacts', 'x9_coordonnees'), ('/account/password', 'x9_mot_de_passe'), ('/account/devices', 'x9_appareils')]) {
+  for (final (route, name) in [('/account', '62_parametres'), ('/account/contacts', 'x9_coordonnees'), ('/account/password', 'x9_mot_de_passe'), ('/account/devices', 'x9_appareils'), ('/account/reminders', 'x15_rappels')]) {
     testWidgets('compte : $name', (t) async {
       await signedIn(t, route);
       await _capture(t, name);
@@ -521,6 +539,10 @@ void main() {
     await t.tap(find.text('Changer de profil'));
     await _settle(t);
     await _capture(t, '53_changer_profil');
+  });
+  testWidgets('rappels (sombre)', (t) async {
+    await _show(t, '/account/reminders', mode: ThemeMode.dark);
+    await _capture(t, 'x15_rappels_sombre');
   });
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);

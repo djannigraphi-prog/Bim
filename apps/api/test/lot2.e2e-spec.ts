@@ -90,6 +90,13 @@ describe('Lot 2 (e2e)', () => {
       expect(p).toMatchObject({ remindersEnabled: false, quietHours: { start: '21:30', end: '05:30' }, quietHoursSource: 'personal' });
       const back = (await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: null, quietEnd: null }).expect(200)).body;
       expect(back).toMatchObject({ remindersEnabled: false, quietHours: { start: '22:00', end: '06:00' }, quietHoursSource: 'default' });
+
+      // Écran « Rappels » de l'app : un seul choix envoyé à la fois ; rien d'autre ne change, et jamais le service lui-même.
+      await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: '23:00', quietEnd: '07:00' }).expect(200);
+      const on = (await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ remindersEnabled: true }).expect(200)).body;
+      expect(on).toEqual({ remindersEnabled: true, quietHours: { start: '23:00', end: '07:00' }, quietHoursSource: 'personal', remindersAvailable: false });
+      const platform = (await h.pool.query("select value from app_settings where key = 'notifications.reminders_enabled'")).rows[0];
+      expect(platform.value).toBe(false);
     });
 
     it('les réglages des rappels sont enregistrés comme non validés et contrôlés dans l’administration', async () => {

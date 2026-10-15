@@ -11,7 +11,7 @@ import '../../account/presentation/account_security_screens.dart';
 import '../../auth/application/session_controller.dart';
 import '../../projects/presentation/report_sheet.dart';
 
-/// Écran 62 (Paramètres), version du lot 0 : identité, profils (53), coordonnées, mot de passe, appareils, thème, déconnexion.
+/// Écran 62 (Paramètres) : identité, profils (53), coordonnées, mot de passe, appareils, rappels (lot 2), thème, déconnexion.
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
 
@@ -77,6 +77,15 @@ class AccountScreen extends ConsumerWidget {
               leading: const Icon(Icons.devices_outlined),
               title: const Text('Appareils connectés'),
               onTap: () => context.push('/account/devices'),
+            ),
+            const SizedBox(height: BimSpacing.lg),
+            Text('NOTIFICATIONS', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.notifications_none_rounded),
+              title: const Text('Rappels'),
+              subtitle: const Text('Rappels de Peni et heures calmes'),
+              onTap: () => context.push('/account/reminders'),
             ),
             const SizedBox(height: BimSpacing.lg),
             Text('AIDE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),

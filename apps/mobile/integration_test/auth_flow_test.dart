@@ -4,6 +4,7 @@
 // Parcours : bienvenue → inscription (2 étapes) → code reçu → accueil → déconnexion
 //            → connexion avec un mauvais mot de passe (refusée) → connexion correcte → accueil
 //            → nouveau projet (5 étapes) → programme → journée → séance cochée
+//            → préférences de rappel (enregistrées, service fermé)
 //            → ajout d'un e-mail vérifié (opération protégée) → appareils → nouveau mot de passe → connexion par e-mail.
 // Le code est lu par un relais de la CI dans les journaux de l'API de développement, comme une personne lirait son SMS.
 import 'dart:convert';
@@ -272,6 +273,21 @@ void main() {
     await _waitFor(tester, find.textContaining('Problème général'));
     await _expectLoadedImages(tester, 2);
     await _shot(tester, 'a21_mes_signalements');
+    await _tap(tester, find.byTooltip('Retour'));
+
+    // Lot 2 : préférences de rappel enregistrées par l'API réelle. Le service des rappels reste fermé
+    // (réglage « en attente ») : l'écran le dit, et couper ses rappels n'ouvre rien.
+    await _scrollTap(tester, find.text('Rappels'));
+    await _waitFor(tester, find.byKey(const ValueKey('reminders-unavailable')));
+    expect(tester.widget<SwitchListTile>(find.byKey(const ValueKey('reminders-switch'))).value, isTrue);
+    await _tap(tester, find.byKey(const ValueKey('reminders-switch')));
+    await _waitFor(tester, find.text('Coupés : Peni ne t’enverra aucun rappel.'));
+    await _shot(tester, 'a28_rappels');
+    await _tap(tester, find.byTooltip('Retour'));
+    // Rouvert, l'écran relit le serveur : le choix a bien été enregistré.
+    await _scrollTap(tester, find.text('Rappels'));
+    await _waitFor(tester, find.text('Coupés : Peni ne t’enverra aucun rappel.'));
+    expect(find.byKey(const ValueKey('reminders-unavailable')), findsOneWidget);
     await _tap(tester, find.byTooltip('Retour'));
 
     await _scrollTap(tester, find.text('Téléphone et e-mail'));
