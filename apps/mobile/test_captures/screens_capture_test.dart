@@ -203,6 +203,12 @@ class _FakeProjectsApi extends ProjectsApi {
           {'day': iso(i - 4), 'index': i + 1, 'due': 2, 'done': i < 4 && states[i] == 'done' ? 2 : 0, 'state': i < 5 ? states[i] : 'upcoming'},
       ],
       'today': iso(0),
+      // Coffres de démonstration (écran 26) : semaine 1 ouverte, semaine 2 à venir, coffre final à venir.
+      'chests': [
+        {'kind': 'week', 'week': 1, 'day': iso(2), 'fromIndex': 1, 'toIndex': 7, 'due': 14, 'done': 10, 'state': 'open'},
+        {'kind': 'week', 'week': 2, 'day': iso(9), 'fromIndex': 8, 'toIndex': 14, 'due': 10, 'done': 0, 'state': 'upcoming'},
+        {'kind': 'final', 'week': null, 'day': iso(55), 'fromIndex': 1, 'toIndex': 60, 'due': 96, 'done': 20, 'state': 'upcoming'},
+      ],
     });
   }
 
@@ -458,6 +464,12 @@ void main() {
   testWidgets('signalements', (t) async {
     await _show(t, '/projects/p1/reports');
     await _capture(t, 'x10_signalements');
+  });
+  testWidgets('26 coffre ouvert', (t) async {
+    await _show(t, '/projects/p1');
+    await t.tap(find.byKey(const ValueKey('chest-1')));
+    await _settle(t);
+    await _capture(t, 'x14_coffre');
   });
   testWidgets('mes signalements (tous)', (t) async {
     await _show(t, '/reports');

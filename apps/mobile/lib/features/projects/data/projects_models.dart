@@ -187,8 +187,40 @@ class ProjectDay {
   final String state;
 }
 
+/// Coffre du chemin (écran 26, décision du 15/10/2026) : récompense symbolique (badge et message de Peni),
+/// jamais financière. S'ouvre à 70 % des tâches prévues de la semaine (ou du programme pour le coffre final).
+class ProjectChest {
+  const ProjectChest({required this.kind, this.week, required this.day, required this.due, required this.done, required this.state});
+
+  factory ProjectChest.fromJson(Map<String, dynamic> j) => ProjectChest(
+        kind: j['kind'] as String,
+        week: j['week'] as int?,
+        day: j['day'] as String,
+        due: j['due'] as int,
+        done: j['done'] as int,
+        state: j['state'] as String,
+      );
+
+  /// week ou final.
+  final String kind;
+  final int? week;
+  final String day;
+  final int due;
+  final int done;
+  /// open · upcoming · missed
+  final String state;
+
+  bool get isOpen => state == 'open';
+  bool get isFinal => kind == 'final';
+
+  /// Nombre de tâches à faire pour ouvrir le coffre (70 %, arrondi au-dessus, comme le serveur).
+  int get needed => (due * 70 + 99) ~/ 100;
+
+  String get badge => isFinal ? 'Programme terminé' : 'Semaine $week tenue';
+}
+
 class ProjectDetail {
-  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget, this.programTitle, this.validatedBy, this.measurement});
+  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget, this.programTitle, this.validatedBy, this.measurement, this.chests = const []});
 
   factory ProjectDetail.fromJson(Map<String, dynamic> j) => ProjectDetail(
         summary: ProjectSummary.fromJson(j),
@@ -206,6 +238,7 @@ class ProjectDetail {
         tasks: (j['tasks'] as List<dynamic>).map((e) => ProjectTask.fromJson(e as Map<String, dynamic>)).toList(),
         days: (j['days'] as List<dynamic>).map((e) => ProjectDay.fromJson(e as Map<String, dynamic>)).toList(),
         today: j['today'] as String,
+        chests: ((j['chests'] as List<dynamic>?) ?? const []).map((e) => ProjectChest.fromJson(e as Map<String, dynamic>)).toList(),
       );
 
   final ProjectSummary summary;
@@ -227,6 +260,7 @@ class ProjectDetail {
   final List<ProjectTask> tasks;
   final List<ProjectDay> days;
   final String today;
+  final List<ProjectChest> chests;
 
   /// Séances par semaine affichées sur l'écran 24 : la réponse de la personne si elle existe,
   /// sinon la tâche la plus fréquente (une habitude quotidienne ne compte pas comme 7 séances choisies).

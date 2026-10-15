@@ -208,6 +208,9 @@ void main() {
     await _tap(tester, find.text('Créer mon programme'));
     await _waitFor(tester, find.textContaining('Renforcer mes abdos', findRichText: true));
     await _tap(tester, find.text('Lancer mon programme'));
+    // Écran 26 réel : le chemin des jours (coffre de la semaine 1 au jour 7).
+    await _waitFor(tester, find.text('Voir l’étape du jour'));
+    await _shot(tester, 'a26_carte');
     await _tap(tester, find.text('Voir l’étape du jour'));
     await _tap(tester, find.text('Séance · Abdos'));
     await _waitFor(tester, find.text('Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'));

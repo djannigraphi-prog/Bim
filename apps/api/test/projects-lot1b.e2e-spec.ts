@@ -210,4 +210,44 @@ describe('Projets — lot 1, suite (e2e)', () => {
       expect(rows[3].payload).toBe('premium');
     });
   });
+
+  describe('coffres du chemin (écran 26, C8)', () => {
+    it('semaine à 70 % des tâches prévues : coffre ouvert par rattrapage, événement, refermé si l’on décoche ; tâche ajoutée sans effet sur le passé', async () => {
+      const u = await user();
+      const p = (await h.http().post('/v1/projects').set(u.auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 7, durationDays: 30 }).expect(201)).body;
+      // Projet commencé il y a 8 jours (la semaine 1 est terminée, rien n'a été coché).
+      await h.pool.query("update projects set start_date = start_date - 8, planned_end_date = planned_end_date - 8 where id = $1", [p.id]);
+      const d0 = (await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body;
+      expect(d0.chests[0]).toMatchObject({ kind: 'week', week: 1, fromIndex: 1, toIndex: 7, due: 7, done: 0, state: 'missed' });
+      expect(d0.chests.filter((c: { kind: string }) => c.kind === 'week')).toHaveLength(4);
+      expect(d0.chests.at(-1)).toMatchObject({ kind: 'final', fromIndex: 1, toIndex: 30, state: 'upcoming' });
+      expect(JSON.stringify(d0.chests)).not.toMatch(/coin|amount|price|montant/i); // aucune valeur financière
+
+      const task = d0.tasks[0].id;
+      const week1 = d0.days.slice(0, 7).map((d: { day: string }) => d.day);
+      for (const day of week1.slice(0, 4)) await h.http().put(`/v1/projects/${p.id}/days/${day}/tasks/${task}/done`).set(u.auth).expect(200);
+      expect((await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body.chests[0]).toMatchObject({ done: 4, state: 'missed' }); // 57 %
+      await h.http().put(`/v1/projects/${p.id}/days/${week1[4]}/tasks/${task}/done`).set(u.auth).expect(200);
+      expect((await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body.chests[0]).toMatchObject({ done: 5, state: 'open' }); // 71 %
+      const events = async () => (await h.pool.query("select payload from project_events where project_id = $1 and type = 'chest_opened'", [p.id])).rows.map((r: { payload: string }) => r.payload);
+      expect(await events()).toEqual(['week:1']);
+      // Décocher repasse sous le seuil : le coffre se referme (aucun nouvel événement).
+      await h.http().delete(`/v1/projects/${p.id}/days/${week1[4]}/tasks/${task}/done`).set(u.auth).expect(200);
+      expect((await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body.chests[0].state).toBe('missed');
+      expect(await events()).toEqual(['week:1']);
+
+      // Une tâche ajoutée aujourd'hui ne compte pas pour les jours passés (ni pour le coffre de la semaine 1).
+      const before = (await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body;
+      await h.http().post(`/v1/projects/${p.id}/tasks`).set(u.auth).send({ title: 'Gainage', timeOfDay: '18:00', weekdays: 127 }).expect(201);
+      const after = (await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body;
+      expect(after.days[0]).toEqual(before.days[0]);
+      expect(after.chests[0]).toEqual(before.chests[0]);
+      expect(after.days[8].due).toBe(before.days[8].due + 1); // aujourd'hui (jour 9) : la nouvelle tâche compte
+      // Une tâche retirée garde son historique : le jour 1 coché reste « fait ».
+      const gainage = after.tasks.find((t: { title: string }) => t.title === 'Gainage').id;
+      await h.http().delete(`/v1/projects/${p.id}/tasks/${gainage}`).set(u.auth).expect(200);
+      await h.http().delete(`/v1/projects/${p.id}/tasks/${task}`).set(u.auth).expect(409); // jamais la dernière tâche
+      expect((await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body.days[0]).toMatchObject({ state: 'done' });
+    });
+  });
 });

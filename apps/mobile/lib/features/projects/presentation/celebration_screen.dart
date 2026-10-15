@@ -86,6 +86,24 @@ class _Body extends ConsumerWidget {
             _Tile(value: '${project.bestStreak}', label: 'jours d’affilée'),
           ],
         ),
+        if (project.chests.any((c) => c.isOpen)) ...[
+          const SizedBox(height: BimSpacing.lg),
+          Text('Mes badges', style: theme.textTheme.titleMedium),
+          const SizedBox(height: BimSpacing.sm),
+          // Coffres ouverts (écran 26) : badges symboliques, sans valeur financière.
+          Wrap(
+            spacing: BimSpacing.sm,
+            runSpacing: BimSpacing.sm,
+            children: [
+              for (final c in project.chests.where((c) => c.isOpen))
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(10)),
+                  child: Text('🏅 ${c.badge}', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: BimSpacing.xxl),
         BimButton(
           label: 'Prendre ma photo « après »',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -258,6 +259,7 @@ class _PathState extends State<_Path> {
         final isToday = d.day == p.today;
         final tappable = d.state != 'upcoming' && d.state != 'paused' && d.day.compareTo(p.today) <= 0;
         final peni = isToday && !p.summary.isPaused;
+        final chests = p.chests.where((c) => c.day == d.day).toList();
         return LayoutBuilder(
           builder: (context, c) {
             // Colonne de largeur fixe : le centre de chaque rond est connu, ce qui permet de tracer le chemin (maquette 26).
@@ -304,6 +306,34 @@ class _PathState extends State<_Path> {
                     top: cy - 32,
                     child: const Peni(pose: PeniPose.wave, size: 64),
                   ),
+                if (chests.isNotEmpty)
+                  Builder(
+                    builder: (context) {
+                      // Coffre(s) de la période qui se termine ce jour-là, du côté libre (Peni occupe l'autre côté aujourd'hui).
+                      const size = 46.0;
+                      final width = chests.length * size + (chests.length - 1) * 6;
+                      final peniLeft = offsets[i % offsets.length] > 0;
+                      final left = peni ? !peniLeft : (x - r) > (c.maxWidth - x - r);
+                      return Positioned(
+                        left: left ? x - r - BimSpacing.sm - width : x + r + BimSpacing.sm,
+                        top: cy - size / 2,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final (k, chest) in chests.indexed) ...[
+                              if (k > 0) const SizedBox(width: 6),
+                              _ChestNode(
+                                key: ValueKey('chest-${chest.isFinal ? 'final' : chest.week}'),
+                                chest: chest,
+                                size: size,
+                                onTap: () => showChest(context, chest),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
               ],
             );
           },
@@ -311,6 +341,110 @@ class _PathState extends State<_Path> {
       },
     );
   }
+}
+
+/// Coffre du chemin (écran 26) : jaune s'il est ouvert, gris sinon. Symbolique : un badge et un message de Peni.
+class _ChestNode extends StatelessWidget {
+  const _ChestNode({super.key, required this.chest, required this.size, required this.onTap});
+
+  final ProjectChest chest;
+  final double size;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final name = chest.isFinal ? 'Coffre final' : 'Coffre de la semaine ${chest.week}';
+    final state = switch (chest.state) { 'open' => 'ouvert', 'missed' => 'pas encore obtenu', _ => 'à venir' };
+    final art = SvgPicture.asset('assets/gifts/gift_chest_s.svg', width: size * 0.62);
+    return Semantics(
+      button: true,
+      label: '$name, $state',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: chest.isOpen ? BimColors.progressReached : scheme.surfaceContainerHighest,
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), offset: const Offset(0, 3))],
+          ),
+          child: chest.isOpen
+              ? art
+              : Opacity(
+                  opacity: 0.55,
+                  child: ColorFiltered(
+                    colorFilter: const ColorFilter.matrix([0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0, 0, 0, 1, 0]),
+                    child: art,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fenêtre d'un coffre : badge et message de Peni, sans reproche. Aucune valeur financière.
+Future<void> showChest(BuildContext context, ProjectChest chest) {
+  final theme = Theme.of(context);
+  final week = 'la semaine ${chest.week}';
+  final (PeniPose pose, String title, String message) = switch ((chest.isFinal, chest.state)) {
+    (false, 'open') => (PeniPose.cheer, 'Semaine ${chest.week} tenue !', 'Bravo, tu as fait ${chest.done} tâches sur ${chest.due} cette semaine. Je suis tellement fière de toi !'),
+    (false, 'missed') => (
+        PeniPose.happy,
+        'Coffre de $week',
+        'Cette semaine a été plus difficile, ce n’est pas grave. Tu peux encore rattraper les jours passés : '
+            'il faut ${chest.needed} tâches sur ${chest.due}, tu en as fait ${chest.done}.',
+      ),
+    (false, _) => (PeniPose.think, 'Coffre de $week', 'Fais au moins ${chest.needed} des ${chest.due} tâches prévues cette semaine pour l’ouvrir. Pour l’instant : ${chest.done}.'),
+    (true, 'open') => (PeniPose.cheer, 'Programme terminé !', 'Tu as fait ${chest.done} tâches sur ${chest.due}. Tu peux être fier·ère de toi, moi je le suis !'),
+    (true, 'missed') => (
+        PeniPose.happy,
+        'Coffre final',
+        'Il manquait quelques tâches pour l’ouvrir (${chest.done} sur ${chest.due}). Tout ce que tu as accompli compte, et tu peux recommencer quand tu veux.',
+      ),
+    (true, _) => (
+        PeniPose.think,
+        'Coffre final',
+        'Il s’ouvre le dernier jour si tu as fait au moins ${chest.needed} des ${chest.due} tâches du programme. Pour l’instant : ${chest.done}.',
+      ),
+  };
+  return showModalBottomSheet<void>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, BimSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Peni(pose: pose, size: 88),
+            const SizedBox(height: BimSpacing.sm),
+            Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
+            const SizedBox(height: BimSpacing.sm),
+            Text(message, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+            if (chest.isOpen) ...[
+              const SizedBox(height: BimSpacing.md),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(10)),
+                child: Text('🏅 Badge « ${chest.badge} »', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+              ),
+            ],
+            const SizedBox(height: BimSpacing.md),
+            Text(
+              'Un coffre est une récompense symbolique : un badge et un message de Peni. Il ne contient ni pièces ni argent.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: BimSpacing.md),
+            BimButton(label: 'Continuer', variant: BimButtonVariant.dark, onPressed: () => Navigator.pop(ctx)),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// Pointillés entre deux jours, sans recouvrir les ronds.

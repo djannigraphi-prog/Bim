@@ -190,11 +190,19 @@ export const projectTasks = pgTable(
     /** template = issu d'un modèle validé ; answers = construit depuis les réponses de l'écran 23 ; user = ajouté par la personne. */
     origin: varchar('origin', { length: 10 }).notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
+    /**
+     * Période où la tâche fait partie du programme (décision du 15/10, coffres et progression) : à partir de
+     * `active_from` (null = depuis le début du projet) et jusqu'à la veille de `active_until` (null = toujours).
+     * Une tâche ajoutée en cours de route ne compte pas pour les jours passés ; une tâche retirée garde son historique.
+     */
+    activeFrom: date('active_from', { mode: 'string' }),
+    activeUntil: date('active_until', { mode: 'string' }),
     removedAt: timestamp('removed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('project_tasks_project_idx').on(t.projectId),
+    check('project_tasks_active_ck', sql`${t.activeUntil} IS NULL OR ${t.activeFrom} IS NULL OR ${t.activeUntil} >= ${t.activeFrom}`),
     check('project_tasks_weekdays_ck', sql`${t.weekdays} BETWEEN 1 AND 127`),
     check('project_tasks_time_ck', sql`${t.timeOfDay} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`),
     check('project_tasks_origin_ck', sql`${t.origin} IN ('template', 'answers', 'user')`),
@@ -237,7 +245,7 @@ export const projectPauses = pgTable(
  * Journal des événements d'un projet, écrit dans la même transaction que le changement (ordre garanti : identifiants
  * UUID v7 croissants). Source unique prévue pour les rappels (lot 2 : recalcul des horaires) et pour Peni (lot 3 :
  * contexte du projet), sans qu'ils modifient le module Projets. Types : created, paused, resumed, completed, abandoned,
- * task_added, task_removed, mode_changed, measurement_added (voir docs/DEPENDANCES_LOTS_2_3.md).
+ * task_added, task_removed, mode_changed, measurement_added, chest_opened (voir docs/DEPENDANCES_LOTS_2_3.md).
  */
 export const projectEvents = pgTable(
   'project_events',

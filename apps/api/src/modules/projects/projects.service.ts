@@ -21,7 +21,7 @@ import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
 import { ProjectPhotosService } from './photos.service';
 import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, UpdateProjectDto } from './dto';
-import { addDays, computePlan, diffDays, dueTasks, generateTitle, isPaused, isValidDay, spreadWeekdays, today } from './plan';
+import { addDays, Chest, computePlan, diffDays, dueTasks, generateTitle, isPaused, isValidDay, spreadWeekdays, today } from './plan';
 
 type ProjectRow = typeof projects.$inferSelect;
 type TaskRow = typeof projectTasks.$inferSelect;
@@ -258,25 +258,29 @@ export class ProjectsService {
     return p;
   }
 
+  /**
+   * `history` : toutes les tâches, y compris retirées (chacune ne compte que pendant sa période active) — sert au calcul
+   * des jours, de la progression et des coffres. `tasks` : les tâches actuelles du programme (affichage, modification).
+   */
   private async parts(projectId: string) {
-    const [tasks, pauses] = await Promise.all([
-      this.db.select().from(projectTasks).where(and(eq(projectTasks.projectId, projectId), isNull(projectTasks.removedAt))).orderBy(asc(projectTasks.timeOfDay), asc(projectTasks.sortOrder)),
+    const [history, pauses] = await Promise.all([
+      this.db.select().from(projectTasks).where(eq(projectTasks.projectId, projectId)).orderBy(asc(projectTasks.timeOfDay), asc(projectTasks.sortOrder)),
       this.db.select().from(projectPauses).where(eq(projectPauses.projectId, projectId)),
     ]);
-    const completions = tasks.length
+    const completions = history.length
       ? await this.db
           .select({ taskId: taskCompletions.taskId, day: taskCompletions.day })
           .from(taskCompletions)
-          .where(inArray(taskCompletions.taskId, tasks.map((t) => t.id)))
+          .where(inArray(taskCompletions.taskId, history.map((t) => t.id)))
       : [];
-    return { tasks, pauses, completions: new Set(completions.map((c) => `${c.taskId}|${c.day}`)) };
+    return { tasks: history.filter((t) => !t.removedAt), history, pauses, completions: new Set(completions.map((c) => `${c.taskId}|${c.day}`)) };
   }
 
-  private stats(p: ProjectRow, parts: { tasks: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
+  private stats(p: ProjectRow, parts: { history: TaskRow[]; pauses: PauseRow[]; completions: Set<string> }) {
     return computePlan({
       startDate: p.startDate,
       plannedEndDate: p.plannedEndDate,
-      tasks: parts.tasks,
+      tasks: parts.history,
       pauses: parts.pauses,
       completions: parts.completions,
       today: this.today(),
@@ -366,6 +370,8 @@ export class ProjectsService {
       totalSteps: s.totalOccurrences,
       completedSteps: doneSessions,
       bestStreak: s.bestStreak,
+      /** Coffres du chemin (écran 26) : symboliques, jamais financiers. */
+      chests: s.chests,
       tasks: parts.tasks.map((t) => ({ id: t.id, title: t.title, detail: t.detail, icon: t.icon, timeOfDay: t.timeOfDay, weekdays: t.weekdays, origin: t.origin })),
       days: s.days,
       today: this.today(),
@@ -379,7 +385,8 @@ export class ProjectsService {
     const s = this.stats(p, parts);
     const summary = s.days.find((d) => d.day === day);
     if (!summary) throw Errors.validation({ fields: { day: ['Ce jour ne fait pas partie du programme.'] } });
-    const due = dueTasks(day, parts.tasks, parts.pauses);
+    // Les tâches qui faisaient partie du programme ce jour-là (y compris une tâche retirée depuis).
+    const due = dueTasks(day, parts.history, parts.pauses);
     return {
       day,
       index: summary.index,
@@ -451,17 +458,27 @@ export class ProjectsService {
     if (!isValidDay(day)) throw Errors.validation({ fields: { day: ['Date invalide (AAAA-MM-JJ).'] } });
     const p = await this.load(userId, projectId);
     const parts = await this.parts(p.id);
-    const task = parts.tasks.find((t) => t.id === taskId);
+    const task = parts.history.find((t) => t.id === taskId);
     if (!task) throw Errors.notFound('Tâche');
     if (!dueTasks(day, [task], []).length) throw Errors.conflict('TASK_NOT_DUE', "Cette tâche n'est pas prévue ce jour-là.");
     if (!this.canCheck(p, day, parts.pauses)) {
       throw Errors.conflict('DAY_NOT_EDITABLE', p.status === 'paused' ? 'Ton projet est en pause.' : 'Ce jour ne peut pas être modifié.');
     }
-    if (done) {
-      await this.db.insert(taskCompletions).values({ taskId, day }).onConflictDoNothing();
-    } else {
-      await this.db.delete(taskCompletions).where(and(eq(taskCompletions.taskId, taskId), eq(taskCompletions.day, day)));
-    }
+    // Coffres ouverts par cette case : un événement par coffre qui s'ouvre (source des notifications du lot 2 et de Peni).
+    const key = `${taskId}|${day}`;
+    const openBefore = new Set(this.stats(p, parts).chests.filter((c) => c.state === 'open').map(chestCode));
+    const after = new Set(parts.completions);
+    if (done) after.add(key);
+    else after.delete(key);
+    const opened = this.stats(p, { ...parts, completions: after }).chests.filter((c) => c.state === 'open' && !openBefore.has(chestCode(c)));
+    await this.db.transaction(async (tx) => {
+      if (done) {
+        await tx.insert(taskCompletions).values({ taskId, day }).onConflictDoNothing();
+      } else {
+        await tx.delete(taskCompletions).where(and(eq(taskCompletions.taskId, taskId), eq(taskCompletions.day, day)));
+      }
+      for (const c of opened) await tx.insert(projectEvents).values({ id: uuidv7(), projectId: p.id, type: 'chest_opened', payload: chestCode(c) });
+    });
     return this.day(userId, projectId, day);
   }
 
@@ -504,6 +521,8 @@ export class ProjectsService {
         weekdays: dto.weekdays,
         origin: 'user',
         sortOrder: 100,
+        // Compte à partir d'aujourd'hui : les jours passés ne deviennent pas « manqués ».
+        activeFrom: this.today(),
       });
       await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'task_added', payload: taskId });
     });
@@ -518,7 +537,8 @@ export class ProjectsService {
     if (!parts.tasks.some((t) => t.id === taskId)) throw Errors.notFound('Tâche');
     if (parts.tasks.length <= 1) throw Errors.conflict('LAST_TASK', 'Un programme garde au moins une tâche.');
     await this.db.transaction(async (tx) => {
-      await tx.update(projectTasks).set({ removedAt: new Date() }).where(eq(projectTasks.id, taskId));
+      // Ne compte plus à partir d'aujourd'hui ; les jours passés gardent leur historique.
+      await tx.update(projectTasks).set({ removedAt: new Date(), activeUntil: this.today() }).where(eq(projectTasks.id, taskId));
       await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'task_removed', payload: taskId });
     });
     return this.detail(userId, projectId);
@@ -582,4 +602,9 @@ export class ProjectsService {
     // Les photos avant / après (données sensibles) sont effacées avec le projet.
     await this.photos.purgeProject(p.id);
   }
+}
+
+/** Identifiant stable d'un coffre dans un projet : « week:3 » ou « final ». */
+function chestCode(c: Chest): string {
+  return c.kind === 'final' ? 'final' : `week:${c.week}`;
 }

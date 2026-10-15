@@ -97,4 +97,13 @@ void main() {
     expect(ProjectReport.label(r.reason), 'Difficulté avec l’application');
     expect(ProjectReport.label('too_hard'), 'Trop difficile pour moi');
   });
+
+  test('coffre : seuil de 70 % arrondi au-dessus, badge, aucune donnée financière', () {
+    final c = ProjectChest.fromJson({'kind': 'week', 'week': 2, 'day': '2026-10-25', 'fromIndex': 8, 'toIndex': 14, 'due': 7, 'done': 4, 'state': 'missed'});
+    expect(c.needed, 5); // 4,9 → 5 tâches sur 7
+    expect(c.isOpen, isFalse);
+    expect(c.badge, 'Semaine 2 tenue');
+    expect(const ProjectChest(kind: 'final', day: '2026-11-10', due: 10, done: 7, state: 'open').needed, 7);
+    expect(const ProjectChest(kind: 'final', day: '2026-11-10', due: 10, done: 7, state: 'open').badge, 'Programme terminé');
+  });
 }

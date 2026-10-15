@@ -9,6 +9,15 @@ export type Day = string;
 export interface PlanTask {
   id: string;
   weekdays: number;
+  /** Premier jour où la tâche fait partie du programme (null ou absent = depuis le début). */
+  activeFrom?: Day | null;
+  /** Jour à partir duquel elle n'en fait plus partie (exclu ; null ou absent = toujours). */
+  activeUntil?: Day | null;
+}
+
+/** La tâche faisait-elle partie du programme ce jour-là ? (tâches ajoutées ou retirées en cours de route) */
+export function isActiveOn(task: PlanTask, day: Day): boolean {
+  return (!task.activeFrom || day >= task.activeFrom) && (!task.activeUntil || day < task.activeUntil);
 }
 
 export interface PauseRange {
@@ -49,7 +58,7 @@ export function isPaused(day: Day, pauses: PauseRange[]): boolean {
 export function dueTasks<T extends PlanTask>(day: Day, tasks: T[], pauses: PauseRange[]): T[] {
   if (isPaused(day, pauses)) return [];
   const bit = weekdayBit(day);
-  return tasks.filter((t) => (t.weekdays & bit) !== 0);
+  return tasks.filter((t) => (t.weekdays & bit) !== 0 && isActiveOn(t, day));
 }
 
 /**
@@ -99,6 +108,63 @@ export interface PlanStats {
   /** Jours consécutifs entièrement réalisés, jusqu'à aujourd'hui (aujourd'hui compte s'il est terminé). */
   streak: number;
   bestStreak: number;
+  /** Coffres du chemin (écran 26, C8). */
+  chests: Chest[];
+}
+
+/**
+ * Coffre (écran 26, décision du fondateur du 15/10/2026) : récompense symbolique (badge et message de Peni),
+ * jamais financière. Un coffre par semaine complète de programme (jours 1-7, 8-14… ; les jours de pause ne comptent
+ * pas) et un coffre final pour tout le programme. Un coffre s'ouvre quand au moins 70 % des tâches prévues sur sa
+ * période sont réellement cochées ; seules comptent les tâches qui faisaient partie du programme ce jour-là
+ * (pas de tâche ajoutée après coup, pas de jour de pause, aucun jour de repos). Le coffre final ne s'ouvre qu'une
+ * fois le dernier jour atteint. Le rattrapage d'un jour passé, déjà permis, compte.
+ */
+export interface Chest {
+  kind: 'week' | 'final';
+  /** Numéro de semaine (coffre de semaine), null pour le coffre final. */
+  week: number | null;
+  /** Jour du chemin où le coffre est posé (dernier jour de sa période). */
+  day: Day;
+  /** Numéros des jours de programme couverts. */
+  fromIndex: number;
+  toIndex: number;
+  due: number;
+  done: number;
+  /** open : ouvert · upcoming : période en cours · missed : période passée sous le seuil (peut encore s'ouvrir par rattrapage). */
+  state: 'open' | 'upcoming' | 'missed';
+}
+
+/** Seuil validé par le fondateur le 15/10/2026 : 70 % des tâches prévues de la période. */
+export const CHEST_THRESHOLD_PERCENT = 70;
+
+export function chestReached(done: number, due: number): boolean {
+  // Calcul en entiers (pas d'arrondi) : 7 tâches sur 10 ouvrent le coffre, 6 sur 9 non (66 %).
+  return due > 0 && done * 100 >= due * CHEST_THRESHOLD_PERCENT;
+}
+
+export function computeChests(days: DaySummary[], today: Day): Chest[] {
+  const program = days.filter((d) => d.index !== null);
+  const chests: Chest[] = [];
+  const make = (kind: Chest['kind'], week: number | null, period: DaySummary[]): Chest | null => {
+    const due = period.reduce((n, d) => n + d.due, 0);
+    if (due === 0) return null; // aucune tâche prévue sur la période : pas de coffre
+    const done = period.reduce((n, d) => n + d.done, 0);
+    const last = period[period.length - 1];
+    const ended = last.day < today;
+    // Le coffre final attend le dernier jour : « Programme terminé » ne s'affiche jamais avant la fin.
+    const open = chestReached(done, due) && (kind === 'week' || last.day <= today);
+    return { kind, week, day: last.day, fromIndex: period[0].index!, toIndex: last.index!, due, done, state: open ? 'open' : ended ? 'missed' : 'upcoming' };
+  };
+  for (let w = 1; w * 7 <= program.length; w++) {
+    const c = make('week', w, program.slice((w - 1) * 7, w * 7));
+    if (c) chests.push(c);
+  }
+  if (program.length) {
+    const c = make('final', null, program);
+    if (c) chests.push(c);
+  }
+  return chests;
 }
 
 export function computePlan(input: PlanInput): PlanStats {
@@ -151,6 +217,7 @@ export function computePlan(input: PlanInput): PlanStats {
     currentDayIndex,
     streak,
     bestStreak: best,
+    chests: computeChests(days, input.today),
   };
 }
 
