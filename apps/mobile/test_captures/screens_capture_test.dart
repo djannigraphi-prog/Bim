@@ -27,6 +27,8 @@ import 'package:bim/features/notifications/data/inbox_api.dart';
 import 'package:bim/features/notifications/data/notification_preferences_api.dart';
 import 'package:bim/features/notifications/presentation/notifications_screen.dart';
 import 'package:bim/features/notifications/presentation/reminder_preferences_screen.dart';
+import 'package:bim/features/peni/data/peni_api.dart';
+import 'package:bim/features/peni/presentation/peni_chat_screen.dart';
 import 'package:bim/features/projects/data/projects_api.dart';
 import 'package:bim/features/projects/data/projects_models.dart';
 import 'package:bim/features/projects/presentation/celebration_screen.dart';
@@ -85,6 +87,52 @@ class _FakeNotificationPreferencesApi extends NotificationPreferencesApi {
 }
 
 /// Notifications de démonstration POUR LES CAPTURES UNIQUEMENT (types et textes réels de l'API, données inventées).
+/// Discussion de la maquette 25, POUR LES CAPTURES UNIQUEMENT : textes identiques à ceux que produit l'API pour ces
+/// messages (moteur guided-v1, vérifiés par `engine.spec.ts`), sans serveur.
+class _FakePeniApi extends PeniApi {
+  _FakePeniApi(super.api);
+
+  @override
+  Future<PeniTurn> start({String? mode, String? budget}) async => const PeniTurn(
+        conversationId: 'c1',
+        messages: [
+          PeniMessage(id: '1', role: 'peni', text: 'Coucou Yannick ! 🥰 Raconte-moi : qu’est-ce que tu aimerais changer ?', pose: 'wave'),
+          PeniMessage(id: '2', role: 'user', text: 'Je veux perdre du ventre avant mon mariage en décembre. Mais j’ai pas trop le temps la semaine 😅'),
+          PeniMessage(
+            id: '3',
+            role: 'peni',
+            text: 'Félicitations pour le mariage !! 💍 On a environ 7 semaines, c’est parfait. Combien de fois par semaine peux-tu t’y mettre ?',
+            pose: 'think',
+          ),
+          PeniMessage(id: '4', role: 'user', text: 'En salle, le samedi et le dimanche matin'),
+          PeniMessage(
+            id: '5',
+            role: 'peni',
+            text: 'Tu préfères un projet économique, avec des solutions gratuites, ou Premium, avec des idées d’achats ? Le choix est gratuit.',
+            pose: 'think',
+          ),
+          PeniMessage(id: '6', role: 'user', text: 'Premium'),
+          PeniMessage(id: '7', role: 'peni', text: 'Quel budget indicatif ? Rien n’est payé dans BIM.', pose: 'think'),
+          PeniMessage(id: '8', role: 'user', text: 'Moyen · ≈ 35 000 F'),
+          PeniMessage(
+            id: '9',
+            role: 'peni',
+            text: 'Top ! J’ai noté tout ça 👇',
+            pose: 'cheer',
+            quickReplies: [PeniQuickReply(id: 'restart', label: 'Recommencer')],
+            summary: [
+              (label: 'Catégorie', value: 'Sport · Abdos'),
+              (label: 'Durée', value: '30 jours'),
+              (label: 'Séances', value: '2 / semaine'),
+              (label: 'Moment', value: 'Le matin'),
+              (label: 'Mode', value: 'Premium · moyen'),
+            ],
+          ),
+        ],
+        draft: ProjectDraft(mode: 'premium', budget: 'medium', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 2, availability: 'morning', durationDays: 30),
+      );
+}
+
 class _FakeInboxApi extends InboxApi {
   _FakeInboxApi(super.api);
 
@@ -326,6 +374,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     accountApiProvider.overrideWithValue(_FakeAccountApi(client)),
     notificationPreferencesApiProvider.overrideWithValue(_FakeNotificationPreferencesApi(client)),
     inboxApiProvider.overrideWithValue(_FakeInboxApi(client)),
+    peniApiProvider.overrideWithValue(_FakePeniApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -345,6 +394,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/notifications', builder: (_, __) => NotificationsScreen(now: _FakeInboxApi.now)),
     GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
     GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),
+    GoRoute(path: '/peni/new-project', builder: (_, __) => const PeniChatScreen()),
     GoRoute(path: '/projects/p1', builder: (_, __) => const ProjectMapScreen(projectId: 'p1')),
     GoRoute(path: '/projects/p1/program', builder: (_, __) => const ProgramScreen(projectId: 'p1')),
     GoRoute(path: '/projects/p3/done', builder: (_, __) => const CelebrationScreen(projectId: 'p3')),
@@ -566,6 +616,14 @@ void main() {
     await t.tap(find.text('Changer de profil'));
     await _settle(t);
     await _capture(t, '53_changer_profil');
+  });
+  testWidgets('25 discussion avec Peni', (t) async {
+    await _show(t, '/peni/new-project');
+    await _capture(t, '25_peni');
+  });
+  testWidgets('25 discussion avec Peni (sombre, petit écran)', (t) async {
+    await _show(t, '/peni/new-project', mode: ThemeMode.dark, physical: const Size(960, 1704));
+    await _capture(t, '25_peni_sombre_petit');
   });
   testWidgets('rappels (sombre)', (t) async {
     await _show(t, '/account/reminders', mode: ThemeMode.dark);

@@ -58,6 +58,21 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
     }
   }
 
+  /// « Je préfère en parler avec Peni » (19) et « Pas sûr ? Demande à Peni » (20) : Peni rend un brouillon, que la
+  /// personne vérifie à la dernière étape avant de créer le projet (règle R5 : Peni propose, la personne confirme).
+  Future<void> _askPeni() async {
+    final d = ref.read(projectDraftProvider);
+    final result = await context.push<ProjectDraft>('/peni/new-project', extra: <String, String?>{'mode': d.mode, 'budget': d.budget});
+    if (result == null || !mounted) return;
+    _update((_) => result);
+    setState(() {
+      _step = 5;
+      _error = null;
+      _fieldErrors = {};
+    });
+    showBimSnack(context, 'Peni a rempli ton projet. Vérifie-le, puis crée ton programme.');
+  }
+
   void _back() {
     if (_step == 1) {
       context.pop();
@@ -144,7 +159,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                 Expanded(
                   child: switch (_step) {
                     1 => _ModeStep(draft: draft, catalog: c, onChanged: _update),
-                    2 => _CategoryStep(draft: draft, catalog: c, onChanged: _update),
+                    2 => _CategoryStep(draft: draft, catalog: c, onChanged: _update, onAskPeni: _askPeni),
                     3 => _GoalStep(draft: draft, catalog: c, onChanged: _update),
                     4 => _PhotoStep(
                         photo: _beforePhoto,
@@ -181,7 +196,8 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                         ),
                       if (_step == 1)
                         TextButton.icon(
-                          onPressed: () => showComingSoon(context, feature: 'La discussion avec Peni'),
+                          key: const ValueKey('ask-peni'),
+                          onPressed: _askPeni,
                           icon: const Peni(pose: PeniPose.happy, size: 28),
                           label: const Text('Je préfère en parler avec Peni'),
                           style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.onSurface, minimumSize: const Size(0, kBimMinTouch)),
@@ -427,11 +443,12 @@ class _BudgetButton extends StatelessWidget {
 // ------------------------------------------------------------------ Écran 20
 
 class _CategoryStep extends StatelessWidget {
-  const _CategoryStep({required this.draft, required this.catalog, required this.onChanged});
+  const _CategoryStep({required this.draft, required this.catalog, required this.onChanged, required this.onAskPeni});
 
   final ProjectDraft draft;
   final ProjectCatalog catalog;
   final _Update onChanged;
+  final VoidCallback onAskPeni;
 
   @override
   Widget build(BuildContext context) {
@@ -463,7 +480,8 @@ class _CategoryStep extends StatelessWidget {
               ),
             InkWell(
               borderRadius: BorderRadius.circular(BimRadius.card),
-              onTap: () => showComingSoon(context, feature: 'L’aide de Peni pour choisir'),
+              key: const ValueKey('ask-peni-category'),
+              onTap: onAskPeni,
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(BimRadius.card),

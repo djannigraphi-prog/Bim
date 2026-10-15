@@ -14,6 +14,7 @@ import '../../features/auth/presentation/verify_code_screen.dart';
 import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/notifications/presentation/reminder_preferences_screen.dart';
+import '../../features/peni/presentation/peni_chat_screen.dart';
 import '../../features/projects/presentation/celebration_screen.dart';
 import '../../features/projects/presentation/my_projects_screen.dart';
 import '../../features/projects/presentation/new_project_screen.dart';
@@ -47,7 +48,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc)) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || loc.startsWith('/account') || loc.startsWith('/projects') || loc.startsWith('/notifications')) ? '/home' : null,
+          (loc == '/splash' || loc.startsWith('/account') || loc.startsWith('/projects') || loc.startsWith('/notifications') || loc.startsWith('/peni')) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -74,6 +75,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Lot 1 — projets BIM (écrans 18 à 30).
       GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
       GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),
+      // Lot 3 — Peni (écran 25) : rend un brouillon de projet à l'écran « Nouveau projet ».
+      GoRoute(
+        path: '/peni/new-project',
+        builder: (_, s) {
+          final extra = s.extra is Map<String, String?> ? s.extra! as Map<String, String?> : const <String, String?>{};
+          return PeniChatScreen(mode: extra['mode'], budget: extra['budget']);
+        },
+      ),
       GoRoute(path: '/projects/:id', builder: (_, s) => ProjectMapScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/program', builder: (_, s) => ProgramScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/done', builder: (_, s) => CelebrationScreen(projectId: s.pathParameters['id']!)),

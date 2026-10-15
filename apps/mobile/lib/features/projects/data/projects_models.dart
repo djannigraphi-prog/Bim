@@ -319,6 +319,19 @@ class ProjectDraft {
     this.durationDays,
   });
 
+  /// Brouillon proposé par Peni (lot 3), au format de POST /v1/projects. Les champs absents gardent leur valeur par défaut.
+  factory ProjectDraft.fromJson(Map<String, dynamic> j) => ProjectDraft(
+        mode: j['mode'] as String?,
+        budget: j['budget'] as String?,
+        categoryCode: j['categoryCode'] as String?,
+        goalCode: j['goalCode'] as String?,
+        targetQuantity: (j['targetQuantity'] as num?)?.toInt(),
+        description: j['description'] as String? ?? '',
+        availability: j['availability'] as String?,
+        sessionsPerWeek: (j['sessionsPerWeek'] as num?)?.toInt() ?? 3,
+        durationDays: (j['durationDays'] as num?)?.toInt(),
+      );
+
   final String? mode;
   final String? budget;
   final String? categoryCode;

@@ -244,11 +244,30 @@ void main() {
     await _waitFor(tester, find.text('Ton premier projet t’attend'));
     await _tap(tester, find.widgetWithText(FilledButton, 'Nouveau projet'));
     await _tap(tester, find.text('Mode Éco'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
-    await _tap(tester, find.text('Sport'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
-    await _tap(tester, find.text('Abdos'));
-    await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
+    // Lot 3 : « Je préfère en parler avec Peni » (écran 25), discussion réelle avec l'API (réponses écrites, sans IA).
+    await _tap(tester, find.byKey(const ValueKey('ask-peni')));
+    await _waitFor(tester, find.textContaining('Raconte-moi : qu’est-ce que tu aimerais changer ?'));
+    await tester.enterText(find.byKey(const ValueKey('peni-input')), 'Je veux des abdos');
+    await _tap(tester, find.byKey(const ValueKey('peni-send')));
+    await _waitFor(tester, find.text('Combien de fois par semaine peux-tu t’y mettre ?'));
+    await _tap(tester, find.byKey(const ValueKey('qr-sessions:3')));
+    await _waitFor(tester, find.text('Plutôt le matin, à midi ou l’après-midi ?'));
+    await _tap(tester, find.byKey(const ValueKey('qr-avail:morning')));
+    // Le mode Éco, choisi à l'écran 19, n'est pas redemandé ; la durée l'est seulement sans programme validé.
+    final duration = find.byKey(const ValueKey('qr-dur:30'));
+    final summary = find.byKey(const ValueKey('peni-summary'));
+    for (var i = 0; i < 120 && summary.evaluate().isEmpty && duration.evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    if (duration.evaluate().isNotEmpty) await _tap(tester, duration);
+    await _waitFor(tester, find.byKey(const ValueKey('peni-see-program')));
+    expect(find.text('Sport · Abdos'), findsOneWidget);
+    await _shot(tester, 'a25_peni');
+    await _tap(tester, find.byKey(const ValueKey('peni-see-program')));
+    // Le brouillon de Peni est repris à la dernière étape ; on revient à l'écran 22 pour la photo « avant ».
+    await _waitFor(tester, find.text('Nouveau projet · 5/5'));
+    await _tap(tester, find.byTooltip('Retour'));
+    await _waitFor(tester, find.text('Nouveau projet · 4/5'));
     // Écran 22 : photo « avant » (privée), envoyée après la création du projet.
     await _tap(tester, find.byTooltip('Choisir dans la galerie'));
     await _tap(tester, find.widgetWithText(FilledButton, 'Continuer'));
