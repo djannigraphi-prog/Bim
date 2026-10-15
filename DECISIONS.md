@@ -12,6 +12,24 @@ Référence de l'analyse complète : document « BIM — Analyse et plan de dév
 
 ---
 
+## Règles permanentes (tous les lots)
+
+### R-01 — Choix techniques et dépenses (15/10/2026) · Fondateur · **décidé**
+
+- **Ne jamais choisir automatiquement une solution gratuite uniquement pour économiser.** BIM a vocation à devenir une application importante : priorité à une solution **fiable, performante, sécurisée et capable d'évoluer** avec le nombre d'utilisateurs.
+- Avant de recommander une solution technique ou un service externe, présenter :
+  - les solutions gratuites et leurs limites ;
+  - les solutions payantes et leurs avantages ;
+  - les coûts de démarrage et les coûts mensuels ou annuels ;
+  - les coûts variables (utilisateurs, stockage, trafic, notifications…) ;
+  - les limites qui pourraient réduire les performances ou la fiabilité.
+- Si une solution payante est plus adaptée, la **recommander même si elle coûte plus cher**, en expliquant pourquoi et en donnant son coût estimé. Le fondateur décide ensuite de payer maintenant ou de reporter.
+- En cas de report : préciser les conséquences techniques et les risques, **sans affaiblir inutilement l'architecture** (le code doit permettre de passer à la solution recommandée sans réécriture).
+- **Aucune dépense sans autorisation explicite du fondateur** : abonnements, changements de formule, activation de services facturables, ressources cloud payantes.
+- Le développement et les tests sans dépense supplémentaire peuvent continuer, s'ils ne compromettent pas l'architecture future.
+
+Application : `docs/LOT2_RAPPELS_ETUDE.md` (rappels, 15/10/2026). La recommandation précédente « worker dans l'API au lancement pour 0 en plus » est retirée : elle privilégiait le coût sur la fiabilité.
+
 ## Décisions du fondateur
 
 ### F15 — Âge minimum (14/10/2026) · Fondateur · **provisoire**
@@ -234,7 +252,7 @@ Chaque changement d'horaire ou de suivi d'un projet écrit un événement dans `
 Chaque tâche a une période où elle fait partie du programme (`active_from`, `active_until` : migration 0010, avec reprise de l'historique). Progression, état des jours, série et coffres ne comptent une tâche que pendant cette période : ajouter une tâche ne rend plus « manqués » les jours passés, et retirer une tâche ne fait plus disparaître ce qui a été fait. Calcul unique dans `plan.ts`, testé unitairement (durées de 5 à 90 jours, pauses, tâches ajoutées et retirées, seuil exact).
 
 ### T-025 — Lot 2 : pays et rappels · Fondateur · décidé le 15/10/2026 (détails à valider)
-Lancement en **Côte d'Ivoire** (heure d'Abidjan), architecture prête pour d'autres pays (fuseau par personne au lot 2). Rappels : **notifications d'abord** (envoi par le serveur via Firebase Cloud Messaging, secours local non exact), alarmes exactes seulement si les mesures sur de vrais téléphones le justifient. Contraintes, coûts et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`. Aucune activation en production ni dépense sans accord explicite.
+Lancement en **Côte d'Ivoire** (heure d'Abidjan), architecture prête pour d'autres pays (fuseau par personne au lot 2). Rappels : **notifications d'abord** (envoi par le serveur via Firebase Cloud Messaging, secours local non exact), alarmes exactes seulement si les mesures sur de vrais téléphones le justifient. Comparaison des architectures, coûts et recommandation (selon R-01) : `docs/LOT2_RAPPELS_ETUDE.md`. Aucune activation en production ni dépense sans accord explicite.
 
 ### D-UI-01 — Flutter : Riverpod 2, go_router 14, Dio 5 · Technique · décidé
 Un seul style de gestion d'état (Notifier / FutureProvider). Découpage `features/<nom>/{data,application,presentation}`.
