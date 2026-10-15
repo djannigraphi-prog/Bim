@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { DB, Database } from '../../database/database.module';
 import { notificationInbox } from '../../database/schema';
 import { SettingsService } from '../settings/settings.service';
-import { InboxCategory, inboxCategory, inboxSender, inboxText, InboxType } from './inbox-messages';
+import { INBOX_TEMPLATES_VERSION, InboxCategory, inboxCategory, inboxSender, inboxText, InboxType } from './inbox-messages';
 
 /** Le centre de notifications montre les 30 derniers jours. */
 export const INBOX_DAYS = 30;
@@ -70,7 +70,7 @@ export class InboxService {
     const attempts = offsets?.value?.length ?? 1;
     const page = rows.rows.slice(0, limit);
     return {
-      templatesVersion: 'v1',
+      templatesVersion: INBOX_TEMPLATES_VERSION,
       items: page.map((r) => {
         const at = new Date(r.at);
         return {

@@ -5,6 +5,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../../core/theme/tokens.dart';
+
 /// Façon de programmer un rappel sur le téléphone.
 ///
 /// Version 1 : **non exacte** (décision du 15/10/2026) — Android peut décaler un peu l'affichage pour économiser la
@@ -14,7 +16,17 @@ enum ReminderTiming { inexact }
 
 /// Un rappel à afficher par le téléphone à une heure donnée.
 class LocalReminder {
-  const LocalReminder({required this.id, required this.fireAt, required this.title, required this.body, required this.payload});
+  const LocalReminder({
+    required this.id,
+    required this.fireAt,
+    required this.title,
+    required this.body,
+    required this.payload,
+    this.pose = 'happy',
+  });
+
+  /// Pose de Peni affichée dans la notification (choisie par l'API selon la tentative) : happy, think ou sad.
+  final String pose;
 
   final int id;
   final DateTime fireAt;
@@ -126,27 +138,35 @@ class PluginLocalNotifier implements LocalNotifier {
   static const actionGo = 'go';
   static const actionLater = 'later';
 
-  static const _details = NotificationDetails(
-    android: AndroidNotificationDetails(
-      channelId,
-      'Rappels de Peni',
-      channelDescription: 'Rappels des tâches de tes projets BIM',
-      importance: Importance.high,
-      priority: Priority.high,
-      category: AndroidNotificationCategory.reminder,
-      actions: [
-        AndroidNotificationAction(actionGo, 'J’y vais !', showsUserInterface: true),
-        AndroidNotificationAction(actionLater, 'Plus tard'),
-      ],
-    ),
-  );
+  /// Petite icône de la barre d'état (« B » de BIM, monochrome) et avatar de Peni (maquette 28), générés par
+  /// `scripts/generate-notification-icons.py` à partir des dessins de l'app.
+  static const smallIcon = 'ic_stat_bim';
+  static const poses = {'happy', 'think', 'sad'};
+
+  static NotificationDetails details(String pose) => NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          'Rappels de Peni',
+          channelDescription: 'Rappels des tâches de tes projets BIM',
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.reminder,
+          icon: smallIcon,
+          color: BimColors.red,
+          largeIcon: DrawableResourceAndroidBitmap('peni_notif_${poses.contains(pose) ? pose : 'happy'}'),
+          actions: const [
+            AndroidNotificationAction(actionGo, 'J’y vais !', showsUserInterface: true),
+            AndroidNotificationAction(actionLater, 'Plus tard'),
+          ],
+        ),
+      );
 
   AndroidFlutterLocalNotificationsPlugin? get _android => _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
   @override
   Future<void> init({required void Function(ReminderTarget target) onOpen}) async {
     await _plugin.initialize(
-      settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+      settings: const InitializationSettings(android: AndroidInitializationSettings(smallIcon)),
       onDidReceiveNotificationResponse: (response) {
         if (response.actionId == actionLater) return;
         final target = ReminderTarget.decode(response.payload);
@@ -169,7 +189,7 @@ class PluginLocalNotifier implements LocalNotifier {
       await _plugin.zonedSchedule(
         id: r.id,
         scheduledDate: tz.TZDateTime.from(r.fireAt.toUtc(), tz.UTC),
-        notificationDetails: _details,
+        notificationDetails: details(r.pose),
         androidScheduleMode: switch (timing) {
           ReminderTiming.inexact => AndroidScheduleMode.inexactAllowWhileIdle,
         },

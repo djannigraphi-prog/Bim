@@ -61,6 +61,7 @@ class ReminderScheduler {
             title: r.title,
             body: r.body,
             payload: ReminderTarget(projectId: r.projectId, day: r.day).encode(),
+            pose: r.pose,
           ),
     ];
     await _notifier.replaceAll(list);

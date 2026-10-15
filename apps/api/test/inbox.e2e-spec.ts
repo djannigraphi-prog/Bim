@@ -52,7 +52,7 @@ describe('Centre de notifications (e2e)', () => {
     expect(list.items[1]).toMatchObject({
       category: 'projects',
       sender: 'peni',
-      text: `Petit rappel : ${task.title} t’attend encore aujourd’hui.`,
+      text: `Vas-y, ça ne prend qu’une minute… ${task.title} t’attend 🥺`,
       link: expect.stringMatching(new RegExp(`^/projects/${p.id}/day/\\d{4}-\\d{2}-\\d{2}$`)),
     });
     expect(list.items[2]).toMatchObject({ sender: 'peni', text: `Coffre de la semaine 1 ouvert pour « ${p.title} ». Continue comme ça !`, link: `/projects/${p.id}` });

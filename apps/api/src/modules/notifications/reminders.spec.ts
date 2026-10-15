@@ -87,9 +87,13 @@ describe('calcul des rappels (lot 2)', () => {
   });
 
   it('textes de Peni : courts, sans donnée sensible, selon la tentative', () => {
-    expect(reminderMessage('Séance', 0, false).body).toBe('C’est l’heure : Séance. On y va ?');
-    expect(reminderMessage('Séance', 1, false).body).toContain('Petit rappel');
-    expect(reminderMessage('Séance', 2, true).body).toContain('il est encore temps');
-    expect(reminderMessage('x'.repeat(80), 0, false).body.length).toBeLessThan(90);
+    expect(reminderMessage('Séance', 0, false)).toEqual({ title: 'Peni', body: 'C’est l’heure ! Séance 💪 Tu vas tout déchirer.', pose: 'happy' });
+    expect(reminderMessage('Séance', 1, false)).toEqual({ title: 'Peni', body: 'Vas-y, ça ne prend qu’une minute… Séance t’attend 🥺', pose: 'think' });
+    expect(reminderMessage('Séance', 2, true)).toEqual({ title: 'Peni', body: 'Séance n’est pas encore cochée. Il est encore temps, je crois en toi !', pose: 'sad' });
+    // Une seule tentative prévue : c'est aussi la dernière, mais le premier texte reste celui de l'heure de la tâche.
+    expect(reminderMessage('Séance', 0, true).pose).toBe('happy');
+    expect(reminderMessage('x'.repeat(80), 0, false).body.length).toBeLessThan(110);
+    // Aucun mot qui culpabilise (décision C8).
+    for (const a of [0, 1, 2]) expect(reminderMessage('Séance', a, a === 2).body).not.toMatch(/supplie|honte|déçu|nul/i);
   });
 });

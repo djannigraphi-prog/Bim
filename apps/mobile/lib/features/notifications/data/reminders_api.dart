@@ -13,7 +13,11 @@ class UpcomingReminder {
     required this.fireAt,
     required this.title,
     required this.body,
+    this.pose = 'happy',
   });
+
+  /// Pose de Peni pour cette tentative (happy, think, sad), choisie par l'API avec le texte.
+  final String pose;
 
   /// Clé stable « projet|tâche|jour|tentative » : identifie le rappel (pas de doublon, annulation ciblée).
   final String key;
@@ -34,6 +38,7 @@ class UpcomingReminder {
         fireAt: DateTime.parse(json['fireAt'] as String).toUtc(),
         title: json['title'] as String,
         body: json['body'] as String,
+        pose: json['pose'] as String? ?? 'happy',
       );
 }
 

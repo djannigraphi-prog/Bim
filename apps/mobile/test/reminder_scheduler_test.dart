@@ -4,6 +4,7 @@ import 'package:bim/features/notifications/application/local_notifier.dart';
 import 'package:bim/features/notifications/application/push_token_source.dart';
 import 'package:bim/features/notifications/application/reminder_scheduler.dart';
 import 'package:bim/features/notifications/data/reminders_api.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_notifier.dart';
@@ -44,7 +45,7 @@ class _FakeClient extends ApiClient {
   }
 }
 
-Map<String, dynamic> _reminder(String key, DateTime fireAt, {int attempt = 0}) => {
+Map<String, dynamic> _reminder(String key, DateTime fireAt, {int attempt = 0, String? pose}) => {
       'key': key,
       'projectId': 'p1',
       'taskId': 't1',
@@ -52,7 +53,8 @@ Map<String, dynamic> _reminder(String key, DateTime fireAt, {int attempt = 0}) =
       'attempt': attempt,
       'fireAt': fireAt.toUtc().toIso8601String(),
       'title': 'Peni',
-      'body': 'C’est l’heure : Séance. On y va ?',
+      'body': 'C’est l’heure ! Séance 💪 Tu vas tout déchirer.',
+      if (pose != null) 'pose': pose,
     };
 
 void main() {
@@ -101,7 +103,7 @@ void main() {
         'reminders': [
           _reminder('p1|t1|2026-10-15|0', now.subtract(const Duration(minutes: 1))),
           _reminder('p1|t1|2026-10-16|0', DateTime.utc(2026, 10, 16, 15)),
-          _reminder('p1|t1|2026-10-16|1', DateTime.utc(2026, 10, 16, 16), attempt: 1),
+          _reminder('p1|t1|2026-10-16|1', DateTime.utc(2026, 10, 16, 16), attempt: 1, pose: 'think'),
         ],
       });
       final notifier = FakeNotifier();
@@ -111,6 +113,8 @@ void main() {
       expect(notifier.scheduled.map((x) => x.id), [reminderNotificationId('p1|t1|2026-10-16|0'), reminderNotificationId('p1|t1|2026-10-16|1')]);
       expect(notifier.scheduled.first.fireAt, DateTime.utc(2026, 10, 16, 15));
       expect(notifier.scheduled.first.title, 'Peni');
+      // Pose de Peni choisie par l'API (maquette 28) ; absente : pose joyeuse par défaut.
+      expect(notifier.scheduled.map((x) => x.pose), ['happy', 'think']);
       expect(ReminderTarget.decode(notifier.scheduled.first.payload)!.route, '/projects/p1/day/2026-10-16');
       expect(client.calls, ['GET /v1/me/reminders/upcoming']);
     });
@@ -141,6 +145,19 @@ void main() {
       expect(r.status, ReminderSyncStatus.permissionMissing);
       expect(notifier.scheduled, isEmpty);
       expect(notifier.permissionRequests, 0); // la demande se fait seulement quand la personne active ses rappels
+    });
+  });
+
+  group('apparence des notifications (maquette 28)', () {
+    test('petite icône BIM, couleur BIM, avatar de Peni selon la pose, actions « J’y vais ! / Plus tard »', () {
+      final android = PluginLocalNotifier.details('sad').android!;
+      expect(android.icon, 'ic_stat_bim');
+      expect((android.largeIcon! as DrawableResourceAndroidBitmap).data, 'peni_notif_sad');
+      expect(android.actions!.map((a) => a.title), ['J’y vais !', 'Plus tard']);
+      expect(android.actions!.first.showsUserInterface, isTrue);
+      expect(android.actions!.last.showsUserInterface, isFalse);
+      // Pose inconnue : jamais de ressource manquante, avatar joyeux.
+      expect((PluginLocalNotifier.details('inconnue').android!.largeIcon! as DrawableResourceAndroidBitmap).data, 'peni_notif_happy');
     });
   });
 

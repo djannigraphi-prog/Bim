@@ -169,13 +169,13 @@ export class ReminderWorkerService {
       WHERE d.user_id = ${d.userId}`);
     if (!devices.rows.length) return this.finish(d.id, 'skipped', 'no_device', now);
 
-    const msg = reminderMessage(task.title, d.attempt, d.attempt >= s.offsets.length - 1);
+    const { pose, ...msg } = reminderMessage(task.title, d.attempt, d.attempt >= s.offsets.length - 1);
     let ok = false;
     let transient = false;
     for (const dev of devices.rows) {
       const r = await this.sender.send(
         { deviceId: dev.id, token: dev.token, platform: dev.platform },
-        { ...msg, collapseKey: d.key, ttlSeconds: Math.max(60, Math.round((d.fireAt.getTime() + s.graceMinutes * 60_000 - now.getTime()) / 1000)), data: { type: 'task_reminder', projectId: p.id, taskId: task.id, day: d.day! } },
+        { ...msg, collapseKey: d.key, ttlSeconds: Math.max(60, Math.round((d.fireAt.getTime() + s.graceMinutes * 60_000 - now.getTime()) / 1000)), data: { type: 'task_reminder', projectId: p.id, taskId: task.id, day: d.day!, pose } },
       );
       if (r.ok) ok = true;
       else if (r.permanent) await this.db.delete(pushDevices).where(eq(pushDevices.id, dev.id));

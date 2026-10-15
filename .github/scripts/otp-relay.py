@@ -13,6 +13,7 @@ Usage : otp-relay.py <fichier-journal> <port> [dossier-captures]
   GET /notifications[?min=1][&max=…][&wait=0]  →  notifications de BIM affichées par Android (dumpsys) : titre, texte, actions.
   GET /reminders-service?on=1|0  →  base de test de la CI uniquement : ouvre (ou referme) le service des rappels et retire
       les heures calmes par défaut, puis attend la fin du cache de l'API (31 s).
+  GET /lockscreen?on=1|0  →  verrouille puis rallume l'écran (notifications sur l'écran verrouillé), ou le déverrouille.
   GET /resolve-reports  →  base de test de la CI uniquement : le « support » répond aux signalements ouverts.
   GET /reminder-soon?count=2&minutes=2  →  base de test de la CI uniquement : ajoute des tâches dans quelques minutes
       au dernier projet actif, pour recevoir un vrai rappel pendant le test.
@@ -165,6 +166,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         time.sleep(31)  # cache des réglages de l'API : 30 s
         return self.reply(200, "ouvert" if on else "fermé")
 
+    def lockscreen(self, q):
+        if (q.get("on") or ["0"])[0] == "1":
+            run_adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
+            time.sleep(2)
+            run_adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+            time.sleep(3)
+            state = run_adb("shell", "dumpsys", "window").stdout.decode(errors="replace")
+            locked = "mDreamingLockscreen=true" in state or "isKeyguardShowing=true" in state or "mShowingLockscreen=true" in state
+            return self.reply(200, "verrouillé" if locked else "non verrouillé")
+        run_adb("shell", "wm", "dismiss-keyguard")
+        time.sleep(2)
+        return self.reply(200, "déverrouillé")
+
     def resolve_reports(self, q):
         n = psql(
             "WITH r AS (UPDATE project_reports SET status = 'resolved', resolution = 'Réponse de test de la CI.', "
@@ -196,6 +210,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.notifications(q)
         if url.path == "/reminders-service":
             return self.reminders_service(q)
+        if url.path == "/lockscreen":
+            return self.lockscreen(q)
         if url.path == "/resolve-reports":
             return self.resolve_reports(q)
         if url.path == "/reminder-soon":

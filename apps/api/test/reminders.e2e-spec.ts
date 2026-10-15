@@ -70,7 +70,7 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     // Rejouer le même tour n'envoie rien de plus.
     await worker.tick(now);
     expect(push.sent.filter((s) => s.target.token === token)).toHaveLength(5);
-    expect(sentToMe[0].message).toMatchObject({ title: 'Peni', data: { type: 'task_reminder', projectId: p.id, day } });
+    expect(sentToMe[0].message).toMatchObject({ title: 'Peni', body: expect.stringContaining('💪'), data: { type: 'task_reminder', projectId: p.id, day, pose: 'happy' } });
   });
 
   it('reprise après panne : un rappel resté « en cours d’envoi » (worker arrêté) repart une seule fois', async () => {
@@ -193,7 +193,7 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
 
     await h.http().patch('/v1/me/notification-preferences').set(auth).send({ remindersEnabled: true }).expect(200);
     const list = await get();
-    expect(list).toMatchObject({ available: true, enabled: true, channel: 'local', templatesVersion: 'v1', horizonHours: 48 });
+    expect(list).toMatchObject({ available: true, enabled: true, channel: 'local', templatesVersion: 'v2', horizonHours: 48 });
     const tomorrow = localDay(new Date(Date.now() + 24 * 3600_000));
     const first = list.reminders.find((r: { day: string; attempt: number }) => r.day === tomorrow && r.attempt === 0);
     expect(first).toEqual({
@@ -204,7 +204,8 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
       attempt: 0,
       fireAt: zonedTime(tomorrow, '12:00').toISOString(),
       title: 'Peni',
-      body: `C’est l’heure : ${task.title}. On y va ?`,
+      body: `C’est l’heure ! ${task.title} 💪 Tu vas tout déchirer.`,
+      pose: 'happy',
     });
     // Rythme du réglage (0, +1 h, +2 h), du plus proche au plus lointain, sans doublon.
     expect(list.reminders.filter((r: { day: string }) => r.day === tomorrow).map((r: { attempt: number }) => r.attempt)).toEqual([0, 1, 2]);

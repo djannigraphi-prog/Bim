@@ -340,6 +340,11 @@ void main() {
       expect(n['text'] as String, contains('Rappel test'), reason: jsonEncode(shown));
       expect(n['actions'], ['J’y vais !', 'Plus tard'], reason: jsonEncode(shown));
     }
+    // Écran verrouillé (maquette 28) : notifications affichées par Android sur l'écran de verrouillage.
+    final lock = await _relay(tester, '/lockscreen?on=1');
+    await _shot(tester, 'a28_ecran_verrouille');
+    await _relay(tester, '/lockscreen?on=0');
+    debugPrint('Écran verrouillé pour la capture : $lock');
     await _shot(tester, 'a28_notifications', shade: true);
     // « Plus tard » : la notification se ferme, l'app ne change pas d'écran.
     await _relay(tester, '/ui-tap?text=Plus%20tard&shade=1');

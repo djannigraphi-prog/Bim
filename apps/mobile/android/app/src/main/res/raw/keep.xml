@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icônes des notifications appelées par leur nom depuis le code Dart : à conserver dans la version publiée
+     (sinon l'optimisation des ressources les supprimerait). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_bim,@drawable/peni_notif_happy,@drawable/peni_notif_think,@drawable/peni_notif_sad" />

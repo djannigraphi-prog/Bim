@@ -106,13 +106,19 @@ export function isStale(fireAt: Date, now: Date, graceMinutes: number): boolean 
 }
 
 /**
- * Texte d'un rappel dans la voix de Peni (règle R1 de docs/DEPENDANCES_LOTS_2_3.md : produit à l'envoi, versionné ici).
+ * Texte d'un rappel dans la voix de Peni (règle R1 de docs/DEPENDANCES_LOTS_2_3.md : produit à l'envoi, versionné ici),
+ * avec la pose de Peni affichée par le téléphone (R1 : « la pose de Peni » fait partie de la notification).
  * Jamais de donnée sensible sur l'écran verrouillé : pas de santé, pas de mesure ; le titre de la tâche choisi par la personne.
+ *
+ * v2 (15/10/2026) : rapprochée de la maquette 28 (« C'est l'heure ! … 💪 Tu vas tout déchirer. », « Vas-y, ça ne prend
+ * qu'une minute… 🥺 ») ; le dernier rappel reste encourageant, sans culpabiliser (décision C8), en attendant la décision
+ * du fondateur sur le texte « Je t'en supplie 😭 … » de la maquette, lié à l'alarme (non retenue en version 1).
  */
-export const REMINDER_TEMPLATES_VERSION = 'v1';
-export function reminderMessage(taskTitle: string, attempt: number, lastAttempt: boolean): { title: string; body: string } {
+export const REMINDER_TEMPLATES_VERSION = 'v2';
+export type PeniPose = 'happy' | 'think' | 'sad';
+export function reminderMessage(taskTitle: string, attempt: number, lastAttempt: boolean): { title: string; body: string; pose: PeniPose } {
   const task = taskTitle.length > 60 ? `${taskTitle.slice(0, 57)}…` : taskTitle;
-  if (attempt === 0) return { title: 'Peni', body: `C’est l’heure : ${task}. On y va ?` };
-  if (!lastAttempt) return { title: 'Peni', body: `Petit rappel : ${task} t’attend encore aujourd’hui.` };
-  return { title: 'Peni', body: `${task} : il est encore temps. Je crois en toi !` };
+  if (attempt === 0) return { title: 'Peni', body: `C’est l’heure ! ${task} 💪 Tu vas tout déchirer.`, pose: 'happy' };
+  if (!lastAttempt) return { title: 'Peni', body: `Vas-y, ça ne prend qu’une minute… ${task} t’attend 🥺`, pose: 'think' };
+  return { title: 'Peni', body: `${task} n’est pas encore cochée. Il est encore temps, je crois en toi !`, pose: 'sad' };
 }
