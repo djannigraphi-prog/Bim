@@ -191,9 +191,8 @@ jobs:
               | cut -c1-200 > "$RUNNER_TEMP/e2e.short"
             python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "e2e android" "$RUNNER_TEMP/e2e.short" 6
           fi
-          # Requêtes reçues par l'API (méthode, adresse, statut), sans les corps ni les codes.
-          sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/api.log" | grep "request completed" \
-            | grep -oE '"method":"[A-Z]+","url":"[^"]+"|"statusCode":[0-9]+' | paste -d' ' - - > "$RUNNER_TEMP/api.short" || true
+          # Requêtes reçues par l'API (méthode, adresse, statut ; type et taille des envois), sans les corps ni les codes.
+          python3 "$GITHUB_WORKSPACE/.github/scripts/api-requests.py" "$RUNNER_TEMP/api.log" > "$RUNNER_TEMP/api.short" || true
           grep -E "ERROR|Error" "$RUNNER_TEMP/api.log" | grep -v "ton code est" | cut -c1-300 >> "$RUNNER_TEMP/api.short" || true
           python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "api" "$RUNNER_TEMP/api.short" 3
 

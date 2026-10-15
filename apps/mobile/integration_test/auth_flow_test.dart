@@ -109,7 +109,9 @@ Future<void> _expectLoadedImages(WidgetTester tester, int count) async {
       return;
     }
   }
-  fail('Images non chargées (attendu : $count).');
+  final images = tester.widgetList<Image>(find.byType(Image)).map((i) => i.image.runtimeType).toList();
+  final broken = find.byIcon(Icons.broken_image_outlined).evaluate().length;
+  fail('Images non chargées (attendu : $count ; widgets Image : $images ; icônes d’image cassée : $broken).');
 }
 
 /// Source de photos du test : une image PNG dessinée par le test (le sélecteur du système n'est pas pilotable).
