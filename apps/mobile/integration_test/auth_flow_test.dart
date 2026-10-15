@@ -307,7 +307,8 @@ void main() {
     await _waitFor(tester, find.byKey(const Key('code-field')));
     lastPhoneCode = await _codeFor(digits, previous: lastPhoneCode);
     await tester.enterText(find.byKey(const Key('code-field')).last, lastPhoneCode);
-    await _waitFor(tester, find.text('Paramètres'));
+    // Retour à l'écran du compte (son titre peut être sorti de l'écran après défilement : on attend un élément voisin).
+    await _waitFor(tester, find.text('Appareils connectés'));
     await _scrollTap(tester, find.text('Se déconnecter'));
     await _tap(tester, find.text('Se connecter'));
     await _type(tester, 'E-mail, téléphone ou @nom d’utilisateur', email);

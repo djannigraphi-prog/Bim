@@ -187,9 +187,12 @@ class ChoiceChipBim extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[Icon(icon, size: 18, color: selected ? onFill : scheme.onSurface), const SizedBox(width: 6)],
-              Text(
-                label,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? onFill : scheme.onSurface),
+              // Un libellé trop long pour la largeur de l'écran (320 dp) passe à la ligne au lieu de déborder.
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? onFill : scheme.onSurface),
+                ),
               ),
             ],
           ),
