@@ -283,8 +283,10 @@ void main() {
     await _tap(tester, find.byKey(const ValueKey('reminders-switch')));
     await _waitFor(tester, find.text('Coupés : Peni ne t’enverra aucun rappel.'));
     await _shot(tester, 'a28_rappels');
-    // Toucher l'interrupteur a fait défiler l'écran : on remonte jusqu'au bouton « Retour », comme une personne.
-    await tester.scrollUntilVisible(find.byTooltip('Retour'), -150, scrollable: find.byType(Scrollable).first);
+    // Toucher l'interrupteur a fait défiler l'écran : on remonte exactement jusqu'au bouton « Retour »
+    // (sans glisser au-delà du haut de la liste : cet étirement faisait tomber l'émulateur de la CI).
+    await tester.ensureVisible(find.byTooltip('Retour', skipOffstage: false));
+    await tester.pump(const Duration(milliseconds: 300));
     await _tap(tester, find.byTooltip('Retour'));
     // Rouvert, l'écran relit le serveur : le choix a bien été enregistré.
     await _scrollTap(tester, find.text('Rappels'));
