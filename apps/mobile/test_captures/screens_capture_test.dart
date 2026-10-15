@@ -75,7 +75,7 @@ class _FakeNotificationPreferencesApi extends NotificationPreferencesApi {
 
   @override
   Future<NotificationPreferences> load() async => const NotificationPreferences(
-        remindersEnabled: true,
+        remindersEnabled: false,
         quietHours: QuietHours(start: '22:00', end: '06:00'),
         quietHoursArePersonal: false,
         remindersAvailable: false,

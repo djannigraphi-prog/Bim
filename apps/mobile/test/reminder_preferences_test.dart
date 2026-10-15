@@ -25,7 +25,8 @@ class _FakeServer extends ApiClient {
   _FakeServer({this.available = false}) : super(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
   final bool available;
-  bool enabled = true;
+  /// Rappels désactivés par défaut (décision du 15/10/2026), comme l'API.
+  bool enabled = false;
   Map<String, String>? personal;
   static const platformDefault = {'start': '22:00', 'end': '06:00'};
   final requests = <String>[];
@@ -156,8 +157,9 @@ void main() {
       await _open(tester, server);
       expect(find.byKey(const ValueKey('reminders-unavailable')), findsOneWidget);
       expect(find.textContaining('aucune notification n’est envoyée'), findsOneWidget);
-      expect(_switch(tester).value, isTrue);
-      expect(find.text('Activés pour toi, dès l’ouverture du service.'), findsOneWidget);
+      // Désactivés par défaut : rien n'est activé sans le choix de la personne.
+      expect(_switch(tester).value, isFalse);
+      expect(find.text('Désactivés : active-les pour que Peni te rappelle tes tâches.'), findsOneWidget);
       expect(find.text('De 22:00 à 06:00'), findsOneWidget);
       expect(find.text('Valeur par défaut de BIM'), findsOneWidget);
       expect(find.byKey(const ValueKey('quiet-hours-reset')), findsNothing);
@@ -165,26 +167,27 @@ void main() {
       expect(server.requests, ['GET /v1/me/notification-preferences']);
     });
 
-    testWidgets('couper les rappels n’envoie que ce choix et n’ouvre pas le service', (tester) async {
+    testWidgets('activer ses rappels n’envoie que ce choix et n’ouvre pas le service', (tester) async {
       final server = _FakeServer();
       await _open(tester, server);
       await tester.tap(find.byKey(const ValueKey('reminders-switch')));
       await tester.pump();
       await tester.pump();
       expect(server.bodies, [
-        {'remindersEnabled': false},
+        {'remindersEnabled': true},
       ]);
-      expect(_switch(tester).value, isFalse);
-      expect(find.text('Coupés : Peni ne t’enverra aucun rappel.'), findsOneWidget);
+      expect(_switch(tester).value, isTrue);
+      expect(find.text('Activés pour toi, dès l’ouverture du service.'), findsOneWidget);
       expect(find.text('Choix enregistré.'), findsOneWidget);
       expect(find.byKey(const ValueKey('reminders-unavailable')), findsOneWidget);
-      // Le réactiver renvoie seulement ce choix.
+      // Les désactiver renvoie seulement ce choix.
       await _finish(tester);
       await tester.tap(find.byKey(const ValueKey('reminders-switch')));
       await tester.pump();
       await tester.pump();
-      expect(server.bodies.last, {'remindersEnabled': true});
-      expect(_switch(tester).value, isTrue);
+      expect(server.bodies.last, {'remindersEnabled': false});
+      expect(_switch(tester).value, isFalse);
+      expect(find.text('Désactivés : active-les pour que Peni te rappelle tes tâches.'), findsOneWidget);
       expect(server.requests.where((r) => !r.endsWith('/v1/me/notification-preferences')), isEmpty);
       await _finish(tester);
     });
@@ -211,7 +214,7 @@ void main() {
       expect(find.text('Valeur par défaut de BIM'), findsOneWidget);
       await tester.ensureVisible(find.byKey(const ValueKey('reminders-switch')));
       await tester.pump();
-      expect(_switch(tester).value, isTrue); // les rappels ne sont pas touchés
+      expect(_switch(tester).value, isFalse); // les rappels ne sont pas touchés (toujours désactivés)
       await _finish(tester);
     });
 
@@ -237,8 +240,8 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('Vérifie les informations saisies.'), findsOneWidget);
-      expect(_switch(tester).value, isTrue);
-      expect(server.enabled, isTrue);
+      expect(_switch(tester).value, isFalse);
+      expect(server.enabled, isFalse);
       await _finish(tester);
     });
 
@@ -255,7 +258,7 @@ void main() {
     });
 
     testWidgets('service ouvert : pas d’avertissement', (tester) async {
-      await _open(tester, _FakeServer(available: true));
+      await _open(tester, _FakeServer(available: true)..enabled = true);
       expect(find.byKey(const ValueKey('reminders-unavailable')), findsNothing);
       expect(find.text('Activés pour toi.'), findsOneWidget);
     });

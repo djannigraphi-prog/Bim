@@ -276,12 +276,13 @@ void main() {
     await _tap(tester, find.byTooltip('Retour'));
 
     // Lot 2 : préférences de rappel enregistrées par l'API réelle. Le service des rappels reste fermé
-    // (réglage « en attente ») : l'écran le dit, et couper ses rappels n'ouvre rien.
+    // (réglage « en attente ») : l'écran le dit, et activer ses rappels n'ouvre rien.
     await _scrollTap(tester, find.text('Rappels'));
     await _waitFor(tester, find.byKey(const ValueKey('reminders-unavailable')));
-    expect(tester.widget<SwitchListTile>(find.byKey(const ValueKey('reminders-switch'))).value, isTrue);
+    // Rappels désactivés par défaut (décision du 15/10/2026) : la personne les active elle-même.
+    expect(tester.widget<SwitchListTile>(find.byKey(const ValueKey('reminders-switch'))).value, isFalse);
     await _tap(tester, find.byKey(const ValueKey('reminders-switch')));
-    await _waitFor(tester, find.text('Coupés : Peni ne t’enverra aucun rappel.'));
+    await _waitFor(tester, find.text('Activés pour toi, dès l’ouverture du service.'));
     await _shot(tester, 'a28_rappels');
     // Toucher l'interrupteur a fait défiler l'écran : on remonte exactement jusqu'au bouton « Retour »
     // (sans glisser au-delà du haut de la liste : cet étirement faisait tomber l'émulateur de la CI).
@@ -290,7 +291,7 @@ void main() {
     await _tap(tester, find.byTooltip('Retour'));
     // Rouvert, l'écran relit le serveur : le choix a bien été enregistré.
     await _scrollTap(tester, find.text('Rappels'));
-    await _waitFor(tester, find.text('Coupés : Peni ne t’enverra aucun rappel.'));
+    await _waitFor(tester, find.text('Activés pour toi, dès l’ouverture du service.'));
     expect(find.byKey(const ValueKey('reminders-unavailable')), findsOneWidget);
     await _tap(tester, find.byTooltip('Retour'));
 

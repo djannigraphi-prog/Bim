@@ -81,7 +81,11 @@ describe('Lot 2 (e2e)', () => {
     it('valeurs de la plateforme par défaut, heures calmes personnelles, retour au défaut, contrôles ; rappels pas encore en service', async () => {
       const u = await user();
       const d = (await h.http().get('/v1/me/notification-preferences').set(u.auth).expect(200)).body;
-      expect(d).toEqual({ remindersEnabled: true, quietHours: { start: '22:00', end: '06:00' }, quietHoursSource: 'default', remindersAvailable: false });
+      // Rappels désactivés par défaut (décision du 15/10/2026) : c'est la personne qui les active.
+      expect(d).toEqual({ remindersEnabled: false, quietHours: { start: '22:00', end: '06:00' }, quietHoursSource: 'default', remindersAvailable: false });
+      // Choisir ses heures calmes n'active pas les rappels.
+      const quietOnly = (await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: '22:30', quietEnd: '06:30' }).expect(200)).body;
+      expect(quietOnly).toMatchObject({ remindersEnabled: false, quietHoursSource: 'personal' });
       await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: '21:00' }).expect(400);
       await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: '21:00', quietEnd: null }).expect(400);
       await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: '25:00', quietEnd: '06:00' }).expect(400);

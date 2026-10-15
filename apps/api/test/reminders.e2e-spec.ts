@@ -41,6 +41,8 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     const u = await registerAndActivate(h);
     const auth = bearer(u.tokens.accessToken);
     await h.http().put('/v1/me/push-device').set(auth).send({ token, platform: 'android' }).expect(200);
+    // Rappels désactivés par défaut : la personne les active (décision du 15/10/2026).
+    await h.http().patch('/v1/me/notification-preferences').set(auth).send({ remindersEnabled: true }).expect(200);
     const p = (await h.http().post('/v1/projects').set(auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 7, durationDays: 30 }).expect(201)).body;
     const first = p.tasks[0].id;
     await h.pool.query("update project_tasks set time_of_day = $2 where id = $1", [first, times[0]]);
@@ -140,6 +142,24 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     await worker.tick(at('15:00'));
     expect(await rows(quiet.p.id)).toHaveLength(0); // pas planifié pendant les heures calmes
     expect(push.sent.filter((s) => s.target.token === quiet.token)).toHaveLength(0);
+  });
+
+  it('rappels jamais activés par la personne (valeur par défaut) : rien n’est planifié ni envoyé', async () => {
+    const u = await registerAndActivate(h);
+    const auth = bearer(u.tokens.accessToken);
+    const token = `tok-defaut-${'y'.repeat(30)}`;
+    await h.http().put('/v1/me/push-device').set(auth).send({ token, platform: 'android' }).expect(200);
+    const p = (await h.http().post('/v1/projects').set(auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 7, durationDays: 30 }).expect(201)).body;
+    await h.pool.query('update project_tasks set time_of_day = $2 where id = $1', [p.tasks[0].id, '19:00']);
+    // Choisir ses heures calmes ne vaut pas activation.
+    await h.http().patch('/v1/me/notification-preferences').set(auth).send({ quietStart: '23:00', quietEnd: '05:00' }).expect(200);
+    await worker.tick(at('19:00'));
+    expect(await rows(p.id)).toHaveLength(0);
+    expect(push.sent.filter((s) => s.target.token === token)).toHaveLength(0);
+    // Activés ensuite par la personne : le rappel suivant (+1 h) est planifié et envoyé.
+    await h.http().patch('/v1/me/notification-preferences').set(auth).send({ remindersEnabled: true }).expect(200);
+    await worker.tick(at('20:00'));
+    expect(push.sent.filter((s) => s.target.token === token)).toHaveLength(1);
   });
 
   it('appareil déconnecté : aucun rappel ; interrupteur général coupé : rien n’est planifié', async () => {

@@ -164,7 +164,7 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
           title: const Text('Recevoir les rappels de Peni', style: TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Text(
             !prefs.remindersEnabled
-                ? 'Coupés : Peni ne t’enverra aucun rappel.'
+                ? 'Désactivés : active-les pour que Peni te rappelle tes tâches.'
                 : prefs.remindersAvailable
                     ? 'Activés pour toi.'
                     : 'Activés pour toi, dès l’ouverture du service.',

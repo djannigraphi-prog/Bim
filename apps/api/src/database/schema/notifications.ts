@@ -31,7 +31,9 @@ export const pushDevices = pgTable(
 );
 
 /**
- * Préférences de notification de la personne (lot 2). Heures calmes : null = valeur de la plateforme
+ * Préférences de notification de la personne (lot 2). Rappels **désactivés par défaut** (décision du fondateur du
+ * 15/10/2026) : la personne les active elle-même dans ses paramètres ; ce choix est distinct de l'autorisation système
+ * des notifications demandée par le téléphone. Heures calmes : null = valeur de la plateforme
  * (réglage `notifications.quiet_hours`, dans l'administration), sinon « HH:MM » à l'heure locale.
  */
 export const notificationPreferences = pgTable(
@@ -40,7 +42,7 @@ export const notificationPreferences = pgTable(
     userId: uuid('user_id')
       .primaryKey()
       .references(() => users.id, { onDelete: 'cascade' }),
-    remindersEnabled: boolean('reminders_enabled').notNull().default(true),
+    remindersEnabled: boolean('reminders_enabled').notNull().default(false),
     quietStart: varchar('quiet_start', { length: 5 }),
     quietEnd: varchar('quiet_end', { length: 5 }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

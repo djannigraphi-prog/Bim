@@ -7,6 +7,9 @@ import { notificationPreferences, pushDevices, sessions } from '../../database/s
 import { SettingsService } from '../settings/settings.service';
 import { NotificationPreferencesDto, RegisterDeviceDto } from './dto';
 
+/** Décision du fondateur (15/10/2026) : sans choix explicite de la personne, aucun rappel. */
+export const REMINDERS_ENABLED_BY_DEFAULT = false;
+
 export interface QuietHours {
   start: string;
   end: string;
@@ -59,7 +62,7 @@ export class NotificationsService {
     const personal = row?.quietStart && row.quietEnd ? { start: row.quietStart, end: row.quietEnd } : null;
     const platform = await this.settings.get<boolean>('notifications.reminders_enabled');
     return {
-      remindersEnabled: row?.remindersEnabled ?? true,
+      remindersEnabled: row?.remindersEnabled ?? REMINDERS_ENABLED_BY_DEFAULT,
       quietHours: personal ?? (await this.defaultQuietHours()),
       quietHoursSource: personal ? 'personal' : 'default',
       /** Les rappels ne sont pas encore en service sur la plateforme : l'app l'indique honnêtement. */

@@ -99,14 +99,15 @@ export class ReminderWorkerService {
     s ??= await this.settings();
     if (!s.enabled) return 0;
     const from = new Date(now.getTime() - s.graceMinutes * 60_000);
-    // Personnes joignables : au moins un appareil dont la session est valable, rappels non désactivés.
+    // Personnes joignables : au moins un appareil dont la session est valable, rappels activés par la personne
+    // (désactivés par défaut : sans ligne de préférences, aucun rappel).
     const people = await this.db.execute<{ user_id: string; tz: string; quiet_start: string | null; quiet_end: string | null }>(sql`
       SELECT DISTINCT d.user_id, COALESCE(up.timezone, ${DEFAULT_TIMEZONE}) AS tz, np.quiet_start, np.quiet_end
       FROM push_devices d
       JOIN sessions se ON se.family_id = d.session_family_id AND se.revoked_at IS NULL AND se.rotated_at IS NULL AND se.expires_at > ${now}
       LEFT JOIN user_preferences up ON up.user_id = d.user_id
       LEFT JOIN notification_preferences np ON np.user_id = d.user_id
-      WHERE COALESCE(np.reminders_enabled, true)`);
+      WHERE np.reminders_enabled IS TRUE`);
     if (!people.rows.length) return 0;
     const byUser = new Map(people.rows.map((r) => [r.user_id, r]));
     const projectRows = await this.db.select().from(projects).where(and(eq(projects.status, 'active'), inArray(projects.userId, [...byUser.keys()])));
@@ -189,7 +190,7 @@ export class ReminderWorkerService {
       FROM users u LEFT JOIN notification_preferences np ON np.user_id = u.id LEFT JOIN user_preferences up ON up.user_id = u.id
       WHERE u.id = ${d.userId}`);
     const person = people.rows[0];
-    if (!person || person.enabled === false) return this.finish(d.id, 'skipped', 'disabled', now);
+    if (!person || person.enabled !== true) return this.finish(d.id, 'skipped', 'disabled', now);
     const quiet = person.quiet_start && person.quiet_end ? { start: person.quiet_start, end: person.quiet_end } : s.quiet;
     const local = new Intl.DateTimeFormat('en-GB', { timeZone: person.tz ?? DEFAULT_TIMEZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
     if (inQuietHours(local, quiet)) return this.finish(d.id, 'skipped', 'quiet', now);
