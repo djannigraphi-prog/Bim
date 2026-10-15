@@ -70,7 +70,7 @@ Analyse : `docs/DEPENDANCES_LOTS_2_3.md`. Aucun blocage d'architecture ; correct
 
 ### Vérification finale
 - CI complète **réussie** sur `a87c92f` (exécution 38687427022) : API (lint, compilation, 51 tests unitaires, 79 de bout en bout dont S3 réel, contrat OpenAPI, image Docker), mobile (analyse sans remarque, tests, captures, APK), Android sur émulateur contre l'API (parcours complet du lot 0 et du lot 1, captures réelles), administration (7 scénarios Chromium).
-- Dernier ajustement (`da1c637`, libellé « Intermédiaire » sur petit écran) : CI en cours au moment de la rédaction ; résultat donné dans le bilan au fondateur.
+- Dernier ajustement du code (`da1c637`, libellé « Intermédiaire » sur petit écran) : CI complète **réussie** (exécution 38688399936 : api, mobile, android-e2e, admin), capture du petit écran vérifiée.
 - En local (15/10) : API 51 unitaires + 79 e2e réussis (S3 réel seulement en CI) ; administration 7 scénarios Chromium réussis.
 
 ## Tests exécutés (session 1, 14/10/2026)
