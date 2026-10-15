@@ -7,6 +7,7 @@
 //            → préférences de rappel (enregistrées, service fermé)
 //            → ajout d'un e-mail vérifié (opération protégée) → appareils → nouveau mot de passe → connexion par e-mail.
 // Le code est lu par un relais de la CI dans les journaux de l'API de développement, comme une personne lirait son SMS.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -85,15 +86,40 @@ Future<String> _codeFor(String digits, {String? email, String? previous}) async 
 }
 
 /// Capture réelle de l'écran de l'émulateur (adb, via le relais de la CI) : rendu Android véritable.
-Future<void> _shot(WidgetTester tester, String name) async {
+/// [shade] : volet des notifications d'Android ouvert (notifications réellement affichées).
+Future<void> _shot(WidgetTester tester, String name, {bool shade = false}) async {
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 250));
   }
   final client = HttpClient();
   try {
-    final res = await (await client.getUrl(Uri.parse('$_codeRelay/shot?name=$name'))).close();
+    final res = await (await client.getUrl(Uri.parse('$_codeRelay/shot?name=$name${shade ? '&shade=1' : ''}'))).close();
     await res.drain<void>();
     if (res.statusCode != 200) fail('Capture « $name » impossible (${res.statusCode}).');
+  } finally {
+    client.close();
+  }
+}
+
+/// Appel au relais de la CI (système Android ou base de test), pendant que l'app continue de tourner.
+/// Renvoie la réponse ; échoue avec le message du relais (ce qu'il a vu) si l'opération n'a pas abouti.
+Future<String> _relay(WidgetTester tester, String path) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  try {
+    final req = await client.getUrl(Uri.parse('$_codeRelay$path'));
+    final pending = req.close().then((res) async => (res.statusCode, await res.transform(utf8.decoder).join()));
+    // L'app continue d'afficher ses images pendant l'attente (le relais peut attendre plusieurs minutes).
+    var done = false;
+    late (int, String) result;
+    unawaited(pending.then((r) {
+      result = r;
+      done = true;
+    }));
+    while (!done) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    if (result.$1 != 200) fail('Relais $path : ${result.$1} ${result.$2}');
+    return result.$2;
   } finally {
     client.close();
   }
@@ -282,6 +308,9 @@ void main() {
     // Rappels désactivés par défaut (décision du 15/10/2026) : la personne les active elle-même.
     expect(tester.widget<SwitchListTile>(find.byKey(const ValueKey('reminders-switch'))).value, isFalse);
     await _tap(tester, find.byKey(const ValueKey('reminders-switch')));
+    // Autorisation du téléphone, distincte du choix BIM : la vraie fenêtre d'Android est acceptée.
+    await _relay(tester, '/ui-tap?text=Allow&wait=30');
+    await _waitFor(tester, find.text('Autorisées pour BIM.'));
     await _waitFor(tester, find.text('Activés pour toi, dès l’ouverture du service.'));
     await _shot(tester, 'a28_rappels');
     // Toucher l'interrupteur a fait défiler l'écran : on remonte exactement jusqu'au bouton « Retour »
@@ -289,10 +318,34 @@ void main() {
     await tester.ensureVisible(find.byTooltip('Retour', skipOffstage: false));
     await tester.pump(const Duration(milliseconds: 300));
     await _tap(tester, find.byTooltip('Retour'));
-    // Rouvert, l'écran relit le serveur : le choix a bien été enregistré.
+
+    // Notifications programmées classiques (maquette 28). Base de test de la CI uniquement : service des rappels
+    // ouvert et deux tâches ajoutées dans quelques minutes, pour recevoir de vrais rappels sur l'émulateur.
+    await _relay(tester, '/reminders-service?on=1');
+    await _relay(tester, '/reminder-soon?count=2&minutes=2');
+    // Rouvert, l'écran relit le serveur (choix bien enregistré) et programme les rappels sur le téléphone.
     await _scrollTap(tester, find.text('Rappels'));
-    await _waitFor(tester, find.text('Activés pour toi, dès l’ouverture du service.'));
-    expect(find.byKey(const ValueKey('reminders-unavailable')), findsOneWidget);
+    await _waitFor(tester, find.text('Activés pour toi.'));
+    expect(find.byKey(const ValueKey('reminders-unavailable')), findsNothing);
+    await _waitFor(tester, find.textContaining('programmés sur ce téléphone pour les prochaines 48 h'));
+    // Android affiche les deux rappels à l'heure prévue (mode non exact : quelques minutes au plus).
+    final shown = jsonDecode(await _relay(tester, '/notifications?min=2&wait=420')) as List<dynamic>;
+    for (final n in shown.cast<Map<String, dynamic>>()) {
+      expect(n['title'], 'Peni');
+      expect(n['text'] as String, contains('Rappel test'));
+      expect(n['actions'], ['J’y vais !', 'Plus tard']);
+    }
+    await _shot(tester, 'a28_notifications', shade: true);
+    // « Plus tard » : la notification se ferme, l'app ne change pas d'écran.
+    await _relay(tester, '/ui-tap?text=Plus%20tard&shade=1');
+    final left = jsonDecode(await _relay(tester, '/notifications?max=${shown.length - 1}&wait=20')) as List<dynamic>;
+    expect(left, hasLength(shown.length - 1));
+    // « J'y vais ! » : l'app s'ouvre sur la journée du projet, où figure la tâche du rappel.
+    await _relay(tester, '/ui-tap?text=vais&shade=1');
+    await _waitFor(tester, find.textContaining('Rappel test'));
+    await _shot(tester, 'a28_jy_vais');
+    await _tap(tester, find.byTooltip('Retour'));
+    await _relay(tester, '/reminders-service?on=0');
     await _tap(tester, find.byTooltip('Retour'));
 
     // La section « Notifications » allonge les Paramètres : « Téléphone et e-mail » est maintenant au-dessus.

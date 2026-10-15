@@ -180,6 +180,58 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     }
   });
 
+  it('rappels à venir pour le téléphone : même calcul et mêmes textes, un seul canal par appareil, rien sans activation', async () => {
+    const u = await registerAndActivate(h);
+    const auth = bearer(u.tokens.accessToken);
+    const p = (await h.http().post('/v1/projects').set(auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 7, durationDays: 30 }).expect(201)).body;
+    const task = p.tasks[0];
+    await h.pool.query('update project_tasks set time_of_day = $2 where id = $1', [task.id, '12:00']);
+    const get = async () => (await h.http().get('/v1/me/reminders/upcoming').set(auth).expect(200)).body;
+
+    // Désactivés par défaut : rien à programmer.
+    expect(await get()).toMatchObject({ available: true, enabled: false, channel: 'local', reminders: [] });
+
+    await h.http().patch('/v1/me/notification-preferences').set(auth).send({ remindersEnabled: true }).expect(200);
+    const list = await get();
+    expect(list).toMatchObject({ available: true, enabled: true, channel: 'local', templatesVersion: 'v1', horizonHours: 48 });
+    const tomorrow = localDay(new Date(Date.now() + 24 * 3600_000));
+    const first = list.reminders.find((r: { day: string; attempt: number }) => r.day === tomorrow && r.attempt === 0);
+    expect(first).toEqual({
+      key: `${p.id}|${task.id}|${tomorrow}|0`,
+      projectId: p.id,
+      taskId: task.id,
+      day: tomorrow,
+      attempt: 0,
+      fireAt: zonedTime(tomorrow, '12:00').toISOString(),
+      title: 'Peni',
+      body: `C’est l’heure : ${task.title}. On y va ?`,
+    });
+    // Rythme du réglage (0, +1 h, +2 h), du plus proche au plus lointain, sans doublon.
+    expect(list.reminders.filter((r: { day: string }) => r.day === tomorrow).map((r: { attempt: number }) => r.attempt)).toEqual([0, 1, 2]);
+    const times = list.reminders.map((r: { fireAt: string }) => r.fireAt);
+    expect([...times].sort()).toEqual(times);
+    expect(new Set(list.reminders.map((r: { key: string }) => r.key)).size).toBe(list.reminders.length);
+    expect(list.reminders.every((r: { fireAt: string }) => new Date(r.fireAt).getTime() > Date.now() - 60_000)).toBe(true);
+
+    // Tâche de demain cochée à l'avance : ses rappels disparaissent.
+    await h.pool.query('insert into task_completions (task_id, day) values ($1, $2)', [task.id, tomorrow]);
+    expect((await get()).reminders.filter((r: { day: string }) => r.day === tomorrow)).toHaveLength(0);
+
+    // Cet appareil reçoit les notifications du serveur : rien à programmer sur le téléphone (pas de doublon).
+    await h.http().put('/v1/me/push-device').set(auth).send({ token: `tok-canal-${'z'.repeat(30)}`, platform: 'android' }).expect(200);
+    expect(await get()).toMatchObject({ channel: 'push', reminders: [] });
+    await h.http().delete('/v1/me/push-device').set(auth).expect(204);
+    expect((await get()).channel).toBe('local');
+
+    // Service fermé par l'interrupteur général : rien.
+    await setSetting('notifications.reminders_enabled', false);
+    try {
+      expect(await get()).toMatchObject({ available: false, enabled: true, reminders: [] });
+    } finally {
+      await setSetting('notifications.reminders_enabled', true);
+    }
+  });
+
   it('surveillance : worker actif = ok ; rappels en retard = dégradé ; worker silencieux = arrêté ; visible dans l’administration', async () => {
     const now = at('18:00');
     await worker.tick(now);

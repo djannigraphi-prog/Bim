@@ -7,6 +7,9 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../application/local_notifier.dart';
+import '../application/reminder_scheduler.dart';
+import '../application/reminder_sync.dart';
 import '../data/notification_preferences_api.dart';
 
 /// Choix d'une heure ; remplaçable dans les tests.
@@ -43,7 +46,11 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
   Object? _loadError;
   bool _saving = false;
 
+  /// Autorisation système d'afficher des notifications (null = téléphone sans notifications programmées).
+  bool? _systemAllowed;
+
   NotificationPreferencesApi get _api => ref.read(notificationPreferencesApiProvider);
+  LocalNotifier get _notifier => ref.read(localNotifierProvider);
 
   @override
   void initState() {
@@ -55,7 +62,15 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
     setState(() => _loadError = null);
     try {
       final prefs = await _api.load();
-      if (mounted) setState(() => _prefs = prefs);
+      final allowed = _notifier.supported ? await _notifier.permissionGranted() : null;
+      if (mounted) {
+        setState(() {
+          _prefs = prefs;
+          _systemAllowed = allowed;
+        });
+      }
+      // Rappels activés : l'écran resynchronise et affiche ce qui est réellement programmé sur ce téléphone.
+      if (mounted && prefs.remindersEnabled) await ReminderSync.syncNow(ref);
     } catch (e) {
       if (mounted) setState(() => _loadError = e);
     }
@@ -69,10 +84,24 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
       if (!mounted) return;
       setState(() => _prefs = prefs);
       showBimSnack(context, 'Choix enregistré.');
+      // Choix BIM enregistré ; l'autorisation du téléphone est une étape distincte, demandée seulement à l'activation.
+      if (prefs.remindersEnabled && _systemAllowed == false) await _askSystemPermission();
+      await ReminderSync.syncNow(ref);
     } catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _askSystemPermission() async {
+    final allowed = await _notifier.requestPermission();
+    if (!mounted) return;
+    setState(() => _systemAllowed = allowed);
+    if (allowed) {
+      await ReminderSync.syncNow(ref);
+    } else {
+      showBimSnack(context, 'Sans autorisation, ton téléphone n’affichera pas les rappels. Tu peux l’activer dans ses réglages.');
     }
   }
 
@@ -130,6 +159,7 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
     final scheme = theme.colorScheme;
     final border = BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(BimRadius.card));
     final quiet = prefs.quietHours;
+    final sync = ref.watch(reminderSyncStatusProvider);
     return [
       if (!prefs.remindersAvailable) ...[
         Container(
@@ -172,6 +202,33 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
           onChanged: _saving ? null : (v) => _save((api) => api.setRemindersEnabled(v)),
         ),
       ),
+      if (prefs.remindersEnabled && _systemAllowed != null) ...[
+        const SizedBox(height: BimSpacing.md),
+        Container(
+          key: const ValueKey('system-permission'),
+          decoration: border,
+          padding: const EdgeInsets.symmetric(horizontal: BimSpacing.lg, vertical: BimSpacing.xs),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(_systemAllowed! ? Icons.phone_android : Icons.notifications_off_outlined),
+            title: const Text('Notifications du téléphone', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(_systemAllowed! ? 'Autorisées pour BIM.' : 'Non autorisées : ton téléphone n’affichera pas les rappels.'),
+            trailing: _systemAllowed!
+                ? null
+                : TextButton(key: const ValueKey('system-permission-request'), onPressed: _askSystemPermission, child: const Text('Autoriser')),
+          ),
+        ),
+      ],
+      if (prefs.remindersEnabled && sync?.status == ReminderSyncStatus.scheduled) ...[
+        const SizedBox(height: BimSpacing.sm),
+        Text(
+          sync!.count == 0
+              ? 'Aucun rappel à venir sur ce téléphone dans les prochaines 48 h.'
+              : '${sync.count} rappel${sync.count > 1 ? 's' : ''} programmé${sync.count > 1 ? 's' : ''} sur ce téléphone pour les prochaines 48 h.',
+          key: const ValueKey('reminders-scheduled'),
+          style: theme.textTheme.bodySmall?.copyWith(color: BimColors.grey600),
+        ),
+      ],
       const SizedBox(height: BimSpacing.lg),
       Container(
         decoration: border,

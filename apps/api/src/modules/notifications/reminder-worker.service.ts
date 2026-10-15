@@ -8,7 +8,8 @@ import { notificationDeliveries, projectPauses, projects, projectTasks, pushDevi
 import { dueTasks, isActiveOn } from '../projects/plan';
 import { SettingsService } from '../settings/settings.service';
 import { PUSH_SENDER, PushSender } from './push-sender';
-import { dueReminders, inQuietHours, isStale, QuietWindow, ReminderContext, reminderMessage } from './reminders';
+import { loadReminderContexts, loadReminderSettings, ReminderSettings } from './reminder-data';
+import { dueReminders, inQuietHours, isStale, reminderMessage } from './reminders';
 
 /** Bail d'un rappel pris par un worker : au-delà, un worker arrêté en plein envoi rend la main (reprise). */
 export const LEASE_SECONDS = 120;
@@ -25,7 +26,7 @@ export interface RemindersHealth {
   lastHour: { sent: number; skipped: number; stale: number; failed: number };
 }
 
-type Settings = { enabled: boolean; offsets: number[]; quiet: QuietWindow | null; graceMinutes: number };
+type Settings = ReminderSettings;
 
 /**
  * Worker des rappels (lot 2). Chaque minute : battement de cœur, reprise des baux expirés, planification de la fenêtre
@@ -46,14 +47,8 @@ export class ReminderWorkerService {
     @Inject(PUSH_SENDER) private readonly sender: PushSender,
   ) {}
 
-  async settings(): Promise<Settings> {
-    const [enabled, offsets, quiet, grace] = await Promise.all([
-      this.settingsService.get<boolean>('notifications.reminders_enabled'),
-      this.settingsService.get<number[]>('notifications.reminder_offsets_minutes'),
-      this.settingsService.get<QuietWindow | null>('notifications.quiet_hours'),
-      this.settingsService.get<number>('notifications.reminder_grace_minutes'),
-    ]);
-    return { enabled: enabled?.value === true, offsets: offsets?.value ?? [0], quiet: quiet?.value ?? null, graceMinutes: grace?.value ?? 30 };
+  settings(): Promise<Settings> {
+    return loadReminderSettings(this.settingsService);
   }
 
   /** Un tour complet du worker (appelé chaque minute). */
@@ -110,37 +105,10 @@ export class ReminderWorkerService {
       WHERE np.reminders_enabled IS TRUE`);
     if (!people.rows.length) return 0;
     const byUser = new Map(people.rows.map((r) => [r.user_id, r]));
-    const projectRows = await this.db.select().from(projects).where(and(eq(projects.status, 'active'), inArray(projects.userId, [...byUser.keys()])));
-    if (!projectRows.length) return 0;
-    const ids = projectRows.map((p) => p.id);
-    const [tasks, pauses] = await Promise.all([
-      this.db.select().from(projectTasks).where(inArray(projectTasks.projectId, ids)),
-      this.db.select().from(projectPauses).where(inArray(projectPauses.projectId, ids)),
-    ]);
-    const done = tasks.length
-      ? await this.db
-          .select({ taskId: taskCompletions.taskId, day: taskCompletions.day })
-          .from(taskCompletions)
-          .where(and(inArray(taskCompletions.taskId, tasks.map((t) => t.id)), sql`${taskCompletions.day} >= (${from}::timestamptz - interval '2 days')::date`))
-      : [];
-    const completions = new Set(done.map((c) => `${c.taskId}|${c.day}`));
     const values = [];
-    for (const p of projectRows) {
-      const person = byUser.get(p.userId)!;
-      const ctx: ReminderContext = {
-        projectId: p.id,
-        status: p.status,
-        startDate: p.startDate,
-        plannedEndDate: p.plannedEndDate,
-        tasks: tasks.filter((t) => t.projectId === p.id),
-        pauses: pauses.filter((x) => x.projectId === p.id),
-        completions,
-        timeZone: person.tz,
-        offsets: s.offsets,
-        quiet: person.quiet_start && person.quiet_end ? { start: person.quiet_start, end: person.quiet_end } : s.quiet,
-      };
+    for (const { userId, ctx } of await loadReminderContexts(this.db, byUser, s, from)) {
       for (const r of dueReminders(ctx, from, now)) {
-        values.push({ id: uuidv7(), key: r.key, userId: p.userId, projectId: p.id, taskId: r.taskId, day: r.day, attempt: r.attempt, fireAt: r.fireAt });
+        values.push({ id: uuidv7(), key: r.key, userId, projectId: ctx.projectId, taskId: r.taskId, day: r.day, attempt: r.attempt, fireAt: r.fireAt });
       }
     }
     if (!values.length) return 0;

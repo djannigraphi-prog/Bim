@@ -8,9 +8,16 @@ Il n'existe que dans la CI : l'API elle-même n'expose aucun code.
 Usage : otp-relay.py <fichier-journal> <port> [dossier-captures]
   GET /code?digits=<8 derniers chiffres> ou /code?to=<e-mail>
   GET /shot?name=<nom>  →  capture réelle de l'écran de l'émulateur (adb screencap), enregistrée dans le dossier-captures.
+  GET /ui-tap?text=<texte>[&shade=1][&wait=20]  →  touche un élément du système (fenêtre d'autorisation, action d'une
+      notification) repéré dans l'arbre d'accessibilité (uiautomator) ; shade=1 ouvre d'abord le volet des notifications.
+  GET /notifications[?min=1][&max=…][&wait=0]  →  notifications de BIM affichées par Android (dumpsys) : titre, texte, actions.
+  GET /reminders-service?on=1|0  →  base de test de la CI uniquement : ouvre (ou referme) le service des rappels et retire
+      les heures calmes par défaut, puis attend la fin du cache de l'API (31 s).
+  GET /reminder-soon?count=2&minutes=2  →  base de test de la CI uniquement : ajoute des tâches dans quelques minutes
+      au dernier projet actif, pour recevoir un vrai rappel pendant le test.
 Les captures montrent le rendu réel d'Android (polices et émojis du système, images chargées par le réseau).
 """
-import http.server, os, re, shutil, subprocess, sys, urllib.parse
+import datetime, html, http.server, json, os, re, shutil, subprocess, sys, time, urllib.parse
 
 LOG, PORT = sys.argv[1], int(sys.argv[2])
 SHOTS = sys.argv[3] if len(sys.argv) > 3 else None
@@ -21,6 +28,59 @@ def adb():
     home = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") or ""
     path = os.path.join(home, "platform-tools", "adb")
     return path if os.path.exists(path) else shutil.which("adb")
+def run_adb(*args, timeout=30):
+    return subprocess.run([adb(), *args], capture_output=True, timeout=timeout)
+
+
+def psql(sql, *params):
+    """Base de test de la CI (DATABASE_URL du job) ; jamais utilisé ailleurs."""
+    cmd = ["psql", os.environ["DATABASE_URL"], "-v", "ON_ERROR_STOP=1", "-At", "-c", sql]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    return out.stdout.strip()
+
+
+NODE = re.compile(r'<node [^>]*>')
+ATTR = re.compile(r'(\w[\w-]*)="([^"]*)"')
+
+
+def norm(t):
+    return html.unescape(t).replace("\u2019", "'").casefold()
+
+
+def ui_nodes():
+    run_adb("shell", "uiautomator", "dump", "/sdcard/bim-ui.xml", timeout=40)
+    xml = run_adb("exec-out", "cat", "/sdcard/bim-ui.xml").stdout.decode(errors="replace")
+    nodes = []
+    for raw in NODE.findall(xml):
+        a = dict(ATTR.findall(raw))
+        m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", a.get("bounds", ""))
+        if m:
+            x1, y1, x2, y2 = map(int, m.groups())
+            nodes.append((a.get("text", "") or a.get("content-desc", ""), (x1 + x2) // 2, (y1 + y2) // 2))
+    return nodes
+
+
+def bim_notifications():
+    """Notifications de BIM affichées (dumpsys notification) : titre, texte et actions, dans l'ordre d'Android."""
+    out = run_adb("shell", "dumpsys", "notification", "--noredact").stdout.decode(errors="replace")
+    found, cur = [], None
+    for line in out.splitlines():
+        t = line.strip()
+        if t.startswith("NotificationRecord("):
+            cur = {"pkg": "ci.bim.app" in t, "title": "", "text": "", "actions": []}
+            found.append(cur)
+        elif cur is not None:
+            m = re.match(r"android\.(title|text)=\w+ \((.*)\)$", t)
+            if m:
+                cur[m.group(1)] = m.group(2)
+            m = re.match(r'\[\d+\] "(.*)" ->', t)
+            if m:
+                cur["actions"].append(m.group(1))
+    return [{k: v for k, v in n.items() if k != "pkg"} for n in found if n["pkg"]]
+
+
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 LINE = re.compile(r"\[ENVOI FACTICE \w+\] → (\S+) : .*?ton code est (\d{6})")
 
@@ -37,15 +97,77 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not SHOTS or not NAME.match(name) or not tool:
             return self.reply(400, "capture impossible")
         os.makedirs(SHOTS, exist_ok=True)
+        if (q.get("shade") or ["0"])[0] == "1":
+            run_adb("shell", "cmd", "statusbar", "expand-notifications")
+            time.sleep(2)
         with open(os.path.join(SHOTS, name + ".png"), "wb") as out:
             done = subprocess.run([tool, "exec-out", "screencap", "-p"], stdout=out, stderr=subprocess.PIPE, timeout=30)
         return self.reply(200 if done.returncode == 0 else 500, "ok" if done.returncode == 0 else done.stderr.decode(errors="replace"))
+
+    def ui_tap(self, q):
+        text = norm((q.get("text") or [""])[0])
+        wait = int((q.get("wait") or ["20"])[0])
+        shade = (q.get("shade") or ["0"])[0] == "1"
+        seen = []
+        end = time.time() + wait
+        while time.time() < end:
+            if shade:
+                run_adb("shell", "cmd", "statusbar", "expand-notifications")
+                time.sleep(1)
+            nodes = ui_nodes()
+            seen = [n[0] for n in nodes if n[0]]
+            for label, x, y in nodes:
+                if text and text in norm(label):
+                    run_adb("shell", "input", "tap", str(x), str(y))
+                    return self.reply(200, label)
+            time.sleep(1)
+        return self.reply(404, "introuvable ; textes visibles : " + " | ".join(seen[:60]))
+
+    def notifications(self, q):
+        least = int((q.get("min") or ["0"])[0])
+        most = int((q.get("max") or ["999"])[0])
+        wait = int((q.get("wait") or ["0"])[0])
+        end = time.time() + wait
+        items = bim_notifications()
+        while not (least <= len(items) <= most) and time.time() < end:
+            time.sleep(3)
+            items = bim_notifications()
+        ok = least <= len(items) <= most
+        return self.reply(200 if ok else 404, json.dumps(items, ensure_ascii=False))
+
+    def reminders_service(self, q):
+        on = (q.get("on") or ["0"])[0] == "1"
+        psql("UPDATE app_settings SET value = %s::jsonb WHERE key = 'notifications.reminders_enabled'" % ("'true'" if on else "'false'"))
+        psql("UPDATE app_settings SET value = %s::jsonb WHERE key = 'notifications.quiet_hours'" % ("'null'" if on else "'{\"start\": \"22:00\", \"end\": \"06:00\"}'"))
+        time.sleep(31)  # cache des réglages de l'API : 30 s
+        return self.reply(200, "ouvert" if on else "fermé")
+
+    def reminder_soon(self, q):
+        count = int((q.get("count") or ["2"])[0])
+        minutes = int((q.get("minutes") or ["2"])[0])
+        # Heure d'Abidjan = UTC ; minute entière suivante + délai.
+        at = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=minutes + 1)).strftime("%H:%M")
+        for i in range(count):
+            psql(
+                "INSERT INTO project_tasks (id, project_id, title, time_of_day, weekdays, origin, sort_order) "
+                "SELECT gen_random_uuid(), id, 'Rappel test %d', '%s', 127, 'user', 90 + %d FROM projects "
+                "WHERE status = 'active' ORDER BY created_at DESC LIMIT 1" % (i + 1, at, i)
+            )
+        return self.reply(200, at)
 
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(url.query)
         if url.path == "/shot":
             return self.shot(q)
+        if url.path == "/ui-tap":
+            return self.ui_tap(q)
+        if url.path == "/notifications":
+            return self.notifications(q)
+        if url.path == "/reminders-service":
+            return self.reminders_service(q)
+        if url.path == "/reminder-soon":
+            return self.reminder_soon(q)
         digits = (q.get("digits") or [""])[0]
         to = (q.get("to") or [""])[0].lower()
         code = None

@@ -6,6 +6,15 @@ import { DB, Database } from '../../database/database.module';
 import { notificationPreferences, pushDevices, sessions } from '../../database/schema';
 import { SettingsService } from '../settings/settings.service';
 import { NotificationPreferencesDto, RegisterDeviceDto } from './dto';
+import { loadReminderContexts, loadReminderSettings } from './reminder-data';
+import { dueReminders, REMINDER_TEMPLATES_VERSION, reminderMessage } from './reminders';
+import { DEFAULT_TIMEZONE } from '../../common/timezone';
+import { userPreferences } from '../../database/schema';
+
+/** Horizon des rappels programmés sur le téléphone ; l'app resynchronise à chaque ouverture et après chaque changement. */
+export const UPCOMING_HORIZON_HOURS = 48;
+/** Plafond par appel : largement au-dessus d'un usage normal, et loin de la limite d'Android (500 alarmes par app). */
+export const UPCOMING_MAX = 60;
 
 /** Décision du fondateur (15/10/2026) : sans choix explicite de la personne, aucun rappel. */
 export const REMINDERS_ENABLED_BY_DEFAULT = false;
@@ -68,6 +77,39 @@ export class NotificationsService {
       /** Les rappels ne sont pas encore en service sur la plateforme : l'app l'indique honnêtement. */
       remindersAvailable: platform?.value === true,
     };
+  }
+
+  /**
+   * Rappels des prochaines heures pour CET appareil, à programmer sur le téléphone (notifications programmées classiques,
+   * non exactes : décision du 15/10/2026). Même calcul et mêmes textes que l'envoi par le serveur.
+   * Un seul canal par appareil : si cet appareil reçoit les notifications du serveur (jeton enregistré), la liste est vide
+   * (« push ») pour éviter tout doublon. Vide aussi tant que le service n'est pas ouvert ou que la personne n'a pas activé
+   * ses rappels.
+   */
+  async upcoming(userId: string, sessionId: string, now: Date = new Date()) {
+    const familyId = await this.familyOf(sessionId);
+    const [s, [prefs], [device], [up]] = await Promise.all([
+      loadReminderSettings(this.settings),
+      this.db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1),
+      this.db.select({ id: pushDevices.id }).from(pushDevices).where(eq(pushDevices.sessionFamilyId, familyId)).limit(1),
+      this.db.select({ timezone: userPreferences.timezone }).from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1),
+    ]);
+    const enabled = prefs?.remindersEnabled ?? REMINDERS_ENABLED_BY_DEFAULT;
+    const channel: 'push' | 'local' = device ? 'push' : 'local';
+    const base = { available: s.enabled, enabled, channel, templatesVersion: REMINDER_TEMPLATES_VERSION, horizonHours: UPCOMING_HORIZON_HOURS };
+    if (!s.enabled || !enabled || channel === 'push') return { ...base, reminders: [] };
+    const to = new Date(now.getTime() + UPCOMING_HORIZON_HOURS * 3600_000);
+    const person = { tz: up?.timezone ?? DEFAULT_TIMEZONE, quiet_start: prefs?.quietStart ?? null, quiet_end: prefs?.quietEnd ?? null };
+    const reminders = [];
+    for (const { ctx } of await loadReminderContexts(this.db, new Map([[userId, person]]), s, now)) {
+      const titles = new Map(ctx.tasks.map((t) => [t.id, t.title]));
+      for (const r of dueReminders(ctx, now, to)) {
+        const msg = reminderMessage(titles.get(r.taskId) ?? '', r.attempt, r.attempt >= s.offsets.length - 1);
+        reminders.push({ key: r.key, projectId: r.projectId, taskId: r.taskId, day: r.day, attempt: r.attempt, fireAt: r.fireAt.toISOString(), ...msg });
+      }
+    }
+    reminders.sort((a, b) => a.fireAt.localeCompare(b.fireAt));
+    return { ...base, reminders: reminders.slice(0, UPCOMING_MAX) };
   }
 
   async updatePreferences(userId: string, dto: NotificationPreferencesDto) {

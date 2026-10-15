@@ -2,11 +2,17 @@ import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/network/api_exception.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/features/auth/application/session_controller.dart';
+import 'package:bim/features/auth/data/models.dart';
+import 'package:bim/features/notifications/application/local_notifier.dart';
 import 'package:bim/features/notifications/data/notification_preferences_api.dart';
+import 'package:bim/features/notifications/data/reminders_api.dart';
 import 'package:bim/features/notifications/presentation/reminder_preferences_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_notifier.dart';
 
 class _NoTokens extends TokenStorage {
   @override
@@ -81,13 +87,19 @@ class _Picker {
 }
 
 /// Écran de téléphone courant (390 × 844) par défaut ; [physical] pour un petit téléphone.
-Future<void> _open(WidgetTester tester, _FakeServer server, {_Picker? picker, Size physical = const Size(1170, 2532)}) async {
+Future<void> _open(
+  WidgetTester tester,
+  _FakeServer server, {
+  _Picker? picker,
+  Size physical = const Size(1170, 2532),
+  List<Override> overrides = const [],
+}) async {
   tester.view.physicalSize = physical;
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [notificationPreferencesApiProvider.overrideWithValue(NotificationPreferencesApi(server))],
+      overrides: [notificationPreferencesApiProvider.overrideWithValue(NotificationPreferencesApi(server)), ...overrides],
       child: MaterialApp(
         theme: BimTheme.light(),
         home: picker == null ? const ReminderPreferencesScreen() : ReminderPreferencesScreen(pickTime: picker.call),
@@ -273,4 +285,93 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('autorisation du téléphone et programmation', () {
+    /// Personne connectée, téléphone simulé, API des rappels à venir simulée (un rappel demain).
+    List<Override> phone(FakeNotifier notifier, _FakeServer server) => [
+          sessionProvider.overrideWith(_SignedIn.new),
+          localNotifierProvider.overrideWithValue(notifier),
+          remindersApiProvider.overrideWithValue(_FakeRemindersApi(server)),
+        ];
+
+    testWidgets('activer : choix enregistré, puis autorisation du téléphone demandée une fois, puis rappels programmés', (tester) async {
+      final server = _FakeServer(available: true);
+      final notifier = FakeNotifier(allowed: false, grantOnRequest: true);
+      await _open(tester, server, overrides: phone(notifier, server));
+      // Rappels désactivés : aucune demande d'autorisation, rien n'est programmé.
+      expect(find.byKey(const ValueKey('system-permission')), findsNothing);
+      expect(notifier.permissionRequests, 0);
+
+      await tester.tap(find.byKey(const ValueKey('reminders-switch')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump();
+      }
+      expect(server.bodies, [
+        {'remindersEnabled': true},
+      ]);
+      expect(notifier.permissionRequests, 1);
+      expect(notifier.scheduled, hasLength(1));
+      expect(find.text('Autorisées pour BIM.'), findsOneWidget);
+      expect(find.text('1 rappel programmé sur ce téléphone pour les prochaines 48 h.'), findsOneWidget);
+      await _finish(tester);
+
+      // Désactiver : tout est annulé sur le téléphone.
+      await tester.tap(find.byKey(const ValueKey('reminders-switch')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump();
+      }
+      expect(server.bodies.last, {'remindersEnabled': false});
+      expect(notifier.scheduled, isEmpty);
+      await _finish(tester);
+    });
+
+    testWidgets('autorisation refusée : le choix BIM reste enregistré, l’écran le dit et propose d’autoriser', (tester) async {
+      final server = _FakeServer(available: true);
+      final notifier = FakeNotifier(allowed: false);
+      await _open(tester, server, overrides: phone(notifier, server));
+      await tester.tap(find.byKey(const ValueKey('reminders-switch')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump();
+      }
+      expect(server.enabled, isTrue); // préférence distincte de l'autorisation système
+      expect(notifier.permissionRequests, 1);
+      expect(notifier.scheduled, isEmpty);
+      expect(find.text('Non autorisées : ton téléphone n’affichera pas les rappels.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('system-permission-request')), findsOneWidget);
+      await _finish(tester);
+    });
+  });
+}
+
+class _SignedIn extends SessionController {
+  @override
+  SessionState build() => SessionSignedIn(
+        Me.fromJson(const {'id': 'u1', 'fullName': 'Awa Koné', 'username': 'awa.kone', 'city': 'Cocody', 'contacts': <dynamic>[]}),
+      );
+}
+
+/// Rappels à venir renvoyés par l'API simulée : un rappel demain si la personne a activé ses rappels.
+class _FakeRemindersApi extends RemindersApi {
+  _FakeRemindersApi(this.server) : super(server);
+  final _FakeServer server;
+
+  @override
+  Future<UpcomingReminders> upcoming() async => UpcomingReminders(
+        available: server.available,
+        enabled: server.enabled,
+        channel: 'local',
+        reminders: [
+          if (server.available && server.enabled)
+            UpcomingReminder(
+              key: 'p1|t1|d|0',
+              projectId: 'p1',
+              taskId: 't1',
+              day: '2026-10-16',
+              attempt: 0,
+              fireAt: DateTime.now().toUtc().add(const Duration(days: 1)),
+              title: 'Peni',
+              body: 'C’est l’heure : Séance. On y va ?',
+            ),
+        ],
+      );
 }

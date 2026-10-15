@@ -1,9 +1,12 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/network/api_client.dart';
 import 'features/auth/application/session_controller.dart';
+import 'features/notifications/application/local_notifier.dart';
 
 void main() => runBim();
 
@@ -20,6 +23,8 @@ void runBim({List<Override> overrides = const []}) {
             onSessionExpired: () => ref.read(sessionProvider.notifier).onExpired(),
           ),
         ),
+        // Notifications programmées sur le téléphone : Android pour l'instant (iOS pas encore compilé).
+        localNotifierProvider.overrideWithValue(Platform.isAndroid ? PluginLocalNotifier() : const NoopLocalNotifier()),
         ...overrides,
       ],
       child: const BimApp(),

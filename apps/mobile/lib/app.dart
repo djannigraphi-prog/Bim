@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'features/notifications/application/reminder_sync.dart';
 
 class BimApp extends ConsumerWidget {
   const BimApp({super.key});
@@ -22,6 +23,8 @@ class BimApp extends ConsumerWidget {
       locale: const Locale('fr'),
       supportedLocales: const [Locale('fr')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      // Rappels programmés sur le téléphone (lot 2) : synchronisés avec l'API, ouverture de la journée depuis une notification.
+      builder: (context, child) => ReminderSync(child: child ?? const SizedBox.shrink()),
     );
   }
 }

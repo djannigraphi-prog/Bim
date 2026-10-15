@@ -1491,6 +1491,26 @@
         ]
       }
     },
+    "/v1/me/reminders/upcoming": {
+      "get": {
+        "operationId": "NotificationsController_upcoming",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rappels des prochaines heures à programmer sur cet appareil (vide si le serveur les envoie)",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/v1/me/notification-preferences": {
       "get": {
         "operationId": "NotificationsController_preferences",

@@ -24,9 +24,14 @@ class ProjectDraftController extends Notifier<ProjectDraft> {
 
 final projectDraftProvider = NotifierProvider<ProjectDraftController, ProjectDraft>(ProjectDraftController.new);
 
+/// Change à chaque modification d'un projet (case cochée, pause, tâche ajoutée…). D'autres fonctions s'y abonnent
+/// (rappels programmés sur le téléphone) sans que le module Projets les connaisse.
+final projectsRevisionProvider = StateProvider<int>((ref) => 0);
+
 /// Après une action (case cochée, pause…) : rafraîchit la liste et le détail.
 void refreshProject(WidgetRef ref, String id) {
   ref
     ..invalidate(myProjectsProvider)
     ..invalidate(projectDetailProvider(id));
+  ref.read(projectsRevisionProvider.notifier).state++;
 }

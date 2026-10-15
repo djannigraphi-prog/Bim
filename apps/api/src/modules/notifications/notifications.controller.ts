@@ -23,6 +23,12 @@ export class NotificationsController {
     await this.notifications.removeDevice(a.sessionId);
   }
 
+  @Get('reminders/upcoming')
+  @ApiOperation({ summary: 'Rappels des prochaines heures à programmer sur cet appareil (vide si le serveur les envoie)' })
+  upcoming(@CurrentAuth() a: AuthContext) {
+    return this.notifications.upcoming(a.userId, a.sessionId);
+  }
+
   @Get('notification-preferences')
   @ApiOperation({ summary: 'Préférences de notification (rappels, heures calmes)' })
   preferences(@CurrentAuth() a: AuthContext) {

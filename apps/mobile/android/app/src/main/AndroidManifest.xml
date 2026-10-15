@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Accès réseau : nécessaire pour joindre l'API BIM (aussi en version publiée). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Rappels programmés (lot 2) : reprogrammés après un redémarrage du téléphone. L'autorisation d'afficher des
+         notifications (Android 13 et plus) est déclarée par la bibliothèque et demandée à la personne quand elle active
+         ses rappels. Pas d'alarme exacte en version 1 (décision du 15/10/2026) : ni SCHEDULE_EXACT_ALARM ni USE_EXACT_ALARM. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="BIM"
         android:name="${applicationName}"
@@ -27,6 +31,17 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Rappels programmés : affichage, actions « J'y vais ! / Plus tard », reprogrammation après redémarrage. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
