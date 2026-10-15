@@ -9,7 +9,7 @@ import { dueTasks, isActiveOn } from '../projects/plan';
 import { SettingsService } from '../settings/settings.service';
 import { PUSH_SENDER, PushSender } from './push-sender';
 import { loadReminderContexts, loadReminderSettings, ReminderSettings } from './reminder-data';
-import { dueReminders, inQuietHours, isStale, reminderMessage } from './reminders';
+import { dueReminders, inQuietHours, isStale, quietExempt, reminderMessage } from './reminders';
 
 /** Bail d'un rappel pris par un worker : au-delà, un worker arrêté en plein envoi rend la main (reprise). */
 export const LEASE_SECONDS = 120;
@@ -161,7 +161,9 @@ export class ReminderWorkerService {
     if (!person || person.enabled !== true) return this.finish(d.id, 'skipped', 'disabled', now);
     const quiet = person.quiet_start && person.quiet_end ? { start: person.quiet_start, end: person.quiet_end } : s.quiet;
     const local = new Intl.DateTimeFormat('en-GB', { timeZone: person.tz ?? DEFAULT_TIMEZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
-    if (inQuietHours(local, quiet)) return this.finish(d.id, 'skipped', 'quiet', now);
+    // Option B : une relance n'est jamais envoyée pendant les heures calmes, même si elle a été planifiée juste avant
+    // (nouvel essai après une erreur d'envoi, heures calmes modifiées entre-temps). Le rappel à l'heure choisie l'est.
+    if (!quietExempt(d.attempt) && inQuietHours(local, quiet)) return this.finish(d.id, 'skipped', 'quiet', now);
 
     const devices = await this.db.execute<{ id: string; token: string; platform: 'android' | 'ios' }>(sql`
       SELECT DISTINCT d.id, d.token, d.platform FROM push_devices d

@@ -137,11 +137,30 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     await worker.dispatch(at('15:00'));
     expect((await rows(off.p.id))[0]).toMatchObject({ status: 'skipped', reason: 'disabled' });
 
+    // Heures calmes, option B : le rappel à l'heure choisie part, les relances qui tombent dans les heures calmes non.
     const quiet = await setup(['15:00']);
-    await h.http().patch('/v1/me/notification-preferences').set(quiet.auth).send({ quietStart: '14:00', quietEnd: '16:00' }).expect(200);
+    await h.http().patch('/v1/me/notification-preferences').set(quiet.auth).send({ quietStart: '14:00', quietEnd: '16:30' }).expect(200);
+    for (const t of ['15:00', '16:00', '17:00']) await worker.tick(at(t));
+    expect((await rows(quiet.p.id)).map((r) => [r.attempt, r.status])).toEqual([[0, 'sent'], [2, 'sent']]); // +1 h (16:00) supprimé
+    expect(push.sent.filter((s) => s.target.token === quiet.token)).toHaveLength(2);
+    // Une relance déjà planifiée n'est pas envoyée si les heures calmes ont commencé entre-temps (revérification).
+    const late = await setup(['15:00']);
     await worker.tick(at('15:00'));
-    expect(await rows(quiet.p.id)).toHaveLength(0); // pas planifié pendant les heures calmes
-    expect(push.sent.filter((s) => s.target.token === quiet.token)).toHaveLength(0);
+    await worker.plan(at('16:00'));
+    await h.http().patch('/v1/me/notification-preferences').set(late.auth).send({ quietStart: '15:30', quietEnd: '18:00' }).expect(200);
+    await worker.dispatch(at('16:00'));
+    expect((await rows(late.p.id)).map((r) => [r.attempt, r.status, r.reason])).toEqual([[0, 'sent', null], [1, 'skipped', 'quiet']]);
+    // Le rappel à l'heure choisie, déjà planifié, part même si les heures calmes commencent entre-temps.
+    const first = await setup(['15:00']);
+    await worker.plan(at('15:00'));
+    await h.http().patch('/v1/me/notification-preferences').set(first.auth).send({ quietStart: '14:00', quietEnd: '18:00' }).expect(200);
+    await worker.dispatch(at('15:00'));
+    expect((await rows(first.p.id))[0]).toMatchObject({ attempt: 0, status: 'sent' });
+    // Aucun doublon : relancer le planificateur et l'envoi sur la même minute ne crée ni n'envoie rien de plus.
+    const before = push.sent.length;
+    await worker.tick(at('15:00'));
+    expect(await rows(first.p.id)).toHaveLength(1);
+    expect(push.sent.length).toBe(before);
   });
 
   it('rappels jamais activés par la personne (valeur par défaut) : rien n’est planifié ni envoyé', async () => {
@@ -193,7 +212,7 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
 
     await h.http().patch('/v1/me/notification-preferences').set(auth).send({ remindersEnabled: true }).expect(200);
     const list = await get();
-    expect(list).toMatchObject({ available: true, enabled: true, channel: 'local', templatesVersion: 'v2', horizonHours: 48 });
+    expect(list).toMatchObject({ available: true, enabled: true, channel: 'local', templatesVersion: 'v3', horizonHours: 48 });
     const tomorrow = localDay(new Date(Date.now() + 24 * 3600_000));
     const first = list.reminders.find((r: { day: string; attempt: number }) => r.day === tomorrow && r.attempt === 0);
     expect(first).toEqual({
@@ -204,7 +223,7 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
       attempt: 0,
       fireAt: zonedTime(tomorrow, '12:00').toISOString(),
       title: 'Peni',
-      body: `C’est l’heure ! ${task.title} 💪 Tu vas tout déchirer.`,
+      body: `${task.title} : c’est l’heure ! 💪 Tu vas tout déchirer.`,
       pose: 'happy',
     });
     // Rythme du réglage (0, +1 h, +2 h), du plus proche au plus lointain, sans doublon.

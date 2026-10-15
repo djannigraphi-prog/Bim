@@ -5,7 +5,11 @@
  * après les délais du réglage `notifications.reminder_offsets_minutes` (proposition non validée : 0, +60, +120 min).
  * Chaque occurrence a une **clé stable** : elle sert d'identifiant anti-doublon jusqu'à l'envoi (une clé = un envoi au plus).
  * Le calcul se fait à l'heure locale de la personne (fuseau IANA) ; les jours de pause, les jours hors programme, les
- * tâches hors de leur période active, les tâches déjà cochées et les heures calmes ne donnent aucun rappel.
+ * tâches hors de leur période active et les tâches déjà cochées ne donnent aucun rappel.
+ *
+ * Heures calmes, option B (décision du fondateur du 15/10/2026, 15 h 44) : le rappel **à l'heure choisie** (tentative 0)
+ * part même pendant les heures calmes, puisque c'est la personne qui a placé sa tâche à cette heure ; les relances
+ * (tentatives 1 et suivantes) qui y tombent sont **supprimées**, jamais reportées.
  */
 import { zonedTime } from '../../common/timezone';
 import { addDays, Day, dueTasks, PauseRange, PlanTask, today } from '../projects/plan';
@@ -59,6 +63,11 @@ export function inQuietHours(localHHMM: string, quiet: QuietWindow | null): bool
   return s < e ? t >= s && t < e : t >= s || t < e;
 }
 
+/** Option B : seul le rappel à l'heure choisie (tentative 0) est permis pendant les heures calmes. */
+export function quietExempt(attempt: number): boolean {
+  return attempt === 0;
+}
+
 const timeFormatters = new Map<string, Intl.DateTimeFormat>();
 function localHHMM(at: Date, timeZone: string): string {
   let f = timeFormatters.get(timeZone);
@@ -92,7 +101,7 @@ export function dueReminders(ctx: ReminderContext, from: Date, to: Date): Remind
       ctx.offsets.forEach((offset, attempt) => {
         const fireAt = new Date(base + offset * 60_000);
         if (fireAt <= from || fireAt > to) return;
-        if (inQuietHours(localHHMM(fireAt, ctx.timeZone), ctx.quiet)) return;
+        if (!quietExempt(attempt) && inQuietHours(localHHMM(fireAt, ctx.timeZone), ctx.quiet)) return;
         out.push({ key: reminderKey(ctx.projectId, task.id, day, attempt), projectId: ctx.projectId, taskId: task.id, day, attempt, fireAt });
       });
     }
@@ -110,15 +119,16 @@ export function isStale(fireAt: Date, now: Date, graceMinutes: number): boolean 
  * avec la pose de Peni affichée par le téléphone (R1 : « la pose de Peni » fait partie de la notification).
  * Jamais de donnée sensible sur l'écran verrouillé : pas de santé, pas de mesure ; le titre de la tâche choisi par la personne.
  *
- * v2 (15/10/2026) : rapprochée de la maquette 28 (« C'est l'heure ! … 💪 Tu vas tout déchirer. », « Vas-y, ça ne prend
- * qu'une minute… 🥺 ») ; le dernier rappel reste encourageant, sans culpabiliser (décision C8), en attendant la décision
- * du fondateur sur le texte « Je t'en supplie 😭 … » de la maquette, lié à l'alarme (non retenue en version 1).
+ * v2 (15/10/2026) : rapprochée de la maquette 28.
+ * v3 (15/10/2026, décision du fondateur de 15 h 44 : principe des textes validé, **provisoires** jusqu'à la vérification
+ * sur vrais téléphones) : encourageants, jamais culpabilisants ; la tâche est **au début** du texte, car Android n'affiche
+ * qu'environ 40 caractères d'une notification repliée ; la pose triste du dernier rappel est remplacée par la joyeuse.
  */
-export const REMINDER_TEMPLATES_VERSION = 'v2';
+export const REMINDER_TEMPLATES_VERSION = 'v3';
 export type PeniPose = 'happy' | 'think' | 'sad';
 export function reminderMessage(taskTitle: string, attempt: number, lastAttempt: boolean): { title: string; body: string; pose: PeniPose } {
   const task = taskTitle.length > 60 ? `${taskTitle.slice(0, 57)}…` : taskTitle;
-  if (attempt === 0) return { title: 'Peni', body: `C’est l’heure ! ${task} 💪 Tu vas tout déchirer.`, pose: 'happy' };
-  if (!lastAttempt) return { title: 'Peni', body: `Vas-y, ça ne prend qu’une minute… ${task} t’attend 🥺`, pose: 'think' };
-  return { title: 'Peni', body: `${task} n’est pas encore cochée. Il est encore temps, je crois en toi !`, pose: 'sad' };
+  if (attempt === 0) return { title: 'Peni', body: `${task} : c’est l’heure ! 💪 Tu vas tout déchirer.`, pose: 'happy' };
+  if (!lastAttempt) return { title: 'Peni', body: `${task} t’attend encore. Un petit pas aujourd’hui, c’est déjà gagné 🙂`, pose: 'think' };
+  return { title: 'Peni', body: `${task} : encore un peu de temps ! Et sinon, demain est une nouvelle chance 💛`, pose: 'happy' };
 }

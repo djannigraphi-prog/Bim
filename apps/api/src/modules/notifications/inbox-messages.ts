@@ -5,7 +5,8 @@
  */
 import { reminderMessage } from './reminders';
 
-export const INBOX_TEMPLATES_VERSION = 'v1';
+/** v2 (15/10/2026) : suit les textes v3 des rappels. */
+export const INBOX_TEMPLATES_VERSION = 'v2';
 
 export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder';
 export type InboxCategory = 'projects' | 'support';

@@ -348,6 +348,25 @@ void main() {
       await _finish(tester);
     });
 
+    testWidgets('essai des 3 textes de Peni : trois notifications à une minute d’écart, tâche en tête, poses sans tristesse', (tester) async {
+      final server = _FakeServer();
+      final notifier = FakeNotifier();
+      await _open(tester, server, overrides: phone(notifier, server));
+      final before = DateTime.now();
+      await _tapKey(tester, 'test-reminder-texts');
+      await tester.pump();
+      expect(notifier.tests.map((t) => t.id), [1, 2, 3]);
+      expect(notifier.tests.map((t) => t.pose), ['happy', 'think', 'happy']);
+      for (final (i, t) in notifier.tests.indexed) {
+        expect(t.body, startsWith('Séance d’essai'));
+        expect(t.fireAt.difference(before).inSeconds, inInclusiveRange(60 * (i + 1) - 5, 60 * (i + 1) + 5));
+        expect(testReminderIds, contains(t.id)); // jamais annulés par la synchronisation des rappels
+      }
+      expect(server.bodies, isEmpty);
+      expect(server.enabled, isFalse);
+      await _finish(tester);
+    });
+
     testWidgets('autorisation refusée : le choix BIM reste enregistré, l’écran le dit et propose d’autoriser', (tester) async {
       final server = _FakeServer(available: true);
       final notifier = FakeNotifier(allowed: false);

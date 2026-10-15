@@ -30,6 +30,14 @@ String _hhmm(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.to
 
 TimeOfDay _parse(String hhmm) => TimeOfDay(hour: int.parse(hhmm.substring(0, 2)), minute: int.parse(hhmm.substring(3, 5)));
 
+/// Textes v3 des rappels (`apps/api/src/modules/notifications/reminders.ts`) pour une tâche d'exemple, avec la pose de
+/// Peni : seulement pour l'essai sur téléphone. Le test `reminder-texts-sync.spec.ts` de l'API vérifie qu'ils sont identiques.
+const testReminderTexts = [
+  ('Séance d’essai : c’est l’heure ! 💪 Tu vas tout déchirer.', 'happy'),
+  ('Séance d’essai t’attend encore. Un petit pas aujourd’hui, c’est déjà gagné 🙂', 'think'),
+  ('Séance d’essai : encore un peu de temps ! Et sinon, demain est une nouvelle chance 💛', 'happy'),
+];
+
 /// Préférences de rappel (lot 2). La maquette 28 montre les notifications elles-mêmes, sur l'écran verrouillé :
 /// elles dépendent de Firebase et ne sont pas encore en service. Cet écran ne règle que les choix de la personne,
 /// enregistrés par l'API ; il n'active jamais le service des rappels et le dit clairement tant qu'il est fermé.
@@ -111,7 +119,27 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
 
   /// Rappel d'essai pour les tests sur téléphones : demande l'autorisation du téléphone si besoin, puis programme une
   /// notification dans [minutes] minutes (mode non exact, comme les rappels).
-  Future<void> _scheduleTest(int minutes) async {
+  Future<void> _scheduleTest(int minutes) => _scheduleTests([
+        LocalReminder(
+          id: testReminderId,
+          fireAt: DateTime.now().add(Duration(minutes: minutes)),
+          title: 'Peni',
+          body: 'Rappel d’essai : c’est l’heure ! Ceci est un test des notifications de BIM 💪',
+          payload: '',
+        ),
+      ]);
+
+  /// Essai des trois textes de Peni et de leurs poses (à l'heure, +1 h, dernier rappel), une minute d'écart, pour les
+  /// vérifier sur de vrais téléphones. Copie des textes v3 du serveur (`reminders.ts`), contrôlée par un test de l'API.
+  Future<void> _scheduleTextTests() {
+    final now = DateTime.now();
+    return _scheduleTests([
+      for (final (i, (body, pose)) in testReminderTexts.indexed)
+        LocalReminder(id: i + 1, fireAt: now.add(Duration(minutes: i + 1)), title: 'Peni', body: body, pose: pose, payload: ''),
+    ]);
+  }
+
+  Future<void> _scheduleTests(List<LocalReminder> reminders) async {
     var allowed = await _notifier.permissionGranted();
     if (!allowed) allowed = await _notifier.requestPermission();
     if (!mounted) return;
@@ -120,18 +148,11 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
       showBimSnack(context, 'Sans autorisation, ton téléphone n’affichera pas les rappels. Tu peux l’activer dans ses réglages.');
       return;
     }
-    final at = DateTime.now().add(Duration(minutes: minutes));
-    await _notifier.scheduleTest(
-      LocalReminder(
-        id: testReminderId,
-        fireAt: at,
-        title: 'Peni',
-        body: 'Rappel d’essai : c’est l’heure ! Ceci est un test des notifications de BIM 💪',
-        payload: '',
-      ),
-    );
+    for (final r in reminders) {
+      await _notifier.scheduleTest(r);
+    }
     if (!mounted) return;
-    setState(() => _testAt = at);
+    setState(() => _testAt = reminders.first.fireAt);
     showBimSnack(context, 'Rappel d’essai prévu. Tu peux verrouiller le téléphone.');
   }
 
@@ -330,6 +351,7 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
                 children: [
                   OutlinedButton(key: const ValueKey('test-reminder-1'), onPressed: () => _scheduleTest(1), child: const Text('Dans 1 minute')),
                   OutlinedButton(key: const ValueKey('test-reminder-15'), onPressed: () => _scheduleTest(15), child: const Text('Dans 15 minutes')),
+                  OutlinedButton(key: const ValueKey('test-reminder-texts'), onPressed: _scheduleTextTests, child: const Text('Les 3 textes de Peni')),
                 ],
               ),
               if (_testAt != null) ...[

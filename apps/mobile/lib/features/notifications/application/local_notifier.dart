@@ -105,6 +105,9 @@ abstract class LocalNotifier {
 /// Identifiant réservé au rappel d'essai : jamais annulé par la synchronisation des rappels.
 const testReminderId = 1;
 
+/// Identifiants réservés aux essais des trois textes de Peni (1, 2, 3) : jamais annulés par la synchronisation.
+const testReminderIds = {testReminderId, 2, 3};
+
 /// Plateforme sans notifications locales (tests, iOS non encore compilé) : rien n'est programmé, rien n'est simulé.
 class NoopLocalNotifier implements LocalNotifier {
   const NoopLocalNotifier();
@@ -194,7 +197,7 @@ class PluginLocalNotifier implements LocalNotifier {
   @override
   Future<void> replaceAll(List<LocalReminder> reminders, {ReminderTiming timing = ReminderTiming.inexact}) async {
     for (final p in await _plugin.pendingNotificationRequests()) {
-      if (p.id != testReminderId) await _plugin.cancel(id: p.id);
+      if (!testReminderIds.contains(p.id)) await _plugin.cancel(id: p.id);
     }
     for (final r in reminders) {
       await _schedule(r, timing);
