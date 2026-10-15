@@ -79,5 +79,26 @@ Constat : dans le parcours Android, un glissement du test au-delà du haut de l'
 | Écran Rappels complet | Impeller | **hors ligne** (deux fois) |
 | Écran Rappels complet | sans Impeller | en ligne |
 
+Troisième série (autres versions d'Android, Impeller) :
+
+| Situation | Android 13 | Android 15 |
+| --- | --- | --- |
+| Liste Flutter simple | — | en ligne |
+| Liste simple + Peni (SVG) | — | **hors ligne** |
+| Écran Rappels complet | **hors ligne** | **hors ligne** |
+
 Conclusion : l'émulateur tombe seulement avec la combinaison dessin SVG + effet d'étirement + Impeller. Le plantage touche l'émulateur entier, pas seulement l'app : l'origine la plus probable est le rendu graphique simulé de l'émulateur, déclenché par un contenu ordinaire de BIM. Ce n'est pas prouvé pour de vrais téléphones : **à vérifier sur 3 à 5 téléphones courants** (geste banal pour une personne). Corrections possibles si le problème s'y produit (à décider) : Peni en image PNG plutôt qu'en SVG, ou effet d'étirement remplacé. Le parcours de bout en bout remonte en haut de l'écran sans ce geste ; la sonde reste disponible.
+
+Même résultat sur Android 13, 14 et 15 : la version d'Android n'y change rien, ce qui renforce la piste du rendu graphique simulé de l'émulateur (le même pour toutes les versions), sans la prouver pour de vrais téléphones.
+
+### Solutions évaluées (aucune appliquée : décision à prendre après les tests sur téléphones, `docs/TESTS_TELEPHONES.md`, T12 et T13)
+
+| Solution | Effet attendu | Avantages | Inconvénients et risques | Recommandation |
+| --- | --- | --- | --- | --- |
+| 1. Ne rien changer ; vérifier sur 3 à 5 vrais téléphones | Savoir si le problème existe hors de l'émulateur | Aucun changement de l'app ; gratuit | Demande les téléphones de test | **D'abord** |
+| 2. Signaler le cas à Flutter et à l'émulateur Android (sonde minimale : liste + un SVG + glissement) | Correction à la source, ou confirmation que c'est connu | Gratuit ; la sonde de 40 lignes suffit | Délai inconnu | **En parallèle** (avec ton accord pour publier l'exemple, qui ne contient pas de code métier) |
+| 3. Peni en images PNG dans l'app (comme les icônes de notification, script de génération) | Supprime l'élément déclencheur | Dessin de Peni inchangé (copies) ; affichage un peu plus rapide | Poids de l'app (+ ~0,5 Mo pour 5 poses en 3 densités) ; moins net si très agrandi ; deux formats à tenir à jour | Si les vrais téléphones reproduisent le problème |
+| 4. Remplacer l'effet d'étirement d'Android 12+ par l'ancien effet de lueur (réglage global de défilement) | Supprime l'élément déclencheur partout | Une ligne de code | Ressenti moins naturel sur Android récent ; masque le problème sans le comprendre | Non, sauf urgence |
+| 5. Désactiver Impeller sur Android (ancien moteur Skia) | Supprime l'élément déclencheur | Une ligne dans le manifeste | Flutter abandonne Skia sur Android ; performances et rendu moins bons ; dette future | Non |
+| 6. Précompiler les SVG (vector_graphics) | Incertain : même chemin de dessin | Chargement plus rapide | Peut ne rien corriger ; à vérifier avec la sonde | Seulement si 3 est écartée |
 
