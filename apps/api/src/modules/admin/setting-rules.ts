@@ -51,6 +51,14 @@ const RULES: Array<[RegExp, Rule]> = [
         : '{"start": "HH:MM", "end": "HH:MM"} ou null (pas d’heures calmes).',
   ],
   [/^notifications\.reminder_grace_minutes$/, intIn(5, 180)],
+  [/^maintenance\.account_purge_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
+  [/^maintenance\.account_purge_mode$/, (v) => (v === 'simulation' || v === 'real' ? null : '« simulation » ou « real ».')],
+  [/^maintenance\.account_purge_after_days$/, intIn(30, 3650)],
+  [/^peni\.llm_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
+  [/^peni\.daily_message_limit$/, intIn(1, 1000)],
+  [/^peni\.conversation_max_messages$/, intIn(5, 500)],
+  // Durée de conservation des discussions avec Peni : null tant qu'elle n'est pas validée (aucune suppression).
+  [/^peni\.conversation_retention_days$/, intIn(7, 3650, true)],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

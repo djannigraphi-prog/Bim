@@ -127,6 +127,13 @@
       "when": 1792082070828,
       "tag": "0017_peni_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792086642039,
+      "tag": "0018_peni_retention",
+      "breakpoints": true
     }
   ]
 }

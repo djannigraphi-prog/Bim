@@ -1712,6 +1712,26 @@
         ]
       }
     },
+    "/admin/v1/maintenance/peni-retention": {
+      "get": {
+        "operationId": "MaintenanceAdminController_peniRetentionOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conservation des discussions avec Peni : durée réglée, discussions expirées, derniers passages",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/v1/peni/conversations": {
       "post": {
         "operationId": "PeniController_start",

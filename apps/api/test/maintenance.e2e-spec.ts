@@ -210,7 +210,7 @@ describe('Purge des comptes jamais vérifiés (e2e)', () => {
   it('passage quotidien : seulement à 3 h (heure d’Abidjan), et sans effet tant que la purge est désactivée', async () => {
     const runner = h.app.get(MaintenanceRunner);
     expect(await runner.runIfDue(new Date('2026-10-16T02:59:00Z'))).toBeNull();
-    expect(await runner.runIfDue(new Date('2026-10-16T03:10:00Z'))).toMatchObject({ status: 'disabled' });
+    expect(await runner.runIfDue(new Date('2026-10-16T03:10:00Z'))).toMatchObject({ purge: { status: 'disabled' }, peniRetention: { status: 'not_configured' } });
   });
 
   it('toute table liée aux comptes est classée : bloquante (activité) ou supprimée avec le compte', async () => {

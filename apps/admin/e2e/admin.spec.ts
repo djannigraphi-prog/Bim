@@ -205,5 +205,6 @@ test('maintenance : purge des comptes jamais vérifiés désactivée, en simulat
   await expect(row).toContainText('Simulation');
   await expect(row).toContainText('Terminé');
   await expect(row.getByRole('cell').last()).toHaveText('0');
+  await expect(page.getByTestId('peni-retention')).toContainText('Aucune durée fixée : aucune discussion n’est supprimée.');
   await page.screenshot({ path: 'test-results/captures/maintenance.png' });
 });

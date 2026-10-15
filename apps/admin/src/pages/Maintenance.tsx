@@ -21,20 +21,36 @@ interface Overview {
   runs: Run[];
 }
 
+interface PeniRetention {
+  retentionDays: number | null;
+  decided: boolean;
+  active: boolean;
+  minDays: number;
+  expired: number | null;
+  runs: Array<{ id: string; status: string; deleted: number; startedAt: string }>;
+}
+
 const STATUS: Record<string, string> = { ok: 'Terminé', aborted: 'Arrêté (plus de 500 comptes)', error: 'Erreur' };
 
 /**
- * Purge des comptes jamais vérifiés : état, derniers passages et simulation à la demande. Aucune suppression depuis
- * cette page : la suppression réelle se décide dans les Réglages, après validation du fondateur.
+ * Maintenance : purge des comptes jamais vérifiés (état, passages, simulation) et conservation des discussions avec
+ * Peni (durée, discussions concernées, passages). Aucune suppression depuis cette page : tout se décide dans les
+ * Réglages, après validation du fondateur.
  */
 export function Maintenance() {
   const [data, setData] = useState<Overview | null>(null);
+  const [peni, setPeni] = useState<PeniRetention | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
     try {
-      setData(await api<Overview>('/admin/v1/maintenance/account-purge'));
+      const [purge, retention] = await Promise.all([
+        api<Overview>('/admin/v1/maintenance/account-purge'),
+        api<PeniRetention>('/admin/v1/maintenance/peni-retention'),
+      ]);
+      setData(purge);
+      setPeni(retention);
       setError(null);
     } catch (e) {
       setError(errorText(e));
@@ -103,6 +119,36 @@ export function Maintenance() {
               )}
             </tbody>
           </table>
+        </>
+      )}
+      {peni && (
+        <>
+          <h2>Conservation des discussions avec Peni</h2>
+          <p data-testid="peni-retention">
+            {peni.retentionDays === null
+              ? 'Aucune durée fixée : aucune discussion n’est supprimée.'
+              : `Durée réglée : ${peni.retentionDays} jours sans activité${peni.active ? ' (suppression automatique active)' : ' — pas encore validée : aucune suppression'}.`}{' '}
+            {peni.expired !== null && `Discussions concernées aujourd’hui : ${peni.expired}.`}
+          </p>
+          <p>Durée minimale : {peni.minDays} jours. La durée se règle dans Réglages (peni.conversation_retention_days), marquée « decided » une fois validée.</p>
+          {peni.runs.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Discussions supprimées</th>
+                </tr>
+              </thead>
+              <tbody>
+                {peni.runs.map((r) => (
+                  <tr key={r.id}>
+                    <td>{new Date(r.startedAt).toLocaleString('fr-FR')}</td>
+                    <td>{r.deleted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </>
       )}
     </section>

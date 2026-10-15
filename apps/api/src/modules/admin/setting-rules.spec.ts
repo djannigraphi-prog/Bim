@@ -32,6 +32,21 @@ describe('règles des réglages administrables', () => {
     expect(validateSettingValue('notifications.reminder_grace_minutes', 1)).not.toBeNull();
   });
 
+  it('purge des comptes et Peni : interrupteurs, mode, limites, conservation (null = aucune suppression)', () => {
+    expect(validateSettingValue('maintenance.account_purge_enabled', false)).toBeNull();
+    expect(validateSettingValue('maintenance.account_purge_enabled', 'non')).not.toBeNull();
+    expect(validateSettingValue('maintenance.account_purge_mode', 'simulation')).toBeNull();
+    expect(validateSettingValue('maintenance.account_purge_mode', 'reel')).not.toBeNull();
+    expect(validateSettingValue('maintenance.account_purge_after_days', 7)).not.toBeNull(); // décision : 30 jours au moins
+    expect(validateSettingValue('peni.llm_enabled', 1)).not.toBeNull();
+    expect(validateSettingValue('peni.daily_message_limit', 0)).not.toBeNull();
+    expect(validateSettingValue('peni.conversation_max_messages', 60)).toBeNull();
+    expect(validateSettingValue('peni.conversation_retention_days', null)).toBeNull();
+    expect(validateSettingValue('peni.conversation_retention_days', 365)).toBeNull();
+    expect(validateSettingValue('peni.conversation_retention_days', 0)).not.toBeNull();
+    expect(validateSettingValue('peni.conversation_retention_days', 6)).not.toBeNull();
+  });
+
   it('valeur manquante refusée', () => {
     expect(validateSettingValue('x.y', undefined)).not.toBeNull();
   });
