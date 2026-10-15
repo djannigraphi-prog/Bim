@@ -274,6 +274,15 @@ void main() {
     await _scrollTap(tester, find.text('7'));
     await _tap(tester, find.text('Créer mon programme'));
     await _waitFor(tester, find.textContaining('Renforcer mes abdos', findRichText: true));
+    // Lot 3 (écran 24) : Peni explique la séance (sans IA), puis on revient au programme.
+    await _tap(tester, find.text('Demander à Peni'));
+    await _waitFor(tester, find.byKey(const ValueKey('peni-explain-intro')));
+    await _tap(tester, find.byKey(const ValueKey('peni-explain-q-when')));
+    await _waitFor(tester, find.byWidgetPredicate((w) => w is Text && w.key == const ValueKey('peni-explain-answer') && (w.data ?? '').startsWith('À ')));
+    await _shot(tester, 'a24_peni_explication');
+    await _tap(tester, find.byKey(const ValueKey('peni-explain-close')));
+    await _waitFor(tester, find.text('Lancer mon programme'));
+    expect(find.byKey(const ValueKey('peni-explain-intro')), findsNothing);
     await _tap(tester, find.text('Lancer mon programme'));
     // Écran 26 réel : le chemin des jours (coffre de la semaine 1 au jour 7).
     await _waitFor(tester, find.text('Voir l’étape du jour'));

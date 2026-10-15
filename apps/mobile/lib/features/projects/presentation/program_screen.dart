@@ -9,6 +9,7 @@ import '../../../core/widgets/bim_icons.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../peni/presentation/peni_task_sheet.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
@@ -156,18 +157,34 @@ class _Program extends ConsumerWidget {
                   margin: const EdgeInsets.only(bottom: BimSpacing.sm),
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BimRadius.card), side: BorderSide(color: scheme.outline, width: 1.5)),
-                  child: ListTile(
-                    leading: Icon(bimIcon(t.icon)),
-                    title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('${t.timeOfDay} · ${t.weekdaysLabel}${t.detail == null ? '' : '\n${t.detail}'}'),
-                    isThreeLine: t.detail != null,
-                    trailing: p.tasks.length > 1
-                        ? IconButton(
-                            tooltip: 'Retirer cette tâche',
-                            icon: const Icon(Icons.remove_circle_outline),
-                            onPressed: () => _run(context, ref, (api) => api.removeTask(s.id, t.id)),
-                          )
-                        : null,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        leading: Icon(bimIcon(t.icon)),
+                        title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text('${t.timeOfDay} · ${t.weekdaysLabel}${t.detail == null ? '' : '\n${t.detail}'}'),
+                        isThreeLine: t.detail != null,
+                        trailing: p.tasks.length > 1
+                            ? IconButton(
+                                tooltip: 'Retirer cette tâche',
+                                icon: const Icon(Icons.remove_circle_outline),
+                                onPressed: () => _run(context, ref, (api) => api.removeTask(s.id, t.id)),
+                              )
+                            : null,
+                      ),
+                      // Lot 3 : Peni explique la tâche (sans IA) ; la feuille se ferme pour revenir au programme.
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(BimSpacing.sm, 0, BimSpacing.sm, BimSpacing.xs),
+                        child: TextButton.icon(
+                          key: ValueKey('explain-${t.id}'),
+                          onPressed: () => showPeniTaskExplanation(context, projectId: s.id, taskId: t.id),
+                          icon: const Peni(pose: PeniPose.think, size: 24),
+                          label: const Text('Demander à Peni'),
+                          style: TextButton.styleFrom(foregroundColor: BimColors.red, minimumSize: const Size(0, kBimMinTouch)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               if (s.mode == 'premium') ...[

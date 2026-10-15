@@ -1882,6 +1882,43 @@
         ]
       }
     },
+    "/v1/peni/projects/{projectId}/tasks/{taskId}/explanation": {
+      "get": {
+        "operationId": "PeniController_explainTask",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",

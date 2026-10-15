@@ -8,9 +8,11 @@ import { CLOCK, ProjectsService } from '../projects/projects.service';
 import { today } from '../projects/plan';
 import { userTimezone } from '../projects/timezone';
 import { SettingsService } from '../settings/settings.service';
+import { loadReminderSettings } from '../notifications/reminder-data';
 import { inQuietHours, QuietWindow } from '../notifications/reminders';
 import { EncouragementQueryDto, PeniMessageDto, StartPeniConversationDto } from './dto';
 import { encouragement } from './encouragements';
+import { explainTask } from './task-explanations';
 import { EngineContext, handleInput, InvalidChoiceError, PENI_ENGINE_VERSION, PeniReply, PeniState, QuickReply, startConversation } from './engine';
 import { LLM_PROVIDER, LlmProvider } from './llm-provider';
 
@@ -185,6 +187,40 @@ export class PeniService {
       weekChest,
       localTime,
       quiet: inQuietHours(localTime, quietWindow),
+    });
+  }
+
+  /**
+   * Peni explique une tâche du programme (écran 24) : contenu réel du programme, jours et heure, conseils généraux de
+   * prudence, ce qui se passe si elle n'est pas faite, rappels selon les préférences et les heures calmes. Lecture seule.
+   */
+  async explainTask(userId: string, projectId: string, taskId: string) {
+    const p = await this.projects.detail(userId, projectId);
+    const task = p.tasks.find((t) => t.id === taskId);
+    if (!task) throw Errors.notFound('Tâche');
+    const tz = await userTimezone(this.db, userId);
+    const [[prefs], settings] = await Promise.all([
+      this.db
+        .select({ enabled: notificationPreferences.remindersEnabled, start: notificationPreferences.quietStart, end: notificationPreferences.quietEnd })
+        .from(notificationPreferences)
+        .where(eq(notificationPreferences.userId, userId)),
+      loadReminderSettings(this.settings),
+    ]);
+    const quiet = prefs?.start && prefs.end ? { start: prefs.start, end: prefs.end } : settings.quiet;
+    const localTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(this.clock.now());
+    return explainTask({
+      task,
+      project: {
+        status: p.status,
+        pausedUntil: p.pausedUntil,
+        categoryCode: p.categoryCode,
+        categoryLabel: p.categoryLabel,
+        goalLabel: p.goal?.label ?? null,
+        programTitle: p.program?.title ?? null,
+        validatedBy: p.program?.validatedBy ?? null,
+      },
+      reminders: { serviceOpen: settings.enabled, enabledByPerson: prefs?.enabled === true, offsets: settings.offsets, quiet },
+      quietNow: inQuietHours(localTime, quiet),
     });
   }
 

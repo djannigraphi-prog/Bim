@@ -88,6 +88,32 @@ class PeniEncouragement {
       PeniEncouragement(key: j['key'] as String, text: j['text'] as String, pose: j['pose'] as String? ?? 'happy');
 }
 
+/// Explication d'une tâche du programme par Peni (écran 24), écrite par l'API (sans IA).
+class PeniTaskExplanation {
+  const PeniTaskExplanation({required this.taskId, required this.title, required this.intro, required this.pose, required this.sections});
+
+  final String taskId;
+  final String title;
+  final String intro;
+  final String pose;
+
+  /// Questions courtes et leurs réponses : what, when, how, missed, reminders.
+  final List<({String id, String question, String answer})> sections;
+
+  PeniPose get peniPose => PeniPose.values.where((p) => p.name == pose).firstOrNull ?? PeniPose.think;
+
+  factory PeniTaskExplanation.fromJson(Map<String, dynamic> j) => PeniTaskExplanation(
+        taskId: j['taskId'] as String,
+        title: j['title'] as String,
+        intro: j['intro'] as String,
+        pose: j['pose'] as String? ?? 'think',
+        sections: [
+          for (final s in (j['sections'] as List<dynamic>? ?? const []))
+            (id: (s as Map<String, dynamic>)['id'] as String, question: s['question'] as String, answer: s['answer'] as String),
+        ],
+      );
+}
+
 class PeniApi {
   PeniApi(this._api);
   final ApiClient _api;
@@ -103,6 +129,9 @@ class PeniApi {
     },);
     return PeniTurn(conversationId: j['id'] as String, messages: PeniTurn._messages(j), draft: PeniTurn._draft(j));
   }
+
+  Future<PeniTaskExplanation> explainTask(String projectId, String taskId) async =>
+      PeniTaskExplanation.fromJson(await _api.get('/v1/peni/projects/$projectId/tasks/$taskId/explanation'));
 
   Future<PeniEncouragement> encouragement(String projectId, {required String context, String? day}) async => PeniEncouragement.fromJson(
         await _api.get('/v1/peni/projects/$projectId/encouragement', query: {'context': context, if (day != null) 'day': day}),

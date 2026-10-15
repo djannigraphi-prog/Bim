@@ -203,4 +203,61 @@ describe('Peni (e2e)', () => {
       await h.http().get(`/v1/peni/projects/${p.id}/encouragement?context=day`).expect(401);
     });
   });
+
+  describe('Peni explique une tâche (écran 24)', () => {
+    async function project() {
+      const u = await user();
+      const p = (await h.http().post('/v1/projects').set(u.auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 3, availability: 'afternoon', durationDays: 30 }).expect(201)).body;
+      return { u, p, task: p.tasks[0] as { id: string; title: string } };
+    }
+    const explain = (auth: Record<string, string>, projectId: string, taskId: string, status = 200) =>
+      h.http().get(`/v1/peni/projects/${projectId}/tasks/${taskId}/explanation`).set(auth).expect(status);
+
+    it('explication de la séance créée depuis les réponses : cinq réponses courtes, sans exercice inventé', async () => {
+      const { u, p, task } = await project();
+      const e = (await explain(u.auth, p.id, task.id)).body;
+      expect(e).toMatchObject({ taskId: task.id, title: task.title, version: 'v1' });
+      expect(e.sections.map((x: { id: string }) => x.id)).toEqual(['what', 'when', 'how', 'missed', 'reminders']);
+      expect(e.sections[0].answer).toContain('préparée à partir de tes réponses');
+      expect(e.sections[1].answer).toMatch(/^À 15 h, .* : 3 fois par semaine\.$/);
+      // Rappels désactivés par défaut pour la personne (ou service pas encore ouvert) : Peni le dit, sans rien promettre.
+      expect(e.sections[4].answer).toMatch(/désactivés|pas encore en service/);
+    });
+
+    it('préférences de la personne : rappels activés et heures calmes prises en compte', async () => {
+      const { u, p, task } = await project();
+      await h.pool.query(`update app_settings set value = 'true'::jsonb where key = 'notifications.reminders_enabled'`);
+      h.settings.invalidate();
+      try {
+        await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ remindersEnabled: true, quietStart: '15:30', quietEnd: '16:30' }).expect(200);
+        const e = (await explain(u.auth, p.id, task.id)).body;
+        expect(e.sections[4].answer).toBe('Je te rappelle à 15 h, puis à 17 h si la tâche n’est pas cochée. Pas d’autre relance : elle tomberait pendant tes heures calmes (15 h 30 – 16 h 30).');
+      } finally {
+        await h.pool.query(`update app_settings set value = 'false'::jsonb where key = 'notifications.reminders_enabled'`);
+        h.settings.invalidate();
+      }
+    });
+
+    it('projet en pause : la tâche reprendra ensuite, aucun rappel pendant la pause', async () => {
+      const { u, p, task } = await project();
+      await h.http().post(`/v1/projects/${p.id}/pause`).set(u.auth).send({ days: 3 }).expect(200);
+      const e = (await explain(u.auth, p.id, task.id)).body;
+      expect(e.intro).toContain('Ton projet est en pause jusqu’au');
+      expect(e.sections[4].answer).toBe('Aucun rappel pendant la pause. Ils reprendront avec ton projet.');
+    });
+
+    it('tâche ajoutée par la personne ; tâche retirée, d’un autre projet ou d’une autre personne : introuvable', async () => {
+      const { u, p, task } = await project();
+      const added = (await h.http().post(`/v1/projects/${p.id}/tasks`).set(u.auth).send({ title: 'Marche', detail: 'Jusqu’au marché', timeOfDay: '07:00', weekdays: 127 }).expect(201)).body;
+      const mine = added.tasks.find((t: { title: string }) => t.title === 'Marche');
+      expect((await explain(u.auth, p.id, mine.id)).body.sections[0].answer).toBe('C’est une tâche que tu as ajoutée toi-même : « Jusqu’au marché ». C’est toi qui décides de son contenu.');
+      await h.http().delete(`/v1/projects/${p.id}/tasks/${mine.id}`).set(u.auth).expect(200);
+      await explain(u.auth, p.id, mine.id, 404);
+      const other = await project();
+      await explain(u.auth, p.id, other.task.id, 404);
+      await explain(other.u.auth, p.id, task.id, 404);
+      await explain(u.auth, p.id, 'pas-un-uuid', 400);
+      await h.http().get(`/v1/peni/projects/${p.id}/tasks/${task.id}/explanation`).expect(401);
+    });
+  });
 });

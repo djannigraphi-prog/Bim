@@ -36,4 +36,10 @@ export class PeniController {
   encouragement(@CurrentAuth() a: AuthContext, @Param('projectId', ParseUUIDPipe) projectId: string, @Query() q: EncouragementQueryDto) {
     return this.peni.encouragement(a.userId, projectId, q);
   }
+
+  @Get('projects/:projectId/tasks/:taskId/explanation')
+  @ApiOperation({ summary: 'Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte' })
+  explainTask(@CurrentAuth() a: AuthContext, @Param('projectId', ParseUUIDPipe) projectId: string, @Param('taskId', ParseUUIDPipe) taskId: string) {
+    return this.peni.explainTask(a.userId, projectId, taskId);
+  }
 }

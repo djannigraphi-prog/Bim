@@ -131,6 +131,32 @@ class _FakePeniApi extends PeniApi {
         ],
         draft: ProjectDraft(mode: 'premium', budget: 'medium', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 2, availability: 'morning', durationDays: 30),
       );
+
+  /// Explication de la tâche t1 du projet de démonstration (lundi, mercredi, vendredi à 15 h), textes de l'API v1.
+  @override
+  Future<PeniTaskExplanation> explainTask(String projectId, String taskId) async => const PeniTaskExplanation(
+        taskId: 't1',
+        title: 'Séance · Perte de poids',
+        intro: 'Bonne question ! Voici « Séance · Perte de poids » expliquée simplement 👇',
+        pose: 'think',
+        sections: [
+          (
+            id: 'what',
+            question: 'C’est quoi ?',
+            answer:
+                'C’est ta séance de sport · perte de poids. Je l’ai préparée à partir de tes réponses. Le détail des exercices n’est pas encore rédigé par l’équipe BIM pour cette catégorie : en attendant, tu choisis ce que tu fais, à ton rythme.',
+          ),
+          (id: 'when', question: 'Quand ?', answer: 'À 15 h, le lundi, le mercredi et le vendredi : 3 fois par semaine.'),
+          (
+            id: 'how',
+            question: 'Comment m’y prendre ?',
+            answer:
+                'Commence doucement : quelques minutes pour t’échauffer, puis va à ton rythme. Bois de l’eau, et arrête-toi si tu as mal. Au moindre doute sur ta santé, demande l’avis d’un professionnel de santé. Quand c’est fait, coche la tâche dans ta journée ✅',
+          ),
+          (id: 'missed', question: 'Et si je ne peux pas ?', answer: 'Pas grave 💛 Une tâche non cochée ne te fait rien perdre : ton programme continue.'),
+          (id: 'reminders', question: 'Vais-je avoir un rappel ?', answer: 'Tes rappels sont désactivés. Tu peux les activer quand tu veux dans Paramètres → Rappels.'),
+        ],
+      );
 }
 
 class _FakeInboxApi extends InboxApi {
@@ -537,6 +563,15 @@ void main() {
   testWidgets('24 programme', (t) async {
     await _show(t, '/projects/p1/program');
     await _capture(t, '24_np_plan');
+  });
+  testWidgets('24 Peni explique une tâche', (t) async {
+    await _show(t, '/projects/p1/program');
+    await t.ensureVisible(find.text('Demander à Peni').first);
+    await _settle(t);
+    await t.tap(find.text('Demander à Peni').first);
+    await _settle(t);
+    expect(find.byKey(const ValueKey('peni-explain-intro')), findsOneWidget);
+    await _capture(t, '24_peni_explication');
   });
   testWidgets('26 carte du projet', (t) async {
     await _show(t, '/projects/p1');
