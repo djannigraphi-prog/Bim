@@ -31,7 +31,23 @@ export const PURGE_BLOCKING_TABLES = [
   'notification_deliveries',
   'peni_conversations',
   'peni_messages',
+  // Lot 4 (social) : publier, commenter, aimer, suivre, bloquer ou signaler est une activité.
+  'posts',
+  'post_comments',
+  'post_likes',
+  'comment_likes',
+  'follows',
+  'user_blocks',
+  'content_reports',
 ] as const;
+
+/** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
+const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], string[]>> = {
+  shops: ['owner_user_id'],
+  follows: ['follower_id', 'followee_id'],
+  user_blocks: ['blocker_id', 'blocked_id'],
+  content_reports: ['reporter_id', 'target_user_id'],
+};
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [
   'user_contacts', // seulement si aucune coordonnée n'est vérifiée
@@ -100,7 +116,7 @@ export class AccountPurgeService {
   /** Conditions d'un compte à purger, à l'heure de la base de données (jamais celle du serveur). */
   private eligible(afterDays: number) {
     const blocking = sql.join(
-      PURGE_BLOCKING_TABLES.map((t) => sql`AND NOT EXISTS (SELECT 1 FROM ${sql.identifier(t)} x WHERE x.${sql.identifier(t === 'shops' ? 'owner_user_id' : 'user_id')} = u.id)`),
+      PURGE_BLOCKING_TABLES.flatMap((t) => (BLOCKING_COLUMNS[t] ?? ['user_id']).map((col) => sql`AND NOT EXISTS (SELECT 1 FROM ${sql.identifier(t)} x WHERE x.${sql.identifier(col)} = u.id)`)),
       sql` `,
     );
     return sql`u.status = 'pending_verification'

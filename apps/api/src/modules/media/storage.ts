@@ -50,6 +50,16 @@ export class StorageService {
     await writeFile(p, body);
   }
 
+  /** Lecture directe d'un fichier par le serveur (ex. copie des photos avant / après dans une publication, lot 4). */
+  async read(key: string): Promise<Buffer> {
+    this.assertAvailable();
+    if (this.s3) {
+      const out = await this.s3.send(new GetObjectCommand({ Bucket: this.cfg.S3_BUCKET, Key: key }));
+      return Buffer.from(await out.Body!.transformToByteArray());
+    }
+    return readFile(this.localPath(key));
+  }
+
   async remove(key: string): Promise<void> {
     if (!this.available) return;
     if (this.s3) {

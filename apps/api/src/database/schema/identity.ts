@@ -50,6 +50,8 @@ export const users = pgTable(
     birthDate: date('birth_date', { mode: 'string' }).notNull(),
     gender: gender('gender'),
     city: varchar('city', { length: 80 }).notNull(),
+    /** Photo de profil (lot 4, écrans 05 et 52) : clé du stockage privé, servie par lien temporaire ; null : initiales. */
+    avatarKey: varchar('avatar_key', { length: 200 }),
     /** Null pour un compte créé uniquement via Google, Apple ou Facebook. */
     passwordHash: text('password_hash'),
     passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),

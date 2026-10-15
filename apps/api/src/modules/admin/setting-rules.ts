@@ -59,6 +59,8 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^peni\.conversation_max_messages$/, intIn(5, 500)],
   // Durée de conservation des discussions avec Peni : null tant qu'elle n'est pas validée (aucune suppression).
   [/^peni\.conversation_retention_days$/, intIn(7, 3650, true)],
+  [/^social\.posts_daily_limit$/, intIn(1, 500)],
+  [/^social\.comments_daily_limit$/, intIn(1, 5000)],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

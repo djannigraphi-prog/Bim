@@ -134,6 +134,13 @@
       "when": 1792086642039,
       "tag": "0018_peni_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792107111237,
+      "tag": "0019_social",
+      "breakpoints": true
     }
   ]
 }
