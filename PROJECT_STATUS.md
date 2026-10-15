@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 commencé pour la partie sans dépense (rappels : étapes A à E développées et testées, rien d'activé) ; activation en attente de l'accord du fondateur.
+Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 commencé pour la partie sans dépense (rappels : étapes A à F développées et testées, dont l'écran « Rappels » de l'app ; rien d'activé) ; activation en attente de l'accord du fondateur.
 
 ## Résumé
 
@@ -56,7 +56,7 @@ Catégories administrables ; création en 5 étapes ; modèles de programmes ; c
 | Fin du programme, suppression logique, renommer, projet public (réglage seul) | 30, 24 | API e2e |
 
 ### Comparaison avec les maquettes 18 à 31
-Maquettes : `BIM_Maquettes_PNG_1-31.zip` (15 écrans de 18 à 31). Captures : branche `ci-captures`, 13 écrans (25 et 28 absents : lots 3 et 2).
+Maquettes : `BIM_Maquettes_PNG_1-31.zip` (15 écrans de 18 à 31). Captures : branche `ci-captures`, 13 écrans (25 et 28 absents : lots 3 et 2 ; l'écran des préférences de rappel, sans maquette, est capturé sous `x15_rappels`, et sur émulateur sous `a28_rappels`).
 Écarts corrigés le 15/10 : « par semaine » faux sur l'écran 24 (affichait 7 au lieu des 3 séances choisies) ; chemin en pointillés absent puis trop clairsemé (26) ; tâche en cours non mise en avant et heures futures en rouge (27) ; icônes de catégorie non colorées (20) ; sélections en noir, niveau en sélecteur segmenté, séances en cases (23) ; avertissement de pause (29) ; lien « Résoudre un problème » (21).
 Défauts trouvés grâce aux captures réelles de l'émulateur (320 dp) et corrigés : message de confirmation avec bouton qui restait affiché et masquait l'écran ; libellé « Publier « J'ai fait mon BIM » » coupé ; puce « Problème avec un produit ou un service » qui débordait de 24 px ; « Intermédiaire » coupé (23).
 Écarts voulus (décisions) : paiement et prix retirés de l'écran 24 (F4, C6) ; « Projet économique / Premium » et mention « choix gratuit » (C6) ; « Recommandé pour toi » sans marchands (lot 5) ; offres des marchands désactivées (21, lot 5) ; pas d'aperçu caméra intégré (22 : appareil photo du système) ; étape « durée du programme » ajoutée (23) ; boutons « Publier » en « bientôt disponible » (30, 31 : lot 4) ; Peni pensif au lieu de triste sur l'écran 29 (ne pas culpabiliser) ; textes de démonstration marqués comme tels.
@@ -65,7 +65,7 @@ Coffre (26) : implémenté (règle validée le 15/10), placé à côté du jour 
 Vérification dans un environnement adapté : **captures réelles de l'émulateur Android 14** (branche `ci-captures-android`) : photos avant / après et images jointes réellement affichées, émoji 🏆 rendu en couleur. Les captures de la branche `ci-captures` restent des rendus de test (sans émojis ni images réseau). Pas encore vérifié sur un vrai téléphone.
 
 ### Incomplet ou dépendant d'autres lots
-Contenu des programmes types et habitudes du jour réelles (**C7, action du fondateur**) ; durée de conservation des images jointes aux signalements (T-022 : 12 mois **proposés, en attente de validation juridique et réglementaire**) ; écran 25 Peni (lot 3) ; écran 28 rappels (lot 2) ; écran 52 profil public et publication « J'ai fait mon BIM » (lot 4) ; recommandations de marchands (lot 5) ; stockage S3 de production (validation des dépenses AWS, autorisation ARTCI) ; pas de test sur un vrai téléphone ; iOS non compilé.
+Contenu des programmes types et habitudes du jour réelles (**C7, action du fondateur**) ; durée de conservation des images jointes aux signalements (T-022 : 12 mois **proposés, en attente de validation juridique et réglementaire**) ; écran 25 Peni (lot 3) ; écran 28 rappels (lot 2 : préférences faites ; notifications elles-mêmes après Firebase) ; écran 52 profil public et publication « J'ai fait mon BIM » (lot 4) ; recommandations de marchands (lot 5) ; stockage S3 de production (validation des dépenses AWS, autorisation ARTCI) ; pas de test sur un vrai téléphone ; iOS non compilé.
 
 ### Préparation des lots 2 et 3
 Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal des événements complété, T-023). Décidé le 15/10 (T-025) : lancement en Côte d'Ivoire, architecture prête pour d'autres pays ; rappels par **notifications d'abord**. Étude selon R-01 et R-01 bis (meilleur équilibre qualité, fiabilité, sécurité, évolutivité et coût) : `docs/LOT2_RAPPELS_ETUDE.md` — 5 architectures et 8 composants comparés (gratuit / payant, sécurité, migration) ; **recommandé : service worker séparé (seul poste payant), FCM / APNs, file pg-boss, Parameter Store, Crashlytics, CloudWatch (gratuits car suffisants), évolution prévue vers SQS** ; budget estimé des rappels ≈ 16 à 21 USD/mois au lancement, ≈ 42 à 52 à 100 000 actifs, ≈ 170 à 370 à 1 million (prix de Paris à confirmer). **Lot 2 commencé sans dépense** (accord du 15/10, 07 h 40) : voir la section « Lot 2 — avancement » ; 4 décisions attendent l'accord du fondateur avant activation (étude, section 9).
@@ -86,6 +86,7 @@ Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'a
 | C | Calcul des rappels (fonctions pures) | 9 unitaires | verte (run 38702790136) |
 | D | Worker : file PostgreSQL, anti-doublon, reprise, péremption, essais, revérification, santé, `/health`, page admin | 7 e2e (workers concurrents, panne, jeton invalide…) ; démarrage réel du worker séparé vérifié en local | verte (run 38702790136) |
 | E | Envoi FCM HTTP v1 prêt, inactif | 5 tests contre un faux serveur ; 1 test de configuration | verte (run 38703183336 : API, admin, mobile, Android) |
+| F | Écran « Rappels » dans l'app (Paramètres → Rappels) : recevoir ou non les rappels de Peni, heures calmes personnelles ou par défaut ; relié à `GET/PATCH /v1/me/notification-preferences` ; avertissement « pas encore en service » tant que le réglage de la plateforme est coupé | 10 tests Flutter (modèle, requêtes, écran) ; captures `x15_rappels` (normal, petit écran, sombre) ; parcours Android contre l'API réelle (choix enregistré puis relu, capture `a28_rappels`) ; e2e API complété | verte (run 38719370532) |
 
 Suite API locale : 180 tests réussis (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
@@ -151,6 +152,8 @@ Moyens de vérification possibles :
 ## Erreurs et limites connues
 
 - Application mobile : compilée pour Android en CI ; iOS non compilé ; pas encore testée sur un téléphone contre l'API.
+- Émulateur Android de la CI (15/10, écran Rappels) : un glissement du test au-delà du haut d'une liste (effet d'étirement d'Android) a été suivi, à chaque essai, de la perte de l'émulateur entier (« offline »). Le test fait maintenant un retour exact en haut, sans glissement. Cause non prouvée ; à vérifier sur un vrai téléphone (simple geste de l'utilisateur).
+- Diagnostic CI : les tests Flutter en échec et le journal système Android (en cas d'arrêt de l'app) sont publiés en annotations, lisibles même quand les journaux bruts ne sont pas téléchargeables.
 - Dossiers `android/` et `ios/` non versionnés : à générer une fois l'identifiant de l'app (ex. `ci.bim.app`) choisi par le fondateur.
 - Envoi réel des SMS et e-mails absent : en développement, les codes s'affichent dans la console de l'API. Le démarrage en staging ou en production est refusé tant qu'un vrai fournisseur n'est pas configuré.
 - Photo de profil (écran 05) : non disponible (module médias, lot 4).
@@ -177,8 +180,8 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Lot 2 : réponses du fondateur aux 4 décisions de `docs/LOT2_RAPPELS_ETUDE.md` (section 9) avant toute activation ; aucune dépense sans accord. Sans dépense, possible ensuite : écran des préférences de rappel dans l'app (28).
-1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
+1. Lot 2 : réponses du fondateur aux 4 décisions de `docs/LOT2_RAPPELS_ETUDE.md` (section 9) avant toute activation ; aucune dépense sans accord. L'écran des préférences de rappel est fait (étape F) ; la maquette 28 (notifications sur l'écran verrouillé, « alarme ») attend Firebase (décision 2) et la décision sur l'alarme (4).
+1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (notifications de rappel) → lot 2, après Firebase.
 2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
 4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
