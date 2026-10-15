@@ -101,6 +101,12 @@ Future<void> _shot(WidgetTester tester, String name, {bool shade = false}) async
   }
 }
 
+/// Remet la liste de l'écran affiché tout en haut, par positionnement direct (aucun glissement, aucun étirement).
+Future<void> _toTop(WidgetTester tester) async {
+  tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
 /// Appel au relais de la CI (système Android ou base de test), pendant que l'app continue de tourner.
 /// Renvoie la réponse ; échoue avec le message du relais (ce qu'il a vu) si l'opération n'a pas abouti.
 Future<String> _relay(WidgetTester tester, String path) async {
@@ -318,10 +324,9 @@ void main() {
     await _waitFor(tester, find.text('Autorisées pour BIM.'));
     await _waitFor(tester, find.text('Activés pour toi, dès l’ouverture du service.'));
     await _shot(tester, 'a28_rappels');
-    // Toucher l'interrupteur a fait défiler l'écran : on remonte exactement jusqu'au bouton « Retour »
-    // (sans glisser au-delà du haut de la liste : cet étirement faisait tomber l'émulateur de la CI).
-    await tester.ensureVisible(find.byTooltip('Retour', skipOffstage: false));
-    await tester.pump(const Duration(milliseconds: 300));
+    // Toucher l'interrupteur a fait défiler l'écran : retour direct en haut de la liste (positionnement, sans glissement :
+    // un glissement au-delà du haut d'un écran avec Peni fait tomber l'émulateur de la CI, voir docs/TESTING.md).
+    await _toTop(tester);
     await _tap(tester, find.byTooltip('Retour'));
 
     // Notifications programmées classiques (maquette 28). Base de test de la CI uniquement : service des rappels
