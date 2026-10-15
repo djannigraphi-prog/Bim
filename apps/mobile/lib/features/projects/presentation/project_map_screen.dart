@@ -330,7 +330,8 @@ class _DotsPainter extends CustomPainter {
     if (length == 0) return;
     final dir = delta / length;
     final paint = Paint()..color = color;
-    for (var t = fromRadius + 10; t < length - toRadius - 6; t += 14) {
+    // Le chemin monte vers le jour suivant et arrive donc par le bas, où se trouve son libellé « Jour N » (≈ 22 px).
+    for (var t = fromRadius + 10; t < length - toRadius - 28; t += 14) {
       canvas.drawCircle(from + dir * t, 4, paint);
     }
   }
