@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 14/10/2026 (nuit), session 1 — lot 0 terminé (partie 2 : administration, coordonnées, appareils, écran 53) ; lot 1 partie 1 livrée.
+Dernière mise à jour : 15/10/2026, session 1 — lot 0 terminé ; lot 1 développé, testé en CI et comparé aux maquettes 18 à 31 (bilan ci-dessous, clôture en attente de ta validation).
 
 ## Résumé
 
@@ -16,7 +16,7 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | --- | --- | --- | --- | --- | --- | --- |
 | Socle API (config, journaux, santé, erreurs, OpenAPI, limitation) | Terminée | Fait | — | Image Docker de production démarrée en CI | Exécutés, réussis | — |
 | Environnements staging et production (AWS) | Plan écrit (`docs/DEPLOYMENT.md`) | — | — | **Non déployés** | Image testée en CI | Validation des dépenses AWS, autorisation ARTCI, nom de domaine |
-| Base + migrations (8 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
+| Base + migrations (9 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
 | Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel (lot 2) |
 | F15 — âges par capacité | Terminée | Fait (réglages `age.*`) | — | — | Exécutés, réussis | Vérifications légales (DECISIONS.md) |
 | F16 — récupération vérifiée, step-up | Terminée | Fait | Coordonnées, mot de passe, appareils | **Testée sur Android** (ajout d'un e-mail vérifié, nouveau mot de passe) | API + Android : réussis | — |
@@ -24,7 +24,7 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Connexions Google / Apple / Facebook | Terminée | Préparées, **désactivées** (`NOT_CONFIGURED`) | Boutons affichés, « Bientôt disponible » | — | Exécutés (indisponibilité honnête) | Comptes développeur + clés |
 | Thème clair / sombre | Terminée | Préférence enregistrée | Compilé, capture sombre vérifiée | Écrit | — | — |
 | Administration (API `/admin/v1` + application web React) | Terminée | Fait : connexion + TOTP, rôles, réglages, audit, utilisateurs, programmes types, comptes admin | Web : fait | **Testée dans Chromium contre l'API** | API : 8 unitaires + 13 e2e ; web : unitaires + 5 scénarios navigateur | Rôles à valider (T-019) ; hébergement AWS |
-| Lot 1 — Projets BIM, partie 1 (écrans 18-24, 26, 27, 29, 30) | Terminée | Fait : référentiels, création, programme, journée, pause, fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création + séance cochée) | API : 6 unitaires + 13 e2e ; mobile : captures | Programmes types à rédiger (C7) ; photos avant/après (médias, lot 4) ; rappels (lot 2) ; Peni (lot 3) |
+| Lot 1 — Projets BIM (écrans 18-24, 26, 27, 29-31) | Terminée | Fait : référentiels et catégories administrables, création en 5 étapes, mode Éco / Premium gratuit (C6), programmes types validés (mode, conseils), carte et journée, tâche suivante, tâches ajoutées / retirées, pause, signalement (+ traitement admin), mesures chiffrées, photos avant / après privées (S3), fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création, séance, mesure, photo, signalement) ; **admin testée dans Chromium** ; **photos testées sur un vrai serveur S3** en CI | API, admin, Android : réussis (voir bilan du lot 1) | Contenu des programmes types (C7) ; questions C8 ; Peni (lot 3) ; rappels (lot 2) ; profil public (lot 4) ; recommandations marchands (lot 5) ; stockage S3 de production (dépenses AWS, ARTCI) |
 | Lots 2 à 12 (rappels, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
 ## Tests exécutés (session 1, 14/10/2026)
