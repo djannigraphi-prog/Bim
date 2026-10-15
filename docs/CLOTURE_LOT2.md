@@ -13,7 +13,7 @@
 | Rendus des écrans (tests) | Branche `ci-captures` : `x15_rappels` (normal, petit, sombre), `17_notifications`, `62_parametres` |
 | APK de test pour téléphones (workflow manuel) | Run 38759453834 : réussi, APK arm64 de 57 Mo (adresse d’exemple), conservé jusqu’au 18/10 |
 | Rythme et heures calmes (option B) | Tests `reminders.spec.ts` et `reminders.e2e-spec.ts` ; tableau dans `docs/RYTHME_ET_TEXTES_RAPPELS.md`, section 2 |
-| CI des corrections C1 à C3 | GitHub Actions, commits 86c6626 (C1, C2) et suivant (C3) : résultats à reporter ici |
+| CI des corrections C1 à C3, complète et verte (API, admin avec la page Maintenance, mobile, Android) | GitHub Actions, run 38763949317 (commit 86c6626 : C1, C2) et run 38765040587 (commit 7e0cd4e : C3) |
 | Enquête sur la perte de l'émulateur | `docs/TESTING.md`, « Perte de l'émulateur » (3 séries, 12 situations, Android 13 à 15) |
 
 ## 1. Éléments terminés et prouvés
