@@ -343,7 +343,13 @@ class _FooterButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: fg),
-              if (label != null) ...[const SizedBox(width: BimSpacing.sm), Text(label!, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 16))],
+              // Texte réductible : aucun débordement avec une grande taille de police (réglage d'accessibilité du téléphone).
+              if (label != null) ...[
+                const SizedBox(width: BimSpacing.sm),
+                Flexible(
+                  child: Text(label!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 16)),
+                ),
+              ],
             ],
           ),
         ),

@@ -280,12 +280,20 @@ Développé et testé, **inactif** : fuseau horaire par personne (`profiles.time
 5. **Émulateur** : problème documenté et origine recherchée (voir `docs/TESTING.md`, « Perte de l'émulateur ») ; aucun test supprimé.
 6. Finalisation du lot 2 sans dépense ; bilan présenté avant de considérer le lot comme terminé.
 
+### T-032 — Conservation des discussions avec Peni · Produit · mécanisme décidé, durée NON fixée (fondateur, 15/10/2026, 17 h 48)
+Mécanisme configurable prêt et testé : une discussion sans activité depuis `peni.conversation_retention_days` jours est supprimée chaque nuit avec ses messages (lots de 1 000, verrou, un passage par jour, journal `maintenance_runs`, audit sans contenu). **Aucune durée n'est fixée** : la valeur est null (« pending ») et rien n'est supprimé tant qu'une durée d'au moins 7 jours n'est pas validée (« decided ») après examen de la confidentialité et de la réglementation. La proposition de 12 mois n'est pas retenue pour l'instant.
+
+### T-033 — Encouragements de Peni et « Pas sûr ? » de l'écran 21 · Produit · décidé (15/10/2026, 17 h 48)
+1. Encouragements dans la journée (27) et sur la carte (26) : textes écrits et versionnés (`encouragements.ts`, v1), positifs, naturels, jamais culpabilisants ; aucun avis médical ni promesse de résultat ; affichés dans l'app seulement (aucune notification).
+2. Heures calmes (22 h – 6 h par défaut, ou celles de la personne) : Peni n'incite jamais à faire une tâche ; il félicite ou souhaite une bonne nuit.
+3. « Pas sûr ? Demande à Peni » à l'écran 21 : discussion courte qui ne porte que sur l'objectif ; l'objectif choisi est repris à l'étape 3 et reste modifiable. Une hésitation (« je ne sais pas ») n'est jamais prise pour un objectif.
+
 ### T-031 — Lot 3 (Peni) commencé en parallèle du lot 2 · Produit · décidé (fondateur, 15/10/2026, 16 h 26)
 1. Le lot 3 avance sans attendre les tests sur téléphones du lot 2 (aucune dépendance technique : les rappels et Peni partagent seulement le catalogue de messages, R1 et R4). La checklist du lot 2 reste tenue à jour (`docs/CLOTURE_LOT2.md`).
 2. Première fonctionnalité : **discussion guidée avec Peni (écran 25)** qui prépare un projet, ouverte depuis les écrans 19 et 20. Moteur `guided-v1` : réponses écrites et versionnées dans le dépôt, phrases simples comprises par mots-clés, réponses rapides ; brouillon au format de `POST /v1/projects`, vérifié et confirmé par la personne (R5, R6).
 3. **Aucun fournisseur d'IA** : interface `LlmProvider` prête, seul fournisseur « none » (`PENI_LLM_PROVIDER`), réglage `peni.llm_enabled` à false (« pending »). Un fournisseur ne pourra servir que s'il est branché ET si le réglage est validé (« decided ») ; aucune donnée personnelle n'est envoyée à l'extérieur d'ici là.
 4. Cadrage santé (R4) : aucun avis médical, renvoi vers un professionnel ; urgence : SAMU 185, pompiers 180, le projet n'avance pas.
-5. Limites provisoires (administrables) : 100 messages par 24 heures, 60 par discussion. Durée de conservation des discussions : **à décider** (proposition : 12 mois, ou suppression avec le compte seulement).
+5. Limites provisoires (administrables) : 100 messages par 24 heures, 60 par discussion. Durée de conservation des discussions : mécanisme prêt, durée non fixée (T-032).
 6. Écarts assumés avec la maquette 25 : pas de micro (dictée vocale : service externe) ; la question « à la maison ou en salle » n'est pas posée, car la réponse ne serait utilisée nulle part (elle le sera avec les programmes types, C7).
 
 ### T-030 — Décisions du fondateur du 15/10/2026 (15 h 44) · Produit · décidé
