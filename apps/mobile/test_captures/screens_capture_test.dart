@@ -40,6 +40,11 @@ import 'package:bim/features/projects/presentation/project_map_screen.dart';
 import 'package:bim/features/projects/presentation/reports_screen.dart';
 import 'package:bim/features/projects/presentation/transformation_screen.dart';
 import 'package:bim/features/shell/presentation/home_shell.dart';
+import 'package:bim/features/social/data/social_api.dart';
+import 'package:bim/features/social/data/social_models.dart';
+import 'package:bim/features/social/presentation/composer_screen.dart';
+import 'package:bim/features/social/presentation/post_detail_screen.dart';
+import 'package:bim/features/social/presentation/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -215,6 +220,57 @@ class _FakeAuthApi extends AuthApi {
   Future<Map<String, bool>> socialProviders() async => const {'google': false, 'apple': false, 'facebook': false};
 }
 
+
+/// Publications de démonstration POUR LES CAPTURES UNIQUEMENT (personnes et textes inventés, aucune photo réelle :
+/// les images s'affichent en emplacement neutre, faute de serveur).
+class _FakeSocialApi extends SocialApi {
+  _FakeSocialApi(super.api);
+
+  static const _edwige = PersonRef(id: 'u1', username: 'edwige.k', fullName: 'Edwige Koffi');
+  static const _me = PersonRef(id: 'u0', username: 'yannick.doho', fullName: 'Doho Yannick');
+  static final _bim = FeedPost(
+    id: 'p1',
+    kind: 'bim',
+    text: 'De 90 kg à 65 kg, j’ai transformé mon style et ma vie. Ce BIM est celui dont je suis la plus fière…',
+    visibility: 'public',
+    createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+    author: _edwige,
+    media: const [
+      PostMedia(id: 'b', kind: 'before', width: 800, height: 1000, takenDay: '2026-08-14'),
+      PostMedia(id: 'a', kind: 'after', width: 800, height: 1000, takenDay: '2026-10-13'),
+    ],
+    journey: const Journey(category: 'Style & look', goal: 'Silhouette', days: 30, stepsDone: 24),
+    likeCount: 10240,
+    commentCount: 214,
+    likedByMe: true,
+    isMine: false,
+    followingAuthor: false,
+  );
+
+  @override
+  Future<FeedPage> feed({required String tab, String? cursor}) async => FeedPage(items: tab == 'following' ? const [] : [_bim]);
+
+  @override
+  Future<FeedPost> post(String id) async => _bim;
+
+  @override
+  Future<CommentsPage> comments(String postId, {String? cursor}) async => CommentsPage(total: 3, items: [
+        PostComment(id: 'c1', text: 'Bravo, ça motive ! ✨', createdAt: DateTime.now().subtract(const Duration(hours: 2)), author: _me, likeCount: 12, likedByMe: false, canDelete: false, isMine: false),
+        PostComment(id: 'c2', parentId: 'c1', text: 'Merci ! Le coach m’a bien aidée 😍', createdAt: DateTime.now().subtract(const Duration(hours: 1)), author: _edwige, likeCount: 3, likedByMe: true, canDelete: false, isMine: false),
+        PostComment(id: 'c3', text: 'Tu as suivi quel programme ?', createdAt: DateTime.now().subtract(const Duration(minutes: 20)), author: const PersonRef(id: 'u2', username: 'davila', fullName: 'Davila Koula'), likeCount: 0, likedByMe: false, canDelete: false, isMine: false),
+      ],);
+
+  @override
+  Future<PublicProfile> profile(String username) async =>
+      const PublicProfile(person: _me, bims: 34, followers: 2830, following: 120, projects: 3, isMe: true, followedByMe: false, followsMe: false, blockedByMe: false, city: 'Abidjan');
+
+  @override
+  Future<FeedPage> personPosts(String username, {String? cursor}) async => FeedPage(items: [
+        _bim,
+        for (var i = 0; i < 5; i++)
+          FeedPost(id: 'g$i', kind: 'post', text: 'Séance du jour ${i + 1} 💪', visibility: 'public', createdAt: DateTime.now(), author: _me, media: const [], likeCount: 0, commentCount: 0, likedByMe: false, isMine: true, followingAuthor: false),
+      ],);
+}
 
 /// Données de démonstration POUR LES CAPTURES UNIQUEMENT (jamais affichées dans l'app) ; le catalogue reprend la migration 0005.
 class _FakeProjectsApi extends ProjectsApi {
@@ -401,6 +457,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     notificationPreferencesApiProvider.overrideWithValue(_FakeNotificationPreferencesApi(client)),
     inboxApiProvider.overrideWithValue(_FakeInboxApi(client)),
     peniApiProvider.overrideWithValue(_FakePeniApi(client)),
+    socialApiProvider.overrideWithValue(_FakeSocialApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -428,6 +485,9 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/projects/p1/reports', builder: (_, __) => const ReportsScreen(projectId: 'p1')),
     GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
     GoRoute(path: '/projects/p1/today', builder: (_, __) => ProjectDayScreen(projectId: 'p1', day: _FakeProjectsApi.iso(0))),
+    GoRoute(path: '/posts/p1', builder: (_, __) => const PostDetailScreen(postId: 'p1')),
+    GoRoute(path: '/people/yannick.doho', builder: (_, __) => const ProfileScreen(username: 'yannick.doho')),
+    GoRoute(path: '/social/new', builder: (_, __) => const ComposerScreen()),
   ],);
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
@@ -663,6 +723,49 @@ void main() {
   testWidgets('rappels (sombre)', (t) async {
     await _show(t, '/account/reminders', mode: ThemeMode.dark);
     await _capture(t, 'x15_rappels_sombre');
+  });
+  // Lot 4 — social (écrans 10, 11, 12, 16, 52, 63).
+  Future<void> signIn(ProviderContainer c) => c.read(sessionProvider.notifier).completeSignIn((
+        tokens: const Tokens(accessToken: 'a', refreshToken: 'r'),
+        me: const Me(id: 'u0', fullName: 'Doho Yannick', username: 'yannick.doho', city: 'Abidjan', theme: 'system', contacts: []),
+      ));
+  testWidgets('10 accueil (fil)', (t) async {
+    final c = await _show(t, '/home');
+    await signIn(c);
+    await _settle(t);
+    await _capture(t, '10_accueil');
+  });
+  testWidgets('63 accueil sombre (fil)', (t) async {
+    final c = await _show(t, '/home', mode: ThemeMode.dark);
+    await signIn(c);
+    await _settle(t);
+    await _capture(t, '63_accueil_sombre');
+  });
+  testWidgets('11 publication', (t) async {
+    await _show(t, '/posts/p1');
+    await _capture(t, '11_bim_post');
+  });
+  testWidgets('12 commentaires', (t) async {
+    await _show(t, '/posts/p1');
+    await t.tap(find.byKey(const ValueKey('comments-p1')));
+    await _settle(t);
+    await _capture(t, '12_commentaires');
+  });
+  testWidgets('16 nouveau Bim', (t) async {
+    final c = await _show(t, '/social/new');
+    await signIn(c);
+    await _settle(t);
+    await _capture(t, '16_partager');
+  });
+  testWidgets('52 profil', (t) async {
+    await _show(t, '/people/yannick.doho');
+    await _capture(t, '52_profil_user');
+  });
+  testWidgets('10 accueil, petit écran', (t) async {
+    final c = await _show(t, '/home', physical: const Size(960, 1704));
+    await signIn(c);
+    await _settle(t);
+    await _capture(t, 'x16_petit_ecran_fil');
   });
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);
