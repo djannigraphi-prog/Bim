@@ -20,6 +20,8 @@ export interface LlmRequest {
   system: string;
   messages: LlmMessage[];
   maxOutputTokens: number;
+  /** Annulation quand le délai maximal est dépassé (étape 2) : le fournisseur doit abandonner la requête. */
+  signal?: AbortSignal;
 }
 export interface LlmResult {
   text: string;

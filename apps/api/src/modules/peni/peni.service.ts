@@ -15,6 +15,7 @@ import { encouragement } from './encouragements';
 import { explainTask } from './task-explanations';
 import { EngineContext, EngineInput, EngineResult, handleInput, InvalidChoiceError, PENI_ENGINE_VERSION, PeniReply, PeniState, QuickReply, startConversation } from './engine';
 import { LLM_PROVIDER, LlmProvider } from './llm-provider';
+import { rephrase } from './llm/rephrase';
 
 type Clock = { now(): Date };
 
@@ -129,11 +130,11 @@ export class PeniService {
       const created = await (underLock
         ? this.db.transaction(async (tx) => {
             const snap = await this.snapshot(tx, userId, id, true);
-            const result = await this.respondChecked(snap, input, ctx, maxInConversation);
+            const result = await this.respondChecked(snap, input, ctx, maxInConversation, true);
             return this.persist(tx, userId, id, snap.last, dto, result);
           })
         : this.snapshot(this.db, userId, id, false).then(async (snap) => {
-            const result = await this.respondChecked(snap, input, ctx, maxInConversation);
+            const result = await this.respondChecked(snap, input, ctx, maxInConversation, false);
             return this.db.transaction(async (tx) => {
               const now = await this.snapshot(tx, userId, id, true);
               if (now.last !== snap.last) return null; // un autre message est passé entre-temps : on recommence
@@ -178,16 +179,32 @@ export class PeniService {
     return r.rows[0];
   }
 
-  private async respondChecked(snap: { state: PeniState; n: number }, input: EngineInput, ctx: EngineContext, maxInConversation: number) {
+  private async respondChecked(snap: { state: PeniState; n: number }, input: EngineInput, ctx: EngineContext, maxInConversation: number, underLock: boolean) {
     if (snap.n >= maxInConversation) {
       throw Errors.conflict('PENI_CONVERSATION_TOO_LONG', 'Cette discussion est déjà bien longue 😊 Recommence une nouvelle discussion avec Peni.');
     }
+    let result: EngineResult;
     try {
-      return await this.respond(snap.state, input, ctx);
+      result = await this.respond(snap.state, input, ctx);
     } catch (e) {
       if (e instanceof InvalidChoiceError) throw Errors.validation({ fields: { choice: ['Cette réponse n’est plus proposée. Choisis une des réponses affichées.'] } });
       throw e;
     }
+    // Jamais d'IA sous verrou (dernier essai d'un envoi disputé) : la discussion ne reste pas bloquée pendant un appel.
+    return underLock ? result : this.withAi(result, input, ctx);
+  }
+
+  /**
+   * Peni IA (étape 2) : seulement si un fournisseur est branché ET autorisé par le fondateur (`llmAllowed`, faux
+   * aujourd'hui). L'IA ne peut que reformuler les textes ; le reste vient du moteur guidé. Tout refus, erreur ou
+   * délai dépassé laisse la réponse guidée intacte. Journal sans contenu (ni message, ni texte de l'IA).
+   */
+  private async withAi(result: EngineResult, input: EngineInput, ctx: EngineContext): Promise<EngineResult> {
+    if (!(await this.llmAllowed())) return result;
+    const r = await rephrase(this.llm, { state: result.state, input, replies: result.replies, ctx });
+    this.logger.log({ msg: 'peni.llm', provider: this.llm.name, outcome: r.outcome, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, prompt: r.promptVersion });
+    const texts = r.texts;
+    return texts ? { ...result, replies: result.replies.map((reply, i) => ({ ...reply, text: texts[i] })) } : result;
   }
 
   /** Écriture courte, sous le verrou de la discussion : message de la personne, réponses de Peni, nouvel état. */
