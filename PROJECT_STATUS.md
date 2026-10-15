@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 étudié (rappels, coûts), non commencé en attendant l'accord du fondateur.
+Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 commencé pour la partie sans dépense (rappels : étapes A à E développées et testées, rien d'activé) ; activation en attente de l'accord du fondateur.
 
 ## Résumé
 
@@ -68,12 +68,26 @@ Vérification dans un environnement adapté : **captures réelles de l'émulateu
 Contenu des programmes types et habitudes du jour réelles (**C7, action du fondateur**) ; durée de conservation des images jointes aux signalements (T-022 : 12 mois **proposés, en attente de validation juridique et réglementaire**) ; écran 25 Peni (lot 3) ; écran 28 rappels (lot 2) ; écran 52 profil public et publication « J'ai fait mon BIM » (lot 4) ; recommandations de marchands (lot 5) ; stockage S3 de production (validation des dépenses AWS, autorisation ARTCI) ; pas de test sur un vrai téléphone ; iOS non compilé.
 
 ### Préparation des lots 2 et 3
-Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal des événements complété, T-023). Décidé le 15/10 (T-025) : lancement en Côte d'Ivoire, architecture prête pour d'autres pays ; rappels par **notifications d'abord**. Étude selon R-01 et R-01 bis (meilleur équilibre qualité, fiabilité, sécurité, évolutivité et coût) : `docs/LOT2_RAPPELS_ETUDE.md` — 5 architectures et 8 composants comparés (gratuit / payant, sécurité, migration) ; **recommandé : service worker séparé (seul poste payant), FCM / APNs, file pg-boss, Parameter Store, Crashlytics, CloudWatch (gratuits car suffisants), évolution prévue vers SQS** ; budget estimé des rappels ≈ 16 à 21 USD/mois au lancement, ≈ 42 à 52 à 100 000 actifs, ≈ 170 à 370 à 1 million (prix de Paris à confirmer). **Le lot 2 n'est pas commencé** : 5 décisions attendent l'accord du fondateur (architecture, budget ou report, projet Firebase, rythme et heures calmes, pas d'alarme exacte en version 1).
+Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal des événements complété, T-023). Décidé le 15/10 (T-025) : lancement en Côte d'Ivoire, architecture prête pour d'autres pays ; rappels par **notifications d'abord**. Étude selon R-01 et R-01 bis (meilleur équilibre qualité, fiabilité, sécurité, évolutivité et coût) : `docs/LOT2_RAPPELS_ETUDE.md` — 5 architectures et 8 composants comparés (gratuit / payant, sécurité, migration) ; **recommandé : service worker séparé (seul poste payant), FCM / APNs, file pg-boss, Parameter Store, Crashlytics, CloudWatch (gratuits car suffisants), évolution prévue vers SQS** ; budget estimé des rappels ≈ 16 à 21 USD/mois au lancement, ≈ 42 à 52 à 100 000 actifs, ≈ 170 à 370 à 1 million (prix de Paris à confirmer). **Lot 2 commencé sans dépense** (accord du 15/10, 07 h 40) : voir la section « Lot 2 — avancement » ; 4 décisions attendent l'accord du fondateur avant activation (étude, section 9).
 
 ### Vérification finale
 - CI complète **réussie** sur `2c2a24c` (exécution 38691542705) : API (lint, compilation, 66 tests unitaires, 81 de bout en bout dont S3 réel, contrat OpenAPI, image Docker de production), mobile (analyse sans remarque, tests, captures, APK), Android sur émulateur contre l'API (parcours complet des lots 0 et 1, captures réelles), administration (7 scénarios Chromium).
 - En local (15/10) : API 66 unitaires + 80 e2e réussis (S3 réel seulement en CI) ; administration 7 scénarios Chromium réussis ; migration 0010 appliquée sur une base existante.
 - Non vérifié : vrai téléphone, iOS (compilation non lancée, décision du fondateur).
+
+## Lot 2 — avancement (15/10/2026, partie sans dépense)
+
+Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'aucune décision en attente. **Rien n'est activé** : `WORKER_MODE=off`, `PUSH_PROVIDER=none` par défaut, réglage `notifications.reminders_enabled` = false (« en attente »), aucun projet Firebase, aucune ressource AWS.
+
+| Étape | Contenu | Tests | CI |
+| --- | --- | --- | --- |
+| A | Fuseau horaire par personne ; « aujourd'hui » à l'heure locale (projets, photos, signalements) | unitaires + e2e | verte (run 38701596068) |
+| B | Appareils de notification (par session, supprimés à la déconnexion) ; préférences ; réglages des rappels « en attente » | e2e | verte (run 38701596068) |
+| C | Calcul des rappels (fonctions pures) | 9 unitaires | voir ci-dessous |
+| D | Worker : file PostgreSQL, anti-doublon, reprise, péremption, essais, revérification, santé, `/health`, page admin | 7 e2e (workers concurrents, panne, jeton invalide…) ; démarrage réel du worker séparé vérifié en local | voir ci-dessous |
+| E | Envoi FCM HTTP v1 prêt, inactif | 5 tests contre un faux serveur ; 1 test de configuration | voir ci-dessous |
+
+Suite API locale : 180 tests réussis (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
 ## Tests exécutés (session 1, 14/10/2026)
 
@@ -163,7 +177,7 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Lot 2 : réponses du fondateur aux 5 décisions de `docs/LOT2_RAPPELS_ETUDE.md` avant tout développement complet ; aucune dépense ni activation en production sans accord.
+1. Lot 2 : réponses du fondateur aux 4 décisions de `docs/LOT2_RAPPELS_ETUDE.md` (section 9) avant toute activation ; aucune dépense sans accord. Sans dépense, possible ensuite : écran des préférences de rappel dans l'app (28).
 1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
 2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).

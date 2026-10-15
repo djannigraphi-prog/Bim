@@ -4,12 +4,13 @@
 
 | Élément | Service | Taille de départ |
 | --- | --- | --- |
-| API + worker | ECS Fargate derrière un Application Load Balancer (HTTPS, ACM) | 2 tâches API (0,5 vCPU / 1 Go), 1 worker |
+| API | ECS Fargate derrière un Application Load Balancer (HTTPS, ACM) | 2 tâches (0,5 vCPU / 1 Go) |
+| Worker des rappels (lot 2, **activation soumise à l'accord du fondateur**) | ECS Fargate, même image que l'API, commande `node dist/worker.js`, `WORKER_MODE=standalone`, `PUSH_PROVIDER=fcm` ; **aucune entrée publique** ; contrôle de santé du conteneur : `GET http://localhost:3100/health` (503 = arrêté) ; sortie Internet vers Firebase par le NAT de l'API ou une adresse publique par tâche (à choisir avec le plan réseau) | 2 tâches ARM (0,25 vCPU / 0,5 Go), montée en charge 2 à 6 ; coût détaillé : `docs/LOT2_RAPPELS_ETUDE.md`, section 10 |
 | Base | RDS PostgreSQL 16 | db.t4g.small, 50 Go gp3, sauvegardes 14 jours, Multi-AZ en production |
 | Photos privées (avant / après) | S3 privé, chiffrement au repos, accès bloqué au public, liens présignés de 5 min ; rôle IAM de l'API limité au compartiment | lot 1 (code prêt et testé avec MinIO) |
 | Fichiers publics (publications) | S3 + CloudFront | lot 4 |
-| Secrets | Secrets Manager | une entrée par environnement |
-| Journaux, métriques, alertes | CloudWatch | alarmes 5xx, latence, CPU, connexions base |
+| Secrets | Secrets Manager (secrets de l'API) ; Parameter Store chiffré pour la clé Firebase `FCM_SERVICE_ACCOUNT_JSON`, lisible par le seul rôle du worker | une entrée par environnement |
+| Journaux, métriques, alertes | CloudWatch | alarmes 5xx, latence, CPU, connexions base ; rappels : worker arrêté, rappels en retard, échecs, manqués (filtres sur `reminders.metrics`, voir l'étude, section 11) |
 | E-mails | SES | lot 2 |
 | Images Docker | ECR | balayage de vulnérabilités activé |
 | Administration web | S3 (privé) + CloudFront, accès limité par AWS WAF (adresses IP de l'équipe ou VPN) | fichiers statiques (`apps/admin/dist`) |
@@ -32,5 +33,6 @@ L'infrastructure sera décrite en Terraform dans `infra/terraform/` (à écrire)
 - Restauration de sauvegarde testée (`docs/BACKUP_RESTORE.md`).
 - Administration : `ADMIN_TOTP_ENCRYPTION_KEY` dans Secrets Manager ; routes `/admin/*` de l'API et site d'administration limités aux adresses de l'équipe (WAF) ; premier administrateur principal créé par une tâche ECS ponctuelle : `ADMIN_PASSWORD=… node dist/admin-cli.js --email … --name … --roles super_admin` (mot de passe transmis hors de tout dépôt, double authentification configurée à la première connexion).
 - Vérifications légales de `DECISIONS.md` (F15) et autorisations ARTCI obtenues.
+- Rappels : coût de Paris confirmé avec le calculateur AWS, accord du fondateur sur la dépense et sur les valeurs des réglages `notifications.*` ; projet Firebase créé ; arrêt volontaire d'une tâche du worker en préproduction pour vérifier la reprise et l'alerte.
 
 La publication sur Google Play et l'App Store est une étape distincte, avec les comptes du fondateur ; elle n'est jamais automatique.

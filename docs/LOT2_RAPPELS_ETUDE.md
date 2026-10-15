@@ -1,6 +1,6 @@
 # Lot 2 — Rappels : comparaison des architectures, coûts et recommandation
 
-Version du 15/10/2026, selon les règles **R-01 et R-01 bis** du fondateur (`DECISIONS.md`) : choisir, pour chaque composant, le **meilleur équilibre entre qualité, fiabilité, sécurité, performances, évolutivité et coût** — une solution gratuite si elle suffit vraiment, une solution payante si elle apporte un avantage important ; coûts, limites, sécurité et difficulté de migration présentés ; aucune dépense sans accord. **Rien n'est activé ni développé.** Statuts : *recommandé* (à valider) · *décidé*.
+Version du 15/10/2026, selon les règles **R-01 et R-01 bis** du fondateur (`DECISIONS.md`) : choisir, pour chaque composant, le **meilleur équilibre entre qualité, fiabilité, sécurité, performances, évolutivité et coût** — une solution gratuite si elle suffit vraiment, une solution payante si elle apporte un avantage important ; coûts, limites, sécurité et difficulté de migration présentés ; aucune dépense sans accord. **Mise à jour du 15/10/2026 (après-midi)** : la partie sans dépense est développée et testée (sections 10 à 12) ; **rien n'est activé** (aucun service payant, aucun projet Firebase, interrupteur des rappels coupé). Statuts : *recommandé* (à valider) · *décidé*.
 
 ## 1. Cadre décidé (15/10/2026)
 
@@ -34,8 +34,8 @@ Ces hypothèses seront remplacées par des mesures réelles dès les premiers ut
 | --- | --- | --- | --- | --- | --- |
 | **Canal d'envoi** | FCM (Android) et APNs (iOS) : gratuits, 600 000 messages/min par projet | OneSignal, Pushwoosh, AWS End User Messaging : tableaux de bord, segmentation, campagnes ; **ils passent eux-mêmes par FCM / APNs** | **Gratuit : FCM / APNs** | Même fiabilité de remise ; le payant n'ajoute que des outils marketing, pas nécessaires aux rappels | Faible : l'envoi passe par une interface « envoi de notification » ; ajouter une plateforme marketing plus tard ne touche pas les rappels |
 | **Exécution des rappels** | Dans l'API existante (aucun coût en plus) : le pic du soir ralentit l'app ; une panne ou un déploiement de l'API arrête les rappels | Service séparé (2 tâches Fargate, ≈ 16 USD/mois) : isolation, haute disponibilité, montée en charge automatique | **Payant : service séparé** | Avantage important et nécessaire : fiabilité des rappels et réactivité de l'app au même moment | Faible : même code, déplacé par simple configuration |
-| **File d'attente** | pg-boss dans la base PostgreSQL déjà prévue (aucun coût en plus) : suffisant jusqu'à environ 1 million de personnes actives ; charge modérée sur la base | SQS (≈ 0 à 1 USD au lancement, ≈ 11 à 110 USD à 1 million) : sans limite pratique, ne pèse pas sur la base ; Redis / Valkey (≈ 15 à 30 USD) : très haut débit mais base en plus à exploiter | **Gratuit au lancement : pg-boss** ; **SQS prévu** pour la croissance | À l'échelle du lancement, SQS n'apporte pas d'avantage significatif ; pg-boss garde les tâches en base (aucune perte) | Faible à moyenne : un adaptateur SQS derrière l'interface « file de rappels », quelques jours de travail et de tests ; aucune donnée à migrer (les rappels en attente sont recalculés) |
-| **Minuteur** (sélection des rappels dus chaque minute) | Planification intégrée à pg-boss | EventBridge Scheduler (dans la gratuité de 14 millions de déclenchements/mois, ensuite 1 USD par million) | **Gratuit : pg-boss** au lancement ; EventBridge avec SQS | Même fiabilité tant que le worker tourne en deux exemplaires | Faible |
+| **File d'attente** | File dans la base PostgreSQL déjà prévue (aucun coût en plus ; d'abord pg-boss, finalement une table dédiée, voir 12) : suffisant jusqu'à environ 1 million de personnes actives ; charge modérée sur la base | SQS (≈ 0 à 1 USD au lancement, ≈ 11 à 110 USD à 1 million) : sans limite pratique, ne pèse pas sur la base ; Redis / Valkey (≈ 15 à 30 USD) : très haut débit mais base en plus à exploiter | **Gratuit au lancement : file PostgreSQL** ; **SQS prévu** pour la croissance | À l'échelle du lancement, SQS n'apporte pas d'avantage significatif ; la file garde les rappels en base (aucune perte) | Faible à moyenne : un adaptateur SQS derrière l'interface « file de rappels », quelques jours de travail et de tests ; aucune donnée à migrer (les rappels en attente sont recalculés) |
+| **Minuteur** (sélection des rappels dus chaque minute) | Minuterie du worker (chaque minute, sans chevauchement) | EventBridge Scheduler (dans la gratuité de 14 millions de déclenchements/mois, ensuite 1 USD par million) | **Gratuit : minuterie du worker** au lancement ; EventBridge avec SQS | Même fiabilité tant que le worker tourne en deux exemplaires | Faible |
 | **Secret de connexion à Firebase** | Parameter Store (SecureString chiffré par KMS, paramètres standard sans frais) : pas de rotation automatique | Secrets Manager (0,40 USD par secret et par mois) : rotation automatique | **Gratuit : Parameter Store** | Chiffré, accès limité au worker ; la rotation automatique ne s'applique pas à une clé Firebase (rotation manuelle, documentée) | Très faible |
 | **Surveillance serveur** | CloudWatch, offre gratuite permanente : 10 alarmes, 3 tableaux de bord, 5 Go de journaux/mois | CloudWatch au-delà (journaux 0,50 USD/Go, alarme 0,10 USD) ; Grafana Cloud Pro (19 USD par utilisateur et par mois) | **CloudWatch** (gratuit au lancement, payant à l'usage ensuite) | Intégré à AWS, sans service de plus ; l'offre gratuite couvre le lancement, le coût suit le volume | Faible (journaux et métriques standard) |
 | **Plantages de l'app** | Firebase Crashlytics (gratuit, même projet Firebase) ; Sentry gratuit (5 000 erreurs/mois, 1 utilisateur) | Sentry Team (26 USD/mois) : suivi commun app + serveur | **Gratuit : Crashlytics** | Référence pour les apps mobiles, gratuite, déjà dans l'écosystème Firebase | Faible |
@@ -61,7 +61,7 @@ Prix de calcul : AWS Fargate ARM (Graviton). Tarif public us-east-1 : 0,03238 US
 
 ### Option 2 — Service « worker » séparé (même code, file de tâches dans PostgreSQL) — **recommandé**
 
-Même image Docker que l'API, autre commande de démarrage ; planification et envois dans une file pg-boss stockée dans PostgreSQL (déjà prévu).
+Même image Docker que l'API, autre commande de démarrage (`npm run start:worker`) ; planification et envois dans une file stockée dans PostgreSQL (table `notification_deliveries`, déjà développée).
 
 | | |
 | --- | --- |
@@ -108,19 +108,19 @@ Un minuteur EventBridge déclenche chaque minute la sélection des rappels dus ;
 
 ## 5. Recommandation technique finale
 
-**Option 2 au lancement public, conçue pour passer à l'option 3 sans réécriture.** Un seul poste payant est recommandé au lancement — le service séparé — parce qu'il apporte un avantage important et nécessaire (fiabilité des rappels, réactivité de l'app). Les autres composants restent gratuits parce qu'ils répondent pleinement au besoin (voir 3 bis) : FCM / APNs, file pg-boss, Parameter Store, Crashlytics, CloudWatch dans son offre gratuite.
+**Option 2 au lancement public, conçue pour passer à l'option 3 sans réécriture.** Un seul poste payant est recommandé au lancement — le service séparé — parce qu'il apporte un avantage important et nécessaire (fiabilité des rappels, réactivité de l'app). Les autres composants restent gratuits parce qu'ils répondent pleinement au besoin (voir 3 bis) : FCM / APNs, file PostgreSQL, Parameter Store, Crashlytics, CloudWatch dans son offre gratuite.
 
 1. Un service **worker** séparé (même code que l'API), **2 tâches** de 0,25 vCPU / 0,5 Go ARM, montée en charge automatique (2 à 6 tâches) selon la longueur de la file.
 2. Planification **côté serveur**, recalculée à partir du journal des événements du projet (T-023) ; vérification « tâche déjà cochée ? » au moment d'envoyer ; heures calmes.
 3. Envoi par **FCM / APNs** (notifications « système », priorité haute), plus une **notification locale de secours** non exacte dans l'app.
-4. Le code passe par deux interfaces : « file de rappels » et « envoi de notification ». Remplacer pg-boss par SQS (option 3), ou FCM par un autre canal, ne touche pas les règles métier.
+4. Le code passe par deux interfaces : « file de rappels » et « envoi de notification ». Remplacer la file PostgreSQL par SQS (option 3), ou FCM par un autre canal, ne touche pas les règles métier.
 5. **Surveillance** : tableau de bord et alertes (rappels en retard, échecs FCM, file qui grossit), taux de remise mesuré par modèle de téléphone.
 
 **Pourquoi pas l'option 1, moins chère :** elle place les rappels et l'app sur les mêmes machines au moment exact où les deux sont le plus sollicités, et une panne ou un déploiement de l'API arrêterait les rappels. Pour un produit dont la promesse est « Peni te rappelle à l'heure », la fiabilité des rappels est centrale.
 
 ## 6. Estimation budgétaire (rappels uniquement)
 
-Hors API, base de données et autres services, chiffrés dans le budget d'hébergement global (`DEPLOYMENT.md`, à compléter selon R-01). Montants en USD par mois, estimés ; Paris à confirmer.
+Hors API, base de données et autres services, chiffrés dans le budget d'hébergement global (`DEPLOYMENT.md`, à compléter selon R-01). Montants en USD par mois, estimés ; détail des ressources et du coût à Paris en section 10.
 
 | Poste | Lancement (≈ 10 000 actifs) | ≈ 100 000 actifs | ≈ 1 000 000 actifs |
 | --- | --- | --- | --- |
@@ -145,14 +145,71 @@ Coûts uniques ou annuels : compte Apple Developer 99 USD/an (déjà nécessaire
 - Téléphones très limitants en arrière-plan (Tecno, Infinix, itel…) : les notifications « système » FCM résistent mieux que tout traitement dans l'app ; à mesurer sur de vrais téléphones.
 - Téléphones sans services Google : pas de FCM ; seule la notification locale de secours fonctionne. Part à mesurer.
 
-## 9. Décisions qui demandent ton accord
+## 9. Décisions qui demandent réellement ton accord
 
-1. **Architecture** : option 2 (recommandée), conçue pour évoluer vers l'option 3 ; composants gratuits retenus là où ils suffisent (tableau 3 bis).
-2. **Budget** : ≈ 16 à 21 USD/mois pour les rappels au lancement (à ajouter au budget d'hébergement), ou report avec les conséquences du point 7.
-3. **Création du projet Firebase** au nom de l'entreprise (gratuit), pour les tests sur de vrais téléphones.
-4. **Rythme et heures calmes** : heure de la tâche, +1 h, +2 h ; pas de rappel de 22 h à 6 h (réglable par la personne).
-5. **Pas d'alarme exacte en version 1**, décision réexaminée après mesures.
+Rien de ce qui suit n'est considéré comme validé. Elles ne bloquent pas le développement sans dépense (déjà fait, voir 12) ; elles bloquent l'**activation**.
 
-Sans dépense et sans attendre ces décisions, il est possible de préparer : le fuseau horaire par personne, les interfaces « file de rappels » et « envoi de notification » avec leurs tests, les modèles de messages de Peni et les préférences de notification. L'intégration réelle de Firebase et le déploiement du worker attendent ton accord.
+| # | Décision | Ce que je propose | Quand elle devient nécessaire | Si tu refuses ou reportes |
+| --- | --- | --- | --- | --- |
+| 1 | **Service séparé pour les rappels (dépense)** | 2 tâches Fargate ARM 0,25 vCPU / 0,5 Go à Paris, ≈ **16 à 17 USD/mois** si un NAT est déjà prévu pour l'API, ≈ **23 à 24 USD/mois** sinon (détail en 10) | Avant le lancement public | Le worker tourne dans l'API (`WORKER_MODE=embedded`, 0 USD en plus), avec les inconvénients du point 7 ; bascule plus tard par simple configuration |
+| 2 | **Création du projet Firebase** au nom de l'entreprise (gratuit) | Un projet « BIM » (Android puis iOS), compte de service réservé au worker, clé dans Parameter Store | Pour l'inscription des téléphones dans l'app et les tests sur de vrais téléphones | Pas de notification réelle ; le reste fonctionne. Google devient sous-traitant des jetons d'appareil : à mentionner dans la politique de confidentialité (ARTCI) |
+| 3 | **Rythme des rappels et heures calmes** (valeurs produit) | Heure de la tâche, +1 h, +2 h ; aucun rappel de 22 h à 6 h, réglable par la personne | Avant l'activation | Toute autre valeur se change dans l'administration, sans développement |
+| 4 | **Pas d'alarme exacte en version 1** | Notifications seulement, réexamen après mesures sur de vrais téléphones | Avant la version 1 | Les alarmes exactes demandent une autorisation Android spéciale (refusée par défaut sur Android 14) et un développement mobile en plus |
 
-Sources : [Firebase — tarifs (FCM et Crashlytics « No-cost »)](https://firebase.google.com/pricing/?hl=fr) · [CloudWatch — tarifs et offre gratuite](https://www.cloudzero.com/blog/cloudwatch-pricing) · [Secrets Manager et Parameter Store](https://infisical.com/blog/aws-secrets-manager-vs-parameter-store) · [Grafana Cloud — offre gratuite](https://costbench.com/software/observability/grafana-cloud/free-plan/) · [Sentry — offre gratuite](https://costbench.com/software/developer-tools/sentry/free-plan/) · [FCM — limites et quotas](https://firebase.google.com/docs/cloud-messaging/throttling-and-quotas) · [Android 14 — alarmes exactes](https://developer.android.com/about/versions/14/changes/schedule-exact-alarms) · [Tarifs Fargate (us-east-1)](https://www.vantage.sh/blog/fargate-pricing) · [Région Paris, écart de prix moyen](https://cloudprice.net/aws/region/eu-west-3) · [EventBridge — tarifs](https://aws.amazon.com/eventbridge/pricing/) · [SQS — tarifs](https://hevodata.com/learn/comprehensive-guide-on-aws-sqs-pricing/) · [ElastiCache — tarifs 2026](https://upstash.com/blog/aws-elasticache-pricing-explained-2026-full-cost-breakdown) · [Fin d'Amazon Pinpoint](https://docs.aws.amazon.com/pinpoint/latest/userguide/migrate.html)
+Points que je ne te soumets pas, parce qu'ils sont techniques, gratuits et réversibles (pour information) : file PostgreSQL native au lieu de pg-boss (12) ; délai de grâce de 30 minutes (réglage « provisoire », modifiable) ; permission d'administration « surveillance technique » (`system.health` : administrateur principal, technique, support), rattachée à la proposition T-019 encore à valider.
+
+## 10. Coût réel du service des rappels à Paris (eu-west-3) — détail
+
+**Ce qui est confirmé et ce qui ne l'est pas.** Les prix officiels de la région Paris n'ont pas pu être lus depuis l'environnement de travail (la page de prix AWS et le calculateur sont inaccessibles, et les sources publiques ne donnent que la Virginie, l'Irlande ou Francfort). Les chiffres ci-dessous sont donc **des estimations encadrées**, pas des prix confirmés. Confirmation exacte, gratuite et sans rien créer : le [calculateur AWS](https://calculator.aws/) (région « Europe (Paris) »), ou, une fois ton compte AWS ouvert, `aws pricing get-products --service-code AmazonECS --region us-east-1 --filters Type=TERM_MATCH,Field=location,Value="EU (Paris)"` (lecture seule, gratuite). Je le ferai avant toute demande d'activation.
+
+Ressources nécessaires (aucune n'est créée) :
+
+| Ressource | Quantité | Prix de référence | Estimation Paris / mois |
+| --- | --- | --- | --- |
+| Calcul Fargate ARM (Graviton) | 2 tâches × 0,25 vCPU / 0,5 Go, 730 h | us-east-1 : 0,03238 USD/vCPU-h, 0,00356 USD/Go-h → 7,21 USD par tâche | **≈ 15,9 à 16,6 USD** (Paris + 10 à 15 %) |
+| Accès sortant vers Firebase | au choix : (a) NAT déjà prévu pour l'API, partagé ; (b) une adresse IPv4 publique par tâche | (a) heure du NAT payée par l'API, + ≈ 0,05 USD par Go traité ; (b) 0,005 USD/h par adresse (toutes régions) | (a) **≈ 0** ; (b) **7,30 USD** |
+| Journaux CloudWatch | ≈ 1 ligne de mesure par minute et par tâche, ≈ 0,1 Go/mois | 5 Go/mois gratuits (partagés avec l'API), puis ≈ 0,5 USD/Go | **0** au lancement |
+| Alarmes CloudWatch + e-mail d'alerte (SNS) | 4 alarmes (voir 11) | 10 alarmes gratuites (l'API en prévoit 4 : total 8) ; 1 000 e-mails SNS gratuits | **0** au lancement |
+| Mesures personnalisées (filtres de journaux) | ≈ 4 | 10 gratuites, puis 0,30 USD | **0** au lancement |
+| Secret Firebase | 1 paramètre chiffré (Parameter Store standard) | gratuit (chiffrement par la clé gérée AWS) | **0** |
+| Image Docker | la même que l'API (ECR) | déjà comptée | **0** |
+| Base de données | la même que l'API (RDS) ; ≈ 3 écritures par rappel | déjà comptée ; charge modérée | **0** en plus au lancement |
+| Données sortantes | ≈ 1 million de notifications de ≈ 2 Ko = 2 Go | 100 Go/mois gratuits | **0** |
+| **Total estimé** | | | **≈ 16 à 17 USD/mois** avec NAT partagé ; **≈ 23 à 24 USD/mois** avec adresses publiques |
+
+Remarques : (1) le choix NAT / adresses publiques dépend du plan réseau global (`DEPLOYMENT.md`, encore à préciser selon R-01) ; un NAT seul coûte ≈ 35 à 40 USD/mois et n'est pas justifié pour le seul worker. (2) Une seule tâche diviserait le calcul par deux (≈ 8 USD) mais un déploiement ou une panne arrêterait les rappels ; non recommandé. (3) FCM reste gratuit à tout volume.
+
+## 11. Reprise après panne, doublons, surveillance et alertes — prévus et testés
+
+Tout ce tableau est **développé et vérifié par des tests automatiques** (fichiers `reminders.spec.ts`, `reminders.e2e-spec.ts`, `fcm-push-sender.spec.ts`, exécutés en CI sur une vraie base PostgreSQL) ; seule la partie « alarmes CloudWatch » est une configuration d'hébergement, décrite ici et à créer au déploiement.
+
+| Mécanisme | Comment | Test qui le prouve |
+| --- | --- | --- |
+| **Aucun doublon** | Chaque rappel a une clé unique « projet, tâche, jour, tentative » en base ; la planification ignore les clés existantes ; un envoi n'est pris que par un seul worker (`FOR UPDATE SKIP LOCKED`) | 2 planificateurs et 3 workers en parallèle → 5 rappels, 5 envois exactement ; rejouer le tour n'envoie rien |
+| **Dernier rempart anti-doublon** | Si un worker s'arrête entre l'envoi et son enregistrement, le rappel repart, mais avec le même identifiant de regroupement : le téléphone remplace l'affichage au lieu d'en montrer deux | identifiant stable vérifié (faux serveur FCM) |
+| **Reprise après panne** | Un rappel « en cours d'envoi » plus de 120 s (worker arrêté, déploiement) est repris par un autre worker | rappel bloqué par un worker « arrêté » → repris une seule fois |
+| **Pas de rappel périmé** | Au-delà de 30 min de retard, le rappel n'est pas envoyé (compté « manqué ») ; côté FCM, durée de vie limitée au temps restant (un téléphone éteint ne le reçoit pas des heures après) | rappel à 15:00 traité à 15:31 → « stale » |
+| **Erreurs passagères** | Réseau, délai, saturation (429, 5xx) : nouvel essai après 1 puis 2 min, 3 essais au plus, puis « échec » visible | échec simulé → nouvel essai après 1 min → envoyé |
+| **Jetons invalides** | Seuls les refus sans ambiguïté (appareil désinscrit, autre projet) retirent l'appareil ; une erreur de notre message ne supprime jamais d'appareil | jeton refusé → appareil retiré ; 400 → pas de suppression |
+| **Revérification juste avant l'envoi** | Tâche cochée, projet en pause, rappels coupés par la personne, heures calmes, appareil déconnecté | 5 cas testés, aucun envoi |
+| **Interrupteurs** | `WORKER_MODE` (déploiement) et réglage `notifications.reminders_enabled` (administration, coupé tant que non validé) | interrupteur coupé → rien n'est planifié, état « désactivé » |
+| **Battement de cœur** | Chaque tour (chaque minute) enregistre l'heure en base | état « arrêté » si plus de 3 min sans battement |
+| **État de santé** | `ok` / `dégradé` (rappels en retard, échecs ou manqués dans l'heure) / `arrêté` / `désactivé` ; `/health` du conteneur (503 si arrêté, ECS remplace la tâche) ; page `/admin/v1/reminders/health` | les 4 états testés ; accès refusé au rôle commercial |
+| **Mesures** | Une ligne `reminders.metrics` par minute (planifiés, repris, traités, en retard, envoyés, manqués, échecs) | vérifiée au démarrage réel du worker en local |
+
+Alertes à créer au déploiement (CloudWatch, gratuites dans les 10 alarmes) : (1) **worker arrêté** — aucune ligne `reminders.metrics` depuis 3 min, ou moins de 2 tâches en marche ; (2) **rappels en retard** — `overdue > 0` pendant 3 min ; (3) **échecs d'envoi** — `failed > 0` sur 15 min ; (4) **rappels manqués** — `stale > 0` sur 15 min. Destination : e-mail de l'équipe (SNS). Test prévu en préproduction : arrêter volontairement une tâche et vérifier la reprise et l'alerte.
+
+## 12. Avancement du lot 2 (sans dépense)
+
+| Étape | Contenu | État |
+| --- | --- | --- |
+| A | Fuseau horaire par personne (Abidjan par défaut), « aujourd'hui » calculé à l'heure locale partout | Fait, testé, CI verte |
+| B | Appareils de notification (rattachés à la session, supprimés à la déconnexion), préférences (rappels, heures calmes) | Fait, testé, CI verte |
+| C | Calcul des rappels en fonctions pures (clés, heures calmes, pauses, période active, fuseaux, textes de Peni) | Fait, testé |
+| D | Worker : file PostgreSQL, reprise, anti-doublon, surveillance, point d'entrée séparé | Fait, testé |
+| E | Envoi FCM (API HTTP v1) prêt mais inactif ; testé contre un faux serveur | Fait, testé |
+| — | Écran des rappels dans l'app (28), inscription du téléphone | Attend le projet Firebase (décision 2) pour l'inscription ; l'écran des préférences peut être fait sans dépense |
+
+**Changement technique (pour information)** : la file prévue avec pg-boss a été remplacée par une table dédiée (`notification_deliveries`). Même coût (0), même base ; avantages : contrôle exact de la clé anti-doublon, des reprises et des états, une dépendance de moins, et un passage à SQS toujours possible derrière la même interface.
+
+Sources : [Calculateur AWS](https://calculator.aws/) · [Tarifs Fargate us-east-1 (relus le 09/07/2026)](https://www.factualminds.com/tools/aws-fargate-pricing-calculator/) · [Fargate : coûts annexes](https://fortem.dev/blog/aws-fargate-pricing-real-costs/) · [Firebase — tarifs (FCM et Crashlytics « No-cost »)](https://firebase.google.com/pricing/?hl=fr) · [CloudWatch — tarifs et offre gratuite](https://www.cloudzero.com/blog/cloudwatch-pricing) · [Secrets Manager et Parameter Store](https://infisical.com/blog/aws-secrets-manager-vs-parameter-store) · [Grafana Cloud — offre gratuite](https://costbench.com/software/observability/grafana-cloud/free-plan/) · [Sentry — offre gratuite](https://costbench.com/software/developer-tools/sentry/free-plan/) · [FCM — limites et quotas](https://firebase.google.com/docs/cloud-messaging/throttling-and-quotas) · [Android 14 — alarmes exactes](https://developer.android.com/about/versions/14/changes/schedule-exact-alarms) · [Tarifs Fargate (us-east-1)](https://www.vantage.sh/blog/fargate-pricing) · [Région Paris, écart de prix moyen](https://cloudprice.net/aws/region/eu-west-3) · [EventBridge — tarifs](https://aws.amazon.com/eventbridge/pricing/) · [SQS — tarifs](https://hevodata.com/learn/comprehensive-guide-on-aws-sqs-pricing/) · [ElastiCache — tarifs 2026](https://upstash.com/blog/aws-elasticache-pricing-explained-2026-full-cost-breakdown) · [Fin d'Amazon Pinpoint](https://docs.aws.amazon.com/pinpoint/latest/userguide/migrate.html)
