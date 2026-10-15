@@ -1,6 +1,6 @@
 # Tests sur téléphones Android physiques (lot 2)
 
-Statut : **préparé, pas encore réalisé**. Rien de payant : un ordinateur, quelques téléphones et le réseau Wi-Fi local suffisent. Le service général des rappels reste **désactivé** ; les notifications se testent avec le « rappel d'essai » des versions de test.
+Statut : **préparé, pas encore réalisé** (aucun résultat n'est enregistré ci-dessous). Rien de payant : un ordinateur, quelques téléphones et le réseau Wi-Fi local suffisent. Le service général des rappels reste **désactivé** ; les notifications se testent avec le « rappel d'essai » des versions de test.
 
 ## Pourquoi
 
@@ -21,7 +21,7 @@ L'émulateur de la CI ne remplace pas de vrais téléphones :
 ## Installation (environ 20 minutes)
 
 1. **Ordinateur** : base de données et API en local (`docs/INSTALLATION.md`), avec `SMS_PROVIDER=console` : les codes de vérification s'affichent dans la console de l'API. Lancer l'API : `cd apps/api && npm run start:dev`.
-2. **Adresse de l'ordinateur sur le Wi-Fi** : par exemple `192.168.1.20` (`ipconfig` sous Windows, `ip addr` sous Linux, Réglages Réseau sous macOS). Le téléphone et l'ordinateur doivent être sur le **même Wi-Fi**. Vérifier depuis le navigateur du téléphone : `http://192.168.1.20:3000/health` doit répondre.
+2. **Adresse de l'ordinateur sur le Wi-Fi** : `scripts/test-telephones.sh` l'affiche et vérifie que l'API répond (sinon : `ipconfig` sous Windows, `ip addr` sous Linux, Réglages Réseau sous macOS ; par exemple `192.168.1.20`). Le téléphone et l'ordinateur doivent être sur le **même Wi-Fi**. Vérifier depuis le navigateur du téléphone : `http://192.168.1.20:3000/health` doit répondre.
 3. **APK de test** : GitHub → Actions → « APK de test (téléphones) » → « Run workflow », adresse `http://192.168.1.20:3000`. Télécharger l'artefact `bim-test-arm64` (conservé 3 jours). Sans GitHub : `flutter build apk --debug --dart-define=BIM_API_URL=http://192.168.1.20:3000 --dart-define=BIM_ENV=test`.
 4. **Installer** sur le téléphone : copier le fichier `.apk` et l'ouvrir (autoriser l'installation depuis cette source), ou `adb install app-arm64-v8a-debug.apk`.
 5. Créer un compte de test dans l'app (code lu dans la console de l'API), créer un projet.
@@ -49,6 +49,7 @@ Noter pour chaque ligne : ✅ conforme, ❌ non conforme (avec une capture d'éc
 | T13 | Même geste ailleurs avec Peni | Même geste sur l'écran d'un projet (Peni en haut) et sur Notifications vide | Idem T12 |
 | T14 | Centre de notifications | Cloche de l'accueil | Écran « Notifications » ; vide ou avec les éléments réels (coffres, réponses du support) |
 | T15 | Réglages propres à la marque | Noter les réglages qui ont changé quelque chose : démarrage automatique (Tecno, Infinix, Xiaomi), « optimisation de la batterie » pour BIM, gestion des applications en arrière-plan | Liste à joindre aux résultats, pour préparer l'aide de Peni aux personnes concernées |
+| T16 | « J'y vais ! » app entièrement fermée | « Dans 1 minute », fermer l'app (retirer des récentes), toucher « J'y vais ! » quand la notification arrive | L'app démarre normalement (rappel d'essai sans projet : écran d'accueil) |
 
 Les rappels réels (calculés par l'API à partir des tâches) ne se testent qu'avec le service des rappels ouvert. Le service reste fermé par décision du fondateur ; l'ouvrir, même dans la base de test locale, se fera seulement avec son accord.
 
@@ -56,6 +57,6 @@ Les rappels réels (calculés par l'API à partir des tâches) ne se testent qu'
 
 À reporter dans le tableau ci-dessous, puis dans `PROJECT_STATUS.md`.
 
-| Téléphone | Android | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14 | Remarques |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | | | | | | | | | | |
+| Téléphone | Android | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14 | T15 | T16 | Remarques |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | | | | | | | | | | | |
