@@ -26,6 +26,10 @@ apps/mobile/android/local.properties
 apps/mobile/ios/Flutter/Generated.xcconfig
 apps/mobile/ios/Pods/
 
+# Python (scripts de la CI) : caches générés automatiquement
+__pycache__/
+*.py[cod]
+
 # Éditeurs et système
 .idea/
 .vscode/
