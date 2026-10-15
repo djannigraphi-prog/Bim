@@ -1,0 +1,26 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Jeton de notification de l'appareil connecté (fourni par Firebase Cloud Messaging dans l'app). */
+export class RegisterDeviceDto {
+  @ApiProperty({ description: 'Jeton FCM de l’appareil' }) @IsString() @MinLength(20) @MaxLength(4096) token!: string;
+  @ApiProperty({ enum: ['android', 'ios'] }) @IsIn(['android', 'ios']) platform!: 'android' | 'ios';
+  @ApiPropertyOptional({ example: '1.0.0' }) @IsOptional() @IsString() @MaxLength(20) appVersion?: string;
+}
+
+/** Préférences de notification. Heures calmes : les deux heures, ou null pour revenir à la valeur de la plateforme. */
+export class NotificationPreferencesDto {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() remindersEnabled?: boolean;
+  @ApiPropertyOptional({ example: '22:00', nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(HHMM, { message: 'Heure au format HH:MM.' })
+  quietStart?: string | null;
+  @ApiPropertyOptional({ example: '06:00', nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(HHMM, { message: 'Heure au format HH:MM.' })
+  quietEnd?: string | null;
+}

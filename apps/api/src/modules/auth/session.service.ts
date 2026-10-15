@@ -6,7 +6,7 @@ import { randomToken, sha256 } from '../../common/crypto';
 import { AppError } from '../../common/errors';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database, DbOrTx } from '../../database/database.module';
-import { sessions, users } from '../../database/schema';
+import { pushDevices, sessions, users } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 
 export type SpaceType = 'user' | 'merchant' | 'courier';
@@ -86,6 +86,7 @@ export class SessionService {
       if (current.rotatedAt) {
         // Réutilisation d'un jeton déjà échangé : on coupe toute la famille.
         await tx.update(sessions).set({ revokedAt: new Date(), revokedReason: 'refresh_reuse' }).where(and(eq(sessions.familyId, current.familyId), isNull(sessions.revokedAt)));
+        await tx.delete(pushDevices).where(eq(pushDevices.sessionFamilyId, current.familyId));
         await this.audit.log({ actorType: 'system', action: 'session.refresh_reuse_detected', targetType: 'user', targetId: current.userId, ip: client.ip, userAgent: client.userAgent, metadata: { familyId: current.familyId } }, tx);
         return { error: 'reuse' as const };
       }
@@ -148,6 +149,8 @@ export class SessionService {
     const rows = await tx.select({ familyId: sessions.familyId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
     if (!rows[0]) return;
     await tx.update(sessions).set({ revokedAt: new Date(), revokedReason: reason }).where(and(eq(sessions.familyId, rows[0].familyId), isNull(sessions.revokedAt)));
+    // L'appareil déconnecté ne reçoit plus de notifications (lot 2).
+    await tx.delete(pushDevices).where(eq(pushDevices.sessionFamilyId, rows[0].familyId));
   }
 
   /**
@@ -164,6 +167,7 @@ export class SessionService {
       .update(sessions)
       .set({ revokedAt: new Date(), revokedReason: reason })
       .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), keepFamily ? ne(sessions.familyId, keepFamily) : undefined));
+    await tx.delete(pushDevices).where(and(eq(pushDevices.userId, userId), keepFamily ? ne(pushDevices.sessionFamilyId, keepFamily) : undefined));
   }
 
   /** Une ligne par appareil connecté (dernière rotation de chaque famille encore valable). */

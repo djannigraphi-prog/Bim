@@ -34,6 +34,23 @@ const RULES: Array<[RegExp, Rule]> = [
         ? null
         : 'Libellés pour small, medium et boosted.',
   ],
+  [/^notifications\.reminders_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
+  [
+    /^notifications\.reminder_offsets_minutes$/,
+    (v) =>
+      Array.isArray(v) && v.length >= 1 && v.length <= 5 && v.every((x, i) => Number.isInteger(x) && x >= 0 && x <= 360 && (i === 0 || x > (v[i - 1] as number)))
+        ? null
+        : 'Liste croissante de 1 à 5 délais en minutes (0 à 360), ex. [0, 60, 120].',
+  ],
+  [
+    /^notifications\.quiet_hours$/,
+    (v) =>
+      v === null ||
+      (v && typeof v === 'object' && !Array.isArray(v) && ['start', 'end'].every((k) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String((v as Record<string, unknown>)[k]))))
+        ? null
+        : '{"start": "HH:MM", "end": "HH:MM"} ou null (pas d’heures calmes).',
+  ],
+  [/^notifications\.reminder_grace_minutes$/, intIn(5, 180)],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {
