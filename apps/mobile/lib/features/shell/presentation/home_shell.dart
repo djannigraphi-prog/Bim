@@ -7,6 +7,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
+import '../../notifications/data/inbox_api.dart';
 import '../../projects/presentation/my_projects_screen.dart';
 
 /// Barre du bas des maquettes (Q8) : Accueil · Messages · « + » (nouveau projet, Q9) · Live · BimShop.
@@ -54,6 +55,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final session = ref.watch(sessionProvider);
     final scheme = Theme.of(context).colorScheme;
     final tab = _tabs[_tab];
+    // Pastille de la cloche : notifications pas encore vues (lot 2, écran 17).
+    final unread = session is SessionSignedIn ? (ref.watch(inboxUnreadProvider).valueOrNull ?? 0) : 0;
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
@@ -63,8 +66,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           IconButton(tooltip: 'Rechercher', icon: const Icon(Icons.search_rounded), onPressed: () => showComingSoon(context, feature: 'La recherche')),
           IconButton(
             tooltip: 'Notifications',
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () => _visitor ? showVisitorGate(context, ref) : showComingSoon(context, feature: 'Le centre de notifications'),
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 99 ? '99+' : '$unread'),
+              backgroundColor: BimColors.red,
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+            onPressed: () => _visitor ? showVisitorGate(context, ref) : context.push('/notifications'),
           ),
           IconButton(
             tooltip: session is SessionSignedIn ? 'Mon compte' : 'Se connecter',

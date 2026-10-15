@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { FcmPushSender, parseServiceAccount } from './fcm-push-sender';
+import { InboxService } from './inbox.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { DisabledPushSender, PUSH_SENDER, PushSender, RecordingPushSender } from './push-sender';
@@ -28,6 +29,7 @@ function pushSenderFactory(cfg: AppConfig): PushSender {
   controllers: [NotificationsController, RemindersAdminController],
   providers: [
     NotificationsService,
+    InboxService,
     ReminderWorkerService,
     ReminderRunner,
     { provide: PUSH_SENDER, useFactory: pushSenderFactory, inject: [APP_CONFIG] },

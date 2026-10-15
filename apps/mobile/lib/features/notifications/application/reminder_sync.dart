@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/router/app_router.dart';
 import '../../auth/application/session_controller.dart';
 import '../../projects/application/projects_providers.dart';
+import '../data/inbox_api.dart';
 import 'local_notifier.dart';
 import 'reminder_scheduler.dart';
 
@@ -24,6 +25,8 @@ class ReminderSync extends ConsumerStatefulWidget {
   /// sans réseau, les rappels déjà programmés restent en place.
   static Future<ReminderSyncResult?> syncNow(WidgetRef ref) async {
     if (ref.read(sessionProvider) is! SessionSignedIn) return null;
+    // Mêmes moments pour la pastille de la cloche (ouverture, retour au premier plan, changements).
+    ref.invalidate(inboxUnreadProvider);
     try {
       final result = await ref.read(reminderSchedulerProvider).sync();
       ref.read(reminderSyncStatusProvider.notifier).state = result;

@@ -1,0 +1,52 @@
+# Enquête sur la perte de l'émulateur Android de la CI (15/10/2026) : sonde lancée à la demande, jamais automatiquement.
+# Elle compare le même geste (glissement au-delà du haut d'une liste) sur une liste Flutter simple, sur l'écran Rappels
+# de BIM, et un témoin sans geste ; puis la liste simple sans le moteur de rendu Impeller. Résultats en annotations.
+name: Sonde émulateur
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - probe: none
+            impeller: "true"
+          - probe: plain
+            impeller: "true"
+          - probe: bim
+            impeller: "true"
+          - probe: plain
+            impeller: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Activer KVM (émulateur accéléré)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Rendu sans Impeller (variante)
+        if: matrix.impeller == 'false'
+        working-directory: apps/mobile
+        run: |
+          sed -i 's#        <!-- Don.t delete the meta-data below.#        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false" />\n&#' android/app/src/main/AndroidManifest.xml
+          grep -n "EnableImpeller" android/app/src/main/AndroidManifest.xml
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - name: Sonde ${{ matrix.probe }} (Impeller ${{ matrix.impeller }})
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: apps/mobile
+          script: |
+            status=0; flutter test integration_test/overscroll_probe_test.dart -d emulator-5554 --dart-define=PROBE=${{ matrix.probe }} --reporter expanded > "$RUNNER_TEMP/probe.log" 2>&1 || status=$?; state=$(timeout 20 adb get-state 2>&1 || echo "sans réponse"); tail -n 5 "$RUNNER_TEMP/probe.log"; echo "::notice title=Sonde ${{ matrix.probe }} (Impeller ${{ matrix.impeller }})::test=$status ; émulateur=$state"

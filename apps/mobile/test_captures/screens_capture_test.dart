@@ -23,7 +23,9 @@ import 'package:bim/features/auth/presentation/register_step2_screen.dart';
 import 'package:bim/features/auth/presentation/splash_screen.dart';
 import 'package:bim/features/auth/presentation/verify_code_screen.dart';
 import 'package:bim/features/auth/presentation/welcome_screen.dart';
+import 'package:bim/features/notifications/data/inbox_api.dart';
 import 'package:bim/features/notifications/data/notification_preferences_api.dart';
+import 'package:bim/features/notifications/presentation/notifications_screen.dart';
 import 'package:bim/features/notifications/presentation/reminder_preferences_screen.dart';
 import 'package:bim/features/projects/data/projects_api.dart';
 import 'package:bim/features/projects/data/projects_models.dart';
@@ -80,6 +82,29 @@ class _FakeNotificationPreferencesApi extends NotificationPreferencesApi {
         quietHoursArePersonal: false,
         remindersAvailable: false,
       );
+}
+
+/// Notifications de démonstration POUR LES CAPTURES UNIQUEMENT (types et textes réels de l'API, données inventées).
+class _FakeInboxApi extends InboxApi {
+  _FakeInboxApi(super.api);
+
+  static final now = DateTime(2026, 10, 15, 18);
+
+  @override
+  Future<InboxPage> page({String? category, String? before}) async => InboxPage(
+        items: [
+          InboxItem(id: 'r1', type: 'task_reminder', category: 'projects', sender: 'peni', text: 'C’est l’heure : Séance d’abdos. On y va ?', at: now.subtract(const Duration(minutes: 5)), unread: true, link: null),
+          InboxItem(id: 's1', type: 'report_answered', category: 'support', sender: 'bim', text: 'L’équipe BIM a répondu à ton signalement.', at: now.subtract(const Duration(hours: 2)), unread: true, link: null),
+          InboxItem(id: 'c1', type: 'chest_opened', category: 'projects', sender: 'peni', text: 'Coffre de la semaine 1 ouvert pour « Abdos en 30 jours ». Continue comme ça !', at: now.subtract(const Duration(days: 2)), unread: false, link: null),
+        ].where((i) => category == null || i.category == category).toList(),
+        nextBefore: null,
+      );
+
+  @override
+  Future<void> markSeen() async {}
+
+  @override
+  Future<int> unreadCount() async => 2;
 }
 
 const _demoMe = {
@@ -300,6 +325,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     projectsApiProvider.overrideWithValue(_FakeProjectsApi(client)),
     accountApiProvider.overrideWithValue(_FakeAccountApi(client)),
     notificationPreferencesApiProvider.overrideWithValue(_FakeNotificationPreferencesApi(client)),
+    inboxApiProvider.overrideWithValue(_FakeInboxApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -316,6 +342,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/account/password', builder: (_, __) => const ChangePasswordScreen()),
     GoRoute(path: '/account/devices', builder: (_, __) => const DevicesScreen()),
     GoRoute(path: '/account/reminders', builder: (_, __) => const ReminderPreferencesScreen()),
+    GoRoute(path: '/notifications', builder: (_, __) => NotificationsScreen(now: _FakeInboxApi.now)),
     GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
     GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),
     GoRoute(path: '/projects/p1', builder: (_, __) => const ProjectMapScreen(projectId: 'p1')),
@@ -524,7 +551,7 @@ void main() {
     await _settle(t);
   }
 
-  for (final (route, name) in [('/account', '62_parametres'), ('/account/contacts', 'x9_coordonnees'), ('/account/password', 'x9_mot_de_passe'), ('/account/devices', 'x9_appareils'), ('/account/reminders', 'x15_rappels')]) {
+  for (final (route, name) in [('/account', '62_parametres'), ('/account/contacts', 'x9_coordonnees'), ('/account/password', 'x9_mot_de_passe'), ('/account/devices', 'x9_appareils'), ('/account/reminders', 'x15_rappels'), ('/notifications', '17_notifications')]) {
     testWidgets('compte : $name', (t) async {
       await signedIn(t, route);
       await _capture(t, name);

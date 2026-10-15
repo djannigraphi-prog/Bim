@@ -303,6 +303,9 @@ void main() {
 
     // Lot 2 : préférences de rappel enregistrées par l'API réelle. Le service des rappels reste fermé
     // (réglage « en attente ») : l'écran le dit, et activer ses rappels n'ouvre rien.
+    // Le support répond aux deux signalements envoyés plus haut (base de test de la CI) : ils apparaîtront dans le
+    // centre de notifications (écran 17), lu dans les vraies données.
+    expect(await _relay(tester, '/resolve-reports'), '2');
     await _scrollTap(tester, find.text('Rappels'));
     await _waitFor(tester, find.byKey(const ValueKey('reminders-unavailable')));
     // Rappels désactivés par défaut (décision du 15/10/2026) : la personne les active elle-même.
@@ -347,6 +350,22 @@ void main() {
     await _tap(tester, find.byTooltip('Retour'));
     await _relay(tester, '/reminders-service?on=0');
     await _tap(tester, find.byTooltip('Retour'));
+
+    // Centre de notifications (écran 17) : pastille de la cloche, réponses de l'équipe BIM, puis marquées vues.
+    await _tap(tester, find.byTooltip('Retour'));
+    await _waitFor(tester, find.descendant(of: find.byTooltip('Notifications'), matching: find.text('2')));
+    await _tap(tester, find.byTooltip('Notifications'));
+    await _waitFor(tester, find.textContaining('L’équipe BIM a répondu à ton signalement.', findRichText: true));
+    expect(find.textContaining('L’équipe BIM a répondu à ton signalement.', findRichText: true), findsNWidgets(2));
+    await _shot(tester, 'a17_notifications');
+    await _tap(tester, find.byTooltip('Retour'));
+    await _waitFor(tester, find.byTooltip('Mon compte'));
+    final badge = find.descendant(of: find.byTooltip('Notifications'), matching: find.text('2'));
+    for (var i = 0; i < 40 && badge.evaluate().isNotEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    expect(badge, findsNothing);
+    await _tap(tester, find.byTooltip('Mon compte'));
 
     // La section « Notifications » allonge les Paramètres : « Téléphone et e-mail » est maintenant au-dessus.
     await tester.scrollUntilVisible(find.text('Téléphone et e-mail'), -150, scrollable: find.byType(Scrollable).first);

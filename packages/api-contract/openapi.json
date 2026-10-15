@@ -1443,6 +1443,99 @@
         ]
       }
     },
+    "/v1/me/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "projects",
+                "support"
+              ]
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "Date de la dernière notification reçue (page suivante)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Centre de notifications (30 derniers jours) : coffres, réponses du support, rappels envoyés",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/me/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Nombre de notifications pas encore vues (pastille de la cloche)",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/me/notifications/seen": {
+      "post": {
+        "operationId": "NotificationsController_seen",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tout ce qui est arrivé jusqu’à maintenant devient « vu »",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/v1/me/push-device": {
       "put": {
         "operationId": "NotificationsController_register",

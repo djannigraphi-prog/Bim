@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsDate, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -23,4 +24,15 @@ export class NotificationPreferencesDto {
   @ValidateIf((_, v) => v !== null)
   @Matches(HHMM, { message: 'Heure au format HH:MM.' })
   quietEnd?: string | null;
+}
+
+/** Centre de notifications : filtre (Tout = sans catégorie), page suivante (`before`), taille de page. */
+export class InboxQueryDto {
+  @ApiPropertyOptional({ enum: ['projects', 'support'] }) @IsOptional() @IsIn(['projects', 'support']) category?: 'projects' | 'support';
+  @ApiPropertyOptional({ description: 'Date de la dernière notification reçue (page suivante)' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  before?: Date;
+  @ApiPropertyOptional({ minimum: 1, maximum: 50 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limit?: number;
 }

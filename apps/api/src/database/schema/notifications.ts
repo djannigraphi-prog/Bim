@@ -98,3 +98,17 @@ export const workerHeartbeats = pgTable('worker_heartbeats', {
   startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
   details: varchar('details', { length: 400 }),
 });
+
+/**
+ * Centre de notifications (lot 2, écran 17) : seul l'état « vu » est stocké. Les notifications elles-mêmes sont lues
+ * dans leurs sources (journal des projets, signalements, rappels envoyés) et leur texte est produit à la lecture
+ * (règle R1) : aucune copie, aucun lien du module Projets vers le module Notifications (règle R2).
+ */
+export const notificationInbox = pgTable('notification_inbox', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  /** Tout ce qui est arrivé jusqu'à ce moment est « vu » (null = rien n'a encore été vu). */
+  seenUntil: timestamp('seen_until', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
