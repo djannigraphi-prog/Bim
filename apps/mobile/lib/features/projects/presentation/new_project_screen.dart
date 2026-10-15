@@ -455,6 +455,8 @@ class _CategoryStep extends StatelessWidget {
               _CategoryTile(
                 category: c,
                 tint: dark ? scheme.surfaceContainerLow : hexColor(c.tint, scheme.surfaceContainerLow),
+                // Icône colorée de la teinte de la catégorie, foncée pour rester lisible (maquette 20).
+                iconColor: dark ? null : _deepen(hexColor(c.tint, scheme.surfaceContainerLow)),
                 selected: draft.categoryCode == c.code,
                 onTap: () => onChanged((d) => d.copyWith(categoryCode: c.code, clearGoal: d.categoryCode != c.code)),
               ),
@@ -492,11 +494,18 @@ class _CategoryStep extends StatelessWidget {
   }
 }
 
+/// Version foncée et saturée d’une teinte pastel : contraste ≥ 3:1 sur fond blanc pour les 7 catégories actuelles (WCAG 1.4.11).
+Color _deepen(Color c) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl.withSaturation((hsl.saturation + 0.35).clamp(0.0, 0.85)).withLightness(0.36).toColor();
+}
+
 class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.category, required this.tint, required this.selected, required this.onTap});
+  const _CategoryTile({required this.category, required this.tint, this.iconColor, required this.selected, required this.onTap});
 
   final ProjectCategory category;
   final Color tint;
+  final Color? iconColor;
   final bool selected;
   final VoidCallback onTap;
 
@@ -524,7 +533,7 @@ class _CategoryTile extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CategoryIcon(icon: category.icon, size: 44, background: scheme.surface),
+                  CategoryIcon(icon: category.icon, size: 44, background: scheme.surface, color: iconColor),
                   const Spacer(),
                   if (selected) const Icon(Icons.check_circle, color: BimColors.red),
                 ],

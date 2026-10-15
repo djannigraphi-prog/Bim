@@ -257,24 +257,86 @@ class _PathState extends State<_Path> {
         final d = p.days[i];
         final isToday = d.day == p.today;
         final tappable = d.state != 'upcoming' && d.state != 'paused' && d.day.compareTo(p.today) <= 0;
-        return Align(
-          alignment: Alignment(offsets[i % offsets.length], 0),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _DayNode(
-                day: d,
-                isToday: isToday,
-                icon: p.summary.icon,
-                onTap: tappable ? () => context.push('/projects/${p.summary.id}/day/${d.day}') : null,
-              ),
-              if (isToday && !p.summary.isPaused) ...[const SizedBox(width: BimSpacing.md), const Peni(pose: PeniPose.wave, size: 64)],
-            ],
-          ),
+        final peni = isToday && !p.summary.isPaused;
+        return LayoutBuilder(
+          builder: (context, c) {
+            // Colonne de largeur fixe : le centre de chaque rond est connu, ce qui permet de tracer le chemin (maquette 26).
+            const slot = 170.0;
+            double cx(int k) => (c.maxWidth - slot) / 2 * (1 + offsets[k % offsets.length]) + slot / 2;
+            // Centre vertical du rond : la colonne (rond + 4 + libellé ≈ 18) est centrée dans la ligne.
+            const cy = _rowHeight / 2 - 11;
+            final x = cx(i);
+            final r = (isToday ? 84.0 : 68.0) / 2;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                if (i + 1 < p.days.length)
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _DotsPainter(
+                        from: Offset(x, cy),
+                        fromRadius: r,
+                        // Liste inversée : le jour suivant est dessiné au-dessus.
+                        to: Offset(cx(i + 1), cy - _rowHeight),
+                        toRadius: p.days[i + 1].day == p.today ? 42 : 34,
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  left: x - slot / 2,
+                  width: slot,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: _DayNode(
+                      day: d,
+                      isToday: isToday,
+                      icon: p.summary.icon,
+                      onTap: tappable ? () => context.push('/projects/${p.summary.id}/day/${d.day}') : null,
+                    ),
+                  ),
+                ),
+                if (peni)
+                  Positioned(
+                    // Peni à côté du rond, du côté où il reste de la place.
+                    left: offsets[i % offsets.length] > 0 ? x - r - BimSpacing.md - 64 : x + r + BimSpacing.md,
+                    top: cy - 32,
+                    child: const Peni(pose: PeniPose.wave, size: 64),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
   }
+}
+
+/// Pointillés entre deux jours, sans recouvrir les ronds.
+class _DotsPainter extends CustomPainter {
+  _DotsPainter({required this.from, required this.fromRadius, required this.to, required this.toRadius, required this.color});
+
+  final Offset from;
+  final double fromRadius;
+  final Offset to;
+  final double toRadius;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final delta = to - from;
+    final length = delta.distance;
+    if (length == 0) return;
+    final dir = delta / length;
+    final paint = Paint()..color = color;
+    for (var t = fromRadius + 10; t < length - toRadius - 6; t += 14) {
+      canvas.drawCircle(from + dir * t, 4, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotsPainter old) => old.from != from || old.to != to || old.color != color;
 }
 
 class _DayNode extends StatelessWidget {

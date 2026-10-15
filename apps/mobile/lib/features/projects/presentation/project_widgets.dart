@@ -38,11 +38,13 @@ class ProgressBar extends StatelessWidget {
 
 /// Icône carrée d'une catégorie (écrans 18 et 20).
 class CategoryIcon extends StatelessWidget {
-  const CategoryIcon({super.key, required this.icon, this.size = 48, this.background});
+  const CategoryIcon({super.key, required this.icon, this.size = 48, this.background, this.color});
 
   final String icon;
   final double size;
   final Color? background;
+  /// Couleur de l'icône (par défaut celle du texte).
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +53,7 @@ class CategoryIcon extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(color: background ?? scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.chip)),
-      child: Icon(bimIcon(icon), size: size * 0.5, color: scheme.onSurface),
+      child: Icon(bimIcon(icon), size: size * 0.5, color: color ?? scheme.onSurface),
     );
   }
 }

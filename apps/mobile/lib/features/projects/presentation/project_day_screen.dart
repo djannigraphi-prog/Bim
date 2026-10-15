@@ -197,7 +197,14 @@ class _DayBody extends StatelessWidget {
         ),
         const SizedBox(height: BimSpacing.lg),
         for (final t in plan.tasks)
-          _TaskRow(task: t, editable: plan.editable, busy: pending.contains(t.id), onToggle: () => onToggle(t)),
+          _TaskRow(
+            task: t,
+            editable: plan.editable,
+            // Tâche en cours (maquette 27) : la première pas encore faite d'une journée modifiable.
+            current: plan.editable && identical(t, plan.tasks.where((x) => !x.done).firstOrNull),
+            busy: pending.contains(t.id),
+            onToggle: () => onToggle(t),
+          ),
         if (plan.tasks.isNotEmpty) ...[
           const SizedBox(height: BimSpacing.sm),
           Row(
@@ -216,10 +223,11 @@ class _DayBody extends StatelessWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.editable, required this.busy, required this.onToggle});
+  const _TaskRow({required this.task, required this.editable, required this.current, required this.busy, required this.onToggle});
 
   final ProjectTask task;
   final bool editable;
+  final bool current;
   final bool busy;
   final VoidCallback onToggle;
 
@@ -236,7 +244,7 @@ class _TaskRow extends StatelessWidget {
             width: 52,
             child: Padding(
               padding: const EdgeInsets.only(top: BimSpacing.lg),
-              child: Text(task.timeOfDay, style: TextStyle(fontWeight: FontWeight.w700, color: task.done ? BimColors.success : BimColors.red)),
+              child: Text(task.timeOfDay, style: TextStyle(fontWeight: FontWeight.w700, color: task.done ? BimColors.success : current ? BimColors.red : scheme.onSurfaceVariant)),
             ),
           ),
           Expanded(
@@ -250,8 +258,9 @@ class _TaskRow extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(BimSpacing.md),
                   decoration: BoxDecoration(
+                    color: current ? BimColors.redSoft.withValues(alpha: 0.5) : null,
                     borderRadius: BorderRadius.circular(BimRadius.card),
-                    border: Border.all(color: scheme.outline, width: 1.5),
+                    border: Border.all(color: current ? BimColors.red : scheme.outline, width: 1.5),
                   ),
                   child: Row(
                     children: [

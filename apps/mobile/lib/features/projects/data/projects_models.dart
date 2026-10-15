@@ -228,8 +228,9 @@ class ProjectDetail {
   final List<ProjectDay> days;
   final String today;
 
-  /// Séances par semaine affichées sur l'écran 24 (la tâche la plus fréquente).
-  int get perWeek => tasks.isEmpty ? 0 : tasks.map((t) => _bits(t.weekdays)).reduce((a, b) => a > b ? a : b);
+  /// Séances par semaine affichées sur l'écran 24 : la réponse de la personne si elle existe,
+  /// sinon la tâche la plus fréquente (une habitude quotidienne ne compte pas comme 7 séances choisies).
+  int get perWeek => sessionsPerWeek ?? (tasks.isEmpty ? 0 : tasks.map((t) => _bits(t.weekdays)).reduce((a, b) => a > b ? a : b));
 
   static int _bits(int v) {
     var n = 0;

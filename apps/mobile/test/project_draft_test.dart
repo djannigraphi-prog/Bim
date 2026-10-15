@@ -60,4 +60,21 @@ void main() {
     expect(hourFr('15:00'), '15 h');
     expect(hourFr('07:30'), '7 h 30');
   });
+
+  test('écran 24 : « par semaine » reprend les séances choisies, pas une habitude quotidienne', () {
+    const summary = ProjectSummary(
+      id: 'p', title: 'Perdre 10 kg', categoryLabel: 'Sport', icon: 'dumbbell', mode: 'eco', status: 'active', isPublic: false,
+      durationDays: 60, currentDay: 5, progress: 42, streak: 3, plannedEndDate: '2026-12-09',
+    );
+    const tasks = [
+      ProjectTask(id: 'a', title: 'Séance', icon: 'dumbbell', timeOfDay: '15:00', weekdays: 0x15),
+      ProjectTask(id: 'b', title: 'Étirements', icon: 'check', timeOfDay: '21:00'),
+    ];
+    ProjectDetail detail(int? perWeek) => ProjectDetail(
+          summary: summary, goalLabel: null, programSource: 'answers', totalSteps: 48, completedSteps: 0, bestStreak: 0,
+          sessionsPerWeek: perWeek, tasks: tasks, days: const [], today: '2026-10-15',
+        );
+    expect(detail(3).perWeek, 3);
+    expect(detail(null).perWeek, 7);
+  });
 }

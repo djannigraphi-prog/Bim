@@ -199,7 +199,7 @@ class _PauseSheetState extends State<_PauseSheet> {
           children: [
             const Center(child: Peni(pose: PeniPose.sad, size: 96)),
             const SizedBox(height: BimSpacing.md),
-            Text('Mettre en pause « ${widget.title} » ?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            Text('Mettre en pause «\u00A0${widget.title}\u00A0»\u00A0?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
             const SizedBox(height: BimSpacing.lg),
             Text('Durée de la pause', style: theme.textTheme.titleMedium),
             const SizedBox(height: BimSpacing.sm),
