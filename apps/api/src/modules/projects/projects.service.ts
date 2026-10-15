@@ -23,6 +23,7 @@ import { ProjectPhotosService } from './photos.service';
 import { userTimezone } from './timezone';
 import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, UpdateProjectDto } from './dto';
 import { addDays, Chest, computePlan, diffDays, dueTasks, generateTitle, isPaused, isValidDay, spreadWeekdays, today } from './plan';
+import { pickTemplate } from './templates';
 
 type ProjectRow = typeof projects.$inferSelect;
 /** Projet chargé avec le fuseau horaire de sa propriétaire : « aujourd'hui » se calcule à son heure locale. */
@@ -225,16 +226,20 @@ export class ProjectsService {
    * Programme type publié (donc validé) le plus précis : même objectif avant « tous objectifs », puis même mode
    * (économique / Premium) avant « les deux ». Un programme réservé à l'autre mode n'est jamais utilisé.
    */
+  /** Modèles publiés (catégorie, objectif, mode, durée) : utilisés par Peni pour annoncer la bonne durée (R5). */
+  publishedTemplates() {
+    return this.db
+      .select({ categoryCode: programTemplates.categoryCode, goalCode: programTemplates.goalCode, mode: programTemplates.mode, status: programTemplates.status, durationDays: programTemplates.durationDays })
+      .from(programTemplates)
+      .where(eq(programTemplates.status, 'published'));
+  }
+
   private async findTemplate(categoryCode: string, goalCode: string | null, mode: 'eco' | 'premium') {
-    const published = (
-      await this.db
-        .select()
-        .from(programTemplates)
-        .where(and(eq(programTemplates.categoryCode, categoryCode), eq(programTemplates.status, 'published')))
-    ).filter((t) => t.mode === 'any' || t.mode === mode);
-    const rank = (t: (typeof published)[number]) => (t.goalCode === goalCode ? 0 : 2) + (t.mode === mode ? 0 : 1);
-    const candidates = published.filter((t) => t.goalCode === goalCode || t.goalCode === null).sort((a, b) => rank(a) - rank(b));
-    return candidates[0] ?? null;
+    const rows = await this.db
+      .select()
+      .from(programTemplates)
+      .where(and(eq(programTemplates.categoryCode, categoryCode), eq(programTemplates.status, 'published')));
+    return pickTemplate(rows, categoryCode, goalCode, mode);
   }
 
   // ---------------------------------------------------------------- Lecture

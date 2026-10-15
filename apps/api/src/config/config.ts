@@ -90,6 +90,11 @@ const schema = z
     /** Envoi des notifications : « none » (rien n'est envoyé), « fcm » (Firebase Cloud Messaging), « test » (enregistré en mémoire). */
     PUSH_PROVIDER: z.enum(['none', 'fcm', 'test']).default('none'),
     /**
+     * Fournisseur d'IA de Peni (lot 3). Seule valeur possible : « none » (discussion guidée, sans IA). Un fournisseur
+     * ne sera ajouté qu'après l'accord du fondateur (coût, données envoyées, ARTCI) : voir src/modules/peni/llm-provider.ts.
+     */
+    PENI_LLM_PROVIDER: z.enum(['none']).default('none'),
+    /**
      * Compte de service Firebase (JSON complet), obligatoire avec PUSH_PROVIDER=fcm. Secret : injecté depuis AWS
      * (Parameter Store chiffré ou Secrets Manager), jamais écrit dans le dépôt ni dans les journaux.
      */

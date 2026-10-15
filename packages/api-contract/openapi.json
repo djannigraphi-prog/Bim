@@ -1712,6 +1712,104 @@
         ]
       }
     },
+    "/v1/peni/conversations": {
+      "post": {
+        "operationId": "PeniController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPeniConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer une discussion avec Peni (sans IA : réponses écrites par l’équipe BIM)",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/conversations/{id}": {
+      "get": {
+        "operationId": "PeniController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Relire une discussion avec Peni",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/conversations/{id}/messages": {
+      "post": {
+        "operationId": "PeniController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeniMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Répondre à Peni (message libre ou réponse rapide) ; renvoie le brouillon de projet quand tout est noté",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -3023,6 +3121,52 @@
             "type": "object",
             "example": "06:00",
             "nullable": true
+          }
+        }
+      },
+      "StartPeniConversationDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "new_project"
+            ],
+            "description": "Écrans 19, 20 et 25 : construire un projet avec Peni"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "eco",
+              "premium"
+            ],
+            "description": "Mode déjà choisi à l’écran 19 (Peni ne le redemande pas)"
+          },
+          "budget": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "boosted"
+            ]
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "PeniMessageDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "Je veux perdre du ventre avant mon mariage en décembre",
+            "description": "Message libre (exclusif de « choice »)"
+          },
+          "choice": {
+            "type": "string",
+            "example": "sessions:2",
+            "description": "Identifiant d’une réponse rapide proposée par le dernier message de Peni"
           }
         }
       },

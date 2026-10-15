@@ -39,6 +39,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `WORKER_HEALTH_PORT` | 3100 | port du contrôle de santé `/health` du worker séparé (200 = ok/dégradé/désactivé, 503 = arrêté) | |
 | `PUSH_PROVIDER` | none | envoi des notifications : `none`, `fcm` (Firebase), `test` (mémoire) | `test` refusé hors development/test |
 | `FCM_SERVICE_ACCOUNT_JSON` | (vide) | compte de service Firebase (JSON) — **secret**, injecté depuis Parameter Store chiffré ou Secrets Manager | obligatoire et vérifié si `PUSH_PROVIDER=fcm` |
+| `PENI_LLM_PROVIDER` | none | fournisseur d'IA de Peni (lot 3) : seule valeur acceptée `none` (discussion guidée, aucune donnée envoyée) | un fournisseur ne sera ajouté qu'après accord du fondateur ; réglage `peni.llm_enabled` comme second interrupteur |
 | `FCM_API_BASE_URL`, `FCM_TOKEN_URL` | (vide) | adresses de remplacement pour tester contre un faux serveur | refusées hors development/test |
 
 Tests e2e uniquement : `TEST_DATABASE_ADMIN_URL` (défaut `postgres://bim:bim@localhost:5432/postgres`), `KEEP_TEST_DB=1` pour garder la base après les tests.

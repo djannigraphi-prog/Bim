@@ -8,5 +8,6 @@ import { ReportsService } from './reports.service';
 @Module({
   controllers: [ProjectsController, ReportsController],
   providers: [ProjectsService, ProjectPhotosService, ReportsService, { provide: CLOCK, useValue: { now: () => new Date() } }],
+  exports: [ProjectsService, CLOCK],
 })
 export class ProjectsModule {}

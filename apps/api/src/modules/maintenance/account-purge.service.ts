@@ -29,6 +29,8 @@ export const PURGE_BLOCKING_TABLES = [
   'courier_accounts',
   'push_devices',
   'notification_deliveries',
+  'peni_conversations',
+  'peni_messages',
 ] as const;
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [
