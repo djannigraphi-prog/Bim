@@ -111,6 +111,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ../../.github/scripts/publish-captures.sh
+      # Le NDK imposé par Flutter était téléchargé chez Google à chaque compilation ; une archive tronquée faisait
+      # échouer la compilation par intermittence. Il n'est plus téléchargé qu'une fois par version (cache GitHub).
+      - name: Paquets Android lourds (versions et clés du cache)
+        id: android-pkgs
+        run: bash ../../.github/scripts/android-sdk-packages.sh
+      - name: Cache du NDK
+        id: ndk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.android-pkgs.outputs.ndk_path }}
+          key: ${{ steps.android-pkgs.outputs.ndk_key }}
+      - run: echo "::notice title=cache android::NDK ${{ steps.android-pkgs.outputs.ndk_version }} repris du cache = ${{ steps.ndk-cache.outputs.cache-hit == 'true' }}"
       - name: Compilation Android (debug)
         if: ${{ !cancelled() }}
         # En cas d'échec, la fin du journal de compilation est publiée en annotations (journaux bruts pas toujours lisibles).
@@ -179,6 +191,24 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - run: flutter pub get
         working-directory: apps/mobile
+      # NDK (compilation) et image système (émulateur) : téléchargés chez Google à chaque exécution, cause des échecs
+      # intermittents (archive tronquée). Désormais une fois par version (cache GitHub) ; sans cache, comme avant.
+      - name: Paquets Android lourds (versions et clés du cache)
+        id: android-pkgs
+        run: bash .github/scripts/android-sdk-packages.sh 34 google_apis x86_64
+      - name: Cache du NDK
+        id: ndk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.android-pkgs.outputs.ndk_path }}
+          key: ${{ steps.android-pkgs.outputs.ndk_key }}
+      - name: Cache de l'image système de l'émulateur
+        id: image-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.android-pkgs.outputs.image_path }}
+          key: ${{ steps.android-pkgs.outputs.image_key }}
+      - run: echo "::notice title=cache android::NDK ${{ steps.android-pkgs.outputs.ndk_version }} repris du cache = ${{ steps.ndk-cache.outputs.cache-hit == 'true' }} ; image système reprise du cache = ${{ steps.image-cache.outputs.cache-hit == 'true' }}"
       - name: Parcours inscription / connexion sur émulateur Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
