@@ -29,7 +29,7 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 
 ## Bilan du lot 1 — Projets BIM (15/10/2026)
 
-État : **développé et vérifié ; clôture soumise à la validation du fondateur.** Code vérifié : commit `ba4ff69` (résultat de la CI à confirmer).
+État : **développé et vérifié ; clôture soumise à la validation du fondateur.** Code vérifié : commit `ba4ff69`, CI complète réussie (exécution 38678402273 : api, mobile, android-e2e, admin).
 
 ### Exigences prévues (ANALYSE.md, section 11)
 Catégories administrables ; création en 5 étapes ; modèles de programmes ; carte et journée ; tâches ; pause ; signalement ; suppression ; célébration ; avant / après. Ajouts décidés pendant le lot : modes Éco / Premium gratuits et indépendants de l'abonnement (C6), mesures chiffrées (bilan « d'après tes mesures »).
@@ -55,7 +55,7 @@ Maquettes : `BIM_Maquettes_PNG_1-31.zip` (15 écrans de 18 à 31). Captures : br
 Écarts corrigés le 15/10 : « par semaine » faux sur l'écran 24 (affichait 7 au lieu des 3 séances choisies) ; chemin en pointillés absent (26) ; tâche en cours non mise en avant et heures futures en rouge (27) ; icônes de catégorie non colorées (20) ; « ? » isolé dans le titre de pause (29).
 Écarts voulus (décisions) : paiement et prix retirés de l'écran 24 (F4, C6) ; « Projet économique / Premium » et mention « choix gratuit » (C6) ; « Recommandé pour toi » sans marchands (lot 5) ; offres des marchands désactivées (21, lot 5) ; pas d'aperçu caméra intégré (22 : appareil photo du système) ; étape « durée du programme » ajoutée (23) ; boutons « Publier » en « bientôt disponible » (30, 31 : lot 4) ; textes de démonstration marqués comme tels.
 Écarts en attente du fondateur (C8) : coffre sur le chemin (26) ; lien « Résoudre un problème » (21) ; avertissement de pause d'un marchand (29).
-Écarts mineurs restants : barre d'onglets du bas absente de la capture 18 (capture de l'écran seul) ; bulle de Peni remplacée par un bandeau en haut de la carte (26) ; rappel « 14:45 » et icône calendrier absents (rappels : lot 2) ; style des sélecteurs de l'écran 23 (rouge au lieu de noir).
+Écarts mineurs restants : barre d'onglets du bas absente de la capture 18 (capture de l'écran seul) ; bulle de Peni remplacée par un bandeau en haut de la carte (26) ; rappel « 14:45 » et icône calendrier absents (rappels : lot 2) ; style des sélecteurs de l’écran 23 (rouge au lieu de noir) ; chemin de l’écran 26 moins dense (1 à 2 points entre deux jours au lieu de 4 à 5).
 Limites des captures : émojis affichés en carrés (police des captures sans émojis ; non vérifié sur un vrai téléphone) ; écran 31 capturé sans photos (les images réseau ne se chargent pas dans les captures ; l'affichage réel est couvert par le test Android).
 
 ### Incomplet ou dépendant d'autres lots
