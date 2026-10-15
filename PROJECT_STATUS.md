@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 15/10/2026 (matin), session 1 — lot 0 terminé ; lot 1 développé, vérifié en CI et sur émulateur, comparé aux maquettes 18 à 31 ; décisions C8 du fondateur appliquées (sauf la règle du coffre, en attente) ; dépendances des lots 2 et 3 analysées.
+Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 étudié (rappels, coûts), non commencé en attendant l'accord du fondateur.
 
 ## Résumé
 
@@ -16,7 +16,7 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | --- | --- | --- | --- | --- | --- | --- |
 | Socle API (config, journaux, santé, erreurs, OpenAPI, limitation) | Terminée | Fait | — | Image Docker de production démarrée en CI | Exécutés, réussis | — |
 | Environnements staging et production (AWS) | Plan écrit (`docs/DEPLOYMENT.md`) | — | — | **Non déployés** | Image testée en CI | Validation des dépenses AWS, autorisation ARTCI, nom de domaine |
-| Base + migrations (10 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
+| Base + migrations (11 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
 | Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel (lot 2) |
 | F15 — âges par capacité | Terminée | Fait (réglages `age.*`) | — | — | Exécutés, réussis | Vérifications légales (DECISIONS.md) |
 | F16 — récupération vérifiée, step-up | Terminée | Fait | Coordonnées, mot de passe, appareils | **Testée sur Android** (ajout d'un e-mail vérifié, nouveau mot de passe) | API + Android : réussis | — |
@@ -24,12 +24,12 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Connexions Google / Apple / Facebook | Terminée | Préparées, **désactivées** (`NOT_CONFIGURED`) | Boutons affichés, « Bientôt disponible » | — | Exécutés (indisponibilité honnête) | Comptes développeur + clés |
 | Thème clair / sombre | Terminée | Préférence enregistrée | Compilé, capture sombre vérifiée | Écrit | — | — |
 | Administration (API `/admin/v1` + application web React) | Terminée | Fait : connexion + TOTP, rôles, réglages, audit, utilisateurs, programmes types, comptes admin | Web : fait | **Testée dans Chromium contre l'API** | API : 8 unitaires + 13 e2e ; web : unitaires + 5 scénarios navigateur | Rôles à valider (T-019) ; hébergement AWS |
-| Lot 1 — Projets BIM (écrans 18-24, 26, 27, 29-31) | Terminée | Fait : référentiels et catégories administrables, création en 5 étapes, mode Éco / Premium gratuit (C6), programmes types validés (mode, conseils), carte et journée, tâche suivante, tâches ajoutées / retirées, pause, signalement de projet ou général avec image jointe (+ traitement admin), avertissement de pause, mesures chiffrées, photos avant / après privées (S3), fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création, séance, photos, signalements avec image, captures réelles de l'écran) ; **admin testée dans Chromium** (image jointe chargée) ; **photos testées sur un vrai serveur S3** en CI | API, admin, Android : réussis (voir bilan du lot 1) | Contenu des programmes types (C7) ; règle du coffre (C8) ; Peni (lot 3) ; rappels (lot 2) ; profil public (lot 4) ; recommandations marchands (lot 5) ; stockage S3 de production (dépenses AWS, ARTCI) |
+| Lot 1 — Projets BIM (écrans 18-24, 26, 27, 29-31) | Terminée | Fait : référentiels et catégories administrables, création en 5 étapes, mode Éco / Premium gratuit (C6), programmes types validés (mode, conseils), carte et journée, tâche suivante, tâches ajoutées / retirées, pause, signalement de projet ou général avec image jointe (+ traitement admin), avertissement de pause, coffres symboliques (70 %), mesures chiffrées, photos avant / après privées (S3), fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création, séance, photos, signalements avec image, captures réelles de l'écran) ; **admin testée dans Chromium** (image jointe chargée) ; **photos testées sur un vrai serveur S3** en CI | API, admin, Android : réussis (voir bilan du lot 1) | Contenu des programmes types (C7) ; Peni (lot 3) ; rappels (lot 2) ; profil public (lot 4) ; recommandations marchands (lot 5) ; stockage S3 de production (dépenses AWS, ARTCI) |
 | Lots 2 à 12 (rappels, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
 ## Bilan du lot 1 — Projets BIM (15/10/2026)
 
-État : **exigences propres au lot 1 développées et vérifiées ; clôture soumise à la validation du fondateur.** Une seule décision attendue touche le lot 1 : la règle du coffre (C8). Code vérifié : voir « Vérification finale » ci-dessous.
+État : **terminé** (15/10/2026) : toutes les exigences propres au lot 1 sont développées et vérifiées, coffres compris (règle validée par le fondateur le 15/10). Restent hors du lot 1 : contenus et validations listés ci-dessous.
 
 ### Exigences prévues (ANALYSE.md, section 11)
 Catégories administrables ; création en 5 étapes ; modèles de programmes ; carte et journée ; tâches ; pause ; signalement ; suppression ; célébration ; avant / après. Ajouts décidés pendant le lot : modes Éco / Premium gratuits et indépendants de l'abonnement (C6), mesures chiffrées (bilan « d'après tes mesures »), décisions C8 du 15/10 (« Résoudre un problème » avec image, avertissement de pause, coffre symbolique).
@@ -51,6 +51,8 @@ Catégories administrables ; création en 5 étapes ; modèles de programmes ; c
 | Mesures chiffrées et variation | 26, 30 | API e2e (pas encore dans le test Android) |
 | Photos avant / après privées : réencodage, EXIF et GPS supprimés, lien temporaire, purge à la suppression | 22, 31 | API e2e (stockage local) ; **serveur S3 réel en CI** (lien signé, lecture anonyme refusée, effacement) ; Android (envoi, puis photos **réellement téléchargées et affichées**, capture réelle) |
 | Journal des événements du projet (source prévue des rappels et de Peni) | — | API e2e (contrat) |
+| Coffres (C8) : un par semaine complète + final, ouverts à 70 % des tâches prévues réellement cochées, badge et message de Peni, aucune valeur financière ; événement `chest_opened` ; badges dans le bilan | 26, 30 | 15 tests unitaires (durées 5 à 90 jours, pauses, tâches ajoutées / retirées, seuil exact, coffre final) ; API e2e (rattrapage, ouverture, refermeture, tâche ajoutée sans effet sur le passé) ; captures |
+| Période active des tâches (T-024) : une tâche ajoutée ne compte pas pour les jours passés, une tâche retirée garde son historique | 24, 26, 27 | tests unitaires et e2e ; migration 0010 vérifiée sur une base existante (reprise de l'historique) |
 | Fin du programme, suppression logique, renommer, projet public (réglage seul) | 30, 24 | API e2e |
 
 ### Comparaison avec les maquettes 18 à 31
@@ -58,20 +60,20 @@ Maquettes : `BIM_Maquettes_PNG_1-31.zip` (15 écrans de 18 à 31). Captures : br
 Écarts corrigés le 15/10 : « par semaine » faux sur l'écran 24 (affichait 7 au lieu des 3 séances choisies) ; chemin en pointillés absent puis trop clairsemé (26) ; tâche en cours non mise en avant et heures futures en rouge (27) ; icônes de catégorie non colorées (20) ; sélections en noir, niveau en sélecteur segmenté, séances en cases (23) ; avertissement de pause (29) ; lien « Résoudre un problème » (21).
 Défauts trouvés grâce aux captures réelles de l'émulateur (320 dp) et corrigés : message de confirmation avec bouton qui restait affiché et masquait l'écran ; libellé « Publier « J'ai fait mon BIM » » coupé ; puce « Problème avec un produit ou un service » qui débordait de 24 px ; « Intermédiaire » coupé (23).
 Écarts voulus (décisions) : paiement et prix retirés de l'écran 24 (F4, C6) ; « Projet économique / Premium » et mention « choix gratuit » (C6) ; « Recommandé pour toi » sans marchands (lot 5) ; offres des marchands désactivées (21, lot 5) ; pas d'aperçu caméra intégré (22 : appareil photo du système) ; étape « durée du programme » ajoutée (23) ; boutons « Publier » en « bientôt disponible » (30, 31 : lot 4) ; Peni pensif au lieu de triste sur l'écran 29 (ne pas culpabiliser) ; textes de démonstration marqués comme tels.
-En attente : coffre sur le chemin (26) — principe décidé, règle de déverrouillage proposée le 15/10, à valider ; avertissement d'un marchand avant une pause (29) — avec les marchands (lot 5).
+Coffre (26) : implémenté (règle validée le 15/10), placé à côté du jour qui clôt sa période. En attente : avertissement d'un marchand avant une pause (29) — avec les marchands (lot 5).
 Écarts mineurs restants, acceptés provisoirement : bulle de Peni remplacée par un bandeau en haut de la carte (26, bulle définitive avec Peni au lot 3) ; rappel « 14:45 » et icône calendrier absents (rappels : lot 2) ; barre d'onglets absente de la capture 18 (capture de l'écran seul) ; unités « cm / kg » dans le libellé plutôt que dans le champ (23).
 Vérification dans un environnement adapté : **captures réelles de l'émulateur Android 14** (branche `ci-captures-android`) : photos avant / après et images jointes réellement affichées, émoji 🏆 rendu en couleur. Les captures de la branche `ci-captures` restent des rendus de test (sans émojis ni images réseau). Pas encore vérifié sur un vrai téléphone.
 
 ### Incomplet ou dépendant d'autres lots
-Contenu des programmes types et habitudes du jour réelles (**C7, action du fondateur**) ; règle du coffre (C8, à valider) ; conservation des images jointes aux signalements (T-022, à valider) ; écran 25 Peni (lot 3) ; écran 28 rappels (lot 2) ; écran 52 profil public et publication « J'ai fait mon BIM » (lot 4) ; recommandations de marchands (lot 5) ; stockage S3 de production (validation des dépenses AWS, autorisation ARTCI) ; pas de test sur un vrai téléphone ; iOS non compilé.
+Contenu des programmes types et habitudes du jour réelles (**C7, action du fondateur**) ; durée de conservation des images jointes aux signalements (T-022 : 12 mois **proposés, en attente de validation juridique et réglementaire**) ; écran 25 Peni (lot 3) ; écran 28 rappels (lot 2) ; écran 52 profil public et publication « J'ai fait mon BIM » (lot 4) ; recommandations de marchands (lot 5) ; stockage S3 de production (validation des dépenses AWS, autorisation ARTCI) ; pas de test sur un vrai téléphone ; iOS non compilé.
 
 ### Préparation des lots 2 et 3
-Analyse : `docs/DEPENDANCES_LOTS_2_3.md`. Aucun blocage d'architecture ; correction faite : journal des événements du projet complété (source des rappels et de Peni, T-023). Règles à respecter au lot 2 (textes de Peni produits à l'envoi depuis des modèles, jetons push par appareil, etc.) et décisions à prendre : fuseau horaire et pays visés (D-L2-01), alarme sur Android et iOS (D-L2-02), processus de tâches de fond à héberger (D-L2-03), fournisseur du modèle de langage (D-L3-01).
+Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal des événements complété, T-023). Décidé le 15/10 (T-025) : lancement en Côte d'Ivoire, architecture prête pour d'autres pays ; rappels par **notifications d'abord**. Étude, contraintes et coûts : `docs/LOT2_RAPPELS_ETUDE.md` (FCM et APNs gratuits ; worker dans l'API au lancement = 0 en plus, ou tâche séparée ≈ 7 à 10 USD/mois). **Le lot 2 n'est pas commencé** : 5 décisions attendent l'accord du fondateur (option du worker, projet Firebase, rythme et heures calmes des rappels, moment de la demande d'autorisation, pas d'alarme exacte en version 1).
 
 ### Vérification finale
-- CI complète **réussie** sur `a87c92f` (exécution 38687427022) : API (lint, compilation, 51 tests unitaires, 79 de bout en bout dont S3 réel, contrat OpenAPI, image Docker), mobile (analyse sans remarque, tests, captures, APK), Android sur émulateur contre l'API (parcours complet du lot 0 et du lot 1, captures réelles), administration (7 scénarios Chromium).
-- Dernier ajustement du code (`da1c637`, libellé « Intermédiaire » sur petit écran) : CI complète **réussie** (exécution 38688399936 : api, mobile, android-e2e, admin), capture du petit écran vérifiée.
-- En local (15/10) : API 51 unitaires + 79 e2e réussis (S3 réel seulement en CI) ; administration 7 scénarios Chromium réussis.
+- CI complète **réussie** sur `2c2a24c` (exécution 38691542705) : API (lint, compilation, 66 tests unitaires, 81 de bout en bout dont S3 réel, contrat OpenAPI, image Docker de production), mobile (analyse sans remarque, tests, captures, APK), Android sur émulateur contre l'API (parcours complet des lots 0 et 1, captures réelles), administration (7 scénarios Chromium).
+- En local (15/10) : API 66 unitaires + 80 e2e réussis (S3 réel seulement en CI) ; administration 7 scénarios Chromium réussis ; migration 0010 appliquée sur une base existante.
+- Non vérifié : vrai téléphone, iOS (compilation non lancée, décision du fondateur).
 
 ## Tests exécutés (session 1, 14/10/2026)
 
@@ -85,7 +87,7 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 | Build de production + migrations compilées | `npm run build` puis `node dist/database/migrate.js` | réussi |
 | Mobile (CI GitHub) | `flutter analyze`, `flutter test` (7 tests), 29 captures, `flutter build apk --debug` | réussis (exécution 38636192504) |
 | Android ↔ API (émulateur) | `flutter test integration_test` | réussi (exécution 38636192504) |
-| API (15/10) | unitaires 51 ; e2e 80 dont le stockage S3 réel (CI) + 1 à écrire au lot 8 (abonné Premium) | réussis (local : 79 + S3 non lancé faute de serveur S3 ; CI : 80) |
+| API (15/10) | unitaires 66 ; e2e 81 dont le stockage S3 réel (CI) + 1 à écrire au lot 8 (abonné Premium) | réussis (local : 80 + S3 non lancé faute de serveur S3 ; CI : 81) |
 | Administration web | Vitest (2) + Playwright/Chromium contre l'API (7 scénarios) | réussis (CI, job `admin`) |
 | Image Docker de l'API | build, migrations, démarrage en production, santé | en CI (job `api`) |
 
@@ -161,7 +163,8 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Lot 1 : validation du bilan et de la règle du coffre (C8) par le fondateur ; programmes types (C7) ; durée de conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
+1. Lot 2 : réponses du fondateur aux 5 décisions de `docs/LOT2_RAPPELS_ETUDE.md` avant tout développement complet ; aucune dépense ni activation en production sans accord.
+1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
 2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
 4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
