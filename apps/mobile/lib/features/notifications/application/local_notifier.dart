@@ -86,10 +86,14 @@ abstract class LocalNotifier {
   /// Demande l'autorisation système (Android 13 et plus). Renvoie la réponse de la personne.
   Future<bool> requestPermission();
 
-  /// Remplace tous les rappels programmés par [reminders].
+  /// Remplace tous les rappels programmés par [reminders] (le rappel d'essai éventuel est conservé).
   Future<void> replaceAll(List<LocalReminder> reminders, {ReminderTiming timing = ReminderTiming.inexact});
 
   Future<void> cancelAll();
+
+  /// Rappel d'essai (versions de test uniquement, tests sur téléphones) : une vraie notification programmée de la même
+  /// façon que les rappels, sans passer par le service des rappels. Identifiant [testReminderId].
+  Future<void> scheduleTest(LocalReminder reminder);
 
   /// Nombre de rappels programmés (contrôle et tests).
   Future<int> pendingCount();
@@ -97,6 +101,9 @@ abstract class LocalNotifier {
   /// Cible de la notification qui a lancé l'app, s'il y en a une (consommée une seule fois).
   Future<ReminderTarget?> takeLaunchTarget();
 }
+
+/// Identifiant réservé au rappel d'essai : jamais annulé par la synchronisation des rappels.
+const testReminderId = 1;
 
 /// Plateforme sans notifications locales (tests, iOS non encore compilé) : rien n'est programmé, rien n'est simulé.
 class NoopLocalNotifier implements LocalNotifier {
@@ -113,6 +120,8 @@ class NoopLocalNotifier implements LocalNotifier {
   Future<void> replaceAll(List<LocalReminder> reminders, {ReminderTiming timing = ReminderTiming.inexact}) async {}
   @override
   Future<void> cancelAll() async {}
+  @override
+  Future<void> scheduleTest(LocalReminder reminder) async {}
   @override
   Future<int> pendingCount() async => 0;
   @override
@@ -184,9 +193,15 @@ class PluginLocalNotifier implements LocalNotifier {
 
   @override
   Future<void> replaceAll(List<LocalReminder> reminders, {ReminderTiming timing = ReminderTiming.inexact}) async {
-    await _plugin.cancelAll();
+    for (final p in await _plugin.pendingNotificationRequests()) {
+      if (p.id != testReminderId) await _plugin.cancel(id: p.id);
+    }
     for (final r in reminders) {
-      await _plugin.zonedSchedule(
+      await _schedule(r, timing);
+    }
+  }
+
+  Future<void> _schedule(LocalReminder r, ReminderTiming timing) => _plugin.zonedSchedule(
         id: r.id,
         scheduledDate: tz.TZDateTime.from(r.fireAt.toUtc(), tz.UTC),
         notificationDetails: details(r.pose),
@@ -197,11 +212,12 @@ class PluginLocalNotifier implements LocalNotifier {
         body: r.body,
         payload: r.payload,
       );
-    }
-  }
 
   @override
   Future<void> cancelAll() => _plugin.cancelAll();
+
+  @override
+  Future<void> scheduleTest(LocalReminder reminder) => _schedule(reminder, ReminderTiming.inexact);
 
   @override
   Future<int> pendingCount() async => (await _plugin.pendingNotificationRequests()).length;

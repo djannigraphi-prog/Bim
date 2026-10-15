@@ -35,7 +35,14 @@ class FakeNotifier implements LocalNotifier {
   Future<void> cancelAll() async {
     cancels++;
     scheduled = [];
+    test = null;
   }
+
+  /// Rappel d'essai programmé (tests sur téléphones).
+  LocalReminder? test;
+
+  @override
+  Future<void> scheduleTest(LocalReminder reminder) async => test = reminder;
 
   @override
   Future<int> pendingCount() async => scheduled.length;

@@ -325,6 +325,25 @@ void main() {
       await _finish(tester);
     });
 
+    testWidgets('rappel d’essai (versions de test) : autorisation demandée, vraie notification programmée, service inchangé', (tester) async {
+      final server = _FakeServer();
+      final notifier = FakeNotifier(allowed: false, grantOnRequest: true);
+      await _open(tester, server, overrides: phone(notifier, server));
+      final before = DateTime.now();
+      await _tapKey(tester, 'test-reminder-1');
+      await tester.pump();
+      expect(notifier.permissionRequests, 1);
+      final test = notifier.test!;
+      expect(test.id, testReminderId);
+      expect(test.body, contains('Rappel d’essai'));
+      expect(test.fireAt.difference(before).inSeconds, inInclusiveRange(55, 65));
+      expect(find.byKey(const ValueKey('test-reminder-at')), findsOneWidget);
+      // Ni préférence ni service touchés : rien n'est envoyé à l'API.
+      expect(server.bodies, isEmpty);
+      expect(server.enabled, isFalse);
+      await _finish(tester);
+    });
+
     testWidgets('autorisation refusée : le choix BIM reste enregistré, l’écran le dit et propose d’autoriser', (tester) async {
       final server = _FakeServer(available: true);
       final notifier = FakeNotifier(allowed: false);

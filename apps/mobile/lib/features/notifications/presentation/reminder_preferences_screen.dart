@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/env.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
@@ -48,6 +49,9 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
 
   /// Autorisation système d'afficher des notifications (null = téléphone sans notifications programmées).
   bool? _systemAllowed;
+
+  /// Heure du rappel d'essai programmé (versions de test).
+  DateTime? _testAt;
 
   NotificationPreferencesApi get _api => ref.read(notificationPreferencesApiProvider);
   LocalNotifier get _notifier => ref.read(localNotifierProvider);
@@ -103,6 +107,32 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
     } else {
       showBimSnack(context, 'Sans autorisation, ton téléphone n’affichera pas les rappels. Tu peux l’activer dans ses réglages.');
     }
+  }
+
+  /// Rappel d'essai pour les tests sur téléphones : demande l'autorisation du téléphone si besoin, puis programme une
+  /// notification dans [minutes] minutes (mode non exact, comme les rappels).
+  Future<void> _scheduleTest(int minutes) async {
+    var allowed = await _notifier.permissionGranted();
+    if (!allowed) allowed = await _notifier.requestPermission();
+    if (!mounted) return;
+    setState(() => _systemAllowed = allowed);
+    if (!allowed) {
+      showBimSnack(context, 'Sans autorisation, ton téléphone n’affichera pas les rappels. Tu peux l’activer dans ses réglages.');
+      return;
+    }
+    final at = DateTime.now().add(Duration(minutes: minutes));
+    await _notifier.scheduleTest(
+      LocalReminder(
+        id: testReminderId,
+        fireAt: at,
+        title: 'Peni',
+        body: 'Rappel d’essai : c’est l’heure ! Ceci est un test des notifications de BIM 💪',
+        payload: '',
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _testAt = at);
+    showBimSnack(context, 'Rappel d’essai prévu. Tu peux verrouiller le téléphone.');
   }
 
   Future<void> _editQuietHours(NotificationPreferences prefs) async {
@@ -277,6 +307,39 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
           ],
         ),
       ),
+      if (!Env.isProduction && _notifier.supported) ...[
+        const SizedBox(height: BimSpacing.lg),
+        Container(
+          key: const ValueKey('test-reminder'),
+          decoration: border,
+          padding: const EdgeInsets.all(BimSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Tests sur téléphone', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: BimSpacing.xs),
+              Text(
+                'Version de test uniquement : programme une vraie notification sur ce téléphone, comme un rappel, '
+                'sans ouvrir le service des rappels.',
+                style: theme.textTheme.bodySmall?.copyWith(color: BimColors.grey600),
+              ),
+              const SizedBox(height: BimSpacing.md),
+              Wrap(
+                spacing: BimSpacing.sm,
+                runSpacing: BimSpacing.sm,
+                children: [
+                  OutlinedButton(key: const ValueKey('test-reminder-1'), onPressed: () => _scheduleTest(1), child: const Text('Dans 1 minute')),
+                  OutlinedButton(key: const ValueKey('test-reminder-15'), onPressed: () => _scheduleTest(15), child: const Text('Dans 15 minutes')),
+                ],
+              ),
+              if (_testAt != null) ...[
+                const SizedBox(height: BimSpacing.sm),
+                Text('Rappel d’essai prévu à ${_hhmm(TimeOfDay.fromDateTime(_testAt!))}.', key: const ValueKey('test-reminder-at')),
+              ],
+            ],
+          ),
+        ),
+      ],
     ];
   }
 }

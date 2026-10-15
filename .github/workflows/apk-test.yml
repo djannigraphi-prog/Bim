@@ -1,0 +1,39 @@
+# APK de test pour les téléphones Android physiques (lot 2) : lancé à la demande, jamais automatiquement.
+# Version de test (debug) : accepte une API en http sur le réseau local, affiche le « rappel d'essai ».
+# Rien n'est publié sur Google Play ; le fichier reste 3 jours dans les artefacts de l'exécution.
+name: APK de test (téléphones)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Adresse de l'API vue depuis le téléphone (ex. http://192.168.1.20:3000)"
+        required: true
+        type: string
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - name: Vérifier l'adresse de l'API
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: |
+          echo "$API_URL" | grep -Eq '^https?://[A-Za-z0-9.:-]+(/.*)?$' || { echo "::error::Adresse d'API invalide : $API_URL"; exit 1; }
+      - name: Compiler l'APK de test (téléphones 64 bits)
+        working-directory: apps/mobile
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: flutter build apk --debug --split-per-abi --target-platform android-arm64 --dart-define=BIM_API_URL="$API_URL" --dart-define=BIM_ENV=test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bim-test-arm64
+          path: apps/mobile/build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+          retention-days: 3
