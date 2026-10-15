@@ -354,9 +354,9 @@ void main() {
     await _tap(tester, find.byTooltip('Retour'));
 
     // Centre de notifications (écran 17) : pastille de la cloche, réponses de l'équipe BIM, puis marquées vues.
-    // Les Paramètres ont défilé jusqu'à « Rappels » : retour exact en haut, sans glissement.
-    await tester.ensureVisible(find.byTooltip('Retour', skipOffstage: false));
-    await tester.pump(const Duration(milliseconds: 300));
+    // Les Paramètres ont défilé jusqu'à « Rappels » : on remonte jusqu'au bouton « Retour ». Cet écran ne contient
+    // aucun dessin SVG : d'après la sonde (docs/TESTING.md), ce défilement ne fait pas tomber l'émulateur.
+    await tester.scrollUntilVisible(find.byTooltip('Retour'), -150, scrollable: find.byType(Scrollable).first);
     await _tap(tester, find.byTooltip('Retour'));
     await _waitFor(tester, find.descendant(of: find.byTooltip('Notifications'), matching: find.text('2')));
     await _tap(tester, find.byTooltip('Notifications'));
