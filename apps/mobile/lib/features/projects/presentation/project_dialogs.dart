@@ -206,21 +206,21 @@ class _PauseSheetState extends State<_PauseSheet> {
             Container(
               padding: const EdgeInsets.all(BimSpacing.md),
               decoration: BoxDecoration(color: BimColors.warningBg, borderRadius: BorderRadius.circular(BimRadius.chip)),
-              child: Row(
+              child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, color: BimColors.progressAlmost),
-                  const SizedBox(width: BimSpacing.sm),
+                  Icon(Icons.info_outline, color: BimColors.progressAlmost),
+                  SizedBox(width: BimSpacing.sm),
                   Expanded(
                     child: Text.rich(
-                      const TextSpan(children: [
+                      TextSpan(children: [
                         TextSpan(text: 'Attention : ', style: TextStyle(fontWeight: FontWeight.w800)),
                         TextSpan(
                           text: 'faire une pause peut ralentir l’atteinte de ton objectif. Pendant la pause, ton programme est suspendu '
                               'et sa date de fin est décalée d’autant. Tes progrès et les tâches déjà accomplies sont conservés.',
                         ),
                       ],),
-                      style: const TextStyle(color: BimColors.black, fontSize: 15),
+                      style: TextStyle(color: BimColors.black, fontSize: 15),
                     ),
                   ),
                 ],

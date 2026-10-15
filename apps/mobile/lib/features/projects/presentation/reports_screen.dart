@@ -9,7 +9,7 @@ import '../data/projects_models.dart';
 import 'project_dialogs.dart';
 import 'report_sheet.dart';
 
-/// Signalements d'un projet ('p:<id>') ou tous ('all').
+/// Signalements d'un projet (clé « p: » suivie de l'identifiant) ou tous (clé « all »).
 final projectReportsProvider = FutureProvider.autoDispose.family<List<ProjectReport>, String>(
   (ref, key) => ref.watch(projectsApiProvider).reports(projectId: key == 'all' ? null : key.substring(2)),
 );
