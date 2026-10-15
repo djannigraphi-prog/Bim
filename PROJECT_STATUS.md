@@ -16,7 +16,7 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | --- | --- | --- | --- | --- | --- | --- |
 | Socle API (config, journaux, santé, erreurs, OpenAPI, limitation) | Terminée | Fait | — | Image Docker de production démarrée en CI | Exécutés, réussis | — |
 | Environnements staging et production (AWS) | Plan écrit (`docs/DEPLOYMENT.md`) | — | — | **Non déployés** | Image testée en CI | Validation des dépenses AWS, autorisation ARTCI, nom de domaine |
-| Base + migrations (17 migrations, 0000 à 0016, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
+| Base + migrations (18 migrations, 0000 à 0017, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
 | Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel : **prérequis du lancement public** (décision du 15/10, T-030), dépense à autoriser |
 | F15 — âges par capacité | Terminée | Fait (réglages `age.*`) | — | — | Exécutés, réussis | Vérifications légales (DECISIONS.md) |
 | F16 — récupération vérifiée, step-up | Terminée | Fait | Coordonnées, mot de passe, appareils | **Testée sur Android** (ajout d'un e-mail vérifié, nouveau mot de passe) | API + Android : réussis | — |
@@ -26,7 +26,8 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Administration (API `/admin/v1` + application web React) | Terminée | Fait : connexion + TOTP, rôles, réglages, audit, utilisateurs, programmes types, comptes admin | Web : fait | **Testée dans Chromium contre l'API** | API : 8 unitaires + 13 e2e ; web : unitaires + 5 scénarios navigateur | Rôles à valider (T-019) ; hébergement AWS |
 | Lot 1 — Projets BIM (écrans 18-24, 26, 27, 29-31) | Terminée | Fait : référentiels et catégories administrables, création en 5 étapes, mode Éco / Premium gratuit (C6), programmes types validés (mode, conseils), carte et journée, tâche suivante, tâches ajoutées / retirées, pause, signalement de projet ou général avec image jointe (+ traitement admin), avertissement de pause, coffres symboliques (70 %), mesures chiffrées, photos avant / après privées (S3), fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création, séance, photos, signalements avec image, captures réelles de l'écran) ; **admin testée dans Chromium** (image jointe chargée) ; **photos testées sur un vrai serveur S3** en CI | API, admin, Android : réussis (voir bilan du lot 1) | Contenu des programmes types (C7) ; Peni (lot 3) ; rappels (lot 2) ; profil public (lot 4) ; recommandations marchands (lot 5) ; stockage S3 de production (dépenses AWS, ARTCI) |
 | Lot 2 — Rappels et notifications (écrans 17, 28 ; préférences) | Terminée | Fait : préférences, rappels désactivés par défaut, calcul des rappels (heures calmes option B), textes de Peni v3 (provisoires), worker (inactif), envoi FCM prêt (inactif), rappels à venir, centre de notifications, purge des comptes jamais vérifiés (désactivée, en simulation) | Fait : écran Rappels, notifications programmées et actions, écran Notifications, pastille | **Testé sur émulateur Android contre l'API** (vraies notifications, écran verrouillé, actions) | API, Flutter, Android : réussis | **Pas encore clôturé** : tests sur téléphones physiques, décisions et autorisations listées dans `docs/CLOTURE_LOT2.md` |
-| Lots 3 à 12 (Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
+| Lot 3 — Peni (écrans 19, 20, 25) | **En cours** (commencé le 15/10, en parallèle du lot 2, T-031) | Fait : discussion guidée sans IA (moteur `guided-v1`), brouillon de projet, cadrage santé, limites, interface IA désactivée | Fait : écran 25, entrées 19 et 20, reprise du brouillon | Parcours Android de bout en bout (capture `a25_peni`) | API (13 unitaires, 8 e2e), Flutter (5) | Fournisseur d'IA (accord du fondateur), durée de conservation des discussions, encouragements et messages personnalisés (étapes suivantes) |
+| Lots 4 à 12 (social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
 ## Bilan du lot 1 — Projets BIM (15/10/2026)
 
@@ -76,6 +77,14 @@ Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal
 - En local (15/10) : API 66 unitaires + 80 e2e réussis (S3 réel seulement en CI) ; administration 7 scénarios Chromium réussis ; migration 0010 appliquée sur une base existante.
 - Non vérifié : vrai téléphone, iOS (compilation non lancée, décision du fondateur).
 
+## Lot 3 — avancement (Peni, commencé le 15/10/2026)
+
+| Étape | Contenu | Tests | CI |
+| --- | --- | --- | --- |
+| 3-A | **Discussion guidée avec Peni (écran 25)** : objectif, quantité, séances, moment, mode, budget, durée ; phrases libres comprises (« perdre du ventre avant mon mariage en décembre », « le samedi et le dimanche matin »), réponses rapides ; modèle de programme validé prioritaire ; brouillon au format de `POST /v1/projects`, repris à la dernière étape du nouveau projet et confirmé par la personne ; cadrage santé et urgences (185, 180) ; limites par 24 h et par discussion ; interface IA désactivée (`PENI_LLM_PROVIDER=none`, `peni.llm_enabled`=false) ; tables `peni_conversations`, `peni_messages` (migration 0017) | API : 13 unitaires (moteur), 8 e2e (brouillon accepté par la création de projet, isolation, limites, concurrence, IA jamais appelée) ; Flutter : 5 ; captures `25_peni` ; Android réel : projet créé par la discussion (capture `a25_peni`) | verte (run 38771178589, commit 43f1a91) |
+
+Prochaines étapes du lot 3 (sans dépense) : messages d'encouragement de Peni dans la journée et la carte du projet (catalogue de messages commun, R4) ; « Pas sûr ? » pour l'objectif (écran 21) ; reprise d'une discussion interrompue. Avec ton accord seulement : fournisseur d'IA.
+
 ## Lot 2 — avancement (15/10/2026, partie sans dépense)
 
 Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'aucune décision en attente. **Rien n'est activé** : `WORKER_MODE=off`, `PUSH_PROVIDER=none` par défaut, réglage `notifications.reminders_enabled` = false (« en attente »), aucun projet Firebase, aucune ressource AWS.
@@ -99,7 +108,7 @@ Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'a
 | N | **Décisions du 15/10, 15 h 44 (T-030)** : heures calmes option B (rappel à l'heure choisie envoyé, relances bloquées, jamais reportées) ; textes de Peni v3 (tâche en tête, pose encourageante), provisoires ; bouton « Les 3 textes de Peni » pour les téléphones (T17) | unitaires (7 cas d'heures calmes, nuit minute par minute, textes, copie de l'app identique au serveur) ; e2e (relance bloquée après coup, rappel initial envoyé, aucun doublon) ; Flutter | voir `docs/CLOTURE_LOT2.md` |
 | O | **Purge des comptes jamais vérifiés** (30 jours), **désactivée et en simulation par défaut** : verrou, plafond de 500, aucun code récent, audit sans donnée personnelle, page Maintenance de l'administration (simulation à la demande) ; migration 0016 | 9 e2e (dont : comptes actifs, suspendus, supprimés, récents, utilisés jamais touchés ; simulation ; plafond ; passages simultanés ; tables liées classées) ; test navigateur de l'administration | voir `docs/CLOTURE_LOT2.md` |
 
-Suite API locale : 195 tests réussis le 15/10 (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
+Suite API locale : 218 tests réussis le 15/10 après le lot 3-A (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
 ## Tests exécutés (session 1, 14/10/2026)
 

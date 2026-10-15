@@ -1,6 +1,6 @@
 # Clôture du lot 2 — Rappels et notifications : checklist
 
-État au 15/10/2026, après les décisions de 15 h 44 (T-030). **Le lot 2 n'est pas clôturé.** Un point n'est « terminé » que s'il a une preuve vérifiable : test automatique exécuté, exécution de CI ou capture. Les tests sur vrais téléphones n'ont **pas** été réalisés.
+État au 15/10/2026, après les décisions de 15 h 44 (T-030). **Le lot 2 n'est pas clôturé.** Depuis 16 h 26 (T-031), le lot 3 avance en parallèle : les points ci-dessous restent à faire mais ne bloquent plus le lot 3. Un point n'est « terminé » que s'il a une preuve vérifiable : test automatique exécuté, exécution de CI ou capture. Les tests sur vrais téléphones n'ont **pas** été réalisés.
 
 ## Preuves de référence
 

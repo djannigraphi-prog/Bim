@@ -280,6 +280,14 @@ Développé et testé, **inactif** : fuseau horaire par personne (`profiles.time
 5. **Émulateur** : problème documenté et origine recherchée (voir `docs/TESTING.md`, « Perte de l'émulateur ») ; aucun test supprimé.
 6. Finalisation du lot 2 sans dépense ; bilan présenté avant de considérer le lot comme terminé.
 
+### T-031 — Lot 3 (Peni) commencé en parallèle du lot 2 · Produit · décidé (fondateur, 15/10/2026, 16 h 26)
+1. Le lot 3 avance sans attendre les tests sur téléphones du lot 2 (aucune dépendance technique : les rappels et Peni partagent seulement le catalogue de messages, R1 et R4). La checklist du lot 2 reste tenue à jour (`docs/CLOTURE_LOT2.md`).
+2. Première fonctionnalité : **discussion guidée avec Peni (écran 25)** qui prépare un projet, ouverte depuis les écrans 19 et 20. Moteur `guided-v1` : réponses écrites et versionnées dans le dépôt, phrases simples comprises par mots-clés, réponses rapides ; brouillon au format de `POST /v1/projects`, vérifié et confirmé par la personne (R5, R6).
+3. **Aucun fournisseur d'IA** : interface `LlmProvider` prête, seul fournisseur « none » (`PENI_LLM_PROVIDER`), réglage `peni.llm_enabled` à false (« pending »). Un fournisseur ne pourra servir que s'il est branché ET si le réglage est validé (« decided ») ; aucune donnée personnelle n'est envoyée à l'extérieur d'ici là.
+4. Cadrage santé (R4) : aucun avis médical, renvoi vers un professionnel ; urgence : SAMU 185, pompiers 180, le projet n'avance pas.
+5. Limites provisoires (administrables) : 100 messages par 24 heures, 60 par discussion. Durée de conservation des discussions : **à décider** (proposition : 12 mois, ou suppression avec le compte seulement).
+6. Écarts assumés avec la maquette 25 : pas de micro (dictée vocale : service externe) ; la question « à la maison ou en salle » n'est pas posée, car la réponse ne serait utilisée nulle part (elle le sera avec les programmes types, C7).
+
 ### T-030 — Décisions du fondateur du 15/10/2026 (15 h 44) · Produit · décidé
 1. **Rythme** conservé : rappel à l'heure, puis +1 h et +2 h seulement si la tâche n'est pas cochée.
 2. **Heures calmes 22 h – 6 h, option B** : le rappel initial part à l'heure choisie, même pendant les heures calmes ; les relances +1 h et +2 h n'y sont jamais envoyées (supprimées, jamais reportées). Appliqué (`reminders.ts`, revérification avant l'envoi dans le worker) et testé (report, doublons, envois hors période). Reste ouvert : le retard possible des notifications non exactes du téléphone (options P1 à P3 dans `docs/RYTHME_ET_TEXTES_RAPPELS.md`), à trancher par le fondateur.
