@@ -294,7 +294,9 @@ void main() {
     expect(find.byKey(const ValueKey('reminders-unavailable')), findsOneWidget);
     await _tap(tester, find.byTooltip('Retour'));
 
-    await _scrollTap(tester, find.text('Téléphone et e-mail'));
+    // La section « Notifications » allonge les Paramètres : « Téléphone et e-mail » est maintenant au-dessus.
+    await tester.scrollUntilVisible(find.text('Téléphone et e-mail'), -150, scrollable: find.byType(Scrollable).first);
+    await _tap(tester, find.text('Téléphone et e-mail'));
     await _tap(tester, find.text('Ajouter une coordonnée'));
     await _tap(tester, find.text('E-mail'));
     final email = '$username@exemple.com';
