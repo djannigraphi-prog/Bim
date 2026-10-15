@@ -13,16 +13,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Seconde série : isoler l'élément de l'écran BIM en cause (première série : seul « bim » fait tomber l'émulateur).
+        # Troisième série : même geste sur d'autres versions d'Android (séries 1 et 2 : Android 14, voir docs/TESTING.md).
         include:
+          - probe: bim
+            impeller: "true"
+            api: 33
+          - probe: bim
+            impeller: "true"
+            api: 35
           - probe: svg
             impeller: "true"
-          - probe: bimopen
+            api: 35
+          - probe: plain
             impeller: "true"
-          - probe: bim
-            impeller: "false"
-          - probe: bim
-            impeller: "true"
+            api: 35
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -41,13 +45,13 @@ jobs:
           grep -n "EnableImpeller" android/app/src/main/AndroidManifest.xml
       - run: flutter pub get
         working-directory: apps/mobile
-      - name: Sonde ${{ matrix.probe }} (Impeller ${{ matrix.impeller }})
+      - name: Sonde ${{ matrix.probe }} (Impeller ${{ matrix.impeller }}, Android API ${{ matrix.api || 34 }})
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: ${{ matrix.api || 34 }}
           arch: x86_64
           target: google_apis
           disable-animations: true
           working-directory: apps/mobile
           script: |
-            status=0; flutter test integration_test/overscroll_probe_test.dart -d emulator-5554 --dart-define=PROBE=${{ matrix.probe }} --reporter expanded > "$RUNNER_TEMP/probe.log" 2>&1 || status=$?; state=$(timeout 20 adb get-state 2>&1 || echo "sans réponse"); tail -n 5 "$RUNNER_TEMP/probe.log"; echo "::notice title=Sonde ${{ matrix.probe }} (Impeller ${{ matrix.impeller }})::test=$status ; émulateur=$state"
+            status=0; flutter test integration_test/overscroll_probe_test.dart -d emulator-5554 --dart-define=PROBE=${{ matrix.probe }} --reporter expanded > "$RUNNER_TEMP/probe.log" 2>&1 || status=$?; state=$(timeout 20 adb get-state 2>&1 || echo "sans réponse"); tail -n 5 "$RUNNER_TEMP/probe.log"; echo "::notice title=Sonde ${{ matrix.probe }} (Impeller ${{ matrix.impeller }}, API ${{ matrix.api || 34 }})::test=$status ; émulateur=$state"
