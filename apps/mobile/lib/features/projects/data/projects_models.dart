@@ -390,25 +390,53 @@ class ProjectPhoto {
   final String url;
 }
 
+/// Signalement (écrans 21 et 27) : lié à un projet ou général (« Résoudre un problème »), image facultative.
 class ProjectReport {
-  const ProjectReport({required this.id, required this.day, required this.reason, this.message, required this.status, this.resolution});
+  const ProjectReport({
+    required this.id,
+    this.context = 'project',
+    this.projectId,
+    this.projectTitle,
+    this.day,
+    required this.reason,
+    this.message,
+    this.imageUrl,
+    required this.status,
+    this.resolution,
+    this.createdAt,
+  });
 
   factory ProjectReport.fromJson(Map<String, dynamic> j) => ProjectReport(
         id: j['id'] as String,
-        day: j['day'] as String,
+        context: (j['context'] ?? 'project') as String,
+        projectId: j['projectId'] as String?,
+        projectTitle: j['projectTitle'] as String?,
+        day: j['day'] as String?,
         reason: j['reason'] as String,
         message: j['message'] as String?,
+        imageUrl: (j['image'] as Map<String, dynamic>?)?['url'] as String?,
         status: j['status'] as String,
         resolution: j['resolution'] as String?,
+        createdAt: j['createdAt'] == null ? null : DateTime.parse(j['createdAt'] as String),
       );
 
   final String id;
-  final String day;
+  /// project ou general.
+  final String context;
+  final String? projectId;
+  final String? projectTitle;
+  final String? day;
   final String reason;
   final String? message;
+  /// Lien temporaire vers l'image jointe (privée).
+  final String? imageUrl;
   final String status;
   final String? resolution;
+  final DateTime? createdAt;
 
+  bool get isGeneral => context == 'general';
+
+  /// Motifs depuis la journée d'un projet (écran 27).
   static const reasons = {
     'unavailable': 'Lieu ou intervenant indisponible',
     'too_hard': 'Trop difficile pour moi',
@@ -416,4 +444,14 @@ class ProjectReport {
     'content': 'Tâche inadaptée',
     'other': 'Autre problème',
   };
+
+  /// Motifs d'un problème général (« Résoudre un problème »).
+  static const generalReasons = {
+    'app': 'Difficulté avec l’application',
+    'product': 'Problème avec un produit ou un service',
+    'health': 'Douleur ou malaise',
+    'other': 'Autre problème',
+  };
+
+  static String label(String reason) => reasons[reason] ?? generalReasons[reason] ?? reason;
 }

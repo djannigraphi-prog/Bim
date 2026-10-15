@@ -163,7 +163,8 @@ Future<bool> confirmAbandon(BuildContext context, String title) async {
   return ok ?? false;
 }
 
-/// Écran 29 — Mettre en pause : durée, nouvelle fin prévue. Renvoie le nombre de jours, ou null.
+/// Écran 29 — Mettre en pause : avertissement général (C8, décidé le 15/10), durée, nouvelle fin prévue.
+/// Informe des conséquences sans culpabiliser. Renvoie le nombre de jours, ou null si la personne continue.
 Future<int?> askPause(BuildContext context, {required String title, required String plannedEndDate}) {
   return showModalBottomSheet<int>(
     context: context,
@@ -191,15 +192,40 @@ class _PauseSheetState extends State<_PauseSheet> {
     final theme = Theme.of(context);
     const presets = [(1, '1 jour'), (3, '3 jours'), (7, '1 semaine')];
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, BimSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Center(child: Peni(pose: PeniPose.sad, size: 96)),
+            const Center(child: Peni(pose: PeniPose.think, size: 88)),
             const SizedBox(height: BimSpacing.md),
-            Text('Mettre en pause «\u00A0${widget.title}\u00A0»\u00A0?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            Text('Mettre ton programme en pause\u00A0?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            Text('«\u00A0${widget.title}\u00A0»', textAlign: TextAlign.center, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: BimSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(BimSpacing.md),
+              decoration: BoxDecoration(color: BimColors.warningBg, borderRadius: BorderRadius.circular(BimRadius.chip)),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, color: BimColors.progressAlmost),
+                  const SizedBox(width: BimSpacing.sm),
+                  Expanded(
+                    child: Text.rich(
+                      const TextSpan(children: [
+                        TextSpan(text: 'Attention : ', style: TextStyle(fontWeight: FontWeight.w800)),
+                        TextSpan(
+                          text: 'faire une pause peut ralentir l’atteinte de ton objectif. Pendant la pause, ton programme est suspendu '
+                              'et sa date de fin est décalée d’autant. Tes progrès et les tâches déjà accomplies sont conservés.',
+                        ),
+                      ],),
+                      style: const TextStyle(color: BimColors.black, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: BimSpacing.lg),
             Text('Durée de la pause', style: theme.textTheme.titleMedium),
             const SizedBox(height: BimSpacing.sm),
@@ -241,9 +267,9 @@ class _PauseSheetState extends State<_PauseSheet> {
               ],
             ),
             const SizedBox(height: BimSpacing.lg),
-            BimButton(label: 'Confirmer la pause', variant: BimButtonVariant.dark, onPressed: () => Navigator.pop(context, _days)),
+            BimButton(label: 'Continuer mon programme', variant: BimButtonVariant.dark, onPressed: () => Navigator.pop(context)),
             const SizedBox(height: BimSpacing.sm),
-            BimButton(label: 'Non, je continue 💪', variant: BimButtonVariant.subtle, onPressed: () => Navigator.pop(context)),
+            BimButton(label: 'Mettre en pause', variant: BimButtonVariant.outline, onPressed: () => Navigator.pop(context, _days)),
           ],
         ),
       ),
@@ -352,88 +378,7 @@ Future<double?> askMeasurement(BuildContext context, {required String unit, doub
   return result;
 }
 
-typedef ReportInput = ({String reason, String? taskId, String message});
-
-/// Écran 27 — « Signaler » : un problème sur la journée ou une tâche, transmis au support.
-Future<ReportInput?> askReport(BuildContext context, {required List<ProjectTask> tasks}) {
-  return showModalBottomSheet<ReportInput>(context: context, isScrollControlled: true, builder: (_) => _ReportSheet(tasks: tasks));
-}
-
-class _ReportSheet extends StatefulWidget {
-  const _ReportSheet({required this.tasks});
-
-  final List<ProjectTask> tasks;
-
-  @override
-  State<_ReportSheet> createState() => _ReportSheetState();
-}
-
-class _ReportSheetState extends State<_ReportSheet> {
-  String? _reason;
-  String? _taskId;
-  final _message = TextEditingController();
-
-  @override
-  void dispose() {
-    _message.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, MediaQuery.viewInsetsOf(context).bottom + BimSpacing.lg),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Signaler un problème', style: theme.textTheme.titleLarge),
-            const SizedBox(height: BimSpacing.xs),
-            Text('L’équipe BIM lit chaque signalement et te répond ici.', style: theme.textTheme.bodyMedium),
-            const SizedBox(height: BimSpacing.md),
-            Wrap(
-              spacing: BimSpacing.sm,
-              runSpacing: BimSpacing.sm,
-              children: [
-                for (final e in ProjectReport.reasons.entries)
-                  ChoiceChipBim(label: e.value, selected: _reason == e.key, onTap: () => setState(() => _reason = e.key)),
-              ],
-            ),
-            if (widget.tasks.isNotEmpty) ...[
-              const SizedBox(height: BimSpacing.md),
-              Text('Tâche concernée (facultatif)', style: theme.textTheme.titleMedium),
-              const SizedBox(height: BimSpacing.sm),
-              Wrap(
-                spacing: BimSpacing.sm,
-                runSpacing: BimSpacing.sm,
-                children: [
-                  for (final t in widget.tasks)
-                    ChoiceChipBim(label: t.title, selected: _taskId == t.id, onTap: () => setState(() => _taskId = _taskId == t.id ? null : t.id)),
-                ],
-              ),
-            ],
-            const SizedBox(height: BimSpacing.md),
-            TextField(
-              key: const Key('report-message'),
-              controller: _message,
-              maxLength: 500,
-              maxLines: 3,
-              decoration: const InputDecoration(hintText: 'Explique en quelques mots (facultatif)'),
-            ),
-            const SizedBox(height: BimSpacing.sm),
-            BimButton(
-              label: 'Envoyer',
-              variant: BimButtonVariant.dark,
-              onPressed: _reason == null ? null : () => Navigator.pop(context, (reason: _reason!, taskId: _taskId, message: _message.text.trim())),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// Signalement : voir report_sheet.dart (formulaire commun aux écrans 21 et 27).
 
 /// Conseil affiché après un signalement « douleur ou malaise » : BIM ne donne pas d'avis médical.
 Future<void> showHealthAdvice(BuildContext context) {

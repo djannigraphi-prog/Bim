@@ -47,6 +47,15 @@ Règle : un test n'est déclaré réussi que s'il a été exécuté. Les résult
 ## Lot 1, suite — programmes, signalements, mesures, photos
 
 - `apps/api/test/projects-lot1b.e2e-spec.ts` : programme type choisi selon le mode (économique / Premium), brouillons jamais utilisés, habitude du jour seulement si validée ; prochaine tâche ; catégories et objectifs administrables ; signalement → réponse du support ; mesures (départ, variation) ; photos (métadonnées et GPS supprimés, lien temporaire, remplacement, suppression, purge avec le projet, accès d'un autre compte refusé).
-- `apps/api/test/media-s3.e2e-spec.ts` : même code sur un vrai stockage S3 (MinIO en CI) : lien présigné, lecture refusée sans signature, effacement.
+- `apps/api/test/media-s3.e2e-spec.ts` : même code sur un vrai stockage S3 (en CI : Versity S3 Gateway réglé sur eu-west-3, `.github/scripts/start-s3-test.sh` ; les images MinIO ne sont plus téléchargeables) : lien présigné, lecture refusée sans signature, effacement.
 - Android (`auth_flow_test.dart`) : photo « avant » à la création, photo « après », comparaison, signalement et suivi.
 - Navigateur (`apps/admin/e2e/admin.spec.ts`) : catégories et objectifs, signalements, mode et habitudes du jour des programmes.
+
+## Lot 1, fin — « Résoudre un problème », image jointe, pause, journal des événements (15/10/2026)
+
+- `apps/api/test/reports.e2e-spec.ts` : problème général avec capture (image privée, sans métadonnées, visible par la personne et le support, réponse) ; contrôles (description obligatoire, motifs par contexte, image illisible ou PDF refusés **sans rien créer**) ; signalement depuis un projet avec image, filtre par projet, projet d'un autre refusé ; 20 signalements au plus par 24 h ; stockage non configuré : image refusée clairement (`NOT_CONFIGURED`), texte accepté.
+- `apps/api/test/projects-lot1b.e2e-spec.ts` : contrat du journal des événements (source des lots 2 et 3, `docs/DEPENDANCES_LOTS_2_3.md`).
+- Navigateur : signalement général avec image jointe **réellement chargée** dans l'administration (largeur naturelle de l'image vérifiée ; ce test a révélé l'en-tête `Cross-Origin-Resource-Policy` à autoriser sur les liens signés locaux).
+- Android : image jointe au signalement d'une journée ; « Résoudre un problème » depuis le compte (description + capture) puis « Mes signalements » ; images réellement téléchargées et affichées (vérifié dans l'arbre de rendu, aucune icône d'image cassée).
+- **Captures réelles de l'émulateur** (rendu Android véritable : polices et émojis du système, images chargées par le réseau) : prises par le test via le relais de la CI (`adb screencap`), publiées sur la branche `ci-captures-android` (`a31_avant_apres`, `a27_mes_signalements_projet`, `a30_bilan_emoji`, `a21_mes_signalements`). Les captures de la branche `ci-captures` restent des rendus de test (sans émojis ni images réseau).
+

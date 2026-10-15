@@ -110,6 +110,8 @@ jobs:
   android-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write   # uniquement pour publier les captures réelles de l'émulateur (branche ci-captures-android)
     services:
       postgres:
         image: postgres:16-alpine
@@ -148,7 +150,7 @@ jobs:
           npm run build
           node dist/database/migrate.js
           nohup node dist/main.js > "$RUNNER_TEMP/api.log" 2>&1 &
-          nohup python3 ../../.github/scripts/otp-relay.py "$RUNNER_TEMP/api.log" 3999 > /dev/null 2>&1 &
+          nohup python3 ../../.github/scripts/otp-relay.py "$RUNNER_TEMP/api.log" 3999 "$RUNNER_TEMP/android-shots" > "$RUNNER_TEMP/relay.log" 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:3000/health && break; sleep 1; done
           curl -sf localhost:3000/health
       - uses: subosito/flutter-action@v2
@@ -170,6 +172,16 @@ jobs:
           disable-animations: true
           working-directory: apps/mobile
           script: bash ../../.github/scripts/run-android-e2e.sh
+      - name: Publier les captures réelles de l'émulateur (branche ci-captures-android)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ls "$RUNNER_TEMP"/android-shots/*.png >/dev/null 2>&1; then
+            bash .github/scripts/publish-captures.sh "$RUNNER_TEMP/android-shots" ci-captures-android "émulateur Android 14, API 34, rendu réel"
+          else
+            echo "::warning title=captures android::Aucune capture réelle produite"; cat "$RUNNER_TEMP/relay.log" || true
+          fi
       - name: Résumé (annotations lisibles hors des journaux)
         if: ${{ always() }}
         run: |

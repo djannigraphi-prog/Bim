@@ -233,6 +233,12 @@ export const projectPauses = pgTable(
   ],
 );
 
+/**
+ * Journal des événements d'un projet, écrit dans la même transaction que le changement (ordre garanti : identifiants
+ * UUID v7 croissants). Source unique prévue pour les rappels (lot 2 : recalcul des horaires) et pour Peni (lot 3 :
+ * contexte du projet), sans qu'ils modifient le module Projets. Types : created, paused, resumed, completed, abandoned,
+ * task_added, task_removed, mode_changed, measurement_added (voir docs/DEPENDANCES_LOTS_2_3.md).
+ */
 export const projectEvents = pgTable(
   'project_events',
   {
@@ -248,22 +254,34 @@ export const projectEvents = pgTable(
 );
 
 
-/** Signalement d'un problème depuis la journée (écran 27), traité par le support dans l'administration. */
+/**
+ * Signalements traités par le support dans l'administration. Un seul système pour deux contextes :
+ * - « project » : depuis la journée d'un projet (écran 27), lié au projet, au jour et éventuellement à la tâche ;
+ * - « general » : « Résoudre un problème » (écran 21) ou aide, sans projet (difficulté avec l'app ou un produit).
+ * Une image peut être jointe (capture d'écran, photo d'un produit) : ré-encodée, privée, lue par lien temporaire.
+ */
 export const projectReports = pgTable(
   'project_reports',
   {
     id: uuid('id').primaryKey(),
-    projectId: uuid('project_id')
-      .notNull()
-      .references(() => projects.id, { onDelete: 'cascade' }),
+    context: varchar('context', { length: 8 }).notNull().default('project'),
+    projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    day: date('day', { mode: 'string' }).notNull(),
+    day: date('day', { mode: 'string' }),
     taskId: uuid('task_id').references(() => projectTasks.id, { onDelete: 'set null' }),
-    /** unavailable (salle fermée, coach absent…) · too_hard · health (douleur, malaise) · content (tâche inadaptée) · other */
+    /**
+     * Projet : unavailable (salle fermée, coach absent…) · too_hard · health (douleur, malaise) · content (tâche inadaptée) · other.
+     * Général : app (difficulté avec l'application) · product (produit ou service) · health · other.
+     */
     reason: varchar('reason', { length: 16 }).notNull(),
-    message: varchar('message', { length: 500 }),
+    message: varchar('message', { length: 1000 }),
+    /** Image jointe (clé de stockage privé) et ses dimensions. */
+    attachmentKey: varchar('attachment_key', { length: 200 }),
+    attachmentWidth: integer('attachment_width'),
+    attachmentHeight: integer('attachment_height'),
+    attachmentBytes: integer('attachment_bytes'),
     status: varchar('status', { length: 10 }).notNull().default('open'),
     resolution: varchar('resolution', { length: 500 }),
     resolvedBy: uuid('resolved_by'),
@@ -272,8 +290,13 @@ export const projectReports = pgTable(
   },
   (t) => [
     index('project_reports_status_idx').on(t.status, t.createdAt),
-    check('project_reports_reason_ck', sql`${t.reason} IN ('unavailable', 'too_hard', 'health', 'content', 'other')`),
+    index('project_reports_user_idx').on(t.userId, t.createdAt),
+    check('project_reports_reason_ck', sql`${t.reason} IN ('unavailable', 'too_hard', 'health', 'content', 'other', 'app', 'product')`),
     check('project_reports_status_ck', sql`${t.status} IN ('open', 'resolved')`),
+    check(
+      'project_reports_context_ck',
+      sql`(${t.context} = 'project' AND ${t.projectId} IS NOT NULL AND ${t.day} IS NOT NULL) OR (${t.context} = 'general' AND ${t.projectId} IS NULL AND ${t.taskId} IS NULL AND ${t.message} IS NOT NULL)`,
+    ),
   ],
 );
 

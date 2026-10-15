@@ -210,9 +210,11 @@ class _FakeProjectsApi extends ProjectsApi {
   Future<({bool available, List<ProjectPhoto> items})> photos(String id) async => (available: true, items: const <ProjectPhoto>[]);
 
   @override
-  Future<List<ProjectReport>> reports(String id) async => [
-        ProjectReport(id: 'r1', day: iso(-1), reason: 'unavailable', message: 'Salle fermée (démonstration)', status: 'resolved', resolution: 'Merci, nous avons prévenu le partenaire (démonstration).'),
-        ProjectReport(id: 'r2', day: iso(0), reason: 'too_hard', status: 'open'),
+  Future<List<ProjectReport>> reports({String? projectId}) async => [
+        ProjectReport(id: 'r1', projectId: 'p1', projectTitle: 'Perdre 10 kg', day: iso(-1), reason: 'unavailable', message: 'Salle fermée (démonstration)', status: 'resolved', resolution: 'Merci, nous avons prévenu le partenaire (démonstration).'),
+        ProjectReport(id: 'r2', projectId: 'p1', projectTitle: 'Perdre 10 kg', day: iso(0), reason: 'too_hard', status: 'open'),
+        if (projectId == null)
+          ProjectReport(id: 'r3', context: 'general', reason: 'app', message: 'Le bouton Continuer ne réagit pas (démonstration).', status: 'open', createdAt: DateTime.now()),
       ];
 
   @override
@@ -297,6 +299,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/projects/p3/done', builder: (_, __) => const CelebrationScreen(projectId: 'p3')),
     GoRoute(path: '/projects/p1/transformation', builder: (_, __) => const TransformationScreen(projectId: 'p1')),
     GoRoute(path: '/projects/p1/reports', builder: (_, __) => const ReportsScreen(projectId: 'p1')),
+    GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
     GoRoute(path: '/projects/p1/today', builder: (_, __) => ProjectDayScreen(projectId: 'p1', day: _FakeProjectsApi.iso(0))),
   ],);
   await tester.pumpWidget(UncontrolledProviderScope(
@@ -455,6 +458,16 @@ void main() {
   testWidgets('signalements', (t) async {
     await _show(t, '/projects/p1/reports');
     await _capture(t, 'x10_signalements');
+  });
+  testWidgets('mes signalements (tous)', (t) async {
+    await _show(t, '/reports');
+    await _capture(t, 'x12_mes_signalements');
+  });
+  testWidgets('21 résoudre un problème', (t) async {
+    await _show(t, '/reports');
+    await t.tap(find.text('Signaler un nouveau problème'));
+    await _settle(t);
+    await _capture(t, 'x13_resoudre_un_probleme');
   });
   testWidgets('27 signaler', (t) async {
     await _show(t, '/projects/p1/today');

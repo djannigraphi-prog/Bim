@@ -13,6 +13,9 @@ export class MediaController {
   @Public()
   @Get(':token')
   @Header('Cache-Control', 'private, no-store')
+  // L'administration web (autre origine) affiche les images jointes aux signalements ; l'accès reste protégé
+  // par le jeton signé et temporaire. Sans cet en-tête, helmet impose « same-origin » et le navigateur bloque l'image.
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
   async read(@Param('token') token: string, @Res() res: Response) {
     const body = await this.storage.readSigned(token);
     res.type('image/jpeg').send(body);

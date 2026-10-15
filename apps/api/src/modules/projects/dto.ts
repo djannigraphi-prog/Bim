@@ -92,6 +92,20 @@ export class ReportDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) message?: string;
 }
 
+/** Signalement (écrans 21 et 27), en JSON ou en multipart avec une image dans le champ « image ». */
+export class SendReportDto {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Absent : problème général (« Résoudre un problème »)' }) @IsOptional() @IsUUID() projectId?: string;
+  @ApiPropertyOptional({ example: '2026-10-14', description: 'Jour du projet concerné (obligatoire avec un projet)' })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date au format AAAA-MM-JJ.' })
+  day?: string;
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() taskId?: string;
+  @ApiProperty({ enum: ['unavailable', 'too_hard', 'health', 'content', 'other', 'app', 'product'], description: 'Projet : unavailable, too_hard, health, content, other. Général : app, product, health, other.' })
+  @IsIn(['unavailable', 'too_hard', 'health', 'content', 'other', 'app', 'product'])
+  reason!: string;
+  @ApiPropertyOptional({ description: 'Obligatoire pour un problème général (10 caractères au moins)' }) @IsOptional() @IsString() @MaxLength(1000) message?: string;
+}
+
 export class MeasurementDto {
   @ApiProperty({ example: 82.5, description: 'Valeur dans l’unité de l’objectif (ex. kg), une décimale au plus' }) @IsNumber({ maxDecimalPlaces: 1 }) @Min(1) @Max(1000) value!: number;
 }

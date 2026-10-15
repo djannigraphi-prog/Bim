@@ -161,14 +161,21 @@ test('catégories : création d’une catégorie et d’un objectif chiffré, co
 test('signalements : réponse à la personne puis clôture', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Signalements' }).click();
-  const card = page.getByLabel(`Signalement de @${APP_USERNAME}`);
+  // Signalement général (« Résoudre un problème ») : l'image jointe est réellement chargée par le navigateur.
+  const general = page.getByLabel(`Signalement général de @${APP_USERNAME}`);
+  await expect(general).toContainText("Difficulté avec l'application");
+  await expect(general).toContainText('Le bouton Continuer ne réagit pas (test)');
+  const img = general.getByRole('img', { name: 'Image jointe au signalement' });
+  await expect(img).toBeVisible();
+  await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(320);
+  const card = page.getByLabel(`Signalement de @${APP_USERNAME} sur « Projet de test »`);
   await expect(card).toContainText('Lieu ou intervenant indisponible');
   await expect(card).toContainText('Salle fermée (test)');
   await card.getByLabel('Réponse à la personne').fill('Merci, nous avons prévenu la salle (test).');
   await card.getByRole('button', { name: 'Répondre et clore' }).click();
   await expect(card).toHaveCount(0);
   await page.getByRole('button', { name: 'Traités' }).click();
-  await expect(page.getByLabel(`Signalement de @${APP_USERNAME}`)).toContainText('Réponse : Merci, nous avons prévenu la salle (test).');
+  await expect(page.getByLabel(`Signalement de @${APP_USERNAME} sur « Projet de test »`)).toContainText('Réponse : Merci, nous avons prévenu la salle (test).');
 });
 
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {

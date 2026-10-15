@@ -16,6 +16,7 @@ import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
 import 'project_widgets.dart';
+import 'report_sheet.dart';
 
 /// Écrans 19 à 23 — « Nouveau projet », en 5 étapes. Le programme est créé par le serveur à la fin (écran 24).
 class NewProjectScreen extends ConsumerStatefulWidget {
@@ -663,6 +664,16 @@ class _GoalStepState extends State<_GoalStep> {
             subtitle: const Text('Ton choix est enregistré. Les offres arriveront avec le BimShop.'),
           ),
         ),
+        // Écran 21 : ouvre le formulaire de signalement (C8, décidé le 15/10) ; la réponse arrive dans « Mes signalements ».
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => reportProblem(context),
+            icon: const Icon(Icons.support_outlined),
+            label: const Text('Résoudre un problème'),
+            style: TextButton.styleFrom(foregroundColor: theme.colorScheme.onSurfaceVariant, padding: EdgeInsets.zero),
+          ),
+        ),
       ],
     );
   }
@@ -836,13 +847,10 @@ class _QuestionsStepState extends State<_QuestionsStep> {
           ],
         ),
         label('Ton niveau'),
-        Wrap(
-          spacing: BimSpacing.sm,
-          runSpacing: BimSpacing.sm,
-          children: [
-            for (final (code, text) in levels)
-              ChoiceChipBim(label: text, selected: d.level == code, onTap: () => widget.onChanged((x) => x.copyWith(level: code))),
-          ],
+        _Segmented(
+          options: levels,
+          selected: d.level,
+          onSelect: (code) => widget.onChanged((x) => x.copyWith(level: code)),
         ),
         label('Quand es-tu disponible ?'),
         Wrap(
@@ -853,20 +861,14 @@ class _QuestionsStepState extends State<_QuestionsStep> {
               ChoiceChipBim(
                 label: text,
                 icon: icon,
+                dark: true,
                 selected: d.availability == code,
                 onTap: () => widget.onChanged((x) => x.copyWith(availability: code)),
               ),
           ],
         ),
         label('Séances par semaine'),
-        Wrap(
-          spacing: BimSpacing.sm,
-          runSpacing: BimSpacing.sm,
-          children: [
-            for (var n = 1; n <= 7; n++)
-              ChoiceChipBim(label: '$n', selected: d.sessionsPerWeek == n, onTap: () => widget.onChanged((x) => x.copyWith(sessionsPerWeek: n))),
-          ],
-        ),
+        _CountPicker(max: 7, selected: d.sessionsPerWeek, onSelect: (n) => widget.onChanged((x) => x.copyWith(sessionsPerWeek: n))),
         if (!cat.hasValidatedPrograms) ...[
           label('Durée du programme'),
           Wrap(
@@ -874,7 +876,7 @@ class _QuestionsStepState extends State<_QuestionsStep> {
             runSpacing: BimSpacing.sm,
             children: [
               for (final days in widget.catalog.durationsDays)
-                ChoiceChipBim(label: '$days jours', selected: duration == days, onTap: () => widget.onChanged((x) => x.copyWith(durationDays: days))),
+                ChoiceChipBim(label: '$days jours', dark: true, selected: duration == days, onTap: () => widget.onChanged((x) => x.copyWith(durationDays: days))),
             ],
           ),
         ],
@@ -892,6 +894,113 @@ class _QuestionsStepState extends State<_QuestionsStep> {
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
+    );
+  }
+}
+
+/// Sélecteur segmenté (« Ton niveau », maquette 23) : la valeur choisie ressort en blanc sur un fond gris.
+class _Segmented extends StatelessWidget {
+  const _Segmented({required this.options, required this.selected, required this.onSelect});
+
+  final List<(String, String)> options;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.chip)),
+      child: Row(
+        children: [
+          for (final (code, text) in options)
+            Expanded(
+              child: Semantics(
+                selected: selected == code,
+                button: true,
+                child: GestureDetector(
+                  onTap: () => onSelect(code),
+                  child: AnimatedContainer(
+                    duration: BimDurations.fast,
+                    constraints: const BoxConstraints(minHeight: kBimMinTouch),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: selected == code ? scheme.surface : Colors.transparent,
+                      borderRadius: BorderRadius.circular(BimRadius.chip - 2),
+                      boxShadow: selected == code ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2))] : null,
+                    ),
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: selected == code ? FontWeight.w700 : FontWeight.w500,
+                        color: selected == code ? scheme.onSurface : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Nombre de séances par semaine (maquette 23) : cases carrées sur une ligne ; sur un écran étroit,
+/// les cases gardent une taille confortable au toucher et passent sur deux lignes.
+class _CountPicker extends StatelessWidget {
+  const _CountPicker({required this.max, required this.selected, required this.onSelect});
+
+  final int max;
+  final int? selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, c) {
+        const gap = 6.0;
+        final fit = (c.maxWidth - gap * (max - 1)) / max;
+        final size = fit >= 40 ? fit.floorToDouble() : kBimMinTouch;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (var n = 1; n <= max; n++)
+              Semantics(
+                selected: selected == n,
+                button: true,
+                label: '$n séance${n > 1 ? 's' : ''} par semaine',
+                child: InkWell(
+                  onTap: () => onSelect(n),
+                  borderRadius: BorderRadius.circular(BimRadius.chip),
+                  child: AnimatedContainer(
+                    duration: BimDurations.fast,
+                    width: size,
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selected == n ? scheme.onSurface : scheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(BimRadius.chip),
+                    ),
+                    child: ExcludeSemantics(
+                      child: Text(
+                        '$n',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: selected == n ? scheme.surface : scheme.onSurface),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -1156,13 +1156,13 @@
             "bearer": []
           }
         ],
-        "summary": "Signaler un problème sur une journée ou une tâche (écran 27) ; traité par le support",
+        "summary": "Signaler un problème sur une journée ou une tâche (écran 27) ; voir aussi POST /v1/reports",
         "tags": [
           "Projets"
         ]
       },
       "get": {
-        "operationId": "ProjectsController_reports",
+        "operationId": "ProjectsController_reportsOf",
         "parameters": [
           {
             "name": "id",
@@ -1183,7 +1183,7 @@
             "bearer": []
           }
         ],
-        "summary": "Mes signalements et les réponses du support",
+        "summary": "Mes signalements sur ce projet et les réponses du support",
         "tags": [
           "Projets"
         ]
@@ -1302,6 +1302,144 @@
         ],
         "tags": [
           "Projets"
+        ]
+      }
+    },
+    "/v1/reports": {
+      "post": {
+        "operationId": "ReportsController_send",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "projectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "day": {
+                    "type": "string",
+                    "example": "2026-10-14"
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "unavailable",
+                      "too_hard",
+                      "health",
+                      "content",
+                      "other",
+                      "app",
+                      "product"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG ou WebP ; ré-encodée, métadonnées supprimées"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "projectId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "day": {
+                    "type": "string",
+                    "example": "2026-10-14"
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "unavailable",
+                      "too_hard",
+                      "health",
+                      "content",
+                      "other",
+                      "app",
+                      "product"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG ou WebP ; ré-encodée, métadonnées supprimées"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Envoyer un signalement, avec une image facultative (capture d’écran, photo d’un produit)",
+        "tags": [
+          "Signalements"
+        ]
+      },
+      "get": {
+        "operationId": "ReportsController_mine",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes signalements, leur statut et la réponse du support",
+        "tags": [
+          "Signalements"
         ]
       }
     },

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
@@ -149,8 +150,8 @@ export class AdminController {
   @Get('reports')
   @AdminRoute('reports.read')
   @ApiOperation({ summary: 'Signalements des projets (écran 27), à traiter ou traités' })
-  reports(@Query('status') status?: string) {
-    return this.admin.listReports(status === 'resolved' ? 'resolved' : 'open');
+  reports(@Req() req: Request, @Query('status') status?: string) {
+    return this.admin.listReports(status === 'resolved' ? 'resolved' : 'open', `${req.protocol}://${req.get('host')}`);
   }
 
   @Post('reports/:id/resolve')

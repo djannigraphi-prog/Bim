@@ -191,4 +191,23 @@ describe('Projets — lot 1, suite (e2e)', () => {
       expect(existsSync(join(process.env.MEDIA_LOCAL_DIR!, keys[0]))).toBe(false);
     });
   });
+
+  describe('journal des événements (source prévue des rappels du lot 2 et de Peni au lot 3)', () => {
+    it('chaque changement d’horaire ou de suivi laisse un événement, dans l’ordre', async () => {
+      const u = await user();
+      const p = (await h.http().post('/v1/projects').set(u.auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_perte_poids', targetQuantity: 5, weightKg: 80, durationDays: 30 }).expect(201)).body;
+      const added = (await h.http().post(`/v1/projects/${p.id}/tasks`).set(u.auth).send({ title: 'Marche', timeOfDay: '07:00', weekdays: 127 }).expect(201)).body;
+      const newTask = added.tasks.find((t: { title: string }) => t.title === 'Marche');
+      await h.http().delete(`/v1/projects/${p.id}/tasks/${newTask.id}`).set(u.auth).expect(200);
+      await h.http().patch(`/v1/projects/${p.id}`).set(u.auth).send({ mode: 'premium', budget: 'small' }).expect(200);
+      await h.http().patch(`/v1/projects/${p.id}`).set(u.auth).send({ title: 'Renommé' }).expect(200);
+      await h.http().post(`/v1/projects/${p.id}/measurements`).set(u.auth).send({ value: 79.5 }).expect(201);
+      await h.http().post(`/v1/projects/${p.id}/pause`).set(u.auth).send({ days: 2 }).expect(200);
+      await h.http().post(`/v1/projects/${p.id}/resume`).set(u.auth).expect(200);
+      const rows = (await h.pool.query('select type, payload from project_events where project_id = $1 order by id', [p.id])).rows;
+      expect(rows.map((r: { type: string }) => r.type)).toEqual(['created', 'task_added', 'task_removed', 'mode_changed', 'measurement_added', 'paused', 'resumed']);
+      expect(rows[1].payload).toBe(newTask.id);
+      expect(rows[3].payload).toBe('premium');
+    });
+  });
 });

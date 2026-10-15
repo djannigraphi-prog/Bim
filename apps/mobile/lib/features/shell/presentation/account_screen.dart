@@ -9,6 +9,7 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../account/presentation/account_security_screens.dart';
 import '../../auth/application/session_controller.dart';
+import '../../projects/presentation/report_sheet.dart';
 
 /// Écran 62 (Paramètres), version du lot 0 : identité, profils (53), coordonnées, mot de passe, appareils, thème, déconnexion.
 class AccountScreen extends ConsumerWidget {
@@ -76,6 +77,22 @@ class AccountScreen extends ConsumerWidget {
               leading: const Icon(Icons.devices_outlined),
               title: const Text('Appareils connectés'),
               onTap: () => context.push('/account/devices'),
+            ),
+            const SizedBox(height: BimSpacing.lg),
+            Text('AIDE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.support_outlined),
+              title: const Text('Résoudre un problème'),
+              subtitle: const Text('Avec l’application, un produit ou un service'),
+              onTap: () => reportProblem(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.forum_outlined),
+              title: const Text('Mes signalements'),
+              subtitle: const Text('Statut et réponses de l’équipe BIM'),
+              onTap: () => context.push('/reports'),
             ),
             const SizedBox(height: BimSpacing.lg),
             Text('APPARENCE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),

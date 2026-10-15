@@ -26,6 +26,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/password.service';
 import { SessionService } from '../auth/session.service';
+import { StorageService } from '../media/storage';
 import { SettingsService } from '../settings/settings.service';
 import type { AdminContext } from './admin.decorators';
 import { validateSettingValue } from './setting-rules';
@@ -40,6 +41,7 @@ export class AdminService {
     private readonly audit: AuditService,
     private readonly passwords: PasswordService,
     private readonly sessions: SessionService,
+    private readonly storage: StorageService,
   ) {}
 
   private log(a: AdminContext, meta: RequestMeta, action: string, targetType?: string, targetId?: string, metadata: Record<string, unknown> = {}, tx?: Parameters<AuditService['log']>[1]) {
@@ -245,13 +247,15 @@ export class AdminService {
 
   // ------------------------------------------------------------------ Signalements des projets (écran 27)
 
-  async listReports(status: 'open' | 'resolved' = 'open') {
+  async listReports(status: 'open' | 'resolved' = 'open', apiBase = '') {
     const rows = await this.db
       .select({
         id: projectReports.id,
+        context: projectReports.context,
         day: projectReports.day,
         reason: projectReports.reason,
         message: projectReports.message,
+        attachmentKey: projectReports.attachmentKey,
         status: projectReports.status,
         resolution: projectReports.resolution,
         createdAt: projectReports.createdAt,
@@ -265,13 +269,18 @@ export class AdminService {
         taskTitle: projectTasks.title,
       })
       .from(projectReports)
-      .innerJoin(projects, eq(projects.id, projectReports.projectId))
+      .leftJoin(projects, eq(projects.id, projectReports.projectId))
       .innerJoin(users, eq(users.id, projectReports.userId))
       .leftJoin(projectTasks, eq(projectTasks.id, projectReports.taskId))
       .where(eq(projectReports.status, status))
       .orderBy(status === 'open' ? asc(projectReports.createdAt) : desc(projectReports.resolvedAt))
       .limit(200);
-    return { items: rows };
+    const items = [];
+    for (const { attachmentKey, ...r } of rows) {
+      // Image jointe : jamais publique, lisible par le support via un lien temporaire.
+      items.push({ ...r, image: attachmentKey && this.storage.available ? await this.storage.temporaryUrl(attachmentKey, apiBase) : null });
+    }
+    return { items };
   }
 
   async resolveReport(a: AdminContext, id: string, resolution: string, meta: RequestMeta) {

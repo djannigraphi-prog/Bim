@@ -16,6 +16,7 @@ import 'package:bim/features/projects/application/photo_source.dart';
 import 'package:bim/main.dart' as app;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 
 const _codeRelay = String.fromEnvironment('BIM_TEST_CODE_URL');
@@ -80,6 +81,35 @@ Future<String> _codeFor(String digits, {String? email, String? previous}) async 
     client.close();
   }
   fail("Aucun code reçu pour le numéro se terminant par $digits.");
+}
+
+/// Capture réelle de l'écran de l'émulateur (adb, via le relais de la CI) : rendu Android véritable.
+Future<void> _shot(WidgetTester tester, String name) async {
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+  final client = HttpClient();
+  try {
+    final res = await (await client.getUrl(Uri.parse('$_codeRelay/shot?name=$name'))).close();
+    await res.drain<void>();
+    if (res.statusCode != 200) fail('Capture « $name » impossible (${res.statusCode}).');
+  } finally {
+    client.close();
+  }
+}
+
+/// Attend que [count] images réseau soient réellement décodées et affichées (pas d'icône d'image cassée).
+Future<void> _expectLoadedImages(WidgetTester tester, int count) async {
+  final end = DateTime.now().add(const Duration(seconds: 30));
+  while (DateTime.now().isBefore(end)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    final loaded = tester.widgetList<RawImage>(find.byType(RawImage)).where((r) => r.image != null).length;
+    if (loaded >= count) {
+      expect(find.byIcon(Icons.broken_image_outlined), findsNothing);
+      return;
+    }
+  }
+  fail('Images non chargées (attendu : $count).');
 }
 
 /// Source de photos du test : une image PNG dessinée par le test (le sélecteur du système n'est pas pilotable).
@@ -177,6 +207,10 @@ void main() {
     // Écran 27 : signaler un problème, transmis au support.
     await _tap(tester, find.text('Signaler'));
     await _tap(tester, find.text('Trop difficile pour moi'));
+    // Image jointe (capture ou photo) : envoyée, ré-encodée et stockée en privé par l'API.
+    await _tap(tester, find.text('Joindre une image ou une capture'));
+    await _tap(tester, find.text('Choisir une image ou une capture d’écran'));
+    await _waitFor(tester, find.text('Image jointe'));
     await _tap(tester, find.text('Envoyer'));
     await _waitFor(tester, find.text('Merci, ton signalement est envoyé à l’équipe BIM.'));
 
@@ -189,15 +223,46 @@ void main() {
     await _tap(tester, find.text('Choisir dans la galerie'));
     await _waitFor(tester, find.textContaining('Après · '));
     await _waitFor(tester, find.text('Waouh, la différence ! Tu veux partager ton BIM pour motiver les autres ?'));
+    // Les deux photos sont réellement téléchargées par leur lien temporaire et affichées.
+    await _expectLoadedImages(tester, 2);
+    await _shot(tester, 'a31_avant_apres');
     await _tap(tester, find.text('Garder pour moi'));
     await _tap(tester, find.byTooltip('Plus d’options'));
     await _tap(tester, find.text('Mes signalements'));
+    await _waitFor(tester, find.text('En cours de traitement'));
+    await _expectLoadedImages(tester, 1);
+    await _shot(tester, 'a27_mes_signalements_projet');
+    // Écran 30 (bilan) ouvert directement pour vérifier l'affichage réel des émojis sur Android.
+    final router = GoRouter.of(tester.element(find.text('Mes signalements').first));
+    final projectId = router.routerDelegate.currentConfiguration.uri.pathSegments[1];
+    final opened = router.push<void>('/projects/$projectId/done');
+    await _waitFor(tester, find.text('Ton bilan'));
+    expect(find.textContaining('🏆'), findsOneWidget);
+    await _shot(tester, 'a30_bilan_emoji');
+    router.pop();
+    await opened;
     await _waitFor(tester, find.text('En cours de traitement'));
     await _tap(tester, find.byTooltip('Retour'));
 
     // Lot 0, partie 2 : ajouter un e-mail (opération protégée : mot de passe + code SMS, puis code reçu par e-mail).
     await _tap(tester, find.byTooltip('Retour'));
     await _tap(tester, find.byTooltip('Mon compte'));
+
+    // « Résoudre un problème » (C8) : problème général, description et capture jointe, puis suivi du statut.
+    await _scrollTap(tester, find.text('Résoudre un problème'));
+    await _tap(tester, find.text('Difficulté avec l’application'));
+    await tester.enterText(find.byKey(const Key('report-message')), 'Test automatique : le bouton Continuer ne réagit pas.');
+    await _tap(tester, find.text('Joindre une image ou une capture'));
+    await _tap(tester, find.text('Choisir une image ou une capture d’écran'));
+    await _waitFor(tester, find.text('Image jointe'));
+    await _tap(tester, find.text('Envoyer'));
+    await _waitFor(tester, find.text('Merci, ton signalement est envoyé à l’équipe BIM.'));
+    await _scrollTap(tester, find.text('Mes signalements'));
+    await _waitFor(tester, find.textContaining('Problème général'));
+    await _expectLoadedImages(tester, 2);
+    await _shot(tester, 'a21_mes_signalements');
+    await _tap(tester, find.byTooltip('Retour'));
+
     await _scrollTap(tester, find.text('Téléphone et e-mail'));
     await _tap(tester, find.text('Ajouter une coordonnée'));
     await _tap(tester, find.text('E-mail'));

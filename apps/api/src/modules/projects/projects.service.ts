@@ -9,7 +9,6 @@ import {
   programTemplateTasks,
   programTemplateTips,
   projectMeasurements,
-  projectReports,
   projectCategories,
   projectEvents,
   projectGoals,
@@ -21,7 +20,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
 import { ProjectPhotosService } from './photos.service';
-import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, ReportDto, UpdateProjectDto } from './dto';
+import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, UpdateProjectDto } from './dto';
 import { addDays, computePlan, diffDays, dueTasks, generateTitle, isPaused, isValidDay, spreadWeekdays, today } from './plan';
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -419,40 +418,12 @@ export class ProjectsService {
     await this.db.transaction(async (tx) => {
       await tx.delete(projectMeasurements).where(and(eq(projectMeasurements.projectId, p.id), eq(projectMeasurements.day, day)));
       await tx.insert(projectMeasurements).values({ id: uuidv7(), projectId: p.id, valueTenths: Math.round(dto.value * 10), unit: goal.quantityUnit!, day });
+      await tx.insert(projectEvents).values({ id: uuidv7(), projectId: p.id, type: 'measurement_added', payload: day });
     });
     return this.measurementSummary(p.id, goal.quantityUnit);
   }
 
-  // ---------------------------------------------------------------- Signalements (écran 27)
-
-  async report(userId: string, projectId: string, dto: ReportDto, meta: RequestMeta) {
-    if (!isValidDay(dto.day)) throw Errors.validation({ fields: { day: ['Date invalide.'] } });
-    const p = await this.load(userId, projectId);
-    if (dto.day < p.startDate || dto.day > p.plannedEndDate || dto.day > this.today()) {
-      throw Errors.validation({ fields: { day: ['Ce jour ne fait pas partie du programme ou n’est pas encore arrivé.'] } });
-    }
-    if (dto.taskId) {
-      const [t] = await this.db.select({ id: projectTasks.id }).from(projectTasks).where(and(eq(projectTasks.id, dto.taskId), eq(projectTasks.projectId, p.id)));
-      if (!t) throw Errors.notFound('Tâche');
-    }
-    const id = uuidv7();
-    await this.db.transaction(async (tx) => {
-      await tx.insert(projectReports).values({ id, projectId: p.id, userId, day: dto.day, taskId: dto.taskId ?? null, reason: dto.reason, message: dto.message?.trim() || null });
-      await this.audit.log({ actorType: 'user', actorId: userId, action: 'project.reported', targetType: 'project', targetId: p.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { reason: dto.reason } }, tx);
-    });
-    return {
-      id,
-      status: 'open',
-      // Pour une douleur ou un malaise : BIM ne donne pas d'avis médical, la personne est orientée vers un professionnel.
-      healthAdvice: dto.reason === 'health',
-    };
-  }
-
-  async myReports(userId: string, projectId: string) {
-    const p = await this.load(userId, projectId);
-    const rows = await this.db.select().from(projectReports).where(eq(projectReports.projectId, p.id)).orderBy(desc(projectReports.createdAt));
-    return { items: rows.map((r) => ({ id: r.id, day: r.day, taskId: r.taskId, reason: r.reason, message: r.message, status: r.status, resolution: r.resolution, createdAt: r.createdAt })) };
-  }
+  // Signalements (écrans 21 et 27) : voir ReportsService.
 
   /**
    * « Habitude du jour » (écran 27) : uniquement depuis un programme type validé. Conseil du jour précis s'il existe,
@@ -511,23 +482,30 @@ export class ProjectsService {
       set.mode = mode;
       set.budget = budget;
     }
-    await this.db.update(projects).set(set).where(eq(projects.id, projectId));
+    await this.db.transaction(async (tx) => {
+      await tx.update(projects).set(set).where(eq(projects.id, projectId));
+      if (set.mode !== undefined && set.mode !== p.mode) await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'mode_changed', payload: set.mode });
+    });
     return this.detail(userId, projectId);
   }
 
   async addTask(userId: string, projectId: string, dto: AddTaskDto) {
     const p = await this.load(userId, projectId);
     if (p.status === 'completed') throw Errors.conflict('PROJECT_COMPLETED', 'Ce projet est terminé.');
-    await this.db.insert(projectTasks).values({
-      id: uuidv7(),
-      projectId,
-      title: dto.title.trim(),
-      detail: dto.detail?.trim() || null,
-      icon: 'check',
-      timeOfDay: dto.timeOfDay,
-      weekdays: dto.weekdays,
-      origin: 'user',
-      sortOrder: 100,
+    const taskId = uuidv7();
+    await this.db.transaction(async (tx) => {
+      await tx.insert(projectTasks).values({
+        id: taskId,
+        projectId,
+        title: dto.title.trim(),
+        detail: dto.detail?.trim() || null,
+        icon: 'check',
+        timeOfDay: dto.timeOfDay,
+        weekdays: dto.weekdays,
+        origin: 'user',
+        sortOrder: 100,
+      });
+      await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'task_added', payload: taskId });
     });
     return this.detail(userId, projectId);
   }
@@ -539,7 +517,10 @@ export class ProjectsService {
     const parts = await this.parts(p.id);
     if (!parts.tasks.some((t) => t.id === taskId)) throw Errors.notFound('Tâche');
     if (parts.tasks.length <= 1) throw Errors.conflict('LAST_TASK', 'Un programme garde au moins une tâche.');
-    await this.db.update(projectTasks).set({ removedAt: new Date() }).where(eq(projectTasks.id, taskId));
+    await this.db.transaction(async (tx) => {
+      await tx.update(projectTasks).set({ removedAt: new Date() }).where(eq(projectTasks.id, taskId));
+      await tx.insert(projectEvents).values({ id: uuidv7(), projectId, type: 'task_removed', payload: taskId });
+    });
     return this.detail(userId, projectId);
   }
 

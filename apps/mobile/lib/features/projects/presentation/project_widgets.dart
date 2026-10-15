@@ -153,18 +153,21 @@ class ProgressLegend extends StatelessWidget {
   }
 }
 
-/// Puce sélectionnable (écrans 21 et 23).
+/// Puce sélectionnable (écrans 21 et 23). [dark] : sélection en noir (maquette 23) au lieu du rouge (maquette 21).
 class ChoiceChipBim extends StatelessWidget {
-  const ChoiceChipBim({super.key, required this.label, required this.selected, required this.onTap, this.icon});
+  const ChoiceChipBim({super.key, required this.label, required this.selected, required this.onTap, this.icon, this.dark = false});
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
   final IconData? icon;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final fill = dark ? scheme.onSurface : BimColors.red;
+    final onFill = dark ? scheme.surface : BimColors.white;
     return Semantics(
       selected: selected,
       button: true,
@@ -176,17 +179,17 @@ class ChoiceChipBim extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: kBimMinTouch),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? BimColors.red : scheme.surface,
+            color: selected ? fill : scheme.surface,
             borderRadius: BorderRadius.circular(BimRadius.chip),
-            border: Border.all(color: selected ? BimColors.red : scheme.outline, width: 1.5),
+            border: Border.all(color: selected ? fill : scheme.outline, width: 1.5),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[Icon(icon, size: 18, color: selected ? BimColors.white : scheme.onSurface), const SizedBox(width: 6)],
+              if (icon != null) ...[Icon(icon, size: 18, color: selected ? onFill : scheme.onSurface), const SizedBox(width: 6)],
               Text(
                 label,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? BimColors.white : scheme.onSurface),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? onFill : scheme.onSurface),
               ),
             ],
           ),

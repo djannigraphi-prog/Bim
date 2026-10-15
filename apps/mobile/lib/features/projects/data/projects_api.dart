@@ -52,18 +52,31 @@ class ProjectsApi {
       Measurement.fromJson(await _api.post('/v1/projects/$id/measurements', body: {'value': value}));
 
   /// Renvoie vrai si le serveur recommande de consulter un professionnel (douleur, malaise).
-  Future<bool> report(String id, {required String day, String? taskId, required String reason, String? message}) async {
-    final res = await _api.post('/v1/projects/$id/reports', body: {
-      'day': day,
+  /// Signalement (écrans 21 et 27). Sans [projectId] : problème général. Image facultative (capture, photo).
+  /// Renvoie vrai si la personne doit être orientée vers un professionnel de santé.
+  Future<bool> sendReport({String? projectId, String? day, String? taskId, required String reason, String? message, List<int>? image}) async {
+    final fields = <String, String>{
+      if (projectId != null) 'projectId': projectId,
+      if (day != null) 'day': day,
       if (taskId != null) 'taskId': taskId,
       'reason': reason,
       if (message != null && message.isNotEmpty) 'message': message,
-    },);
+    };
+    final Map<String, dynamic> res;
+    if (image == null) {
+      res = await _api.post('/v1/reports', body: fields);
+    } else {
+      final png = isPng(image);
+      res = await _api.postForm('/v1/reports', fields: fields, fileField: 'image', bytes: image, filename: png ? 'image.png' : 'image.jpg', contentType: png ? 'image/png' : 'image/jpeg');
+    }
     return (res['healthAdvice'] ?? false) as bool;
   }
 
-  Future<List<ProjectReport>> reports(String id) async =>
-      ((await _api.get('/v1/projects/$id/reports'))['items'] as List<dynamic>).map((e) => ProjectReport.fromJson(e as Map<String, dynamic>)).toList();
+  /// Mes signalements (tous, ou ceux d'un projet) avec leur statut et la réponse de l'équipe BIM.
+  Future<List<ProjectReport>> reports({String? projectId}) async =>
+      ((await _api.get('/v1/reports', query: projectId == null ? null : {'projectId': projectId}))['items'] as List<dynamic>)
+          .map((e) => ProjectReport.fromJson(e as Map<String, dynamic>))
+          .toList();
 
   Future<({bool available, List<ProjectPhoto> items})> photos(String id) async {
     final res = await _api.get('/v1/projects/$id/photos');
@@ -74,7 +87,7 @@ class ProjectsApi {
   }
 
   Future<void> uploadPhoto(String id, String kind, List<int> bytes) {
-    final png = bytes.length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47;
+    final png = isPng(bytes);
     return _api.upload(
       '/v1/projects/$id/photos?kind=$kind',
       field: 'photo',
@@ -88,5 +101,8 @@ class ProjectsApi {
 
   Future<ProjectDetail> resume(String id) async => ProjectDetail.fromJson(await _api.post('/v1/projects/$id/resume'));
 }
+
+/// Les sélecteurs d'images renvoient du JPEG ou du PNG (captures d'écran).
+bool isPng(List<int> b) => b.length > 4 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47;
 
 final projectsApiProvider = Provider<ProjectsApi>((ref) => ProjectsApi(ref.watch(apiClientProvider)));

@@ -72,6 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/projects/:id/done', builder: (_, s) => CelebrationScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/transformation', builder: (_, s) => TransformationScreen(projectId: s.pathParameters['id']!)),
       GoRoute(path: '/projects/:id/reports', builder: (_, s) => ReportsScreen(projectId: s.pathParameters['id']!)),
+      GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
       GoRoute(
         path: '/projects/:id/day/:day',
         builder: (_, s) => ProjectDayScreen(projectId: s.pathParameters['id']!, day: s.pathParameters['day']!),

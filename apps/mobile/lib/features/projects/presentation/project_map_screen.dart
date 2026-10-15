@@ -225,7 +225,7 @@ class _Path extends StatefulWidget {
 }
 
 class _PathState extends State<_Path> {
-  static const _rowHeight = 112.0;
+  static const _rowHeight = 136.0;
   late final ScrollController _scroll;
 
   @override
@@ -331,8 +331,8 @@ class _DotsPainter extends CustomPainter {
     final dir = delta / length;
     final paint = Paint()..color = color;
     // Le chemin monte vers le jour suivant et arrive donc par le bas, où se trouve son libellé « Jour N » (≈ 22 px).
-    for (var t = fromRadius + 10; t < length - toRadius - 28; t += 14) {
-      canvas.drawCircle(from + dir * t, 4, paint);
+    for (var t = fromRadius + 10; t < length - toRadius - 28; t += 11) {
+      canvas.drawCircle(from + dir * t, 3.5, paint);
     }
   }
 

@@ -137,10 +137,10 @@ Effet sur le code (vérifié le 14/10/2026) : le module Projets ne lisait déjà
 ### C7 — Programmes types à rédiger · Action du fondateur
 Pour chaque catégorie (et objectif), un programme type : durée, tâches, heures, jours, conseils, validé par une personne compétente (coach, esthéticienne…). Il peut être saisi en base dès maintenant ; l'écran d'administration arrive avec le lot 0 partie 2.
 
-### C8 — Éléments des maquettes sans règle définie · Questions au fondateur
-- Écran 26 : le **coffre** sur le chemin des jours (récompense ? laquelle, à quel moment ?) — non affiché tant qu'il n'est pas défini.
-- Écran 21 : le lien **« Résoudre un problème »** (objectif de type problème à résoudre, ex. acné ? ou aide ?) — non affiché.
-- Écran 29 : l'avertissement « selon Fitness Club, une pause de plus de 5 jours peut ralentir tes résultats » vient d'un marchand ou d'un programme validé : affiché quand ces contenus existeront (lots 5 et C7).
+### C8 — Éléments des maquettes sans règle définie · Réponses du fondateur du 15/10/2026
+- **Écran 21 — « Résoudre un problème » · décidé, implémenté** : ouvre le formulaire de signalement de BIM (le même système que l'écran 27, voir T-022) : description, image ou capture d'écran jointe, envoi, suivi du statut et de la réponse dans « Mes signalements ». Aussi accessible depuis le compte (rubrique Aide).
+- **Écran 29 — avertissement avant une pause · décidé, implémenté** : message général, sans culpabiliser. Texte retenu (proposition du fondateur, légèrement resserrée : la question finale est portée par le titre et les boutons) : titre « Mettre ton programme en pause ? » ; « Attention : faire une pause peut ralentir l'atteinte de ton objectif. Pendant la pause, ton programme est suspendu et sa date de fin est décalée d'autant. Tes progrès et les tâches déjà accomplies sont conservés. » ; boutons « Continuer mon programme » et « Mettre en pause ». Peni pensif au lieu de Peni en larmes (maquette), pour ne pas culpabiliser. L'avertissement d'un marchand (« selon Fitness Club… ») reste prévu avec les marchands (lot 5).
+- **Écran 26 — coffre · principe décidé, règle en attente de validation** : récompense symbolique uniquement (badge, message de Peni, animation), **jamais financière** (ni pièces, ni argent, ni réduction). Règle proposée le 15/10 : un coffre par semaine de programme et un coffre final, ouvert à partir de 70 % des tâches prévues de la période réellement cochées (rattrapages permis compris, jours de pause et de repos exclus). Seuil et rythme à confirmer. Non affiché tant que la règle n'est pas validée.
 
 ## Décisions techniques
 
@@ -215,6 +215,13 @@ Photos strictement privées : ré-encodées en JPEG (1600 px max), métadonnées
 ### T-021 — Signalements et mesures (lot 1) · Technique · décidé
 « Signaler » (écran 27) : raison (lieu ou intervenant indisponible, trop difficile, douleur ou malaise, tâche inadaptée, autre), tâche, message ; traité par le support dans l'administration ; la réponse est visible dans « Mes signalements ». Douleur ou malaise : l'app conseille d'arrêter et de consulter un professionnel (urgences : 185, pompiers : 180), sans avis médical. Les signalements liés à un marchand (salle, coach) lui seront transmis au lot 5.
 Mesures (poids) : déclarées par la personne, privées ; le bilan (écran 30) affiche « d'après tes mesures », jamais un résultat inventé.
+
+### T-022 — Signalements avec image ; problème général (lot 1, C8) · Technique · décidé (conservation à valider)
+Un seul système (table `project_reports`) pour deux contextes : « project » (écran 27 : projet, jour, tâche) et « general » (écran 21 et compte : sans projet, description de 10 caractères au moins ; motifs : application, produit ou service, douleur ou malaise, autre). Une image facultative par signalement : contrôlée (JPEG, PNG, WebP ; taille maximale `MEDIA_MAX_UPLOAD_MB`), ré-encodée en JPEG sans métadonnées ni position GPS (même traitement que les photos, `media/private-image.ts`), rangée en privé sous `reports/<personne>/`, lue par lien temporaire par la personne et par le support (permission `reports.read`). L'image est traitée avant tout enregistrement : une image refusée ou un stockage indisponible ne crée rien, et l'app propose d'envoyer sans image. 20 signalements au plus par personne et par 24 h, 10 envois par 10 minutes par adresse. Routes : `POST/GET /v1/reports` ; les routes `/v1/projects/:id/reports` restent valables (même service).
+À valider : **durée de conservation des images jointes** (proposition : effacement 12 mois après la réponse) et effacement à la suppression du compte (fonction à venir) — à intégrer au registre des traitements (ARTCI).
+
+### T-023 — Journal des événements d'un projet comme source des lots 2 et 3 · Technique · décidé
+Chaque changement d'horaire ou de suivi d'un projet écrit un événement dans `project_events`, dans la même transaction (création, pause, reprise, fin, abandon, tâche ajoutée ou retirée, changement de mode, mesure). Les rappels (lot 2) et Peni (lot 3) liront ce journal au lieu de modifier le module Projets. Détail : `docs/DEPENDANCES_LOTS_2_3.md`.
 
 ### D-UI-01 — Flutter : Riverpod 2, go_router 14, Dio 5 · Technique · décidé
 Un seul style de gestion d'état (Notifier / FutureProvider). Découpage `features/<nom>/{data,application,presentation}`.

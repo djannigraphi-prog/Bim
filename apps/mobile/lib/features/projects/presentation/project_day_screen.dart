@@ -13,6 +13,7 @@ import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
 import 'project_dialogs.dart';
+import 'report_sheet.dart';
 
 /// Écran 27 — Journée du projet : tâches à l'heure, cases à cocher, pause, suppression.
 class ProjectDayScreen extends ConsumerStatefulWidget {
@@ -61,21 +62,7 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
     }
   }
 
-  Future<void> _report(DayPlan plan) async {
-    final input = await askReport(context, tasks: plan.tasks);
-    if (input == null || !mounted) return;
-    try {
-      final health = await ref.read(projectsApiProvider).report(widget.projectId, day: widget.day, taskId: input.taskId, reason: input.reason, message: input.message);
-      if (!mounted) return;
-      if (health) {
-        await showHealthAdvice(context);
-      } else {
-        showBimSnack(context, 'Merci, ton signalement est envoyé à l’équipe BIM.');
-      }
-    } on ApiException catch (e) {
-      if (mounted) showApiError(context, e);
-    }
-  }
+  Future<void> _report(DayPlan plan) => reportProblem(context, projectId: widget.projectId, day: widget.day, tasks: plan.tasks);
 
   Future<void> _delete() async {
     final detail = await ref.read(projectDetailProvider(widget.projectId).future);

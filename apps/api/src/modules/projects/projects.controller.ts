@@ -9,6 +9,7 @@ import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
 import { AddTaskDto, CreateProjectDto, MeasurementDto, PauseDto, ReportDto, UpdateProjectDto } from './dto';
 import { ProjectsService } from './projects.service';
+import { ReportsService } from './reports.service';
 
 /** Projets BIM (lot 1). Réservé à l'espace utilisateur : dans l'espace marchand, « + » ajoute un article (E15). */
 @ApiTags('Projets')
@@ -19,6 +20,7 @@ export class ProjectsController {
   constructor(
     private readonly projects: ProjectsService,
     private readonly photos: ProjectPhotosService,
+    private readonly reports: ReportsService,
   ) {}
 
   @Get('catalog')
@@ -109,15 +111,15 @@ export class ProjectsController {
   }
 
   @Post(':id/reports')
-  @ApiOperation({ summary: 'Signaler un problème sur une journée ou une tâche (écran 27) ; traité par le support' })
+  @ApiOperation({ summary: 'Signaler un problème sur une journée ou une tâche (écran 27) ; voir aussi POST /v1/reports' })
   report(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReportDto, @ReqMeta() meta: RequestMeta) {
-    return this.projects.report(a.userId, id, dto, meta);
+    return this.reports.send(a.userId, { ...dto, projectId: id }, undefined, meta);
   }
 
   @Get(':id/reports')
-  @ApiOperation({ summary: 'Mes signalements et les réponses du support' })
-  reports(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    return this.projects.myReports(a.userId, id);
+  @ApiOperation({ summary: 'Mes signalements sur ce projet et les réponses du support' })
+  reportsOf(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.reports.mine(a.userId, apiBase(req), id);
   }
 
   @Post(':id/photos')
@@ -149,6 +151,6 @@ export class ProjectsController {
   }
 }
 
-function apiBase(req: Request): string {
+export function apiBase(req: Request): string {
   return `${req.protocol}://${req.get('host')}`;
 }

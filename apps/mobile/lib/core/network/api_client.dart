@@ -40,6 +40,17 @@ class ApiClient {
             options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
           ),);
 
+  /// Formulaire multipart : champs texte et, si fourni, un fichier (signalement avec image).
+  Future<Map<String, dynamic>> postForm(String path, {required Map<String, String> fields, String? fileField, List<int>? bytes, String? filename, String? contentType}) =>
+      _run(() => dio.post<dynamic>(
+            path,
+            data: FormData.fromMap({
+              ...fields,
+              if (fileField != null && bytes != null) fileField: MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(contentType!)),
+            }),
+            options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
+          ),);
+
   Future<Map<String, dynamic>> patch(String path, {Object? body}) => _run(() => dio.patch<dynamic>(path, data: body));
 
   Future<Map<String, dynamic>> delete(String path, {Map<String, String>? headers}) =>

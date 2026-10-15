@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG="${RUNNER_TEMP:-/tmp}/admin-e2e-api.log"
 export NODE_ENV=development SMS_PROVIDER=console EMAIL_PROVIDER=console PORT=3000 CORS_ORIGINS=http://localhost:5173 LOG_LEVEL=info
+# Stockage local de test : l'image jointe à un signalement doit s'afficher dans l'administration.
+export MEDIA_STORAGE=local MEDIA_LOCAL_DIR="${RUNNER_TEMP:-/tmp}/admin-e2e-media"
 export ADMIN_E2E_EMAIL="admin.e2e.$(date +%s)@bim.test"
 export ADMIN_E2E_PASSWORD="Admin-E2E-$(openssl rand -hex 8)"
 export ADMIN_E2E_APP_USERNAME="e2e.user$(date +%s | tail -c 7)"
@@ -17,6 +19,8 @@ ADMIN_PASSWORD="$ADMIN_E2E_PASSWORD" node dist/admin-cli.js --email "$ADMIN_E2E_
 node -e "
 const { Pool } = require('pg');
 const { uuidv7 } = require('./dist/common/uuid');
+const sharp = require('sharp');
+const fs = require('fs');
 (async () => {
   const p = new Pool({ connectionString: process.env.DATABASE_URL });
   const id = uuidv7();
@@ -28,6 +32,12 @@ const { uuidv7 } = require('./dist/common/uuid');
   const pid = uuidv7();
   await c.query(\"insert into projects (id, user_id, category_code, title, mode, start_date, duration_days, planned_end_date) values (\$1, \$2, 'sport', 'Projet de test', 'eco', current_date, 30, current_date + 29)\", [pid, id]);
   await c.query(\"insert into project_reports (id, project_id, user_id, day, reason, message) values (\$1, \$2, \$3, current_date, 'unavailable', 'Salle fermée (test)')\", [uuidv7(), pid, id]);
+  // Un signalement général (« Résoudre un problème ») avec une capture d'écran jointe, stockée en privé.
+  const rid = uuidv7();
+  const key = 'reports/' + id + '/' + rid + '.jpg';
+  fs.mkdirSync(process.env.MEDIA_LOCAL_DIR + '/reports/' + id, { recursive: true });
+  fs.writeFileSync(process.env.MEDIA_LOCAL_DIR + '/' + key, await sharp({ create: { width: 320, height: 200, channels: 3, background: 'orange' } }).jpeg().toBuffer());
+  await c.query(\"insert into project_reports (id, context, user_id, reason, message, attachment_key, attachment_width, attachment_height, attachment_bytes) values (\$1, 'general', \$2, 'app', 'Le bouton Continuer ne réagit pas (test)', \$3, 320, 200, 1000)\", [rid, id, key]);
   await c.query('commit');
   c.release();
   await p.end();

@@ -77,4 +77,24 @@ void main() {
     expect(detail(3).perWeek, 3);
     expect(detail(null).perWeek, 7);
   });
+
+  test('signalement général avec image : lu correctement, libellé du motif', () {
+    final r = ProjectReport.fromJson({
+      'id': 'r1',
+      'context': 'general',
+      'projectId': null,
+      'projectTitle': null,
+      'day': null,
+      'reason': 'app',
+      'message': 'Le bouton ne réagit pas',
+      'image': {'url': 'https://exemple.test/i.jpg', 'expiresAt': '2026-10-15T10:00:00Z', 'width': 720, 'height': 1600},
+      'status': 'open',
+      'resolution': null,
+      'createdAt': '2026-10-15T09:00:00.000Z',
+    });
+    expect(r.isGeneral, isTrue);
+    expect(r.imageUrl, 'https://exemple.test/i.jpg');
+    expect(ProjectReport.label(r.reason), 'Difficulté avec l’application');
+    expect(ProjectReport.label('too_hard'), 'Trop difficile pour moi');
+  });
 }
