@@ -73,6 +73,7 @@ export type Permission =
   | 'programs.write'
   | 'programs.publish'
   | 'admins.manage'
+  | 'system.health'
   | 'catalog.write'
   | 'reports.read'
   | 'reports.resolve';

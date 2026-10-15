@@ -15,6 +15,8 @@ export const ADMIN_PERMISSIONS = {
   'reports.read': ['super_admin', 'support', 'moderator'],
   'reports.resolve': ['super_admin', 'support', 'moderator'],
   'admins.manage': ['super_admin'],
+  /** Surveillance technique (état du worker des rappels…) : exploitation, pas d'accès aux données des personnes. */
+  'system.health': ['super_admin', 'tech', 'support'],
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

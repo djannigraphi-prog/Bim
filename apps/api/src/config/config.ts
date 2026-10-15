@@ -77,6 +77,17 @@ const schema = z
     S3_REGION: z.string().default('eu-west-3'),
     /** Uniquement pour un stockage compatible S3 (ex. MinIO en test) ; vide pour AWS. */
     S3_ENDPOINT: z.string().default(''),
+
+    /**
+     * Rappels (lot 2). WORKER_MODE : « off » (défaut, aucun envoi), « embedded » (dans le processus de l'API : tests,
+     * bêta fermée) ou « standalone » (service séparé recommandé, `node dist/worker.js`). Même code dans les deux cas.
+     * Le réglage administrable `notifications.reminders_enabled` reste un second interrupteur (false tant que non validé).
+     */
+    WORKER_MODE: z.enum(['off', 'embedded', 'standalone']).default('off'),
+    /** Port du contrôle de santé du worker séparé (contrôle de conteneur ECS). */
+    WORKER_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(3100),
+    /** Envoi des notifications : « none » (rien n'est envoyé), « fcm » (Firebase Cloud Messaging), « test » (enregistré en mémoire). */
+    PUSH_PROVIDER: z.enum(['none', 'fcm', 'test']).default('none'),
   })
   .superRefine((cfg, ctx) => {
     const devLike = cfg.NODE_ENV === 'development' || cfg.NODE_ENV === 'test';
@@ -102,6 +113,12 @@ const schema = z
     }
     if (cfg.MEDIA_STORAGE === 's3' && !cfg.S3_BUCKET) {
       ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'S3_BUCKET est obligatoire avec MEDIA_STORAGE=s3' });
+    }
+    if (!devLike && cfg.PUSH_PROVIDER === 'test') {
+      ctx.addIssue({ code: 'custom', path: ['PUSH_PROVIDER'], message: 'Le fournisseur de notifications « test » est interdit hors développement' });
+    }
+    if (cfg.WORKER_MODE !== 'off' && cfg.PUSH_PROVIDER === 'none') {
+      ctx.addIssue({ code: 'custom', path: ['PUSH_PROVIDER'], message: 'Un worker de rappels sans fournisseur de notifications ne servirait à rien (PUSH_PROVIDER)' });
     }
     if (cfg.JWT_ACCESS_SECRET === cfg.OTP_SECRET) {
       ctx.addIssue({ code: 'custom', path: ['OTP_SECRET'], message: 'OTP_SECRET doit différer de JWT_ACCESS_SECRET' });

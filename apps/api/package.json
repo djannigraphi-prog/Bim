@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node -e \"require('fs').cpSync('src/database/migrations','dist/database/migrations',{recursive:true})\"",
     "start": "node dist/main.js",
+    "start:worker": "node dist/worker.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",

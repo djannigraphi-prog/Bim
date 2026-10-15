@@ -1539,6 +1539,26 @@
         ]
       }
     },
+    "/admin/v1/reminders/health": {
+      "get": {
+        "operationId": "RemindersAdminController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "État des rappels : worker, retards, envois de la dernière heure",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
