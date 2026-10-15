@@ -36,9 +36,9 @@ class _OfflinePrefs extends NotificationPreferencesApi {
   _OfflinePrefs({this.open = false}) : super(ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9'));
 
   @override
-  Future<NotificationPreferences> load() async => const NotificationPreferences(
+  Future<NotificationPreferences> load() async => NotificationPreferences(
         remindersEnabled: false,
-        quietHours: QuietHours(start: '22:00', end: '06:00'),
+        quietHours: const QuietHours(start: '22:00', end: '06:00'),
         quietHoursArePersonal: false,
         remindersAvailable: open,
       );
