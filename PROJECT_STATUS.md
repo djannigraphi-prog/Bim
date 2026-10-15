@@ -27,6 +27,40 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Lot 1 — Projets BIM (écrans 18-24, 26, 27, 29-31) | Terminée | Fait : référentiels et catégories administrables, création en 5 étapes, mode Éco / Premium gratuit (C6), programmes types validés (mode, conseils), carte et journée, tâche suivante, tâches ajoutées / retirées, pause, signalement (+ traitement admin), mesures chiffrées, photos avant / après privées (S3), fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création, séance, mesure, photo, signalement) ; **admin testée dans Chromium** ; **photos testées sur un vrai serveur S3** en CI | API, admin, Android : réussis (voir bilan du lot 1) | Contenu des programmes types (C7) ; questions C8 ; Peni (lot 3) ; rappels (lot 2) ; profil public (lot 4) ; recommandations marchands (lot 5) ; stockage S3 de production (dépenses AWS, ARTCI) |
 | Lots 2 à 12 (rappels, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
+## Bilan du lot 1 — Projets BIM (15/10/2026)
+
+État : **développé et vérifié ; clôture soumise à la validation du fondateur.** Code vérifié : commit `ba4ff69` (résultat de la CI à confirmer).
+
+### Exigences prévues (ANALYSE.md, section 11)
+Catégories administrables ; création en 5 étapes ; modèles de programmes ; carte et journée ; tâches ; pause ; signalement ; suppression ; célébration ; avant / après. Ajouts décidés pendant le lot : modes Éco / Premium gratuits et indépendants de l'abonnement (C6), mesures chiffrées (bilan « d'après tes mesures »).
+
+### Fonctions développées et vérifiées
+| Fonction | Écrans | Vérification réelle |
+| --- | --- | --- |
+| Catégories et objectifs administrables | 20, 21 ; admin | API e2e ; Playwright (création catégorie + objectif chiffré) |
+| Création en 5 étapes, titre généré, limite de 5 projets | 19-23 | API e2e ; Android (création réelle) |
+| Mode Éco / Premium gratuit, modifiable, sans paiement ni abonnement (C6) | 19 | 4 tests API dédiés + test mobile |
+| Programmes types par mode, publiés avec le nom du validateur ; conseil du jour seulement s'il est validé | 24, 27 ; admin | API e2e ; Playwright (brouillon → publication) |
+| Programme issu des réponses (en attendant C7), tâches ajoutées / retirées | 24 | API e2e ; Android |
+| Carte des jours, tâche suivante, série | 18, 26 | API e2e ; captures |
+| Journée : cocher, rattraper un jour passé, pas de case future | 27 | API e2e ; Android (séance cochée) |
+| Pause (fin décalée, reprise anticipée ou automatique) | 29 | API e2e ; captures |
+| Signalement d'une tâche, réponse du support, orientation santé (185 / 180) | 27 ; admin | API e2e ; Android (envoi + suivi) ; Playwright (réponse + clôture) |
+| Mesures chiffrées et variation | 26, 30 | API e2e (pas encore dans le test Android) |
+| Photos avant / après privées : réencodage, EXIF et GPS supprimés, lien temporaire, purge à la suppression | 22, 31 | API e2e (stockage local) ; **serveur S3 réel en CI** (lien signé, lecture anonyme refusée, effacement) ; Android (envoi avant / après) |
+| Fin du programme, suppression logique, renommer, projet public (réglage seul) | 30, 24 | API e2e |
+
+### Comparaison avec les maquettes 18 à 31
+Maquettes : `BIM_Maquettes_PNG_1-31.zip` (15 écrans de 18 à 31). Captures : branche `ci-captures`, 13 écrans (25 et 28 absents : lots 3 et 2).
+Écarts corrigés le 15/10 : « par semaine » faux sur l'écran 24 (affichait 7 au lieu des 3 séances choisies) ; chemin en pointillés absent (26) ; tâche en cours non mise en avant et heures futures en rouge (27) ; icônes de catégorie non colorées (20) ; « ? » isolé dans le titre de pause (29).
+Écarts voulus (décisions) : paiement et prix retirés de l'écran 24 (F4, C6) ; « Projet économique / Premium » et mention « choix gratuit » (C6) ; « Recommandé pour toi » sans marchands (lot 5) ; offres des marchands désactivées (21, lot 5) ; pas d'aperçu caméra intégré (22 : appareil photo du système) ; étape « durée du programme » ajoutée (23) ; boutons « Publier » en « bientôt disponible » (30, 31 : lot 4) ; textes de démonstration marqués comme tels.
+Écarts en attente du fondateur (C8) : coffre sur le chemin (26) ; lien « Résoudre un problème » (21) ; avertissement de pause d'un marchand (29).
+Écarts mineurs restants : barre d'onglets du bas absente de la capture 18 (capture de l'écran seul) ; bulle de Peni remplacée par un bandeau en haut de la carte (26) ; rappel « 14:45 » et icône calendrier absents (rappels : lot 2) ; style des sélecteurs de l'écran 23 (rouge au lieu de noir).
+Limites des captures : émojis affichés en carrés (police des captures sans émojis ; non vérifié sur un vrai téléphone) ; écran 31 capturé sans photos (les images réseau ne se chargent pas dans les captures ; l'affichage réel est couvert par le test Android).
+
+### Incomplet ou dépendant d'autres lots
+Contenu des programmes types et habitudes du jour réelles (**C7, action du fondateur**) ; questions C8 ; écran 25 Peni (lot 3) ; écran 28 rappels (lot 2) ; écran 52 profil public et publication « J'ai fait mon BIM » (lot 4) ; recommandations de marchands (lot 5) ; stockage S3 de production (validation des dépenses AWS, autorisation ARTCI) ; pas de test sur un vrai téléphone ; iOS non compilé.
+
 ## Tests exécutés (session 1, 14/10/2026)
 
 Environnement : Node 22.22, PostgreSQL 16.15 local.
@@ -39,8 +73,8 @@ Environnement : Node 22.22, PostgreSQL 16.15 local.
 | Build de production + migrations compilées | `npm run build` puis `node dist/database/migrate.js` | réussi |
 | Mobile (CI GitHub) | `flutter analyze`, `flutter test` (7 tests), 29 captures, `flutter build apk --debug` | réussis (exécution 38636192504) |
 | Android ↔ API (émulateur) | `flutter test integration_test` | réussi (exécution 38636192504) |
-| API | unitaires 45, e2e 67 + 1 à écrire au lot 8 (abonné Premium) | réussis (local et CI) |
-| Administration web | Vitest + Playwright/Chromium contre l'API (5 scénarios) | réussis (local et CI, job `admin`) |
+| API (15/10) | unitaires 47 ; e2e 74 dont le stockage S3 réel (CI) + 1 à écrire au lot 8 (abonné Premium) | réussis (local : 73 + S3 non lancé faute de serveur S3 ; CI : 74) |
+| Administration web | Vitest (2) + Playwright/Chromium contre l'API (7 scénarios) | réussis (CI, job `admin`) |
 | Image Docker de l'API | build, migrations, démarrage en production, santé | en CI (job `api`) |
 
 ## Relectures indépendantes (session 1)
@@ -115,7 +149,7 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 
 ## Prochaines tâches prioritaires (note de reprise)
 
-1. Lot 1, suite (sans programmes types) : catégories et objectifs modifiables dans l'administration ; signalement d'un problème sur une tâche (écran 27) ; photos avant / après (écrans 22 et 31, stockage privé : choix S3 à valider) ; profil public d'un projet (écran 52). Écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
+1. Lot 1 : validation du bilan par le fondateur ; réponses C8 ; programmes types (C7). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 (rappels) → lot 2.
 2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
 4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
