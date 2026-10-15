@@ -103,6 +103,16 @@ Future<void> _finish(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+/// Fait défiler jusqu'à l'élément puis le touche (en test, les textes prennent plus de place : le bas peut être caché).
+Future<void> _tapKey(WidgetTester tester, String key) async {
+  final finder = find.byKey(ValueKey(key));
+  await tester.ensureVisible(finder);
+  await tester.pump();
+  await tester.tap(finder);
+  await tester.pump();
+  await tester.pump();
+}
+
 SwitchListTile _switch(WidgetTester tester) => tester.widget<SwitchListTile>(find.byKey(const ValueKey('reminders-switch')));
 
 void main() {
@@ -183,9 +193,7 @@ void main() {
       final server = _FakeServer();
       final picker = _Picker([const TimeOfDay(hour: 21, minute: 30), const TimeOfDay(hour: 7, minute: 0)]);
       await _open(tester, server, picker: picker);
-      await tester.tap(find.byKey(const ValueKey('quiet-hours-edit')));
-      await tester.pump();
-      await tester.pump();
+      await _tapKey(tester, 'quiet-hours-edit');
       expect(picker.asked, [
         ('Début des heures calmes', const TimeOfDay(hour: 22, minute: 0)),
         ('Fin des heures calmes', const TimeOfDay(hour: 6, minute: 0)),
@@ -197,12 +205,12 @@ void main() {
       expect(find.text('Tes heures'), findsOneWidget);
       await _finish(tester);
 
-      await tester.tap(find.byKey(const ValueKey('quiet-hours-reset')));
-      await tester.pump();
-      await tester.pump();
+      await _tapKey(tester, 'quiet-hours-reset');
       expect(server.bodies.last, {'quietStart': null, 'quietEnd': null});
       expect(find.text('De 22:00 à 06:00'), findsOneWidget);
       expect(find.text('Valeur par défaut de BIM'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const ValueKey('reminders-switch')));
+      await tester.pump();
       expect(_switch(tester).value, isTrue); // les rappels ne sont pas touchés
       await _finish(tester);
     });
@@ -211,12 +219,11 @@ void main() {
       final server = _FakeServer();
       final picker = _Picker([null, const TimeOfDay(hour: 8, minute: 0), const TimeOfDay(hour: 8, minute: 0)]);
       await _open(tester, server, picker: picker);
-      await tester.tap(find.byKey(const ValueKey('quiet-hours-edit')));
-      await tester.pump();
+      await _tapKey(tester, 'quiet-hours-edit');
+      expect(picker.asked, hasLength(1)); // choix annulé dès le début : pas de second choix
       expect(server.bodies, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('quiet-hours-edit')));
-      await tester.pump();
-      await tester.pump();
+      await _tapKey(tester, 'quiet-hours-edit');
+      expect(picker.asked, hasLength(3));
       expect(server.bodies, isEmpty);
       expect(find.text('Le début et la fin des heures calmes doivent être différents.'), findsOneWidget);
       expect(find.text('De 22:00 à 06:00'), findsOneWidget);

@@ -198,6 +198,10 @@ jobs:
               | cut -c1-200 > "$RUNNER_TEMP/e2e.short"
             python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "e2e android" "$RUNNER_TEMP/e2e.short" 6
           fi
+          if [ -s "$RUNNER_TEMP/logcat.short" ]; then
+            cut -c1-200 "$RUNNER_TEMP/logcat.short" > "$RUNNER_TEMP/logcat.cut"
+            python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "journal android" "$RUNNER_TEMP/logcat.cut" 4
+          fi
           # Requêtes reçues par l'API (méthode, adresse, statut ; type et taille des envois), sans les corps ni les codes.
           python3 "$GITHUB_WORKSPACE/.github/scripts/api-requests.py" "$RUNNER_TEMP/api.log" > "$RUNNER_TEMP/api.short" || true
           grep -E "ERROR|Error" "$RUNNER_TEMP/api.log" | grep -v "ton code est" | cut -c1-300 >> "$RUNNER_TEMP/api.short" || true
