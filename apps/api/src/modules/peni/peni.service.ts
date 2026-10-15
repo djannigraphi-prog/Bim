@@ -3,12 +3,14 @@ import { and, asc, count, eq, gt, sql } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { peniConversations, peniMessages, users } from '../../database/schema';
+import { notificationPreferences, peniConversations, peniMessages, users } from '../../database/schema';
 import { CLOCK, ProjectsService } from '../projects/projects.service';
 import { today } from '../projects/plan';
 import { userTimezone } from '../projects/timezone';
 import { SettingsService } from '../settings/settings.service';
-import { PeniMessageDto, StartPeniConversationDto } from './dto';
+import { inQuietHours, QuietWindow } from '../notifications/reminders';
+import { EncouragementQueryDto, PeniMessageDto, StartPeniConversationDto } from './dto';
+import { encouragement } from './encouragements';
 import { EngineContext, handleInput, InvalidChoiceError, PENI_ENGINE_VERSION, PeniReply, PeniState, QuickReply, startConversation } from './engine';
 import { LLM_PROVIDER, LlmProvider } from './llm-provider';
 
@@ -75,7 +77,7 @@ export class PeniService {
   async start(userId: string, dto: StartPeniConversationDto) {
     await this.checkDailyLimit(userId);
     const ctx = await this.context(userId);
-    const r = startConversation(ctx, { mode: dto.mode, budget: dto.budget });
+    const r = startConversation(ctx, { mode: dto.mode, budget: dto.budget, categoryCode: dto.categoryCode }, dto.purpose);
     const id = uuidv7();
     const now = this.clock.now();
     await this.db.transaction(async (tx) => {
@@ -147,6 +149,43 @@ export class PeniService {
       status: created.result.draft ? 'completed' : 'open',
       draft: created.result.draft,
     };
+  }
+
+  /**
+   * Encouragement de Peni pour la journée (écran 27) ou la carte (écran 26). Lecture seule, aucune notification :
+   * le texte s'affiche dans l'app. Heures calmes de la personne (ou celles par défaut, 22 h – 6 h) respectées.
+   */
+  async encouragement(userId: string, projectId: string, q: EncouragementQueryDto) {
+    const p = await this.projects.detail(userId, projectId);
+    const dayStr = q.day ?? p.today;
+    const day = p.days.find((d) => d.day === dayStr) ?? null;
+    if (q.day && !day) throw Errors.validation({ fields: { day: ['Ce jour ne fait pas partie du programme.'] } });
+    const tz = await userTimezone(this.db, userId);
+    const [[u], [prefs], defaults] = await Promise.all([
+      this.db.select({ fullName: users.fullName }).from(users).where(eq(users.id, userId)),
+      this.db.select({ start: notificationPreferences.quietStart, end: notificationPreferences.quietEnd }).from(notificationPreferences).where(eq(notificationPreferences.userId, userId)),
+      this.settings.get<QuietWindow | null>('notifications.quiet_hours'),
+    ]);
+    const quietWindow = prefs?.start && prefs.end ? { start: prefs.start, end: prefs.end } : (defaults?.value ?? null);
+    const localTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(this.clock.now());
+    const todayIndex = p.days.find((d) => d.day === p.today)?.index ?? null;
+    const previous = [...p.days].reverse().find((d) => d.day < p.today && d.due > 0 && d.state !== 'paused') ?? null;
+    const weekChest =
+      todayIndex === null ? null : (p.chests.find((c) => c.kind === 'week' && c.state === 'upcoming' && c.fromIndex <= todayIndex && todayIndex <= c.toIndex) ?? null);
+    return encouragement({
+      context: q.context,
+      firstName: (u?.fullName ?? '').trim().split(/\s+/)[0] ?? '',
+      projectId,
+      projectStatus: p.status,
+      durationDays: p.durationDays,
+      day,
+      today: p.today,
+      previous,
+      streak: p.streak,
+      weekChest,
+      localTime,
+      quiet: inQuietHours(localTime, quietWindow),
+    });
   }
 
   private async choiceLabel(tx: Pick<Database, 'select'>, conversationId: string, choice: string): Promise<string> {

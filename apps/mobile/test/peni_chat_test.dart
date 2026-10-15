@@ -42,9 +42,12 @@ class _FakePeni extends PeniApi {
   final calls = <String>[];
   int startFailures = 0;
 
+  String purpose = 'new_project';
+
   @override
-  Future<PeniTurn> start({String? mode, String? budget}) async {
-    calls.add('start ${mode ?? '-'} ${budget ?? '-'}');
+  Future<PeniTurn> start({String purpose = 'new_project', String? mode, String? budget, String? categoryCode}) async {
+    this.purpose = purpose;
+    calls.add(purpose == 'new_project' ? 'start ${mode ?? '-'} ${budget ?? '-'}' : 'start $purpose ${categoryCode ?? '-'} ${mode ?? '-'}');
     if (startFailures > 0) {
       startFailures--;
       throw ApiException.network;
@@ -57,6 +60,12 @@ class _FakePeni extends PeniApi {
   @override
   Future<PeniTurn> send(String conversationId, {String? text, String? choice}) async {
     calls.add(choice != null ? 'choice $choice' : 'text $text');
+    if (purpose == 'choose_goal') {
+      return PeniTurn(conversationId: 'c1', messages: [
+        _user('g1', text ?? choice!),
+        _peni('g2', 'Voilà ton objectif 👇 Tu pourras tout ajuster ensuite.', replies: [('restart', 'Recommencer')], summary: const [(label: 'Objectif', value: 'Abdos')]),
+      ], draft: const ProjectDraft(categoryCode: 'sport', goalCode: 'sport_abdos'),);
+    }
     if (choice == 'cat:sport') {
       return PeniTurn(conversationId: 'c1', messages: [
         _user('m2', 'Sport'),
@@ -127,7 +136,7 @@ Future<void> _pump(WidgetTester tester, {required String initial, required _Fake
       path: '/peni/new-project',
       builder: (_, s) {
         final extra = s.extra is Map<String, String?> ? s.extra! as Map<String, String?> : const <String, String?>{};
-        return PeniChatScreen(mode: extra['mode'], budget: extra['budget']);
+        return PeniChatScreen(mode: extra['mode'], budget: extra['budget'], purpose: extra['purpose'] ?? 'new_project', categoryCode: extra['categoryCode']);
       },
     ),
   ],);
@@ -222,5 +231,33 @@ void main() {
     expect(find.text('Créer mon programme'), findsOneWidget);
     expect(c.read(projectDraftProvider).toJson(), _draft.toJson());
     expect(find.text('Peni a rempli ton projet. Vérifie-le, puis crée ton programme.'), findsOneWidget);
+  });
+
+  testWidgets('écran 21 « Pas sûr ? Demande à Peni » : objectif seulement, repris à l’étape 3', (tester) async {
+    final peni = _FakePeni();
+    final c = ProviderContainer(overrides: [peniApiProvider.overrideWithValue(peni), projectsApiProvider.overrideWithValue(_FakeProjects())]);
+    await _pump(tester, initial: '/projects/new', peni: peni, container: c);
+    await tester.pump();
+    await tester.tap(find.text('Mode Éco'));
+    await tester.pump();
+    await tester.tap(find.text('Continuer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sport'));
+    await tester.pump();
+    await tester.tap(find.text('Continuer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nouveau projet · 3/5'), findsOneWidget);
+    await _tapKey(tester, 'ask-peni-goal');
+    await tester.pumpAndSettle();
+    expect(peni.calls.first, 'start choose_goal sport eco');
+    await tester.enterText(find.byKey(const ValueKey('peni-input')), 'un ventre plus plat');
+    await _tapKey(tester, 'peni-send');
+    expect(find.text('Choisir cet objectif'), findsOneWidget);
+    await _tapKey(tester, 'peni-see-program');
+    await tester.pumpAndSettle();
+    expect(find.text('Nouveau projet · 3/5'), findsOneWidget);
+    expect(c.read(projectDraftProvider).goalCode, 'sport_abdos');
+    expect(c.read(projectDraftProvider).mode, 'eco');
+    expect(find.text('Objectif noté avec Peni. Tu peux encore le modifier.'), findsOneWidget);
   });
 }

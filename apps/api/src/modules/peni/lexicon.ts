@@ -71,3 +71,6 @@ export const URGENT_WORDS = [
   'suicide', 'suicider', 'me tuer', 'en finir', 'envie de mourir', 'veux mourir', 'me faire du mal', 'douleur a la poitrine', 'douleur dans la poitrine',
   'mal a la poitrine', 'je saigne', 'evanoui', 'evanouie', 'je n arrive plus a respirer', 'respire plus',
 ] as const;
+
+/** Hésitation : jamais retenue comme objectif « avec ses mots » ; Peni repropose les objectifs de la liste. */
+export const UNSURE_WORDS = ['sais pas', 'sait pas', 'aucune idee', 'pas sur', 'pas sure', 'hesite', 'j hesite', 'aide moi', 'je ne vois pas', 'peu importe', 'n importe'] as const;

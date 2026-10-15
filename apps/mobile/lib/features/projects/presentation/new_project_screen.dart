@@ -34,6 +34,9 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
   String? _error;
   Map<String, String> _fieldErrors = {};
 
+  /// Change après « Pas sûr ? Demande à Peni » : l'étape 3 est reconstruite avec l'objectif rempli par Peni.
+  int _peniGoalRevision = 0;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +74,24 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
       _fieldErrors = {};
     });
     showBimSnack(context, 'Peni a rempli ton projet. Vérifie-le, puis crée ton programme.');
+  }
+
+  /// Écran 21 « Pas sûr ? Demande à Peni » : Peni aide à choisir l'objectif seulement ; la personne reste à l'étape 3
+  /// avec l'objectif rempli, qu'elle peut encore changer.
+  Future<void> _askPeniGoal() async {
+    final d = ref.read(projectDraftProvider);
+    final result = await context.push<ProjectDraft>(
+      '/peni/new-project',
+      extra: <String, String?>{'purpose': 'choose_goal', 'categoryCode': d.categoryCode, 'mode': d.mode, 'budget': d.budget},
+    );
+    if (result == null || !mounted) return;
+    _update(
+      (x) => result.goalCode != null
+          ? x.copyWith(categoryCode: result.categoryCode, goalCode: result.goalCode, targetQuantity: result.targetQuantity, description: result.description)
+          : x.copyWith(categoryCode: result.categoryCode, clearGoal: true, description: result.description),
+    );
+    setState(() => _peniGoalRevision++);
+    showBimSnack(context, 'Objectif noté avec Peni. Tu peux encore le modifier.');
   }
 
   void _back() {
@@ -160,7 +181,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                   child: switch (_step) {
                     1 => _ModeStep(draft: draft, catalog: c, onChanged: _update),
                     2 => _CategoryStep(draft: draft, catalog: c, onChanged: _update, onAskPeni: _askPeni),
-                    3 => _GoalStep(draft: draft, catalog: c, onChanged: _update),
+                    3 => _GoalStep(key: ValueKey('goal-$_peniGoalRevision'), draft: draft, catalog: c, onChanged: _update, onAskPeni: _askPeniGoal),
                     4 => _PhotoStep(
                         photo: _beforePhoto,
                         onPick: (camera) async {
@@ -575,11 +596,14 @@ class _CategoryTile extends StatelessWidget {
 // ------------------------------------------------------------------ Écran 21
 
 class _GoalStep extends StatefulWidget {
-  const _GoalStep({required this.draft, required this.catalog, required this.onChanged});
+  const _GoalStep({super.key, required this.draft, required this.catalog, required this.onChanged, required this.onAskPeni});
 
   final ProjectDraft draft;
   final ProjectCatalog catalog;
   final _Update onChanged;
+
+  /// « Pas sûr ? Demande à Peni » (lot 3) : Peni aide à formuler l'objectif.
+  final VoidCallback onAskPeni;
 
   @override
   State<_GoalStep> createState() => _GoalStepState();
@@ -660,6 +684,17 @@ class _GoalStepState extends State<_GoalStep> {
           ),
           const SizedBox(height: BimSpacing.lg),
         ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('ask-peni-goal'),
+            onPressed: widget.onAskPeni,
+            icon: const Peni(pose: PeniPose.think, size: 28),
+            label: const Text('Pas sûr ? Demande à Peni'),
+            style: TextButton.styleFrom(foregroundColor: scheme.onSurface, minimumSize: const Size(0, kBimMinTouch), padding: EdgeInsets.zero),
+          ),
+        ),
+        const SizedBox(height: BimSpacing.sm),
         BimTextField(
           label: cat.goals.isEmpty ? 'Décris ton objectif' : 'Ou décris ton objectif',
           optional: cat.goals.isNotEmpty,

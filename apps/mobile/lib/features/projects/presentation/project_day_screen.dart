@@ -9,6 +9,7 @@ import '../../../core/widgets/bim_icons.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../peni/data/peni_api.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
@@ -107,7 +108,12 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
                   ? async.hasError
                       ? ProjectLoadError(error: async.error!, onRetry: () => ref.invalidate(projectDayProvider(_key)))
                       : const Center(child: CircularProgressIndicator())
-                  : _DayBody(plan: plan, pending: _pending, onToggle: _toggle),
+                  : _DayBody(
+                      plan: plan,
+                      pending: _pending,
+                      onToggle: _toggle,
+                      encouragement: ref.watch(peniEncouragementProvider((projectId: widget.projectId, context: 'day', day: widget.day))).valueOrNull,
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.lg),
@@ -133,24 +139,29 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
 }
 
 class _DayBody extends StatelessWidget {
-  const _DayBody({required this.plan, required this.pending, required this.onToggle});
+  const _DayBody({required this.plan, required this.pending, required this.onToggle, this.encouragement});
 
   final DayPlan plan;
   final Set<String> pending;
   final ValueChanged<ProjectTask> onToggle;
+
+  /// Encouragement de Peni écrit par l'API (lot 3) ; à défaut, le message habituel de l'écran.
+  final PeniEncouragement? encouragement;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final done = plan.tasks.where((t) => t.done).length;
     final total = plan.tasks.length;
-    final (PeniPose pose, String defaultMessage) = switch (plan.state) {
-      'paused' => (PeniPose.sad, 'Ton projet est en pause aujourd’hui. Repose-toi bien, je t’attends !'),
+    final (PeniPose fallbackPose, String defaultMessage) = switch (plan.state) {
+      'paused' => (PeniPose.happy, 'Ton projet est en pause aujourd’hui. Repose-toi bien, je t’attends !'),
       'rest' => (PeniPose.happy, 'Pas de tâche prévue aujourd’hui : journée de repos.'),
       _ when total > 0 && done == total => (PeniPose.cheer, 'Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'),
       'upcoming' => (PeniPose.think, 'Cette journée n’a pas encore commencé.'),
       _ => (PeniPose.happy, '$done tâche${done > 1 ? 's' : ''} sur $total faite${done > 1 ? 's' : ''}. On y va ?'),
     };
+    final message = encouragement?.text ?? defaultMessage;
+    final pose = encouragement?.peniPose ?? fallbackPose;
     return ListView(
       padding: const EdgeInsets.all(BimSpacing.screen),
       children: [
@@ -162,22 +173,28 @@ class _DayBody extends StatelessWidget {
               Peni(pose: pose, size: 56),
               const SizedBox(width: BimSpacing.md),
               Expanded(
-                child: plan.tipText == null
-                    ? Text(defaultMessage, style: const TextStyle(color: BimColors.black, fontSize: 15, fontWeight: FontWeight.w600))
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text.rich(
-                            TextSpan(children: [
-                              const TextSpan(text: 'Habitude du jour : ', style: TextStyle(fontWeight: FontWeight.w800)),
-                              TextSpan(text: plan.tipText),
-                            ],),
-                            style: const TextStyle(color: BimColors.black, fontSize: 15),
-                          ),
-                          const SizedBox(height: 4),
-                          Text('Conseil d’un programme validé par ${plan.tipValidatedBy}', style: const TextStyle(color: BimColors.grey600, fontSize: 12)),
-                        ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message,
+                      key: ValueKey('peni-${encouragement?.key ?? 'local'}'),
+                      style: const TextStyle(color: BimColors.black, fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                    if (plan.tipText != null) ...[
+                      const SizedBox(height: BimSpacing.sm),
+                      Text.rich(
+                        TextSpan(children: [
+                          const TextSpan(text: 'Habitude du jour : ', style: TextStyle(fontWeight: FontWeight.w800)),
+                          TextSpan(text: plan.tipText),
+                        ],),
+                        style: const TextStyle(color: BimColors.black, fontSize: 15),
                       ),
+                      const SizedBox(height: 4),
+                      Text('Conseil d’un programme validé par ${plan.tipValidatedBy}', style: const TextStyle(color: BimColors.grey600, fontSize: 12)),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),

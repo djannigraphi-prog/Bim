@@ -11,6 +11,7 @@ import '../../../core/widgets/bim_icons.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../peni/data/peni_api.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
@@ -93,6 +94,8 @@ class _Map extends ConsumerWidget {
     final s = project.summary;
     final todayDay = project.days.where((d) => d.day == project.today).firstOrNull;
     final completed = s.isCompleted;
+    // Lot 3 : encouragement de Peni écrit par l'API (heures calmes respectées) ; à défaut, « On y va ? ».
+    final enc = ref.watch(peniEncouragementProvider((projectId: s.id, context: 'map', day: null))).valueOrNull;
     return Column(
       children: [
         Padding(
@@ -170,10 +173,34 @@ class _Map extends ConsumerWidget {
                     children: [
                       Text('AUJOURD’HUI · ${s.nextTask!.timeOfDay}', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w800, fontSize: 12)),
                       Text(s.nextTask!.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      if (enc != null) ...[
+                        const SizedBox(height: BimSpacing.xs),
+                        Text(enc.text, key: ValueKey('peni-${enc.key}'), style: theme.textTheme.bodyMedium),
+                      ],
                     ],
                   ),
                 ),
-                const Text('On y va ?'),
+                if (enc == null) const Text('On y va ?'),
+              ],
+            ),
+          ),
+        // Rien à faire aujourd'hui (tout est fait, repos, programme terminé…) : Peni le dit quand même.
+        if (s.nextTask == null && !s.isPaused && enc != null)
+          Container(
+            margin: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, 0),
+            padding: const EdgeInsets.all(BimSpacing.md),
+            decoration: BoxDecoration(color: BimColors.warningBg, borderRadius: BorderRadius.circular(BimRadius.card)),
+            child: Row(
+              children: [
+                Peni(pose: enc.peniPose, size: 40),
+                const SizedBox(width: BimSpacing.md),
+                Expanded(
+                  child: Text(
+                    enc.text,
+                    key: ValueKey('peni-${enc.key}'),
+                    style: const TextStyle(color: BimColors.black, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ],
             ),
           ),

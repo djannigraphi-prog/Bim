@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/brand.dart';
+import '../../projects/application/projects_providers.dart';
 import '../../projects/data/projects_models.dart';
 
 /// Réponse rapide proposée par Peni (bouton sous son message).
@@ -71,15 +73,40 @@ class PeniTurn {
   static ProjectDraft? _draft(Map<String, dynamic> j) => j['draft'] is Map<String, dynamic> ? ProjectDraft.fromJson(j['draft'] as Map<String, dynamic>) : null;
 }
 
+/// Encouragement de Peni pour la journée (écran 27) ou la carte (écran 26), écrit par l'API (heures calmes respectées).
+class PeniEncouragement {
+  const PeniEncouragement({required this.key, required this.text, required this.pose});
+
+  /// Situation reconnue par l'API (ex. today_done, quiet_night).
+  final String key;
+  final String text;
+  final String pose;
+
+  PeniPose get peniPose => PeniPose.values.where((p) => p.name == pose).firstOrNull ?? PeniPose.happy;
+
+  factory PeniEncouragement.fromJson(Map<String, dynamic> j) =>
+      PeniEncouragement(key: j['key'] as String, text: j['text'] as String, pose: j['pose'] as String? ?? 'happy');
+}
+
 class PeniApi {
   PeniApi(this._api);
   final ApiClient _api;
 
-  /// Commence une discussion pour construire un projet (mode déjà choisi à l'écran 19, s'il y en a un).
-  Future<PeniTurn> start({String? mode, String? budget}) async {
-    final j = await _api.post('/v1/peni/conversations', body: {'purpose': 'new_project', if (mode != null) 'mode': mode, if (mode == 'premium' && budget != null) 'budget': budget});
+  /// Commence une discussion : tout le projet ([purpose] « new_project », mode déjà choisi à l'écran 19 s'il y en a un)
+  /// ou seulement l'objectif (« choose_goal », « Pas sûr ? » de l'écran 21, catégorie déjà choisie).
+  Future<PeniTurn> start({String purpose = 'new_project', String? mode, String? budget, String? categoryCode}) async {
+    final j = await _api.post('/v1/peni/conversations', body: {
+      'purpose': purpose,
+      if (mode != null) 'mode': mode,
+      if (mode == 'premium' && budget != null) 'budget': budget,
+      if (categoryCode != null) 'categoryCode': categoryCode,
+    },);
     return PeniTurn(conversationId: j['id'] as String, messages: PeniTurn._messages(j), draft: PeniTurn._draft(j));
   }
+
+  Future<PeniEncouragement> encouragement(String projectId, {required String context, String? day}) async => PeniEncouragement.fromJson(
+        await _api.get('/v1/peni/projects/$projectId/encouragement', query: {'context': context, if (day != null) 'day': day}),
+      );
 
   /// Envoie un message libre ([text]) ou une réponse rapide ([choice]) ; renvoie le message de la personne et ceux de Peni.
   Future<PeniTurn> send(String conversationId, {String? text, String? choice}) async {
@@ -89,3 +116,16 @@ class PeniApi {
 }
 
 final peniApiProvider = Provider<PeniApi>((ref) => PeniApi(ref.watch(apiClientProvider)));
+
+typedef EncouragementKey = ({String projectId, String context, String? day});
+
+/// Encouragement du moment ; recalculé après chaque changement du projet (case cochée, pause…). En cas d'erreur,
+/// null : l'écran garde son message habituel (l'encouragement n'est jamais bloquant).
+final peniEncouragementProvider = FutureProvider.autoDispose.family<PeniEncouragement?, EncouragementKey>((ref, k) async {
+  ref.watch(projectsRevisionProvider);
+  try {
+    return await ref.watch(peniApiProvider).encouragement(k.projectId, context: k.context, day: k.day);
+  } catch (_) {
+    return null;
+  }
+});

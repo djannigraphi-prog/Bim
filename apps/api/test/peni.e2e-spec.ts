@@ -149,4 +149,58 @@ describe('Peni (e2e)', () => {
     await service.send(u.userId, c.id, { choice: 'mode:eco' });
     expect(calls).toHaveLength(0);
   });
+
+  it('« Pas sûr ? » (écran 21) : objectif choisi avec Peni, brouillon partiel, discussion terminée sans questions de séances', async () => {
+    const u = await user();
+    const c = (await h.http().post('/v1/peni/conversations').set(u.auth).send({ purpose: 'choose_goal', categoryCode: 'sport', mode: 'eco' }).expect(201)).body;
+    expect(c.purpose).toBe('choose_goal');
+    expect(c.messages[0].text).toContain('Pas de souci, on va trouver ensemble');
+    const r = (await say(u.auth, c.id, { text: 'Je voudrais perdre 6 kg' })).body;
+    expect(r).toMatchObject({ status: 'completed', draft: { categoryCode: 'sport', goalCode: 'sport_perte_poids', targetQuantity: 6 } });
+    expect(r.messages[1].summary).toContainEqual({ label: 'Objectif', value: 'Perte de poids · 6 kg' });
+    await h.http().post('/v1/peni/conversations').set(u.auth).send({ purpose: 'choose_goal', categoryCode: 'x'.repeat(41) }).expect(400);
+  });
+
+  describe('encouragements (écrans 26 et 27)', () => {
+    const hhmm = (offsetMinutes: number) => {
+      const d = new Date(Date.now() + offsetMinutes * 60_000); // Abidjan = UTC
+      return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+    };
+    async function project() {
+      const u = await user();
+      const p = (await h.http().post('/v1/projects').set(u.auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 7, durationDays: 30 }).expect(201)).body;
+      // Heures calmes personnelles loin de l'heure actuelle : le test ne dépend pas de l'heure à laquelle il tourne.
+      await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: hhmm(180), quietEnd: hhmm(240) }).expect(200);
+      return { u, p };
+    }
+    const get = (auth: Record<string, string>, id: string, query: string, status = 200) => h.http().get(`/v1/peni/projects/${id}/encouragement?${query}`).set(auth).expect(status);
+
+    it('journée et carte : message selon l’état du jour ; « tout est fait » après les coches', async () => {
+      const { u, p } = await project();
+      const first = (await get(u.auth, p.id, 'context=day')).body;
+      expect(first).toMatchObject({ key: 'first_day', text: 'C’est le premier jour ! 🎉 On commence ensemble ?', pose: 'wave', version: 'v1' });
+      expect((await get(u.auth, p.id, 'context=map')).body.key).toBe('first_day');
+      const day = (await h.http().get(`/v1/projects/${p.id}/days/${p.today}`).set(u.auth).expect(200)).body;
+      for (const t of day.tasks) await h.http().put(`/v1/projects/${p.id}/days/${p.today}/tasks/${t.id}/done`).set(u.auth).expect(200);
+      expect((await get(u.auth, p.id, `context=day&day=${p.today}`)).body).toMatchObject({ key: 'today_done', pose: 'cheer' });
+    });
+
+    it('heures calmes de la personne : aucun appel à faire une tâche', async () => {
+      const { u, p } = await project();
+      await h.http().patch('/v1/me/notification-preferences').set(u.auth).send({ quietStart: hhmm(-60), quietEnd: hhmm(60) }).expect(200);
+      const r = (await get(u.auth, p.id, 'context=map')).body;
+      expect(['quiet_night', 'quiet_early', 'quiet_calm']).toContain(r.key);
+      expect(r.text).not.toMatch(/on commence|on y va/i);
+    });
+
+    it('contrôles : contexte et jour validés, projet d’une autre personne invisible', async () => {
+      const { u, p } = await project();
+      const other = await user();
+      await get(u.auth, p.id, 'context=autre', 400);
+      await get(u.auth, p.id, 'context=day&day=15-10-2026', 400);
+      await get(u.auth, p.id, 'context=day&day=2020-01-01', 400);
+      await get(other.auth, p.id, 'context=day', 404);
+      await h.http().get(`/v1/peni/projects/${p.id}/encouragement?context=day`).expect(401);
+    });
+  });
 });

@@ -1,10 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 
 export class StartPeniConversationDto {
-  @ApiProperty({ enum: ['new_project'], description: 'Écrans 19, 20 et 25 : construire un projet avec Peni' })
-  @IsIn(['new_project'])
-  purpose!: 'new_project';
+  @ApiProperty({
+    enum: ['new_project', 'choose_goal'],
+    description: 'new_project : construire tout le projet (écrans 19, 20, 25) ; choose_goal : seulement l’objectif (« Pas sûr ? », écran 21)',
+  })
+  @IsIn(['new_project', 'choose_goal'])
+  purpose!: 'new_project' | 'choose_goal';
+  @ApiPropertyOptional({ example: 'sport', description: 'Catégorie déjà choisie à l’écran 20 (choose_goal)' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 40)
+  categoryCode?: string;
   @ApiPropertyOptional({ enum: ['eco', 'premium'], description: 'Mode déjà choisi à l’écran 19 (Peni ne le redemande pas)' })
   @IsOptional()
   @IsIn(['eco', 'premium'])
@@ -26,4 +34,14 @@ export class PeniMessageDto {
   @IsString()
   @Length(1, 60)
   choice?: string;
+}
+
+export class EncouragementQueryDto {
+  @ApiProperty({ enum: ['day', 'map'], description: 'day : écran 27 (journée) ; map : écran 26 (carte du projet)' })
+  @IsIn(['day', 'map'])
+  context!: 'day' | 'map';
+  @ApiPropertyOptional({ example: '2026-10-15', description: 'Jour affiché (écran 27) ; aujourd’hui par défaut' })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  day?: string;
 }

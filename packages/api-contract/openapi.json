@@ -1830,6 +1830,58 @@
         ]
       }
     },
+    "/v1/peni/projects/{projectId}/encouragement": {
+      "get": {
+        "operationId": "PeniController_encouragement",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "context",
+            "required": true,
+            "in": "query",
+            "description": "day : écran 27 (journée) ; map : écran 26 (carte du projet)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "map"
+              ]
+            }
+          },
+          {
+            "name": "day",
+            "required": false,
+            "in": "query",
+            "description": "Jour affiché (écran 27) ; aujourd’hui par défaut",
+            "schema": {
+              "example": "2026-10-15",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encouragement de Peni pour la journée (27) ou la carte (26) ; heures calmes respectées, aucune notification",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -3150,9 +3202,15 @@
           "purpose": {
             "type": "string",
             "enum": [
-              "new_project"
+              "new_project",
+              "choose_goal"
             ],
-            "description": "Écrans 19, 20 et 25 : construire un projet avec Peni"
+            "description": "new_project : construire tout le projet (écrans 19, 20, 25) ; choose_goal : seulement l’objectif (« Pas sûr ? », écran 21)"
+          },
+          "categoryCode": {
+            "type": "string",
+            "example": "sport",
+            "description": "Catégorie déjà choisie à l’écran 20 (choose_goal)"
           },
           "mode": {
             "type": "string",

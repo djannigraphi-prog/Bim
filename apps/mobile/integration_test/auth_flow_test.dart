@@ -280,7 +280,12 @@ void main() {
     await _shot(tester, 'a26_carte');
     await _tap(tester, find.text('Voir l’étape du jour'));
     await _tap(tester, find.text('Séance · Abdos'));
-    await _waitFor(tester, find.text('Tout est fait pour aujourd’hui. Bravo, je suis fière de toi !'));
+    // Lot 3 : encouragement de Peni écrit par l'API pour une journée réussie (« bonne nuit » pendant les heures calmes).
+    final allDone = find.byWidgetPredicate(
+      (w) => w is Text && w.key is ValueKey<String> && const ['peni-today_done', 'peni-today_done_streak', 'peni-quiet_done'].contains((w.key! as ValueKey<String>).value),
+    );
+    await _waitFor(tester, allDone);
+    await _shot(tester, 'a27_encouragement');
 
     // Écran 27 : signaler un problème, transmis au support.
     await _tap(tester, find.text('Signaler'));

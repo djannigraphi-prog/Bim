@@ -161,13 +161,13 @@ describe('Peni : discussion guidée (lot 3, sans modèle de langage)', () => {
     expect(() => handleInput(r.state, { choice: 'cat:inconnue' }, ctx())).toThrow(InvalidChoiceError);
   });
 
-  it('mode déjà choisi à l’écran 19 : pas de question sur le mode ; « Recommencer » repart de zéro', () => {
+  it('mode déjà choisi à l’écran 19 : pas de question sur le mode ; « Recommencer » repart de l’objectif en gardant ce mode', () => {
     const c = ctx();
     let r = startConversation(c, { mode: 'premium', budget: 'small' });
     for (const i of [{ text: 'des fessiers' }, { choice: 'sessions:4' }, { choice: 'avail:morning' }, { choice: 'dur:90' }]) r = handleInput(r.state, i, c);
     expect(r.draft).toMatchObject({ mode: 'premium', budget: 'small', goalCode: 'sport_fessiers', durationDays: 90 });
     const again = handleInput(r.state, { choice: 'restart' }, c);
-    expect(again.state.slots).toEqual({});
+    expect(again.state.slots).toEqual({ mode: 'premium', budget: 'small' });
     expect(again.state.step).toBe('category');
     expect(again.draft).toBeNull();
   });
@@ -187,5 +187,56 @@ describe('Peni : discussion guidée (lot 3, sans modèle de langage)', () => {
     // Mois en cours : fin du mois ; mois passé : l'année suivante.
     expect(talk(ctx(), 'des abdos pour octobre').state.slots.deadlineDays).toBe(17);
     expect(talk(ctx(), 'des abdos pour mars').state.slots.deadlineDays).toBe(137);
+  });
+
+  describe('« Pas sûr ? » à l’écran 21 (objectif seulement)', () => {
+    it('catégorie connue : Peni aide à choisir l’objectif, puis s’arrête (pas de séances ni de mode)', () => {
+      const c = ctx();
+      let r = startConversation(c, { categoryCode: 'sport', mode: 'eco' }, 'choose_goal');
+      expect(r.state.step).toBe('goal');
+      expect(r.replies[0].text).toBe('Pas de souci, on va trouver ensemble 🙂 En sport, qu’est-ce que tu aimerais changer ? Dis-le avec tes mots, ou choisis ci-dessous.');
+      expect(r.replies[0].quickReplies.map((q) => q.id)).toContain('goal:other');
+      r = handleInput(r.state, { text: 'Je voudrais un ventre plus plat' }, c);
+      expect(r.state.step).toBe('done');
+      expect(r.draft).toEqual({ categoryCode: 'sport', goalCode: 'sport_abdos' });
+      expect(r.replies[r.replies.length - 1]).toMatchObject({ text: 'Voilà ton objectif 👇 Tu pourras tout ajuster ensuite.', summary: [{ label: 'Catégorie', value: 'Sport' }, { label: 'Objectif', value: 'Abdos' }] });
+    });
+
+    it('objectif chiffré : la quantité est demandée ; objectif avec ses mots si rien ne correspond à la liste', () => {
+      const c = ctx();
+      let r = startConversation(c, { categoryCode: 'sport' }, 'choose_goal');
+      r = handleInput(r.state, { choice: 'goal:sport_perte_poids' }, c);
+      expect(r.state.step).toBe('quantity');
+      r = handleInput(r.state, { choice: 'qty:5' }, c);
+      expect(r.draft).toEqual({ categoryCode: 'sport', goalCode: 'sport_perte_poids', targetQuantity: 5 });
+      expect(r.replies[0].summary).toContainEqual({ label: 'Objectif', value: 'Perte de poids · 5 kg' });
+
+      const own = handleInput(startConversation(c, { categoryCode: 'sport' }, 'choose_goal').state, { text: 'Avoir plus d’énergie pour jouer avec mes enfants' }, c);
+      expect(own.draft).toEqual({ categoryCode: 'sport', description: 'Avoir plus d’énergie pour jouer avec mes enfants' });
+      expect(own.replies[0].text).toContain('Noté, je garde ton objectif avec tes mots ✍️');
+      // Une hésitation n'est jamais prise pour un objectif : Peni repropose la liste.
+      const unsure = handleInput(startConversation(c, { categoryCode: 'sport' }, 'choose_goal').state, { text: 'Je ne sais pas trop, aide-moi' }, c);
+      expect(unsure.draft).toBeNull();
+      expect(unsure.state.step).toBe('goal');
+      expect(unsure.replies[0].quickReplies.length).toBeGreaterThan(3);
+    });
+
+    it('catégorie sans liste d’objectifs : description demandée ; « Recommencer » garde la catégorie', () => {
+      const c = ctx();
+      let r = startConversation(c, { categoryCode: 'maquillage' }, 'choose_goal');
+      expect(r.state.step).toBe('describe');
+      expect(r.replies[0].text).toBe('Pas de souci, on va trouver ensemble 🙂 Dis-moi avec tes mots ce que tu aimerais obtenir en maquillage.');
+      r = handleInput(r.state, { text: 'Un maquillage naturel pour le bureau' }, c);
+      expect(r.draft).toEqual({ categoryCode: 'maquillage', description: 'Un maquillage naturel pour le bureau' });
+      const again = handleInput(r.state, { choice: 'restart' }, c);
+      expect(again.state).toMatchObject({ step: 'describe', purpose: 'choose_goal', slots: { categoryCode: 'maquillage' } });
+      expect(again.replies[0].text).toBe('On recommence ! 😊 Dis-moi avec tes mots ce que tu aimerais obtenir en maquillage.');
+    });
+
+    it('catégorie inconnue ou absente : Peni demande d’abord le domaine', () => {
+      const r = startConversation(ctx(), { categoryCode: 'inconnue' }, 'choose_goal');
+      expect(r.state.step).toBe('category');
+      expect(r.state.slots.categoryCode).toBeUndefined();
+    });
   });
 });

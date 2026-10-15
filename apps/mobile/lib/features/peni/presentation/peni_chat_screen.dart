@@ -17,11 +17,17 @@ import '../data/peni_api.dart';
 /// l'extérieur). À la fin, « Voir mon programme » rend le brouillon à l'écran « Nouveau projet », qui le fait vérifier
 /// et confirmer : le projet n'est créé qu'avec l'accord de la personne (règle R5).
 class PeniChatScreen extends ConsumerStatefulWidget {
-  const PeniChatScreen({super.key, this.mode, this.budget});
+  const PeniChatScreen({super.key, this.mode, this.budget, this.purpose = 'new_project', this.categoryCode});
 
   /// Mode déjà choisi à l'écran 19 (Peni ne le redemande pas).
   final String? mode;
   final String? budget;
+
+  /// new_project (tout le projet) ou choose_goal (« Pas sûr ? » de l'écran 21 : seulement l'objectif).
+  final String purpose;
+
+  /// Catégorie déjà choisie à l'écran 20 (choose_goal).
+  final String? categoryCode;
 
   @override
   ConsumerState<PeniChatScreen> createState() => _PeniChatScreenState();
@@ -57,7 +63,7 @@ class _PeniChatScreenState extends ConsumerState<PeniChatScreen> {
       _startError = null;
     });
     try {
-      final t = await _api.start(mode: widget.mode, budget: widget.budget);
+      final t = await _api.start(purpose: widget.purpose, mode: widget.mode, budget: widget.budget, categoryCode: widget.categoryCode);
       if (!mounted) return;
       setState(() {
         _conversationId = t.conversationId;
@@ -168,7 +174,14 @@ class _PeniChatScreenState extends ConsumerState<PeniChatScreen> {
     final children = <Widget>[];
     for (var i = 0; i < _messages.length; i++) {
       final m = _messages[i];
-      children.add(_Bubble(message: m, draft: i == lastIndex ? _draft : null, onSeeProgram: _draft == null ? null : () => context.pop(_draft)));
+      children.add(
+        _Bubble(
+          message: m,
+          draft: i == lastIndex ? _draft : null,
+          actionLabel: widget.purpose == 'choose_goal' ? 'Choisir cet objectif' : 'Voir mon programme',
+          onSeeProgram: _draft == null ? null : () => context.pop(_draft),
+        ),
+      );
       if (i == lastIndex && m.fromPeni && m.quickReplies.isNotEmpty) {
         children.add(
           Padding(
@@ -207,10 +220,11 @@ class _PeniChatScreenState extends ConsumerState<PeniChatScreen> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, this.draft, this.onSeeProgram});
+  const _Bubble({required this.message, required this.actionLabel, this.draft, this.onSeeProgram});
 
   final PeniMessage message;
   final ProjectDraft? draft;
+  final String actionLabel;
   final VoidCallback? onSeeProgram;
 
   @override
@@ -261,7 +275,7 @@ class _Bubble extends StatelessWidget {
                 ),
                 if (draft != null) ...[
                   const SizedBox(height: BimSpacing.md),
-                  BimButton(key: const ValueKey('peni-see-program'), label: 'Voir mon programme', onPressed: onSeeProgram),
+                  BimButton(key: const ValueKey('peni-see-program'), label: actionLabel, onPressed: onSeeProgram),
                 ],
               ],
             ],

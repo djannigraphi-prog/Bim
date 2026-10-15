@@ -93,7 +93,7 @@ class _FakePeniApi extends PeniApi {
   _FakePeniApi(super.api);
 
   @override
-  Future<PeniTurn> start({String? mode, String? budget}) async => const PeniTurn(
+  Future<PeniTurn> start({String purpose = 'new_project', String? mode, String? budget, String? categoryCode}) async => const PeniTurn(
         conversationId: 'c1',
         messages: [
           PeniMessage(id: '1', role: 'peni', text: 'Coucou Yannick ! 🥰 Raconte-moi : qu’est-ce que tu aimerais changer ?', pose: 'wave'),

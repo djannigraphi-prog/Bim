@@ -11,7 +11,7 @@
  */
 import { Day, diffDays } from '../projects/plan';
 import { pickTemplate, TemplateRef } from '../projects/templates';
-import { CATEGORY_WORDS, GOAL_WORDS, hasAny, HEALTH_WORDS, MONTHS, normalize, NUMBER_WORDS, URGENT_WORDS, WEEKDAYS } from './lexicon';
+import { CATEGORY_WORDS, GOAL_WORDS, hasAny, HEALTH_WORDS, MONTHS, normalize, NUMBER_WORDS, UNSURE_WORDS, URGENT_WORDS, WEEKDAYS } from './lexicon';
 
 export const PENI_ENGINE_VERSION = 'guided-v1';
 
@@ -62,8 +62,22 @@ export interface Slots {
 
 export type Step = 'category' | 'goal' | 'describe' | 'quantity' | 'sessions' | 'availability' | 'mode' | 'budget' | 'duration' | 'done';
 
+/** new_project : tout le projet (écrans 19, 20) ; choose_goal : seulement l'objectif (« Pas sûr ? », écran 21). */
+export type PeniPurpose = 'new_project' | 'choose_goal';
+
+export interface Known {
+  mode?: Mode;
+  budget?: Budget;
+  /** Catégorie déjà choisie (écran 20), pour « Pas sûr ? » à l'écran 21. */
+  categoryCode?: string;
+}
+
 export interface PeniState {
   version: string;
+  /** Absent dans les discussions enregistrées avant le 15/10/2026 (17 h 48) : new_project. */
+  purpose?: PeniPurpose;
+  /** Ce que l'app savait déjà au début (repris par « Recommencer »). */
+  known?: Known;
   step: Step;
   slots: Slots;
   /** Identifiants des réponses rapides proposées par le dernier message (seules acceptées en « choice »). */
@@ -100,10 +114,18 @@ export interface ProjectDraft {
   durationDays?: number;
 }
 
+/** Objectif choisi avec Peni (« Pas sûr ? », écran 21), à reprendre à l'étape 3 du nouveau projet. */
+export interface GoalDraft {
+  categoryCode: string;
+  goalCode?: string;
+  targetQuantity?: number;
+  description?: string;
+}
+
 export interface EngineResult {
   state: PeniState;
   replies: PeniReply[];
-  draft: ProjectDraft | null;
+  draft: ProjectDraft | GoalDraft | null;
 }
 
 export interface EngineInput {
@@ -118,20 +140,37 @@ const BUDGET_LABEL: Record<Budget, string> = { small: 'petit', medium: 'moyen', 
 
 // ------------------------------------------------------------------------------------------------ Démarrage
 
-export function startConversation(ctx: EngineContext, known: { mode?: Mode; budget?: Budget } = {}): EngineResult {
+export function startConversation(ctx: EngineContext, known: Known = {}, purpose: PeniPurpose = 'new_project'): EngineResult {
   const slots: Slots = {};
   if (known.mode === 'eco') slots.mode = 'eco';
   if (known.mode === 'premium') {
     slots.mode = 'premium';
     if (known.budget && known.budget in BUDGET_LABEL) slots.budget = known.budget;
   }
+  const cat = ctx.catalog.categories.find((c) => c.code === known.categoryCode);
+  if (cat) slots.categoryCode = cat.code;
   const name = ctx.firstName.trim();
-  const reply: PeniReply = {
-    text: `Coucou${name ? ` ${name}` : ''} ! 🥰 Raconte-moi : qu’est-ce que tu aimerais changer ?`,
-    pose: 'wave',
-    quickReplies: ctx.catalog.categories.map((c) => ({ id: `cat:${c.code}`, label: c.label })),
-  };
-  const state: PeniState = { version: PENI_ENGINE_VERSION, step: 'category', slots, offered: reply.quickReplies.map((q) => q.id), misses: 0 };
+  const state: PeniState = { version: PENI_ENGINE_VERSION, purpose, known, step: 'category', slots, offered: [], misses: 0 };
+  let reply: PeniReply;
+  if (purpose === 'choose_goal' && cat) {
+    state.step = nextStep(slots, ctx, purpose);
+    const q = question(state, ctx);
+    reply = {
+      ...q,
+      text: cat.goals.length
+        ? `Pas de souci, on va trouver ensemble 🙂 En ${cat.label.toLowerCase()}, qu’est-ce que tu aimerais changer ? Dis-le avec tes mots, ou choisis ci-dessous.`
+        : `Pas de souci, on va trouver ensemble 🙂 Dis-moi avec tes mots ce que tu aimerais obtenir en ${cat.label.toLowerCase()}.`,
+      pose: 'wave',
+    };
+  } else {
+    if (cat) delete slots.categoryCode; // la discussion complète repart de l'objectif
+    reply = {
+      text: `Coucou${name ? ` ${name}` : ''} ! 🥰 Raconte-moi : qu’est-ce que tu aimerais changer ?`,
+      pose: 'wave',
+      quickReplies: ctx.catalog.categories.map((c) => ({ id: `cat:${c.code}`, label: c.label })),
+    };
+  }
+  state.offered = reply.quickReplies.map((q) => q.id);
   return { state, replies: [reply], draft: null };
 }
 
@@ -146,8 +185,10 @@ export function handleInput(prev: PeniState, input: EngineInput, ctx: EngineCont
   if (input.choice !== undefined) {
     if (!state.offered.includes(input.choice)) throw new InvalidChoiceError(input.choice);
     if (input.choice === 'restart') {
-      const fresh = startConversation(ctx);
-      return { state: fresh.state, replies: [{ ...fresh.replies[0], text: 'On recommence ! 😊 Qu’est-ce que tu aimerais changer ?' }], draft: null };
+      const fresh = startConversation(ctx, state.known ?? {}, state.purpose ?? 'new_project');
+      const first = fresh.replies[0];
+      const text = fresh.state.step === 'category' ? 'On recommence ! 😊 Qu’est-ce que tu aimerais changer ?' : `On recommence ! 😊 ${first.text.replace(/^Pas de souci, on va trouver ensemble 🙂 /, '')}`;
+      return { state: fresh.state, replies: [{ ...first, text }], draft: null };
     }
     if (input.choice !== 'continue') applyChoice(state, input.choice);
   } else {
@@ -188,11 +229,19 @@ export function handleInput(prev: PeniState, input: EngineInput, ctx: EngineCont
 
   const progressed = JSON.stringify(state.slots) !== before;
   const wasDone = state.step === 'done';
-  state.step = nextStep(state.slots, ctx);
+  const purpose = state.purpose ?? 'new_project';
+  state.step = nextStep(state.slots, ctx, purpose);
   if (state.step === 'done') {
-    const draft = buildDraft(state.slots, ctx);
-    const summary = summarize(state.slots, ctx);
-    const text = wasDone ? 'Ton programme est prêt 👇 Vérifie-le avec « Voir mon programme », ou recommence.' : `${prefix}Top ! J’ai noté tout ça 👇`;
+    const goalOnly = purpose === 'choose_goal';
+    const draft = goalOnly ? buildGoalDraft(state.slots) : buildDraft(state.slots, ctx);
+    const summary = goalOnly ? summarizeGoal(state.slots, ctx) : summarize(state.slots, ctx);
+    const text = goalOnly
+      ? wasDone
+        ? 'Ton objectif est prêt 👇 Choisis-le, ou recommence.'
+        : `${prefix}Voilà ton objectif 👇 Tu pourras tout ajuster ensuite.`
+      : wasDone
+        ? 'Ton programme est prêt 👇 Vérifie-le avec « Voir mon programme », ou recommence.'
+        : `${prefix}Top ! J’ai noté tout ça 👇`;
     const reply: PeniReply = { text: text.trim(), pose: 'cheer', quickReplies: [{ id: 'restart', label: 'Recommencer' }], summary };
     replies.push(reply);
     state.offered = ['restart'];
@@ -278,6 +327,13 @@ function extract(state: PeniState, raw: string, n: string, ctx: EngineContext): 
       if (g) s.goalCode = g;
     }
     if (s.goalCode && kg) setQuantity(s, cat, Number(kg[1]));
+    // À la question de l'objectif, une phrase qui ne correspond à aucun objectif de la liste devient l'objectif de la
+    // personne, avec ses mots (le projet l'accepte : objectif décrit, sans objectif de la liste).
+    if (s.goalCode === undefined && state.step === 'goal' && raw.length >= 8 && !hasAny(n, UNSURE_WORDS)) {
+      s.goalCode = null;
+      s.description = raw.slice(0, 500);
+      reactions.push('Noté, je garde ton objectif avec tes mots ✍️');
+    }
   }
   const goal = cat?.goals.find((g) => g.code === s.goalCode);
   if (goal?.quantityUnit && s.targetQuantity === undefined && state.step === 'quantity') {
@@ -385,13 +441,14 @@ function templateFor(s: Slots, ctx: EngineContext) {
   return pickTemplate(ctx.catalog.templates, s.categoryCode, s.goalCode ?? null, s.mode);
 }
 
-export function nextStep(s: Slots, ctx: EngineContext): Step {
+export function nextStep(s: Slots, ctx: EngineContext, purpose: PeniPurpose = 'new_project'): Step {
   const cat = ctx.catalog.categories.find((c) => c.code === s.categoryCode);
   if (!cat) return 'category';
   if (cat.goals.length && s.goalCode === undefined) return 'goal';
   if (!s.goalCode && (s.description ?? '').trim().length < 3) return 'describe';
   const goal = cat.goals.find((g) => g.code === s.goalCode);
   if (goal?.quantityUnit && s.targetQuantity === undefined) return 'quantity';
+  if (purpose === 'choose_goal') return 'done';
   if (s.sessionsPerWeek === undefined) return 'sessions';
   if (s.availability === undefined) return 'availability';
   if (s.mode === undefined) return 'mode';
@@ -486,6 +543,24 @@ export function buildDraft(s: Slots, ctx: EngineContext): ProjectDraft {
     availability: s.availability!,
     ...(template ? {} : { durationDays: s.durationDays }),
   };
+}
+
+export function buildGoalDraft(s: Slots): GoalDraft {
+  return {
+    categoryCode: s.categoryCode!,
+    ...(s.goalCode ? { goalCode: s.goalCode } : {}),
+    ...(s.targetQuantity !== undefined ? { targetQuantity: s.targetQuantity } : {}),
+    ...(s.description ? { description: s.description } : {}),
+  };
+}
+
+function summarizeGoal(s: Slots, ctx: EngineContext): SummaryRow[] {
+  const cat = ctx.catalog.categories.find((c) => c.code === s.categoryCode)!;
+  const goal = cat.goals.find((g) => g.code === s.goalCode);
+  const rows: SummaryRow[] = [{ label: 'Catégorie', value: cat.label }];
+  if (goal) rows.push({ label: 'Objectif', value: goal.quantityUnit && s.targetQuantity !== undefined ? `${goal.label} · ${s.targetQuantity} ${goal.quantityUnit}` : goal.label });
+  else rows.push({ label: 'Objectif', value: s.description ?? '' });
+  return rows;
 }
 
 function summarize(s: Slots, ctx: EngineContext): SummaryRow[] {

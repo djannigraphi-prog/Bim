@@ -80,7 +80,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/peni/new-project',
         builder: (_, s) {
           final extra = s.extra is Map<String, String?> ? s.extra! as Map<String, String?> : const <String, String?>{};
-          return PeniChatScreen(mode: extra['mode'], budget: extra['budget']);
+          return PeniChatScreen(mode: extra['mode'], budget: extra['budget'], purpose: extra['purpose'] ?? 'new_project', categoryCode: extra['categoryCode']);
         },
       ),
       GoRoute(path: '/projects/:id', builder: (_, s) => ProjectMapScreen(projectId: s.pathParameters['id']!)),
