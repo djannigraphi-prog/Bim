@@ -13,7 +13,9 @@ Usage : otp-relay.py <fichier-journal> <port> [dossier-captures]
   GET /notifications[?min=1][&max=…][&wait=0]  →  notifications de BIM affichées par Android (dumpsys) : titre, texte, actions.
   GET /reminders-service?on=1|0  →  base de test de la CI uniquement : ouvre (ou referme) le service des rappels et retire
       les heures calmes par défaut, puis attend la fin du cache de l'API (31 s).
-  GET /lockscreen?on=1|0  →  verrouille puis rallume l'écran (notifications sur l'écran verrouillé), ou le déverrouille.
+  GET /lockscreen-shot?name=<nom>  →  en une seule opération : active l'écran de verrouillage (glissement, sans code),
+      éteint puis rallume l'écran, capture les notifications sur l'écran verrouillé, puis déverrouille. L'app ne dessine
+      pas pendant ce temps : le test attend la réponse sans lui demander d'image.
   GET /resolve-reports  →  base de test de la CI uniquement : le « support » répond aux signalements ouverts.
   GET /reminder-soon?count=2&minutes=2  →  base de test de la CI uniquement : ajoute des tâches dans quelques minutes
       au dernier projet actif, pour recevoir un vrai rappel pendant le test.
@@ -171,21 +173,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
         time.sleep(31)  # cache des réglages de l'API : 30 s
         return self.reply(200, "ouvert" if on else "fermé")
 
-    def lockscreen(self, q):
-        if (q.get("on") or ["0"])[0] == "1":
-            # L'émulateur de la CI démarre sans écran de verrouillage : on active le simple glissement (sans code).
-            run_adb("shell", "locksettings", "set-disabled", "false")
-            run_adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
-            time.sleep(2)
-            run_adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
-            time.sleep(3)
-            state = run_adb("shell", "dumpsys", "window").stdout.decode(errors="replace")
-            locked = "mDreamingLockscreen=true" in state or "isKeyguardShowing=true" in state or "mShowingLockscreen=true" in state
-            return self.reply(200, "verrouillé" if locked else "non verrouillé")
+    def lockscreen_shot(self, q):
+        name = (q.get("name") or [""])[0]
+        if not SHOTS or not NAME.match(name):
+            return self.reply(400, "capture impossible")
+        # L'émulateur de la CI démarre sans écran de verrouillage : on active le simple glissement (sans code).
+        run_adb("shell", "locksettings", "set-disabled", "false")
+        run_adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
+        time.sleep(2)
+        run_adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+        time.sleep(3)
+        state = run_adb("shell", "dumpsys", "window").stdout.decode(errors="replace")
+        locked = any(k in state for k in ("isKeyguardShowing=true", "mShowingLockscreen=true", "mDreamingLockscreen=true", "KeyguardShowing=true"))
+        os.makedirs(SHOTS, exist_ok=True)
+        with open(os.path.join(SHOTS, name + ".png"), "wb") as out:
+            subprocess.run([adb(), "exec-out", "screencap", "-p"], stdout=out, stderr=subprocess.PIPE, timeout=30)
         run_adb("shell", "wm", "dismiss-keyguard")
         time.sleep(2)
         run_adb("shell", "locksettings", "set-disabled", "true")
-        return self.reply(200, "déverrouillé")
+        run_adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+        time.sleep(2)
+        return self.reply(200, "verrouillé" if locked else "non verrouillé")
 
     def resolve_reports(self, q):
         n = psql(
@@ -218,8 +226,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.notifications(q)
         if url.path == "/reminders-service":
             return self.reminders_service(q)
-        if url.path == "/lockscreen":
-            return self.lockscreen(q)
+        if url.path == "/lockscreen-shot":
+            return self.lockscreen_shot(q)
         if url.path == "/resolve-reports":
             return self.resolve_reports(q)
         if url.path == "/reminder-soon":

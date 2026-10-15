@@ -101,6 +101,19 @@ Future<void> _shot(WidgetTester tester, String name, {bool shade = false}) async
   }
 }
 
+/// Appel au relais sans faire dessiner l'app (écran éteint ou verrouillé pendant l'opération).
+Future<String> _relayWithoutFrames(String path) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  try {
+    final res = await (await client.getUrl(Uri.parse('$_codeRelay$path'))).close().timeout(const Duration(minutes: 2));
+    final body = await res.transform(utf8.decoder).join();
+    if (res.statusCode != 200) fail('Relais $path : ${res.statusCode} $body');
+    return body;
+  } finally {
+    client.close();
+  }
+}
+
 /// Remet la liste de l'écran affiché tout en haut, par positionnement direct (aucun glissement, aucun étirement).
 Future<void> _toTop(WidgetTester tester) async {
   tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);
@@ -346,10 +359,11 @@ void main() {
       expect(n['actions'], ['J’y vais !', 'Plus tard'], reason: jsonEncode(shown));
     }
     // Écran verrouillé (maquette 28) : notifications affichées par Android sur l'écran de verrouillage.
-    final lock = await _relay(tester, '/lockscreen?on=1');
-    await _shot(tester, 'a28_ecran_verrouille');
-    await _relay(tester, '/lockscreen?on=0');
+    // Pendant que l'écran est verrouillé, Android ne fait plus dessiner l'app : on attend la réponse du relais sans
+    // demander d'image (sinon le test attendrait indéfiniment).
+    final lock = await _relayWithoutFrames('/lockscreen-shot?name=a28_ecran_verrouille');
     debugPrint('Écran verrouillé pour la capture : $lock');
+    await tester.pump(const Duration(seconds: 1));
     await _shot(tester, 'a28_notifications', shade: true);
     // « Plus tard » : la notification se ferme, l'app ne change pas d'écran.
     await _relay(tester, '/ui-tap?text=Plus%20tard&shade=1');
