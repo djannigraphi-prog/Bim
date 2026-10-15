@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../../config/config';
+import { FcmPushSender, parseServiceAccount } from './fcm-push-sender';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { DisabledPushSender, PUSH_SENDER, PushSender, RecordingPushSender } from './push-sender';
@@ -12,8 +13,12 @@ function pushSenderFactory(cfg: AppConfig): PushSender {
     case 'test':
       return new RecordingPushSender();
     case 'fcm':
-      // Branché à l'étape suivante (projet Firebase à créer et à valider par le fondateur).
-      throw new Error('PUSH_PROVIDER=fcm : envoi Firebase pas encore configuré');
+      // Utilisable seulement avec un compte de service Firebase (projet à créer après accord du fondateur).
+      return new FcmPushSender({
+        account: parseServiceAccount(cfg.FCM_SERVICE_ACCOUNT_JSON),
+        apiBaseUrl: cfg.FCM_API_BASE_URL || undefined,
+        tokenUrl: cfg.FCM_TOKEN_URL || undefined,
+      });
     default:
       return new DisabledPushSender();
   }

@@ -32,4 +32,14 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...base, JWT_ACCESS_SECRET: 'court' })).toThrow(/JWT_ACCESS_SECRET/);
     expect(() => loadConfig({ ...base, OTP_SECRET: base.JWT_ACCESS_SECRET })).toThrow(/OTP_SECRET/);
   });
+
+  it('rappels : « test » interdit en production, worker sans fournisseur refusé, FCM exige un compte de service valide', () => {
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', PUSH_PROVIDER: 'test' })).toThrow(/PUSH_PROVIDER/);
+    expect(() => loadConfig({ ...base, WORKER_MODE: 'standalone' })).toThrow(/PUSH_PROVIDER/);
+    expect(() => loadConfig({ ...base, PUSH_PROVIDER: 'fcm' })).toThrow(/FCM_SERVICE_ACCOUNT_JSON/);
+    expect(() => loadConfig({ ...base, PUSH_PROVIDER: 'fcm', FCM_SERVICE_ACCOUNT_JSON: '{"project_id":"x"}' })).toThrow(/FCM_SERVICE_ACCOUNT_JSON/);
+    const account = JSON.stringify({ project_id: 'bim-test', client_email: 'x@bim-test.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' });
+    expect(loadConfig({ ...base, PUSH_PROVIDER: 'fcm', FCM_SERVICE_ACCOUNT_JSON: account }).PUSH_PROVIDER).toBe('fcm');
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', FCM_API_BASE_URL: 'http://127.0.0.1:9' })).toThrow(/FCM_API_BASE_URL/);
+  });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseServiceAccount } from '../modules/notifications/fcm-push-sender';
 
 /**
  * Configuration de l'API, lue une seule fois au démarrage depuis les variables d'environnement.
@@ -88,6 +89,14 @@ const schema = z
     WORKER_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(3100),
     /** Envoi des notifications : « none » (rien n'est envoyé), « fcm » (Firebase Cloud Messaging), « test » (enregistré en mémoire). */
     PUSH_PROVIDER: z.enum(['none', 'fcm', 'test']).default('none'),
+    /**
+     * Compte de service Firebase (JSON complet), obligatoire avec PUSH_PROVIDER=fcm. Secret : injecté depuis AWS
+     * (Parameter Store chiffré ou Secrets Manager), jamais écrit dans le dépôt ni dans les journaux.
+     */
+    FCM_SERVICE_ACCOUNT_JSON: z.string().default(''),
+    /** Adresses de remplacement pour tester l'envoi contre un faux serveur : développement uniquement. */
+    FCM_API_BASE_URL: z.string().default(''),
+    FCM_TOKEN_URL: z.string().default(''),
   })
   .superRefine((cfg, ctx) => {
     const devLike = cfg.NODE_ENV === 'development' || cfg.NODE_ENV === 'test';
@@ -116,6 +125,16 @@ const schema = z
     }
     if (!devLike && cfg.PUSH_PROVIDER === 'test') {
       ctx.addIssue({ code: 'custom', path: ['PUSH_PROVIDER'], message: 'Le fournisseur de notifications « test » est interdit hors développement' });
+    }
+    if (cfg.PUSH_PROVIDER === 'fcm') {
+      try {
+        parseServiceAccount(cfg.FCM_SERVICE_ACCOUNT_JSON);
+      } catch (e) {
+        ctx.addIssue({ code: 'custom', path: ['FCM_SERVICE_ACCOUNT_JSON'], message: (e as Error).message });
+      }
+    }
+    if (!devLike && (cfg.FCM_API_BASE_URL || cfg.FCM_TOKEN_URL)) {
+      ctx.addIssue({ code: 'custom', path: ['FCM_API_BASE_URL'], message: 'Les adresses FCM de remplacement sont interdites hors développement' });
     }
     if (cfg.WORKER_MODE !== 'off' && cfg.PUSH_PROVIDER === 'none') {
       ctx.addIssue({ code: 'custom', path: ['PUSH_PROVIDER'], message: 'Un worker de rappels sans fournisseur de notifications ne servirait à rien (PUSH_PROVIDER)' });

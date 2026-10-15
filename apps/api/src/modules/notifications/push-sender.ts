@@ -19,6 +19,8 @@ export interface PushMessage {
    */
   collapseKey: string;
   data: Record<string, string>;
+  /** Au-delà, le service d'envoi abandonne le message (téléphone éteint) : jamais de rappel périmé reçu des heures après. */
+  ttlSeconds: number;
 }
 
 /** permanent = le jeton n'est plus valable (app désinstallée…) : l'appareil est retiré. */
