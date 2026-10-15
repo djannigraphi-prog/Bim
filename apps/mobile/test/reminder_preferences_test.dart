@@ -79,7 +79,11 @@ class _Picker {
   }
 }
 
-Future<void> _open(WidgetTester tester, _FakeServer server, {_Picker? picker}) async {
+/// Écran de téléphone courant (390 × 844) par défaut ; [physical] pour un petit téléphone.
+Future<void> _open(WidgetTester tester, _FakeServer server, {_Picker? picker, Size physical = const Size(1170, 2532)}) async {
+  tester.view.physicalSize = physical;
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [notificationPreferencesApiProvider.overrideWithValue(NotificationPreferencesApi(server))],
@@ -250,11 +254,11 @@ void main() {
     });
 
     testWidgets('petit téléphone (320 dp) : aucun débordement', (tester) async {
-      tester.view.physicalSize = const Size(960, 1704);
-      tester.view.devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
       final server = _FakeServer()..personal = {'start': '21:30', 'end': '07:00'};
-      await _open(tester, server);
+      await _open(tester, server, physical: const Size(960, 1704));
+      expect(tester.takeException(), isNull);
+      // Le bas de l'écran est atteint en faisant défiler, sans débordement.
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('quiet-hours-reset')), 100);
       expect(find.byKey(const ValueKey('quiet-hours-reset')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
