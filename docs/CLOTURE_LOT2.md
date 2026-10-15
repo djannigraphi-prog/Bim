@@ -6,12 +6,12 @@
 
 | Preuve | Où la voir |
 | --- | --- |
-| CI complète verte (API, admin, mobile, Android de bout en bout sur émulateur) | GitHub Actions, run RUN_CI (commit COMMIT_CI) ; également run 38754528932 |
+| CI complète verte (API, admin, mobile, Android de bout en bout sur émulateur) | GitHub Actions, run 38759310442 (commit e522f64, après le retrait du fichier compilé) ; également run 38754528932 |
 | Suite API : 184 tests réussis (1 ignoré : S3, exécuté en CI ; 1 à écrire : lot 8, sans rapport) | `cd apps/api && npm test`, relancé le 15/10 à 15 h 20 |
 | Tests Flutter : 39 réussis ; analyse sans remarque | Job « mobile » de la CI |
 | Captures réelles de l'émulateur Android 14 | Branche `ci-captures-android` : `a28_rappels`, `a28_ecran_verrouille`, `a28_notifications`, `a28_notification_seule`, `a28_jy_vais`, `a17_notifications` |
 | Rendus des écrans (tests) | Branche `ci-captures` : `x15_rappels` (normal, petit, sombre), `17_notifications`, `62_parametres` |
-| APK de test pour téléphones (workflow manuel) | Run RUN_APK : APK_RESULT |
+| APK de test pour téléphones (workflow manuel) | Run 38759453834 : réussi, APK arm64 de 57 Mo (adresse d’exemple), conservé jusqu’au 18/10 |
 | Comportement du rythme et des heures calmes | Calcul exécuté sur le code actuel : `docs/RYTHME_ET_TEXTES_RAPPELS.md`, section 2 |
 | Enquête sur la perte de l'émulateur | `docs/TESTING.md`, « Perte de l'émulateur » (3 séries, 12 situations, Android 13 à 15) |
 
@@ -29,7 +29,7 @@
 | Envoi Firebase (FCM HTTP v1) — **inactif** | `fcm-push-sender.spec.ts` (5) contre un faux serveur ; `config.spec.ts` |
 | Rappel d'essai pour les tests sur téléphones (versions de test seulement) | Flutter (autorisation, programmation, service inchangé) |
 | Documentation cohérente avec le code | `PROJECT_STATUS.md` (modules corrigés), `DECISIONS.md` T-025 à T-029, études et protocoles listés ci-dessous |
-| Fichier compilé Python retiré du dépôt ; `.gitignore` complété (`__pycache__/`, `*.py[cod]`) | Commit e522f64 ; CI relancée (run RUN_CI) |
+| Fichier compilé Python retiré du dépôt ; `.gitignore` complété (`__pycache__/`, `*.py[cod]`) | Commit e522f64 ; CI relancée (run 38759310442, verte) |
 
 ## 2. Corrections encore nécessaires (après tes décisions)
 
