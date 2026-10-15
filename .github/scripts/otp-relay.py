@@ -142,6 +142,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             for label, x, y in (exact or partial)[:1]:
                 run_adb("shell", "input", "tap", str(x), str(y))
                 return self.reply(200, label)
+            # Notifications regroupées par Android (« BIM · 2 ») : on déplie le groupe pour voir les boutons.
+            expand = [n for n in nodes if norm(n[0]) == "expand"]
+            if expand:
+                run_adb("shell", "input", "tap", str(expand[0][1]), str(expand[0][2]))
+                time.sleep(1)
             time.sleep(1)
         return self.reply(404, "introuvable ; textes visibles : " + " | ".join(seen[:60]))
 
@@ -168,6 +173,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def lockscreen(self, q):
         if (q.get("on") or ["0"])[0] == "1":
+            # L'émulateur de la CI démarre sans écran de verrouillage : on active le simple glissement (sans code).
+            run_adb("shell", "locksettings", "set-disabled", "false")
             run_adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
             time.sleep(2)
             run_adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
@@ -177,6 +184,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.reply(200, "verrouillé" if locked else "non verrouillé")
         run_adb("shell", "wm", "dismiss-keyguard")
         time.sleep(2)
+        run_adb("shell", "locksettings", "set-disabled", "true")
         return self.reply(200, "déverrouillé")
 
     def resolve_reports(self, q):

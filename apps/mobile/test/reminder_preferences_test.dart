@@ -119,9 +119,11 @@ Future<void> _finish(WidgetTester tester) async {
 /// Fait défiler jusqu'à l'élément puis le touche (en test, les textes prennent plus de place : le bas peut être caché).
 Future<void> _tapKey(WidgetTester tester, String key) async {
   final finder = find.byKey(ValueKey(key));
-  // Élément pas encore construit (bas d'une longue liste) : on fait défiler jusqu'à lui.
-  if (find.byKey(ValueKey(key), skipOffstage: false).evaluate().isEmpty) await tester.scrollUntilVisible(finder, 200);
-  await tester.ensureVisible(finder);
+  final built = find.byKey(ValueKey(key), skipOffstage: false);
+  // Élément pas encore construit (bas d'une longue liste) : on fait défiler jusqu'à lui ; construit mais hors de
+  // l'écran : on l'amène à l'écran.
+  if (built.evaluate().isEmpty) await tester.scrollUntilVisible(finder, 200);
+  await tester.ensureVisible(built);
   await tester.pump();
   await tester.tap(finder);
   await tester.pump();
