@@ -16,8 +16,8 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | --- | --- | --- | --- | --- | --- | --- |
 | Socle API (config, journaux, santé, erreurs, OpenAPI, limitation) | Terminée | Fait | — | Image Docker de production démarrée en CI | Exécutés, réussis | — |
 | Environnements staging et production (AWS) | Plan écrit (`docs/DEPLOYMENT.md`) | — | — | **Non déployés** | Image testée en CI | Validation des dépenses AWS, autorisation ARTCI, nom de domaine |
-| Base + migrations (11 migrations, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
-| Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel (lot 2) |
+| Base + migrations (16 migrations, 0000 à 0015, garde-fous dont F16 garanti par la base) | Terminée | Fait | — | — | Exécutés (e2e sur base vierge) | — |
+| Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel (dépense à autoriser ; rattachement au lot 2 ou au lancement à décider, `docs/CLOTURE_LOT2.md`) |
 | F15 — âges par capacité | Terminée | Fait (réglages `age.*`) | — | — | Exécutés, réussis | Vérifications légales (DECISIONS.md) |
 | F16 — récupération vérifiée, step-up | Terminée | Fait | Coordonnées, mot de passe, appareils | **Testée sur Android** (ajout d'un e-mail vérifié, nouveau mot de passe) | API + Android : réussis | — |
 | Espaces (utilisateur / boutique / livreur) | Terminée | Contrôle d'accès et bascule faits ; création de boutique et de compte livreur : lots 5 et 7 | Écran 53 fait | Bascule vers l'espace utilisateur seulement (aucune boutique ni compte livreur avant les lots 5 et 7) | API : réussis ; capture | KYC (lot 5), `age.min_merchant` / `age.min_courier` |
@@ -25,7 +25,8 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Thème clair / sombre | Terminée | Préférence enregistrée | Compilé, capture sombre vérifiée | Écrit | — | — |
 | Administration (API `/admin/v1` + application web React) | Terminée | Fait : connexion + TOTP, rôles, réglages, audit, utilisateurs, programmes types, comptes admin | Web : fait | **Testée dans Chromium contre l'API** | API : 8 unitaires + 13 e2e ; web : unitaires + 5 scénarios navigateur | Rôles à valider (T-019) ; hébergement AWS |
 | Lot 1 — Projets BIM (écrans 18-24, 26, 27, 29-31) | Terminée | Fait : référentiels et catégories administrables, création en 5 étapes, mode Éco / Premium gratuit (C6), programmes types validés (mode, conseils), carte et journée, tâche suivante, tâches ajoutées / retirées, pause, signalement de projet ou général avec image jointe (+ traitement admin), avertissement de pause, coffres symboliques (70 %), mesures chiffrées, photos avant / après privées (S3), fin, suppression | Fait | **Testé sur émulateur Android contre l'API** (création, séance, photos, signalements avec image, captures réelles de l'écran) ; **admin testée dans Chromium** (image jointe chargée) ; **photos testées sur un vrai serveur S3** en CI | API, admin, Android : réussis (voir bilan du lot 1) | Contenu des programmes types (C7) ; Peni (lot 3) ; rappels (lot 2) ; profil public (lot 4) ; recommandations marchands (lot 5) ; stockage S3 de production (dépenses AWS, ARTCI) |
-| Lots 2 à 12 (rappels, Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
+| Lot 2 — Rappels et notifications (écrans 17, 28 ; préférences) | Terminée | Fait : préférences, rappels désactivés par défaut, calcul des rappels, worker (inactif), envoi FCM prêt (inactif), rappels à venir, centre de notifications | Fait : écran Rappels, notifications programmées et actions, écran Notifications, pastille | **Testé sur émulateur Android contre l'API** (vraies notifications, écran verrouillé, actions) | API, Flutter, Android : réussis | **Pas encore clôturé** : tests sur téléphones physiques, décisions et autorisations listées dans `docs/CLOTURE_LOT2.md` |
+| Lots 3 à 12 (Peni, social, boutique, commandes, paiements, pièces, Lives…) | Analyse faite | Non commencés | Non commencés | — | — | Voir `DECISIONS.md` |
 
 ## Bilan du lot 1 — Projets BIM (15/10/2026)
 
@@ -196,5 +197,5 @@ cd ../mobile && flutter pub get && flutter run --dart-define=BIM_API_URL=http://
 1. Lot 1 (contenus) : programmes types (C7) ; validation juridique de la conservation des images jointes (T-022). Profil public (écran 52) → lot 4 ; écran 25 (Peni) → lot 3 ; écran 28 : notifications programmées faites ; envoi par le serveur après Firebase.
 2. **Nécessitent les programmes types validés (C7)** : contenu des tâches par catégorie, « habitude du jour » de l'écran 27, durées propres à chaque programme. La saisie se fait dans l'administration (Programmes types).
 3. Compilation iOS : pas lancée (décision du fondateur du 14/10).
-4. Choisir et brancher le fournisseur SMS et Amazon SES (lot 2), Firebase pour les notifications.
+4. Fournisseur SMS et Amazon SES (dépense à autoriser ; lot 2 ou prérequis du lancement, à décider), Firebase pour les notifications : voir `docs/CLOTURE_LOT2.md`.
 5. Avant les lots 7 à 9 : réponses C1 à C5, vérifications juridiques (F3, F7, F8, F10, F11, F14, F15, ARTCI, BCEAO) et validation de la simulation F13. Écrans 24 et 38 à redessiner selon F4 (lot 1 / lot 7).

@@ -21,8 +21,11 @@ flutter analyze && flutter test
 
 Aucun secret dans l'app : seule l'adresse de l'API est injectée à la compilation.
 
-## État (lot 0)
+## État (15/10/2026)
 
-Écrans 01 à 06 + code de vérification + mot de passe oublié + paramètres minimaux, reliés à l'API.
-Les onglets Accueil, Messages, Live, BimShop et le bouton « + » affichent « Bientôt disponible ».
-Voir `PROJECT_STATUS.md` à la racine : le code n'a pas encore été compilé (SDK Flutter indisponible dans l'environnement de la session 1).
+Lots 0 et 1 (comptes, projets) et lot 2 (rappels et notifications : écran Rappels, notifications programmées sur le
+téléphone avec « J'y vais ! / Plus tard », centre de notifications) reliés à l'API. Analyse, tests, captures et
+compilation Android exécutés en CI ; parcours de bout en bout sur émulateur Android contre l'API réelle. iOS non compilé.
+État détaillé et vérifié : `PROJECT_STATUS.md` à la racine ; clôture du lot 2 : `docs/CLOTURE_LOT2.md`.
+
+Tests sur téléphones physiques : `docs/TESTS_TELEPHONES.md` (APK de test, rappel d'essai, grille T1 à T15).
