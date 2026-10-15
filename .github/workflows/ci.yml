@@ -91,9 +91,14 @@ jobs:
       - run: flutter analyze
       - name: Tests (exécutés même si l'analyse échoue, pour connaître leur état réel)
         if: ${{ !cancelled() }}
-        # En cas d'échec, relance avec le rapport « github » : chaque test échoué devient une annotation lisible
-        # (les journaux bruts ne sont pas toujours accessibles). Le résultat reste un échec.
-        run: flutter test || { flutter test --reporter github; exit 1; }
+        # En cas d'échec, relance avec le rapport JSON : chaque test échoué devient une annotation lisible
+        # (nom, erreur, ligne ; les journaux bruts ne sont pas toujours accessibles). Le résultat reste un échec.
+        run: |
+          flutter test || {
+            flutter test --reporter json > "$RUNNER_TEMP/flutter-tests.jsonl" || true
+            python3 ../../.github/scripts/flutter-test-annotate.py "$RUNNER_TEMP/flutter-tests.jsonl"
+            exit 1
+          }
       - name: Captures des écrans (comparaison avec les maquettes)
         if: ${{ !cancelled() }}
         run: |
