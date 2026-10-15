@@ -20,13 +20,16 @@ try() { # nom, url de santé, endpoint, clé, secret, commande docker…
   return 1
 }
 ok=1
-try "MinIO (Docker Hub)" http://localhost:9000/minio/health/live http://localhost:9000 bimtest bimtest-secret-123 \
+# Région eu-west-3 (Paris) : la même que celle signée par l'API et le test ; Versity attend us-east-1 par défaut.
+try "Versity S3 Gateway" http://localhost:7070/ http://localhost:7070 bimtest bimtest-secret-123 \
+  -p 7070:7070 -e ROOT_ACCESS_KEY=bimtest -e ROOT_SECRET_KEY=bimtest-secret-123 \
+  versity/versitygw:latest --port :7070 --region eu-west-3 posix /tmp && ok=0
+[ $ok = 1 ] && try "Zenko CloudServer" http://localhost:8000/ http://localhost:8000 accessKey1 verySecretKey1 \
+  -p 8000:8000 -e REMOTE_MANAGEMENT_DISABLE=1 zenko/cloudserver:latest && ok=0
+# MinIO en dernier : ses images publiques ne sont plus téléchargeables (Docker Hub « repository does not exist », quay « unauthorized »).
+[ $ok = 1 ] && try "MinIO (Docker Hub)" http://localhost:9000/minio/health/live http://localhost:9000 bimtest bimtest-secret-123 \
   -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 minio/minio:latest server /data && ok=0
 [ $ok = 1 ] && try "MinIO (quay.io)" http://localhost:9000/minio/health/live http://localhost:9000 bimtest bimtest-secret-123 \
   -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 quay.io/minio/minio:latest server /data && ok=0
-[ $ok = 1 ] && try "Versity S3 Gateway" http://localhost:7070/ http://localhost:7070 bimtest bimtest-secret-123 \
-  -p 7070:7070 -e ROOT_ACCESS_KEY=bimtest -e ROOT_SECRET_KEY=bimtest-secret-123 versity/versitygw:latest --port :7070 posix /tmp && ok=0
-[ $ok = 1 ] && try "Zenko CloudServer" http://localhost:8000/ http://localhost:8000 accessKey1 verySecretKey1 \
-  -p 8000:8000 -e REMOTE_MANAGEMENT_DISABLE=1 zenko/cloudserver:latest && ok=0
 python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "stockage S3 de test" "$LOG" 2
 exit $ok

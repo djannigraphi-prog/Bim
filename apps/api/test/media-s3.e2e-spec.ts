@@ -3,11 +3,11 @@ import sharp from 'sharp';
 import { bearer, Harness, registerAndActivate, startHarness } from './harness';
 
 /**
- * Stockage S3 réel (MinIO, compatible S3) : lancé par la CI quand S3_TEST_ENDPOINT est défini.
+ * Stockage S3 réel (serveur compatible S3 qui applique les signatures) : lancé par la CI quand S3_TEST_ENDPOINT est défini.
  * Vérifie l'envoi, le lien présigné temporaire et l'effacement, avec le même code qu'en production sur AWS.
  */
 const endpoint = process.env.S3_TEST_ENDPOINT;
-(endpoint ? describe : describe.skip)('Photos sur stockage S3 (MinIO)', () => {
+(endpoint ? describe : describe.skip)('Photos sur stockage S3', () => {
   let h: Harness;
   const bucket = `bim-test-${Date.now()}`;
   const s3 = new S3Client({ region: 'eu-west-3', endpoint, forcePathStyle: true });
