@@ -10,10 +10,14 @@ flutter test integration_test/auth_flow_test.dart -d emulator-5554 \
 status=$?
 if [ "$status" -ne 0 ]; then
   {
+    # Délais maximum : si l'émulateur ne répond plus, adb attendrait indéfiniment.
+    echo "== état de l'émulateur"
+    timeout 20 adb devices -l 2>&1 || echo "adb devices : pas de réponse en 20 s (émulateur bloqué ?)"
+    timeout 20 adb shell cat /proc/meminfo 2>&1 | head -n 4 || true
     echo "== tampon des plantages"
-    adb logcat -d -b crash 2>&1 | tail -n 60
+    timeout 30 adb logcat -d -b crash 2>&1 | tail -n 60
     echo "== processus et mémoire"
-    adb logcat -d 2>&1 | grep -E "AndroidRuntime|FATAL|lowmemorykiller|lmkd|Process com\.|has died|Killing|ANR in|OutOfMemory|flutter.*(Error|Exception)|signal [0-9]+|Abort message|VM service" | tail -n 80
+    timeout 60 adb logcat -d 2>&1 | grep -E "AndroidRuntime|FATAL|lowmemorykiller|lmkd|Process com\.|has died|Killing|ANR in|OutOfMemory|flutter.*(Error|Exception)|signal [0-9]+|Abort message|VM service" | tail -n 80
   } > "$RUNNER_TEMP/logcat.short" || true
 fi
 exit "$status"
