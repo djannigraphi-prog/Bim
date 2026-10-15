@@ -118,3 +118,27 @@ export const adminUserRoles = pgTable(
   },
   (t) => [primaryKey({ columns: [t.adminId, t.roleCode] })],
 );
+
+/**
+ * Passages des tâches de maintenance (lot 2 : purge des comptes jamais vérifiés). Une ligne par passage, simulation
+ * comprise : nombre de comptes concernés et supprimés, jamais de nom, de téléphone ni d'e-mail.
+ */
+export const maintenanceRuns = pgTable(
+  'maintenance_runs',
+  {
+    id: uuid('id').primaryKey(),
+    job: varchar('job', { length: 40 }).notNull(),
+    /** simulation (rien n'est supprimé) ou real. */
+    mode: varchar('mode', { length: 12 }).notNull(),
+    /** ok, aborted (plafond dépassé : rien n'est supprimé), error. */
+    status: varchar('status', { length: 12 }).notNull(),
+    /** schedule (passage quotidien) ou admin (simulation demandée depuis l'administration). */
+    trigger: varchar('trigger', { length: 12 }).notNull(),
+    candidates: integer('candidates').notNull(),
+    deleted: integer('deleted').notNull(),
+    details: jsonb('details').notNull().default({}),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('maintenance_runs_job_idx').on(t.job, t.startedAt)],
+);

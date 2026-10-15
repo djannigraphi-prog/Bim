@@ -193,3 +193,17 @@ test('administrateurs : création d’un compte support, double authentification
   await page.getByRole('button', { name: 'Se déconnecter' }).click();
   await expect(page.getByRole('button', { name: 'Continuer' })).toBeVisible();
 });
+
+test('maintenance : purge des comptes jamais vérifiés désactivée, en simulation ; simulation à la demande sans suppression', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Maintenance' }).click();
+  await expect(page.getByText('Purge quotidienne : désactivée')).toBeVisible();
+  await expect(page.getByText('simulation (rien n’est supprimé)')).toBeVisible();
+  await expect(page.getByText(/plus de 30 jours/)).toBeVisible();
+  await page.getByRole('button', { name: 'Lancer une simulation' }).click();
+  const row = page.getByRole('row', { name: /Administration/ }).first();
+  await expect(row).toContainText('Simulation');
+  await expect(row).toContainText('Terminé');
+  await expect(row.getByRole('cell').last()).toHaveText('0');
+  await page.screenshot({ path: 'test-results/captures/maintenance.png' });
+});

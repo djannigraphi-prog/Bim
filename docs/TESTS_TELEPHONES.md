@@ -50,13 +50,18 @@ Noter pour chaque ligne : ✅ conforme, ❌ non conforme (avec une capture d'éc
 | T14 | Centre de notifications | Cloche de l'accueil | Écran « Notifications » ; vide ou avec les éléments réels (coffres, réponses du support) |
 | T15 | Réglages propres à la marque | Noter les réglages qui ont changé quelque chose : démarrage automatique (Tecno, Infinix, Xiaomi), « optimisation de la batterie » pour BIM, gestion des applications en arrière-plan | Liste à joindre aux résultats, pour préparer l'aide de Peni aux personnes concernées |
 | T16 | « J'y vais ! » app entièrement fermée | « Dans 1 minute », fermer l'app (retirer des récentes), toucher « J'y vais ! » quand la notification arrive | L'app démarre normalement (rappel d'essai sans projet : écran d'accueil) |
+| T17 | Textes et poses de Peni (v3, provisoires) | « Les 3 textes de Peni », verrouiller ; regarder les 3 notifications repliées puis dépliées, et sur l'écran verrouillé | Le nom de la tâche (« Séance d'essai ») est visible en notification repliée ; avatars : joyeux, pensif, joyeux ; aucun texte coupé de façon gênante ; capture de chacune |
 
 Les rappels réels (calculés par l'API à partir des tâches) ne se testent qu'avec le service des rappels ouvert. Le service reste fermé par décision du fondateur ; l'ouvrir, même dans la base de test locale, se fera seulement avec son accord.
+
+## Qui réalise ces tests
+
+Ces tests demandent de vrais téléphones dans les mains : ils ne peuvent pas être faits par Claude, qui n'a accès qu'à l'émulateur de la CI. Ils sont réalisés par le fondateur ou un testeur ; Claude reporte ici **uniquement** les résultats transmis (avec les captures), puis corrige les anomalies, avec une CI verte. Points prioritaires demandés par le fondateur : T16 (« J'y vais ! » app fermée), T12 et T13 (plantage avec Peni), T17 (textes et poses), et le retard réel en veille (T6, T7), qui décide de l'option P1 des heures calmes (`docs/RYTHME_ET_TEXTES_RAPPELS.md`).
 
 ## Résultats
 
 À reporter dans le tableau ci-dessous, puis dans `PROJECT_STATUS.md`.
 
-| Téléphone | Android | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14 | T15 | T16 | Remarques |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | | | | | | | | | | | | |
+| Téléphone | Android | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14 | T15 | T16 | T17 | Remarques |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | | | | | | | | | | | | |

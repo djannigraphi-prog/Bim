@@ -280,7 +280,15 @@ Développé et testé, **inactif** : fuseau horaire par personne (`profiles.time
 5. **Émulateur** : problème documenté et origine recherchée (voir `docs/TESTING.md`, « Perte de l'émulateur ») ; aucun test supprimé.
 6. Finalisation du lot 2 sans dépense ; bilan présenté avant de considérer le lot comme terminé.
 
-### T-029 — Textes des rappels v2 et pose de Peni · Technique · proposition à valider
+### T-030 — Décisions du fondateur du 15/10/2026 (15 h 44) · Produit · décidé
+1. **Rythme** conservé : rappel à l'heure, puis +1 h et +2 h seulement si la tâche n'est pas cochée.
+2. **Heures calmes 22 h – 6 h, option B** : le rappel initial part à l'heure choisie, même pendant les heures calmes ; les relances +1 h et +2 h n'y sont jamais envoyées (supprimées, jamais reportées). Appliqué (`reminders.ts`, revérification avant l'envoi dans le worker) et testé (report, doublons, envois hors période). Reste ouvert : le retard possible des notifications non exactes du téléphone (options P1 à P3 dans `docs/RYTHME_ET_TEXTES_RAPPELS.md`), à trancher par le fondateur.
+3. **Textes de Peni** : principe des trois textes validé, pose triste remplacée par une pose encourageante, tâche au début du texte. Appliqué en v3 (deux textes réordonnés pour placer la tâche en tête). **Provisoires** jusqu'à la vérification sur vrais téléphones (T17).
+4. **Purge des comptes jamais vérifiés : 30 jours**, préparée et testée dans le lot 2, **désactivée par défaut et en simulation**. Suppression réelle seulement après validation explicite du fondateur (réglages marqués « decided »). Protections : aucun code récent (24 h), audit sans donnée personnelle, plafond de 500, exécution unique, tests garantissant que les comptes actifs ne sont jamais touchés (`docs/PURGE_COMPTES_NON_VERIFIES.md`). La conservation des tentatives de connexion et des codes n'est pas décidée et n'est pas développée.
+5. **Fournisseur SMS** : prérequis du lancement public, pas du lot 2. Aucun service externe activé, aucune dépense.
+6. Tests T1 à T16 sur au moins trois téléphones avant la clôture ; le lot 2 n'est pas déclaré terminé avant les tests réels, les corrections et les preuves.
+
+### T-029 — Textes des rappels v2 et pose de Peni · Technique · remplacée par T-030 (textes v3)
 Textes rapprochés de la maquette 28 (v2, `reminders.ts`) : « C'est l'heure ! {tâche} 💪 Tu vas tout déchirer. » (Peni joyeuse), « Vas-y, ça ne prend qu'une minute… {tâche} t'attend 🥺 » (Peni pensive), dernier rappel « {tâche} n'est pas encore cochée. Il est encore temps, je crois en toi ! » (Peni triste). Le texte de la maquette « Je t'en supplie 😭 ta séance n'est toujours pas cochée… Il ne reste plus que 2 h ! » n'est pas repris : il accompagne l'« ALARME » (non retenue en version 1) et peut culpabiliser (C8). **À confirmer par le fondateur.** La pose de Peni fait partie de la notification (R1) : l'API la fournit avec le texte ; le téléphone affiche l'image correspondante (copies en PNG produites par `scripts/generate-notification-icons.py`, dessin de Peni inchangé).
 
 ### T-028 — Centre de notifications (écran 17) lu dans les sources · Technique · décidé

@@ -1672,6 +1672,46 @@
         ]
       }
     },
+    "/admin/v1/maintenance/account-purge": {
+      "get": {
+        "operationId": "MaintenanceAdminController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Purge des comptes jamais vérifiés : réglages effectifs et derniers passages",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/maintenance/account-purge/simulate": {
+      "post": {
+        "operationId": "MaintenanceAdminController_simulate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Simulation de la purge : compte les comptes concernés, ne supprime rien",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",

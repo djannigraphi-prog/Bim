@@ -13,6 +13,7 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
 import { InterestsModule } from './modules/interests/interests.module';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -60,6 +61,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     MediaModule,
     ProjectsModule,
     NotificationsModule,
+    MaintenanceModule,
     AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -9,6 +9,7 @@ import { Audit } from './pages/Audit';
 import { Admins } from './pages/Admins';
 import { Catalog } from './pages/Catalog';
 import { Reports } from './pages/Reports';
+import { Maintenance } from './pages/Maintenance';
 
 const NAV: Array<{ to: string; label: string; perm: Permission }> = [
   { to: '/reglages', label: 'Réglages', perm: 'settings.read' },
@@ -18,6 +19,7 @@ const NAV: Array<{ to: string; label: string; perm: Permission }> = [
   { to: '/utilisateurs', label: 'Utilisateurs', perm: 'users.read' },
   { to: '/audit', label: "Journal d'audit", perm: 'audit.read' },
   { to: '/administrateurs', label: 'Administrateurs', perm: 'admins.manage' },
+  { to: '/maintenance', label: 'Maintenance', perm: 'system.health' },
 ];
 
 export function App() {
@@ -78,6 +80,7 @@ export function App() {
           {can('users.read') && <Route path="/utilisateurs" element={<Users canSuspend={can('users.suspend')} />} />}
           {can('audit.read') && <Route path="/audit" element={<Audit />} />}
           {can('admins.manage') && <Route path="/administrateurs" element={<Admins me={me} />} />}
+          {can('system.health') && <Route path="/maintenance" element={<Maintenance />} />}
           <Route path="*" element={<Navigate to={first} replace />} />
         </Routes>
       </main>
