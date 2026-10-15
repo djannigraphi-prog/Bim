@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Relance manuelle sur un commit existant (vérification répétée du parcours Android, diagnostic).
+  workflow_dispatch:
 
 jobs:
   api:
@@ -186,6 +188,9 @@ jobs:
           disable-animations: true
           working-directory: apps/mobile
           script: bash ../../.github/scripts/run-android-e2e.sh
+      - name: Diagnostic de l'émulateur (en cas d'échec seulement)
+        if: ${{ failure() }}
+        run: bash .github/scripts/android-diagnostic.sh
       - name: Publier les captures réelles de l'émulateur (branche ci-captures-android)
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
         env:
