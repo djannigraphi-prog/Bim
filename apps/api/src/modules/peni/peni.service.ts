@@ -13,10 +13,13 @@ import { inQuietHours, QuietWindow } from '../notifications/reminders';
 import { EncouragementQueryDto, PeniMessageDto, StartPeniConversationDto } from './dto';
 import { encouragement } from './encouragements';
 import { explainTask } from './task-explanations';
-import { EngineContext, handleInput, InvalidChoiceError, PENI_ENGINE_VERSION, PeniReply, PeniState, QuickReply, startConversation } from './engine';
+import { EngineContext, EngineInput, EngineResult, handleInput, InvalidChoiceError, PENI_ENGINE_VERSION, PeniReply, PeniState, QuickReply, startConversation } from './engine';
 import { LLM_PROVIDER, LlmProvider } from './llm-provider';
 
 type Clock = { now(): Date };
+
+/** Essais sans verrou avant le dernier essai entièrement sous verrou (voir `PeniService.send`). */
+export const PENI_OPTIMISTIC_ATTEMPTS = 3;
 type MessageRow = typeof peniMessages.$inferSelect;
 
 /**
@@ -112,45 +115,95 @@ export class PeniService {
     await this.checkDailyLimit(userId);
     const ctx = await this.context(userId);
     const maxInConversation = await this.limit('peni.conversation_max_messages', 60);
-    const created = await this.db.transaction(async (tx) => {
-      // Un message à la fois par discussion (deux envois simultanés ne se mélangent pas).
-      const locked = await tx.execute<{ id: string }>(sql`SELECT id FROM peni_conversations WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`);
+    const input: EngineInput = dto.choice ? { choice: dto.choice } : { text: text! };
+
+    // Traitement en deux temps (étape 1 de l'intégration de Peni IA) :
+    //  1. lecture de la discussion puis calcul de la réponse, SANS transaction ni verrou : une réponse lente (un futur
+    //     fournisseur d'IA) ne bloque ni la discussion ni les connexions de la base partagées par toute l'API ;
+    //  2. écriture courte sous verrou, seulement si la discussion n'a pas bougé entre-temps (même dernier numéro
+    //     d'ordre). Sinon la réponse est recalculée sur l'état à jour : jamais de doublon, de trou ni de mélange.
+    // Si la discussion bouge encore (envois simultanés répétés), le dernier essai se fait entièrement sous verrou,
+    // comme avant : le moteur guidé est local et instantané, et tous les messages sont traités l'un après l'autre.
+    for (let attempt = 1; ; attempt++) {
+      const underLock = attempt > PENI_OPTIMISTIC_ATTEMPTS;
+      const created = await (underLock
+        ? this.db.transaction(async (tx) => {
+            const snap = await this.snapshot(tx, userId, id, true);
+            const result = await this.respondChecked(snap, input, ctx, maxInConversation);
+            return this.persist(tx, userId, id, snap.last, dto, result);
+          })
+        : this.snapshot(this.db, userId, id, false).then(async (snap) => {
+            const result = await this.respondChecked(snap, input, ctx, maxInConversation);
+            return this.db.transaction(async (tx) => {
+              const now = await this.snapshot(tx, userId, id, true);
+              if (now.last !== snap.last) return null; // un autre message est passé entre-temps : on recommence
+              return this.persist(tx, userId, id, snap.last, dto, result);
+            });
+          }));
+      if (!created) continue;
+      if (created.result.replies.some((r) => r.safety === 'urgent')) this.logger.warn({ msg: 'peni.safety.urgent', conversationId: id });
+      return {
+        messages: created.rows.map((m) => this.view(m as MessageRow)),
+        status: created.result.draft ? 'completed' : 'open',
+        draft: created.result.draft,
+      };
+    }
+  }
+
+  /**
+   * Calcule la réponse de Peni pour un message. Aujourd'hui le moteur guidé (local, sans IA). Appelé hors de toute
+   * transaction, sauf au dernier essai d'un envoi très disputé (voir `send`). Point d'extension prévu pour l'étape 2.
+   */
+  protected async respond(state: PeniState, input: EngineInput, ctx: EngineContext): Promise<EngineResult> {
+    return handleInput(state, input, ctx);
+  }
+
+  /**
+   * État de la discussion et dernier numéro d'ordre, lus en une seule requête (instantané cohérent : l'état et les
+   * messages sont écrits dans la même transaction). `lock` : verrouille la discussion jusqu'à la fin de la transaction.
+   * Le verrou est pris par une requête à part, AVANT la lecture : une requête qui attend un verrou garde l'instantané
+   * pris à son début pour ses sous-requêtes, et lirait un dernier numéro d'ordre périmé (détecté par le test e2e des
+   * envois simultanés).
+   */
+  private async snapshot(db: Pick<Database, 'execute'>, userId: string, id: string, lock: boolean) {
+    if (lock) {
+      const locked = await db.execute(sql`SELECT id FROM peni_conversations WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`);
       if (!locked.rows.length) throw Errors.notFound('Discussion');
-      const [c] = await tx.select().from(peniConversations).where(eq(peniConversations.id, id));
-      const [{ n, last }] = await tx
-        .select({ n: sql<number>`count(*) FILTER (WHERE ${peniMessages.role} = 'user')`.mapWith(Number), last: sql<number>`coalesce(max(${peniMessages.seq}), 0)`.mapWith(Number) })
-        .from(peniMessages)
-        .where(eq(peniMessages.conversationId, id));
-      if (n >= maxInConversation) {
-        throw Errors.conflict('PENI_CONVERSATION_TOO_LONG', 'Cette discussion est déjà bien longue 😊 Recommence une nouvelle discussion avec Peni.');
-      }
-      const state = c.state as PeniState;
-      let result;
-      try {
-        result = handleInput(state, dto.choice ? { choice: dto.choice } : { text }, ctx);
-      } catch (e) {
-        if (e instanceof InvalidChoiceError) throw Errors.validation({ fields: { choice: ['Cette réponse n’est plus proposée. Choisis une des réponses affichées.'] } });
-        throw e;
-      }
-      const now = this.clock.now();
-      const label = dto.choice ? await this.choiceLabel(tx, id, dto.choice) : text!;
-      const rows = [
-        { id: uuidv7(now.getTime()), conversationId: id, userId, seq: last + 1, role: 'user', text: label.slice(0, 1000), choice: dto.choice ?? null, quickReplies: [], summary: null, pose: null, safety: null, createdAt: now },
-        ...result.replies.map((reply, i) => this.peniRow(id, userId, last + 2 + i, reply, now)),
-      ];
-      await tx.insert(peniMessages).values(rows);
-      await tx
-        .update(peniConversations)
-        .set({ state: result.state, draft: result.draft, status: result.draft ? 'completed' : 'open', updatedAt: now })
-        .where(eq(peniConversations.id, id));
-      return { rows, result };
-    });
-    if (created.result.replies.some((r) => r.safety === 'urgent')) this.logger.warn({ msg: 'peni.safety.urgent', conversationId: id });
-    return {
-      messages: created.rows.map((m) => this.view(m as MessageRow)),
-      status: created.result.draft ? 'completed' : 'open',
-      draft: created.result.draft,
-    };
+    }
+    const r = await db.execute<{ state: PeniState; n: number; last: number }>(sql`SELECT c.state,
+        (SELECT count(*) FROM peni_messages m WHERE m.conversation_id = c.id AND m.role = 'user')::int AS n,
+        (SELECT coalesce(max(m.seq), 0) FROM peni_messages m WHERE m.conversation_id = c.id)::int AS last
+      FROM peni_conversations c WHERE c.id = ${id} AND c.user_id = ${userId}`);
+    if (!r.rows.length) throw Errors.notFound('Discussion');
+    return r.rows[0];
+  }
+
+  private async respondChecked(snap: { state: PeniState; n: number }, input: EngineInput, ctx: EngineContext, maxInConversation: number) {
+    if (snap.n >= maxInConversation) {
+      throw Errors.conflict('PENI_CONVERSATION_TOO_LONG', 'Cette discussion est déjà bien longue 😊 Recommence une nouvelle discussion avec Peni.');
+    }
+    try {
+      return await this.respond(snap.state, input, ctx);
+    } catch (e) {
+      if (e instanceof InvalidChoiceError) throw Errors.validation({ fields: { choice: ['Cette réponse n’est plus proposée. Choisis une des réponses affichées.'] } });
+      throw e;
+    }
+  }
+
+  /** Écriture courte, sous le verrou de la discussion : message de la personne, réponses de Peni, nouvel état. */
+  private async persist(tx: Pick<Database, 'select' | 'insert' | 'update'>, userId: string, id: string, last: number, dto: PeniMessageDto, result: EngineResult) {
+    const now = this.clock.now();
+    const label = dto.choice ? await this.choiceLabel(tx, id, dto.choice) : dto.text!.trim();
+    const rows = [
+      { id: uuidv7(now.getTime()), conversationId: id, userId, seq: last + 1, role: 'user', text: label.slice(0, 1000), choice: dto.choice ?? null, quickReplies: [], summary: null, pose: null, safety: null, createdAt: now },
+      ...result.replies.map((reply, i) => this.peniRow(id, userId, last + 2 + i, reply, now)),
+    ];
+    await tx.insert(peniMessages).values(rows);
+    await tx
+      .update(peniConversations)
+      .set({ state: result.state, draft: result.draft, status: result.draft ? 'completed' : 'open', updatedAt: now })
+      .where(eq(peniConversations.id, id));
+    return { rows, result };
   }
 
   /**

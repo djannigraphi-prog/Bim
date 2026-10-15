@@ -1,5 +1,6 @@
 import { DB } from '../src/database/database.module';
-import { LlmProvider, LlmRequest } from '../src/modules/peni/llm-provider';
+import { EngineContext, EngineInput, EngineResult, PeniState } from '../src/modules/peni/engine';
+import { LLM_PROVIDER, LlmProvider, LlmRequest } from '../src/modules/peni/llm-provider';
 import { PeniService } from '../src/modules/peni/peni.service';
 import { CLOCK, ProjectsService } from '../src/modules/projects/projects.service';
 import { bearer, Harness, registerAndActivate, startHarness } from './harness';
@@ -131,6 +132,128 @@ describe('Peni (e2e)', () => {
     await Promise.all([say(u.auth, c.id, { text: 'des abdos' }), say(u.auth, c.id, { text: '3 fois le matin' })]);
     const seqs = (await h.pool.query('select seq from peni_messages where conversation_id = $1 order by seq', [c.id])).rows.map((r: { seq: number }) => r.seq);
     expect(seqs).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  describe('traitement en deux temps (étape 1 de Peni IA, sans appel externe)', () => {
+    /** Peni dont le calcul de réponse peut être ralenti ou interrompu, pour reproduire une réponse lente (future IA). */
+    class ObservedPeni extends PeniService {
+      calls = 0;
+      hook?: (call: number) => Promise<void>;
+      protected override async respond(state: PeniState, input: EngineInput, ctx: EngineContext): Promise<EngineResult> {
+        this.calls++;
+        if (this.hook) await this.hook(this.calls);
+        return super.respond(state, input, ctx);
+      }
+    }
+    const observed = () => new ObservedPeni(h.app.get(DB), h.settings, h.app.get(ProjectsService), h.app.get(CLOCK), h.app.get(LLM_PROVIDER));
+    function gate() {
+      let open!: () => void;
+      let entered!: () => void;
+      const opened = new Promise<void>((r) => (open = r));
+      const reached = new Promise<void>((r) => (entered = r));
+      return { open, reached, wait: async () => (entered(), opened) };
+    }
+    const rows = async (id: string) =>
+      (await h.pool.query('select seq, role, text from peni_messages where conversation_id = $1 order by seq', [id])).rows as { seq: number; role: string; text: string }[];
+    const contiguous = (r: { seq: number }[]) => expect(r.map((m) => m.seq)).toEqual(r.map((_, i) => i + 1));
+
+    it('réponse lente : ni verrou ni transaction ouverte pendant le calcul ; les autres discussions avancent', async () => {
+      const u = await user();
+      const other = await user();
+      const peni = observed();
+      const c = await peni.start(u.userId, { purpose: 'new_project' });
+      const o = (await h.http().post('/v1/peni/conversations').set(other.auth).send({ purpose: 'new_project' }).expect(201)).body;
+      const g = gate();
+      peni.hook = g.wait;
+      const pending = peni.send(u.userId, c.id, { text: 'des abdos' });
+      await g.reached;
+      // Pendant le calcul : la discussion n'est pas verrouillée et aucune connexion n'attend dans une transaction.
+      const client = await h.pool.connect();
+      try {
+        await client.query('begin');
+        expect((await client.query('select id from peni_conversations where id = $1 for update nowait', [c.id])).rows).toHaveLength(1);
+        await client.query('rollback');
+      } finally {
+        client.release();
+      }
+      const idle = await h.pool.query("select count(*)::int as n from pg_stat_activity where datname = current_database() and state like 'idle in transaction%'");
+      expect(idle.rows[0].n).toBe(0);
+      // Une autre personne discute normalement pendant ce temps.
+      await say(other.auth, o.id, { text: 'je veux un joli teint' });
+      g.open();
+      const r = await pending;
+      expect(r.messages.map((m) => m.role)).toEqual(['user', 'peni']);
+      contiguous(await rows(c.id));
+      expect(peni.calls).toBe(1);
+    });
+
+    it('un autre message passe pendant le calcul : réponse recalculée sur l’état à jour, sans doublon ni trou', async () => {
+      const u = await user();
+      const peni = observed();
+      const c = await peni.start(u.userId, { purpose: 'new_project' });
+      const g = gate();
+      peni.hook = async (call) => (call === 1 ? g.wait() : undefined);
+      const pending = peni.send(u.userId, c.id, { text: '3 fois le matin' });
+      await g.reached;
+      await say(u.auth, c.id, { text: 'des abdos' }); // enregistré pendant que la première réponse est calculée
+      g.open();
+      const r = await pending;
+      expect(peni.calls).toBe(2); // premier calcul abandonné, second sur l'état à jour
+      const all = await rows(c.id);
+      contiguous(all);
+      expect(all.filter((m) => m.role === 'user').map((m) => m.text)).toEqual(['des abdos', '3 fois le matin']);
+      expect(all[all.length - r.messages.length].text).toBe('3 fois le matin');
+      // Même résultat que si les deux messages avaient été envoyés l'un après l'autre.
+      const v = await user();
+      const ref = observed();
+      const d = await ref.start(v.userId, { purpose: 'new_project' });
+      await ref.send(v.userId, d.id, { text: 'des abdos' });
+      await ref.send(v.userId, d.id, { text: '3 fois le matin' });
+      expect((await rows(d.id)).map((m) => m.text)).toEqual(all.map((m) => m.text));
+    });
+
+    it('discussion qui bouge à chaque essai : dernier essai sous verrou, tous les messages traités dans l’ordre', async () => {
+      const u = await user();
+      const peni = observed();
+      const c = await peni.start(u.userId, { purpose: 'new_project' });
+      const extra = ['salut', 'bonjour', 'coucou'];
+      peni.hook = async (call) => {
+        if (call <= extra.length) await say(u.auth, c.id, { text: extra[call - 1] });
+      };
+      await peni.send(u.userId, c.id, { text: 'des abdos' });
+      expect(peni.calls).toBe(4);
+      const all = await rows(c.id);
+      contiguous(all);
+      expect(all.filter((m) => m.role === 'user').map((m) => m.text)).toEqual([...extra, 'des abdos']);
+    });
+
+    it('discussion supprimée pendant le calcul : introuvable, rien n’est écrit', async () => {
+      const u = await user();
+      const peni = observed();
+      const c = await peni.start(u.userId, { purpose: 'new_project' });
+      const g = gate();
+      peni.hook = g.wait;
+      const pending = peni.send(u.userId, c.id, { text: 'des abdos' }).then(
+        () => null,
+        (e: { code?: string }) => e.code,
+      );
+      await g.reached;
+      await h.pool.query('delete from peni_conversations where id = $1', [c.id]);
+      g.open();
+      expect(await pending).toBe('NOT_FOUND');
+      expect(await rows(c.id)).toEqual([]);
+    });
+
+    it('cinq messages envoyés en même temps : tous traités, chacun suivi de sa réponse, numéros sans trou', async () => {
+      const u = await user();
+      const c = (await h.http().post('/v1/peni/conversations').set(u.auth).send({ purpose: 'new_project' }).expect(201)).body;
+      const texts = ['un', 'deux', 'trois', 'quatre', 'cinq'];
+      await Promise.all(texts.map((t) => say(u.auth, c.id, { text: t })));
+      const all = await rows(c.id);
+      contiguous(all);
+      expect(all.filter((m) => m.role === 'user').map((m) => m.text).sort()).toEqual([...texts].sort());
+      all.forEach((m, i) => m.role === 'user' && expect(all[i + 1]?.role).toBe('peni'));
+    });
   });
 
   it('IA : aucun fournisseur branché ; même branché, rien n’est envoyé sans réglage validé par le fondateur', async () => {
