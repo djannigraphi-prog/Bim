@@ -283,6 +283,9 @@ Développé et testé, **inactif** : fuseau horaire par personne (`profiles.time
 ### T-032 — Conservation des discussions avec Peni · Produit · mécanisme décidé, durée NON fixée (fondateur, 15/10/2026, 17 h 48)
 Mécanisme configurable prêt et testé : une discussion sans activité depuis `peni.conversation_retention_days` jours est supprimée chaque nuit avec ses messages (lots de 1 000, verrou, un passage par jour, journal `maintenance_runs`, audit sans contenu). **Aucune durée n'est fixée** : la valeur est null (« pending ») et rien n'est supprimé tant qu'une durée d'au moins 7 jours n'est pas validée (« decided ») après examen de la confidentialité et de la réglementation. La proposition de 12 mois n'est pas retenue pour l'instant.
 
+### T-034 — Peni explique les tâches (écran 24) · Produit · appliqué (15/10/2026) ; contenu à relire
+Explications écrites et versionnées (`task-explanations.ts`, v1), sans IA. Peni n'invente aucun exercice (C7) : il reprend le contenu réel de la tâche (programme validé, séance construite depuis les réponses, tâche ajoutée par la personne). Les « bons réflexes » par catégorie (s'échauffer, aller à son rythme, arrêter en cas de douleur, tester un produit sur une petite zone…) sont des conseils généraux de prudence, **à relire par l'équipe BIM** avec les programmes types (C7). Aucune décision de confidentialité modifiée : rien n'est enregistré (lecture seule).
+
 ### T-033 — Encouragements de Peni et « Pas sûr ? » de l'écran 21 · Produit · décidé (15/10/2026, 17 h 48)
 1. Encouragements dans la journée (27) et sur la carte (26) : textes écrits et versionnés (`encouragements.ts`, v1), positifs, naturels, jamais culpabilisants ; aucun avis médical ni promesse de résultat ; affichés dans l'app seulement (aucune notification).
 2. Heures calmes (22 h – 6 h par défaut, ou celles de la personne) : Peni n'incite jamais à faire une tâche ; il félicite ou souhaite une bonne nuit.
