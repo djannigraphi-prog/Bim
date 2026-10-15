@@ -34,6 +34,11 @@ def main(path: str) -> None:
                     l for l in ev.get('stackTrace', '').splitlines() if '/apps/mobile/' in l or 'test/' in l
                 )[:600]
                 errors.setdefault(ev['testID'], []).append(f"{ev.get('error', '')[:1500]}\n{stack}")
+            elif kind == 'print' and 'testID' in ev:
+                # Les exceptions des tests d'écran sont imprimées (« See exception logs above »).
+                msg = ev.get('message', '')
+                if 'EXCEPTION' in msg or 'Expected' in msg or 'Error' in msg or 'Exception' in msg:
+                    errors.setdefault(ev['testID'], []).append(msg[:2500])
             elif kind == 'testDone' and ev.get('result') != 'success' and not ev.get('hidden'):
                 failed.append(ev['testID'])
     for tid in failed:
