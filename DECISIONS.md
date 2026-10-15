@@ -280,6 +280,9 @@ Développé et testé, **inactif** : fuseau horaire par personne (`profiles.time
 5. **Émulateur** : problème documenté et origine recherchée (voir `docs/TESTING.md`, « Perte de l'émulateur ») ; aucun test supprimé.
 6. Finalisation du lot 2 sans dépense ; bilan présenté avant de considérer le lot comme terminé.
 
+### T-029 — Textes des rappels v2 et pose de Peni · Technique · proposition à valider
+Textes rapprochés de la maquette 28 (v2, `reminders.ts`) : « C'est l'heure ! {tâche} 💪 Tu vas tout déchirer. » (Peni joyeuse), « Vas-y, ça ne prend qu'une minute… {tâche} t'attend 🥺 » (Peni pensive), dernier rappel « {tâche} n'est pas encore cochée. Il est encore temps, je crois en toi ! » (Peni triste). Le texte de la maquette « Je t'en supplie 😭 ta séance n'est toujours pas cochée… Il ne reste plus que 2 h ! » n'est pas repris : il accompagne l'« ALARME » (non retenue en version 1) et peut culpabiliser (C8). **À confirmer par le fondateur.** La pose de Peni fait partie de la notification (R1) : l'API la fournit avec le texte ; le téléphone affiche l'image correspondante (copies en PNG produites par `scripts/generate-notification-icons.py`, dessin de Peni inchangé).
+
 ### T-028 — Centre de notifications (écran 17) lu dans les sources · Technique · décidé
 Le centre de notifications n'enregistre pas de copie : il lit les coffres ouverts (journal des projets), les réponses du support et les rappels réellement envoyés par le serveur, et produit les textes à la lecture (R1). Seul l'état « vu » est stocké (`notification_inbox`, migration 0015). Aucun lien du module Projets vers les Notifications (R2). 30 derniers jours. Filtres « Tout » et « Projets » seulement : « Pièces », « Commandes » et « Live » viendront avec leurs lots. Les rappels programmés par le téléphone (sans serveur) n'y figurent pas : le serveur ne sait pas s'ils ont été affichés.
 

@@ -213,6 +213,8 @@ Alertes à créer au déploiement (CloudWatch, gratuites dans les 10 alarmes) : 
 | H | Firebase préparé sans projet ; étapes de création (`docs/FIREBASE_PROJET.md`) | Fait, testé |
 | I | Notifications programmées classiques sur le téléphone, actions « J'y vais ! / Plus tard », un seul canal par appareil | Fait, testé (dont Android réel) |
 | J | Centre de notifications (écran 17) | Fait, testé |
+| L | Maquette 28 : icône BIM, avatar de Peni selon la tentative, textes v2 | Fait, testé (émulateur) |
+| M | Préparation des tests sur téléphones physiques (`docs/TESTS_TELEPHONES.md`) | Prête ; tests à réaliser |
 | — | Notifications de la maquette 28 (écran verrouillé, boutons « J'y vais ! / Plus tard », « alarme ») et inscription du téléphone | Attendent le projet Firebase (décision 2) et la décision sur l'alarme (4). La maquette 28 montre les notifications elles-mêmes, pas un écran de réglages : l'écran F n'a pas de maquette et reprend le style des Paramètres |
 
 **Changement technique (pour information)** : la file prévue avec pg-boss a été remplacée par une table dédiée (`notification_deliveries`). Même coût (0), même base ; avantages : contrôle exact de la clé anti-doublon, des reprises et des états, une dépendance de moins, et un passage à SQS toujours possible derrière la même interface.

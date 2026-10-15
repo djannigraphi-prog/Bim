@@ -65,6 +65,8 @@ Règle : un test n'est déclaré réussi que s'il a été exécuté. Les résult
 - Flutter : `reminder_preferences_test.dart`, `reminder_scheduler_test.dart`, `notifications_screen_test.dart` ; captures `x15_rappels`, `17_notifications`.
 - Android réel (job `android-e2e`) : autorisation d'Android acceptée dans sa vraie fenêtre, service ouvert **dans la base de test de la CI uniquement**, deux tâches ajoutées quelques minutes plus tard, deux vraies notifications affichées par Android (titre, texte, actions lus dans le rapport d'Android), « Plus tard » puis « J'y vais ! » touchés dans le volet des notifications, journée du projet ouverte ; centre de notifications avec de vraies réponses du support. Le relais de la CI (`.github/scripts/otp-relay.py`) pilote le système (uiautomator, dumpsys) ; il n'agit que sur l'émulateur et la base jetable de la CI.
 
+Ajouts du 15/10 (après-midi) : capture de l'écran réellement verrouillé (`a28_ecran_verrouille`, relais `/lockscreen-shot` : une seule opération, l'app ne dessine pas pendant le verrouillage), notification seule avec l'avatar de Peni (`a28_notification_seule`), textes v2 vérifiés dans le rapport d'Android ; rappel d'essai testé dans les tests Flutter. Tests sur téléphones physiques : protocole dans `docs/TESTS_TELEPHONES.md`.
+
 ## Perte de l'émulateur (enquête du 15/10/2026)
 
 Constat : dans le parcours Android, un glissement du test au-delà du haut de l'écran Rappels faisait perdre l'émulateur entier (« offline »), à chaque essai. Sonde à la demande (workflow « Sonde émulateur », `integration_test/overscroll_probe_test.dart`), même geste, émulateur neuf à chaque fois :

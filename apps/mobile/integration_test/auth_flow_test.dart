@@ -369,6 +369,8 @@ void main() {
     await _relay(tester, '/ui-tap?text=Plus%20tard&shade=1');
     final left = jsonDecode(await _relay(tester, '/notifications?max=${shown.length - 1}&wait=20')) as List<dynamic>;
     expect(left, hasLength(shown.length - 1));
+    // Une seule notification restante : Android l'affiche en entier (avatar de Peni, boutons), comme la maquette 28.
+    await _shot(tester, 'a28_notification_seule', shade: true);
     // « J'y vais ! » : l'app s'ouvre sur la journée du projet, où figure la tâche du rappel.
     await _relay(tester, '/ui-tap?text=vais&shade=1');
     await _waitFor(tester, find.textContaining('Rappel test'));
