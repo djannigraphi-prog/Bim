@@ -114,11 +114,17 @@ Future<void> _expectLoadedImages(WidgetTester tester, int count) async {
 
 /// Source de photos du test : une image PNG dessinée par le test (le sélecteur du système n'est pas pilotable).
 class _TestPhotoSource implements PhotoSource {
+  // Une couleur différente à chaque image, avec un disque blanc : sur les captures réelles, on voit que chaque
+  // image affichée est bien la bonne (et pas un fond vide).
+  static const _colors = [ui.Color(0xFF1E88E5), ui.Color(0xFF43A047), ui.Color(0xFFF20D3A), ui.Color(0xFF8E24AA), ui.Color(0xFFFB8C00)];
+  int _n = 0;
+
   @override
   Future<List<int>?> pick({required bool camera}) async {
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
-    canvas.drawRect(const ui.Rect.fromLTWH(0, 0, 600, 800), ui.Paint()..color = camera ? const ui.Color(0xFFF20D3A) : const ui.Color(0xFF101116));
+    canvas.drawRect(const ui.Rect.fromLTWH(0, 0, 600, 800), ui.Paint()..color = _colors[_n++ % _colors.length]);
+    canvas.drawCircle(const ui.Offset(300, 400), 150, ui.Paint()..color = const ui.Color(0xFFFFFFFF));
     final image = await recorder.endRecording().toImage(600, 800);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     return data!.buffer.asUint8List();
@@ -212,7 +218,7 @@ void main() {
     await _tap(tester, find.text('Choisir une image ou une capture d’écran'));
     await _waitFor(tester, find.text('Image jointe'));
     await _tap(tester, find.text('Envoyer'));
-    await _waitFor(tester, find.text('Merci, ton signalement est envoyé à l’équipe BIM.'));
+    await _waitFor(tester, find.textContaining('Merci, ton signalement est envoyé à l’équipe BIM.'));
 
     // Écran 31 : la photo « avant » est bien enregistrée et lisible ; ajout de la photo « après ».
     await _tap(tester, find.byTooltip('Retour'));
@@ -256,7 +262,7 @@ void main() {
     await _tap(tester, find.text('Choisir une image ou une capture d’écran'));
     await _waitFor(tester, find.text('Image jointe'));
     await _tap(tester, find.text('Envoyer'));
-    await _waitFor(tester, find.text('Merci, ton signalement est envoyé à l’équipe BIM.'));
+    await _waitFor(tester, find.textContaining('Merci, ton signalement est envoyé à l’équipe BIM.'));
     await _scrollTap(tester, find.text('Mes signalements'));
     await _waitFor(tester, find.textContaining('Problème général'));
     await _expectLoadedImages(tester, 2);

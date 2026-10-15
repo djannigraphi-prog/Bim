@@ -2,11 +2,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
+import '../../../core/widgets/feedback.dart';
 import '../application/photo_source.dart';
 import '../data/projects_api.dart';
 import '../data/projects_models.dart';
@@ -27,17 +27,8 @@ Future<void> reportProblem(BuildContext context, {String? projectId, String? day
     await showHealthAdvice(context);
     return;
   }
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: const Text('Merci, ton signalement est envoyé à l’équipe BIM.'),
-        action: SnackBarAction(
-          label: 'Suivre',
-          onPressed: () => context.push(projectId == null ? '/reports' : '/projects/$projectId/reports'),
-        ),
-      ),
-    );
+  // Pas de bouton dans le message : un message avec action reste affiché (Flutter récent) et masquerait l'écran.
+  showBimSnack(context, 'Merci, ton signalement est envoyé à l’équipe BIM. Suis la réponse dans « Mes signalements ».');
 }
 
 class ReportSheet extends ConsumerStatefulWidget {

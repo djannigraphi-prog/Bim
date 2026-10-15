@@ -66,7 +66,8 @@ class BimButton extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: BimSpacing.sm)],
-                      Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+                      // Sur un petit écran (320 dp), un libellé trop long est réduit plutôt que coupé (« Publier « J'ai fait mon BI… »).
+                      Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1))),
                     ],
                   ),
           ),
