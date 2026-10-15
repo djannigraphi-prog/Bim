@@ -79,7 +79,25 @@ def bim_notifications():
             m = re.match(r'\[\d+\] "(.*)" ->', t)
             if m:
                 cur["actions"].append(m.group(1))
-    return [{k: v for k, v in n.items() if k != "pkg"} for n in found if n["pkg"]]
+    # Une même notification peut figurer dans plusieurs sections du rapport (dont certaines sans contenu) :
+    # on garde celles qui ont un titre, sans doublon.
+    out, keys = [], set()
+    for n in found:
+        key = (n["title"], n["text"])
+        if n["pkg"] and n["title"] and key not in keys:
+            keys.add(key)
+            out.append({k: v for k, v in n.items() if k != "pkg"})
+    return out
+
+
+def bim_notifications_raw():
+    """Extrait brut du rapport d'Android autour des notifications de BIM (diagnostic en cas d'échec)."""
+    lines = run_adb("shell", "dumpsys", "notification", "--noredact").stdout.decode(errors="replace").splitlines()
+    keep = []
+    for i, line in enumerate(lines):
+        if "ci.bim.app" in line:
+            keep.extend(lines[i:i + 25])
+    return "\n".join(keep[:150])
 
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -136,7 +154,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             time.sleep(3)
             items = bim_notifications()
         ok = least <= len(items) <= most
-        return self.reply(200 if ok else 404, json.dumps(items, ensure_ascii=False))
+        if not ok:
+            return self.reply(404, json.dumps(items, ensure_ascii=False) + "\n--- rapport d'Android ---\n" + bim_notifications_raw())
+        return self.reply(200, json.dumps(items, ensure_ascii=False))
 
     def reminders_service(self, q):
         on = (q.get("on") or ["0"])[0] == "1"

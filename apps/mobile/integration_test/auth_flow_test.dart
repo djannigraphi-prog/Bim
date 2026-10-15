@@ -336,9 +336,9 @@ void main() {
     // Android affiche les deux rappels à l'heure prévue (mode non exact : quelques minutes au plus).
     final shown = jsonDecode(await _relay(tester, '/notifications?min=2&wait=420')) as List<dynamic>;
     for (final n in shown.cast<Map<String, dynamic>>()) {
-      expect(n['title'], 'Peni');
-      expect(n['text'] as String, contains('Rappel test'));
-      expect(n['actions'], ['J’y vais !', 'Plus tard']);
+      expect(n['title'], 'Peni', reason: jsonEncode(shown));
+      expect(n['text'] as String, contains('Rappel test'), reason: jsonEncode(shown));
+      expect(n['actions'], ['J’y vais !', 'Plus tard'], reason: jsonEncode(shown));
     }
     await _shot(tester, 'a28_notifications', shade: true);
     // « Plus tard » : la notification se ferme, l'app ne change pas d'écran.
