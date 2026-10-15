@@ -83,9 +83,9 @@ Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'a
 | --- | --- | --- | --- |
 | A | Fuseau horaire par personne ; « aujourd'hui » à l'heure locale (projets, photos, signalements) | unitaires + e2e | verte (run 38701596068) |
 | B | Appareils de notification (par session, supprimés à la déconnexion) ; préférences ; réglages des rappels « en attente » | e2e | verte (run 38701596068) |
-| C | Calcul des rappels (fonctions pures) | 9 unitaires | voir ci-dessous |
-| D | Worker : file PostgreSQL, anti-doublon, reprise, péremption, essais, revérification, santé, `/health`, page admin | 7 e2e (workers concurrents, panne, jeton invalide…) ; démarrage réel du worker séparé vérifié en local | voir ci-dessous |
-| E | Envoi FCM HTTP v1 prêt, inactif | 5 tests contre un faux serveur ; 1 test de configuration | voir ci-dessous |
+| C | Calcul des rappels (fonctions pures) | 9 unitaires | verte (run 38702790136) |
+| D | Worker : file PostgreSQL, anti-doublon, reprise, péremption, essais, revérification, santé, `/health`, page admin | 7 e2e (workers concurrents, panne, jeton invalide…) ; démarrage réel du worker séparé vérifié en local | verte (run 38702790136) |
+| E | Envoi FCM HTTP v1 prêt, inactif | 5 tests contre un faux serveur ; 1 test de configuration | verte (run 38703183336 : API, admin, mobile, Android) |
 
 Suite API locale : 180 tests réussis (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
