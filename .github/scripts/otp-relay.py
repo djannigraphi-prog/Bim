@@ -117,10 +117,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 time.sleep(1)
             nodes = ui_nodes()
             seen = [n[0] for n in nodes if n[0]]
-            for label, x, y in nodes:
-                if text and text in norm(label):
-                    run_adb("shell", "input", "tap", str(x), str(y))
-                    return self.reply(200, label)
+            # Libellé exact d'abord (« Allow » et non « Don't allow »), sinon libellé qui contient le texte.
+            exact = [n for n in nodes if text and norm(n[0]).strip() == text]
+            partial = [n for n in nodes if text and text in norm(n[0])]
+            for label, x, y in (exact or partial)[:1]:
+                run_adb("shell", "input", "tap", str(x), str(y))
+                return self.reply(200, label)
             time.sleep(1)
         return self.reply(404, "introuvable ; textes visibles : " + " | ".join(seen[:60]))
 

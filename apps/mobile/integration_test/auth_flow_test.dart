@@ -111,10 +111,12 @@ Future<String> _relay(WidgetTester tester, String path) async {
     // L'app continue d'afficher ses images pendant l'attente (le relais peut attendre plusieurs minutes).
     var done = false;
     late (int, String) result;
-    unawaited(pending.then((r) {
-      result = r;
-      done = true;
-    }));
+    unawaited(
+      pending.then((r) {
+        result = r;
+        done = true;
+      }),
+    );
     while (!done) {
       await tester.pump(const Duration(milliseconds: 500));
     }
