@@ -30,6 +30,21 @@ Référence de l'analyse complète : document « BIM — Analyse et plan de dév
 
 Application : `docs/LOT2_RAPPELS_ETUDE.md` (rappels, 15/10/2026). La recommandation précédente « worker dans l'API au lancement pour 0 en plus » est retirée : elle privilégiait le coût sur la fiabilité.
 
+### R-01 bis — Stratégie technique et financière permanente : précision du 15/10/2026 · Fondateur · **décidé**
+
+Précise R-01 (qui reste valable) : le critère est **le meilleur équilibre entre qualité, fiabilité, sécurité, performances, évolutivité et coût** — ni « gratuit d'abord », ni « payant d'abord ».
+
+1. **Choisir la meilleure solution pour BIM.**
+   - Une solution gratuite peut être choisie si elle répond correctement au besoin avec une qualité satisfaisante.
+   - Une solution payante peut être choisie si elle apporte un avantage technique important et nécessaire.
+   - Jamais de solution gratuite uniquement pour économiser si elle compromet la qualité, la sécurité, la fiabilité ou les performances.
+   - **Pas de solution payante recommandée si elle n'apporte aucun avantage significatif** par rapport à une solution gratuite adaptée.
+2. **Anticiper la croissance** : architecture prévue du lancement jusqu'à une grande échelle ; quand c'est pertinent, prévoir de pouvoir remplacer un service par un plus performant sans reconstruire l'application (interfaces, adaptateurs).
+3. **Présenter les coûts clairement** pour chaque décision importante : solutions gratuites et payantes pertinentes, avantages et inconvénients, coûts de départ et récurrents, limites techniques, conséquences sur la sécurité, la fiabilité et les performances, **coûts et difficultés d'une migration**.
+4. **Autorisation financière** : une solution payante peut être recommandée et son intégration technique préparée ; **aucun service payant activé, aucun abonnement, aucune dépense sans autorisation explicite** du fondateur.
+
+S'applique à tous les lots. Première application : `docs/LOT2_RAPPELS_ETUDE.md` (version du 15/10/2026, composant par composant).
+
 ## Décisions du fondateur
 
 ### F15 — Âge minimum (14/10/2026) · Fondateur · **provisoire**
