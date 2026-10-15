@@ -354,6 +354,9 @@ void main() {
     await _tap(tester, find.byTooltip('Retour'));
 
     // Centre de notifications (écran 17) : pastille de la cloche, réponses de l'équipe BIM, puis marquées vues.
+    // Les Paramètres ont défilé jusqu'à « Rappels » : retour exact en haut, sans glissement.
+    await tester.ensureVisible(find.byTooltip('Retour', skipOffstage: false));
+    await tester.pump(const Duration(milliseconds: 300));
     await _tap(tester, find.byTooltip('Retour'));
     await _waitFor(tester, find.descendant(of: find.byTooltip('Notifications'), matching: find.text('2')));
     await _tap(tester, find.byTooltip('Notifications'));
