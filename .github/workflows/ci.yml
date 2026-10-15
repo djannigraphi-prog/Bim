@@ -32,24 +32,35 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:unit
-      - name: Stockage compatible S3 pour les tests (MinIO, local au runner)
+      - name: Stockage compatible S3 pour les tests (MinIO, sinon s3rver), local au runner
         run: |
+          set +e
+          ok=0
           for img in minio/minio:latest quay.io/minio/minio:latest; do
-            docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 "$img" server /data && break
-            docker rm -f minio 2>/dev/null || true
+            echo "Essai de $img"
+            docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=bimtest -e MINIO_ROOT_PASSWORD=bimtest-secret-123 "$img" server /data
+            for i in $(seq 1 20); do curl -sf localhost:9000/minio/health/live >/dev/null && ok=1 && break; sleep 1; done
+            [ $ok = 1 ] && break
+            docker logs minio 2>&1 | tail -20; docker rm -f minio >/dev/null 2>&1
           done
-          for i in $(seq 1 30); do curl -sf localhost:9000/minio/health/live && break; sleep 1; done
+          if [ $ok = 1 ]; then
+            echo "MinIO prêt (droits d'accès appliqués)"
+            { echo "S3_TEST_ENDPOINT=http://localhost:9000"; echo "AWS_ACCESS_KEY_ID=bimtest"; echo "AWS_SECRET_ACCESS_KEY=bimtest-secret-123"; echo "S3_TEST_ENFORCES_AUTH=1"; } >> "$GITHUB_ENV"
+          else
+            echo "MinIO indisponible : repli sur s3rver (compatible S3, sans contrôle des droits de lecture)"
+            mkdir -p "$RUNNER_TEMP/s3rver" && cd "$RUNNER_TEMP/s3rver" && npm init -y >/dev/null && npm install --no-audit --no-fund s3rver@3.7.1 >/dev/null
+            mkdir -p data
+            nohup node -e "new (require('s3rver'))({port:4569,address:'127.0.0.1',silent:true,directory:'data'}).run()" > s3rver.log 2>&1 &
+            sleep 3
+            { echo "S3_TEST_ENDPOINT=http://127.0.0.1:4569"; echo "AWS_ACCESS_KEY_ID=S3RVER"; echo "AWS_SECRET_ACCESS_KEY=S3RVER"; } >> "$GITHUB_ENV"
+          fi
       - run: npm run test:e2e -- --json --outputFile="$RUNNER_TEMP/e2e.json"
         env:
           TEST_DATABASE_ADMIN_URL: postgres://bim:bim@localhost:5432/postgres
-          S3_TEST_ENDPOINT: http://localhost:9000
-          AWS_ACCESS_KEY_ID: bimtest
-          AWS_SECRET_ACCESS_KEY: bimtest-secret-123
       - name: Détail des tests en échec (annotations)
         if: ${{ failure() }}
         run: |
           python3 "$GITHUB_WORKSPACE/.github/scripts/jest-failures.py" "$RUNNER_TEMP/e2e.json" "$RUNNER_TEMP/e2e.short" || echo "rapport absent" > "$RUNNER_TEMP/e2e.short"
-          docker logs minio 2>&1 | tail -20 >> "$RUNNER_TEMP/e2e.short" || true
           python3 "$GITHUB_WORKSPACE/.github/scripts/annotate-chunks.py" "api e2e" "$RUNNER_TEMP/e2e.short" 6
       - name: Contrat OpenAPI à jour
         env:
