@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { StepUpReleaseInterceptor } from './step-up-release.interceptor';
 import { JwtModule } from '@nestjs/jwt';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { UsersService } from '../users/users.service';
@@ -30,6 +31,7 @@ import { VerificationService } from './verification.service';
     VerificationService,
     UsersService,
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_INTERCEPTOR, useClass: StepUpReleaseInterceptor },
   ],
   exports: [SessionService, VerificationService],
 })

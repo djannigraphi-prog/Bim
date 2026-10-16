@@ -25,7 +25,11 @@ export interface AuthContext {
   space: ActiveSpace;
 }
 
-export type AuthedRequest = Request & { auth?: AuthContext };
+export type AuthedRequest = Request & {
+  auth?: AuthContext;
+  /** Confirmation d'identité prise par la garde pour cette requête ; rendue si l'opération est refusée (4xx). */
+  stepUpGrantId?: string;
+};
 
 export const CurrentAuth = createParamDecorator((_: unknown, ctx: ExecutionContext): AuthContext => {
   const req = ctx.switchToHttp().getRequest<AuthedRequest>();

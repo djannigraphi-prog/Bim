@@ -28,7 +28,7 @@ export class StepUpService {
   }
 
   /** Consomme atomiquement l'autorisation : une deuxième utilisation échoue. */
-  async consume(userId: string, sessionId: string, scope: StepUpScope, token: string): Promise<void> {
+  async consume(userId: string, sessionId: string, scope: StepUpScope, token: string): Promise<string> {
     if (!token) throw this.required(scope);
     const used = await this.db
       .update(stepUpGrants)
@@ -47,6 +47,28 @@ export class StepUpService {
       )
       .returning({ id: stepUpGrants.id });
     if (used.length !== 1) throw this.required(scope);
+    return used[0].id;
+  }
+
+  /**
+   * Rend une confirmation prise pour une opération finalement refusée (erreur 4xx : rien n'a été modifié).
+   * Seulement si elle est encore valable et n'a pas été annulée entre-temps (changement de mot de passe, etc.).
+   */
+  async release(grantId: string): Promise<void> {
+    await this.db
+      .update(stepUpGrants)
+      .set({ consumedAt: null })
+      .where(
+        and(
+          eq(stepUpGrants.id, grantId),
+          gt(stepUpGrants.expiresAt, new Date()),
+          sql`${stepUpGrants.consumedAt} IS NOT NULL`,
+          // Jamais après un changement ou une réinitialisation du mot de passe (qui annule toutes les confirmations),
+          // ni si la session a été fermée entre-temps.
+          sql`NOT EXISTS (SELECT 1 FROM users u WHERE u.id = ${stepUpGrants.userId} AND u.password_changed_at >= ${stepUpGrants.createdAt})`,
+          sql`EXISTS (SELECT 1 FROM sessions s WHERE s.id = ${stepUpGrants.sessionId} AND s.revoked_at IS NULL)`,
+        ),
+      );
   }
 
   /** Annule les autorisations ouvertes (après réinitialisation ou changement de mot de passe). */

@@ -53,7 +53,9 @@ export class AuthGuard implements CanActivate {
     const scope = this.reflector.getAllAndOverride<StepUpScope>(REQUIRED_STEP_UP, targets);
     if (scope) {
       const stepUpToken = req.headers['x-step-up-token'];
-      await this.stepUp.consume(claims.sub, claims.sid, scope, typeof stepUpToken === 'string' ? stepUpToken : '');
+      // Prise atomique (usage unique, même sous envois simultanés) ; rendue par StepUpReleaseInterceptor si la
+      // requête est ensuite refusée (validation ou règle métier), car alors rien n'a été modifié (audit, défaut 2).
+      req.stepUpGrantId = await this.stepUp.consume(claims.sub, claims.sid, scope, typeof stepUpToken === 'string' ? stepUpToken : '');
     }
     return true;
   }
