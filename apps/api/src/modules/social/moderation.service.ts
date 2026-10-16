@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
+import { recountComments } from './access';
 import type { RequestMeta } from '../../common/request-meta';
 import { DB, Database } from '../../database/database.module';
 import { contentReports, postComments, postMedia, posts, stories, users } from '../../database/schema';
@@ -107,7 +108,7 @@ export class ModerationService {
   }
 
   /** Passe un contenu de publié à masqué (ou l'inverse) en gardant le compteur de commentaires exact. */
-  private async setVisibility(tx: Pick<Database, 'update'>, type: 'post' | 'comment' | 'story', id: string, to: 'hidden' | 'published', note: string | null): Promise<boolean> {
+  private async setVisibility(tx: Pick<Database, 'update' | 'execute'>, type: 'post' | 'comment' | 'story', id: string, to: 'hidden' | 'published', note: string | null): Promise<boolean> {
     const from = to === 'hidden' ? 'published' : 'hidden';
     if (type === 'story') {
       const done = await tx.update(stories).set({ status: to }).where(and(eq(stories.id, id), eq(stories.status, from))).returning({ id: stories.id });
@@ -118,12 +119,8 @@ export class ModerationService {
       return done.length > 0;
     }
     const done = await tx.update(postComments).set({ status: to }).where(and(eq(postComments.id, id), eq(postComments.status, from))).returning({ postId: postComments.postId });
-    if (done.length) {
-      await tx
-        .update(posts)
-        .set({ commentCount: to === 'hidden' ? sql`greatest(${posts.commentCount} - 1, 0)` : sql`${posts.commentCount} + 1` })
-        .where(eq(posts.id, done[0].postId));
-    }
+    // Compteur recalculé : un commentaire masqué emporte ses réponses, rétabli il les ramène (audit, défaut 3).
+    if (done.length) await recountComments(tx, done[0].postId);
     return done.length > 0;
   }
 }

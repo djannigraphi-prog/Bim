@@ -61,6 +61,7 @@ export class InboxService {
       SELECT 'comment:' || c.id, 'post_commented', c.created_at, NULL, NULL, NULL, NULL, NULL, NULL, u.full_name, u.username, p.id::text, left(c.text, 120)
       FROM post_comments c JOIN posts p ON p.id = c.post_id JOIN users u ON u.id = c.user_id
       WHERE p.user_id = ${userId} AND c.user_id <> ${userId} AND c.status = 'published' AND p.status = 'published' AND u.status = 'active' AND c.created_at > ${since}
+        AND (c.parent_id IS NULL OR EXISTS (SELECT 1 FROM post_comments pc WHERE pc.id = c.parent_id AND pc.status = 'published'))
         AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${userId}))
       UNION ALL
       SELECT 'follow:' || f.follower_id, 'new_follower', f.created_at, NULL, NULL, NULL, NULL, NULL, NULL, u.full_name, u.username, NULL, NULL

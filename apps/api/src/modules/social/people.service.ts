@@ -10,7 +10,7 @@ import { contentReports, follows, postComments, posts, privacySettings, projects
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
-import { notBlockedBetween } from './access';
+import { notBlockedBetween, commentParentPublished } from './access';
 import { ReportContentDto } from './dto';
 import { PostsService } from './posts.service';
 import { StoriesService } from './stories.service';
@@ -169,7 +169,7 @@ export class PeopleService {
     if (dto.targetType === 'post') {
       targetUserId = (await this.posts.visible(viewerId, dto.targetId)).post.userId;
     } else if (dto.targetType === 'comment') {
-      const [c] = await this.db.select().from(postComments).where(and(eq(postComments.id, dto.targetId), eq(postComments.status, 'published')));
+      const [c] = await this.db.select().from(postComments).where(and(eq(postComments.id, dto.targetId), eq(postComments.status, 'published'), commentParentPublished()));
       if (!c) throw Errors.notFound('Commentaire');
       await this.posts.visible(viewerId, c.postId).catch(() => {
         throw Errors.notFound('Commentaire');

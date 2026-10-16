@@ -1,5 +1,6 @@
 import { AnyColumn, SQL, sql } from 'drizzle-orm';
-import { posts, users } from '../../database/schema';
+import type { Database } from '../../database/database.module';
+import { postComments, posts, users } from '../../database/schema';
 
 /**
  * Règles de visibilité du social (lot 4), écrites une seule fois et appliquées dans la requête SQL elle-même.
@@ -19,4 +20,25 @@ export function postVisibleTo(viewerId: string): SQL {
 /** Aucun blocage, dans un sens ou dans l'autre, entre `viewerId` et la personne de la colonne `other`. */
 export function notBlockedBetween(viewerId: string, other: SQL | AnyColumn): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = ${other}) OR (b.blocker_id = ${other} AND b.blocked_id = ${viewerId}))`;
+}
+
+/**
+ * Un commentaire n'existe pour les autres que si son parent (pour une réponse) est lui aussi publié : les réponses
+ * d'un commentaire masqué ou supprimé ne sont ni affichées, ni comptées, ni notifiées, ni actionnables (audit, défaut 3).
+ */
+export function commentParentPublished(): SQL {
+  return sql`(${postComments.parentId} IS NULL OR EXISTS (SELECT 1 FROM post_comments pc WHERE pc.id = ${postComments.parentId} AND pc.status = 'published'))`;
+}
+
+/**
+ * Recalcule le compteur de commentaires d'une publication à partir de la base, après un masquage, un
+ * rétablissement ou une suppression : commentaires publiés dont le parent éventuel est publié.
+ */
+export async function recountComments(tx: Pick<Database, 'execute'>, postId: string): Promise<void> {
+  await tx.execute(sql`
+    UPDATE posts SET comment_count = (
+      SELECT count(*) FROM post_comments c
+      WHERE c.post_id = ${postId} AND c.status = 'published'
+        AND (c.parent_id IS NULL OR EXISTS (SELECT 1 FROM post_comments pc WHERE pc.id = c.parent_id AND pc.status = 'published'))
+    ) WHERE id = ${postId}`);
 }

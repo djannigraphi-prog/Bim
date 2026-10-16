@@ -13,7 +13,7 @@ import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { CLOCK, Clock, ProjectsService } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
-import { notBlockedBetween, postVisibleTo } from './access';
+import { notBlockedBetween, postVisibleTo, commentParentPublished, recountComments } from './access';
 import { CreateBimPostDto, CreateCommentDto, CreatePostDto } from './dto';
 
 export const MAX_POST_IMAGES = 4;
@@ -398,7 +398,7 @@ export class PostsService {
   }
 
   private async visibleComment(viewerId: string, commentId: string) {
-    const [c] = await this.db.select().from(postComments).where(and(eq(postComments.id, commentId), eq(postComments.status, 'published')));
+    const [c] = await this.db.select().from(postComments).where(and(eq(postComments.id, commentId), eq(postComments.status, 'published'), commentParentPublished()));
     if (!c) throw Errors.notFound('Commentaire');
     const { post } = await this.visible(viewerId, c.postId).catch(() => {
       throw Errors.notFound('Commentaire');
@@ -416,7 +416,7 @@ export class PostsService {
         .set({ status: 'deleted', text: '' })
         .where(and(eq(postComments.status, 'published'), sql`(${postComments.id} = ${commentId} OR ${postComments.parentId} = ${commentId})`))
         .returning({ id: postComments.id });
-      await tx.update(posts).set({ commentCount: sql`greatest(${posts.commentCount} - ${gone.length}, 0)` }).where(eq(posts.id, post.id));
+      await recountComments(tx, post.id);
       await this.audit.log({ actorType: 'user', actorId: viewerId, action: 'social.comment_deleted', targetType: 'post', targetId: post.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { commentId, removed: gone.length } }, tx);
     });
   }
