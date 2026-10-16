@@ -82,6 +82,8 @@ export class ShopTeamService {
       }
       const [{ n }] = await tx.select({ n: count() }).from(shopMembers).where(and(eq(shopMembers.shopId, shopId), eq(shopMembers.role, 'staff'), isNull(shopMembers.revokedAt)));
       if (n >= MAX_SHOP_STAFF) throw Errors.conflict('TEAM_LIMIT', `${MAX_SHOP_STAFF} employés au plus.`);
+      // Une nouvelle invitation part toujours sans aucune permission (rien ne revient d'une participation passée).
+      await tx.delete(shopMemberPermissions).where(and(eq(shopMemberPermissions.shopId, shopId), eq(shopMemberPermissions.userId, u.id)));
       if (existing) {
         await tx
           .update(shopMembers)
@@ -95,8 +97,13 @@ export class ShopTeamService {
     return this.list(shopId, apiBase);
   }
 
-  private async staffMember(shopId: string, userId: string) {
-    const [m] = await this.db.select().from(shopMembers).where(and(eq(shopMembers.shopId, shopId), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt)));
+  /** Employé (actif ou invité) de la boutique, ligne verrouillée : retrait et permissions ne se croisent pas. */
+  private async staffMember(tx: Parameters<Parameters<Database['transaction']>[0]>[0], shopId: string, userId: string) {
+    const [m] = await tx
+      .select()
+      .from(shopMembers)
+      .where(and(eq(shopMembers.shopId, shopId), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt)))
+      .for('update');
     if (!m) throw Errors.notFound('Membre');
     if (m.role === 'owner') throw new AppError('OWNER_IMMUTABLE', 'Le propriétaire a tous les droits ; ils ne se modifient pas.', HttpStatus.CONFLICT);
     return m;
@@ -104,9 +111,9 @@ export class ShopTeamService {
 
   /** Remplace l'ensemble des permissions d'un employé ; journal avec avant / après. */
   async setPermissions(ownerId: string, shopId: string, userId: string, permissions: ShopPermission[], meta: RequestMeta, apiBase: string) {
-    await this.staffMember(shopId, userId);
     const wanted = [...new Set(permissions)].sort();
     await this.db.transaction(async (tx) => {
+      await this.staffMember(tx, shopId, userId);
       const before = (
         await tx
           .select({ p: shopMemberPermissions.permission })
@@ -127,8 +134,8 @@ export class ShopTeamService {
 
   /** Retirer un employé (ou annuler une invitation) : accès et permissions supprimés immédiatement. */
   async remove(ownerId: string, shopId: string, userId: string, meta: RequestMeta, apiBase: string) {
-    await this.staffMember(shopId, userId);
     await this.db.transaction(async (tx) => {
+      await this.staffMember(tx, shopId, userId);
       await tx.update(shopMembers).set({ revokedAt: new Date() }).where(and(eq(shopMembers.shopId, shopId), eq(shopMembers.userId, userId)));
       await tx.delete(shopMemberPermissions).where(and(eq(shopMemberPermissions.shopId, shopId), eq(shopMemberPermissions.userId, userId)));
       await this.audit.log({ actorType: 'user', actorId: ownerId, action: 'shop.member_removed', targetType: 'user', targetId: userId, ip: meta.ip, userAgent: meta.userAgent, metadata: { shopId } }, tx);
@@ -154,11 +161,16 @@ export class ShopTeamService {
 
   async answer(userId: string, birthDate: string, shopId: string, accept: boolean, meta: RequestMeta) {
     if (accept) await this.ages.assert('merchant', birthDate);
-    const done = await this.db
-      .update(shopMembers)
-      .set(accept ? { acceptedAt: new Date() } : { revokedAt: new Date() })
-      .where(and(eq(shopMembers.shopId, shopId), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt), isNull(shopMembers.acceptedAt)))
-      .returning({ userId: shopMembers.userId });
+    const done = await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(shopMembers)
+        .set(accept ? { acceptedAt: new Date() } : { revokedAt: new Date() })
+        .where(and(eq(shopMembers.shopId, shopId), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt), isNull(shopMembers.acceptedAt)))
+        .returning({ userId: shopMembers.userId });
+      // Invitation refusée : aucune permission préparée ne reste en base.
+      if (rows.length && !accept) await tx.delete(shopMemberPermissions).where(and(eq(shopMemberPermissions.shopId, shopId), eq(shopMemberPermissions.userId, userId)));
+      return rows;
+    });
     if (!done.length) throw Errors.notFound('Invitation');
     await this.audit.log({ actorType: 'user', actorId: userId, action: accept ? 'shop.invitation_accepted' : 'shop.invitation_declined', targetType: 'shop', targetId: shopId, ip: meta.ip, userAgent: meta.userAgent });
     return { accepted: accept };

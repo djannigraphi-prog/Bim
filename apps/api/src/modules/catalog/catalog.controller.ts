@@ -79,9 +79,11 @@ export class MerchantCatalogController {
   @Post('products/:id/publish')
   @RequireShopPermission('products.publish')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Publier sur le BimShop (une photo et une rubrique au moins ; boutique ouverte)' })
+  @ApiOperation({ summary: 'Publier sur le BimShop (une photo et une rubrique au moins ; boutique ouverte) ; un article masqué exige aussi « masquer ou republier »' })
   publish(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
-    return this.catalog.setStatus(this.shop(a), a.userId, id, 'published', meta, apiBase(req), ['draft', 'hidden']);
+    // Publier un brouillon, ou republier un article masqué (contrat du lot 5-B conservé). Republier relève aussi de
+    // « Masquer ou republier » : le service l'exige pour un article masqué.
+    return this.catalog.setStatus(this.shop(a), a.userId, id, 'published', meta, apiBase(req), ['draft', 'hidden'], 'products.visibility');
   }
 
   @Post('products/:id/hide')

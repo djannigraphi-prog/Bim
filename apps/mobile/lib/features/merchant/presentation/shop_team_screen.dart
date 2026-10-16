@@ -98,7 +98,8 @@ class _ShopTeamScreenState extends ConsumerState<ShopTeamScreen> {
                   ),
                 ),
                 const SizedBox(width: BimSpacing.sm),
-                BimButton(key: const ValueKey('team-invite'), label: 'Inviter', loading: _busy, onPressed: _busy ? null : _invite),
+                // BimButton prend toute la largeur disponible : largeur fixe dans une ligne.
+                SizedBox(width: 120, child: BimButton(key: const ValueKey('team-invite'), label: 'Inviter', loading: _busy, onPressed: _busy ? null : _invite)),
               ],
             ),
             const SizedBox(height: BimSpacing.lg),

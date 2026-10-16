@@ -121,7 +121,9 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     // 8. Historique non corrompu : les anciens cœurs restent en base (inactifs), la version précédente est conservée.
     expect((await h.pool.query('select count(*)::int n from product_favorites where product_id = $1 and product_version = 1', [p.id])).rows[0].n).toBe(2);
     const rev = (await h.pool.query('select version, changed_fields, previous, changed_by from product_revisions where product_id = $1', [p.id])).rows;
-    expect(rev).toEqual([{ version: 2, changed_fields: 'title,priceFcfa', previous: expect.objectContaining({ title: 'Robe soirée à plumes', priceFcfa: 45000 }), changed_by: s.ownerId }]);
+    expect(rev).toEqual([
+      { version: 2, changed_fields: 'title,priceFcfa', previous: expect.objectContaining({ title: 'Robe soirée à plumes', priceFcfa: 45000, reputation: { favorites: 2 } }), changed_by: s.ownerId },
+    ]);
     const audit = await h.pool.query("select metadata from audit_logs where action = 'shop.product_content_changed' and target_id = $1", [p.id]);
     expect(audit.rows[0].metadata).toMatchObject({ reference: p.reference, fields: ['title', 'priceFcfa'], version: 2, reputationReset: true });
 
@@ -235,8 +237,11 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     await h.http().post(`/v1/shop/products/${p.id}/hide`).set(visibility.auth).expect(200);
     await h.http().post(`/v1/shop/products/${p.id}/show`).set(visibility.auth).expect(200);
     await h.http().patch(`/v1/shop/products/${p.id}`).set(visibility.auth).send({ title: 'Non' }).expect(403);
-    // Publier n'autorise pas à modifier.
+    // Publier n'autorise pas à modifier, ni à republier un article masqué (« masquer ou republier »), même par /publish.
     await h.http().patch(`/v1/shop/products/${p.id}`).set(publisher.auth).send({ title: 'Non' }).expect(403);
+    await h.http().post(`/v1/shop/products/${p.id}/hide`).set(visibility.auth).expect(200);
+    expect((await h.http().post(`/v1/shop/products/${p.id}/publish`).set(publisher.auth).expect(403)).body.error).toMatchObject({ code: 'SHOP_PERMISSION_REQUIRED', details: { permission: 'products.visibility' } });
+    expect((await h.http().post(`/v1/shop/products/${p.id}/publish`).set(s.auth).expect(200)).body.status).toBe('published');
     // Une autre boutique : introuvable.
     const other = await shop('Autre');
     await h.http().patch(`/v1/shop/products/${p.id}`).set(other.auth).send({ title: 'Vol', confirmReputationReset: true }).expect(404);
@@ -291,11 +296,30 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     await h.http().get('/v1/shop').set(awaShop).expect(403);
     expect((await h.pool.query('select count(*)::int n from shop_member_permissions where user_id = $1', [awa.userId])).rows[0].n).toBe(0);
 
-    // Invitation refusée par la personne.
+    // Réinvitée après son retrait : elle repart sans aucune permission.
+    await h.http().post('/v1/shop/team').set(s.auth).send({ username: awa.username }).expect(201);
+    await h.http().post(`/v1/shop-invitations/${s.shopId}/accept`).set(awa.auth).expect(200);
+    expect((await h.http().get('/v1/shop/team').set(s.auth).expect(200)).body.items.find((m: { userId: string }) => m.userId === awa.userId)).toMatchObject({ status: 'active', permissions: [] });
+
+    // Invitation refusée par la personne : permissions préparées effacées, aucun accès ; réinvitée, rien ne revient.
     const koffi = await client();
     await h.http().post('/v1/shop/team').set(s.auth).send({ username: koffi.username }).expect(201);
+    await h.http().put(`/v1/shop/team/${koffi.userId}/permissions`).set(s.auth).send({ permissions: ['payments.decide'] }).expect(200);
     await h.http().post(`/v1/shop-invitations/${s.shopId}/decline`).set(koffi.auth).expect(200);
+    expect((await h.pool.query('select count(*)::int n from shop_member_permissions where user_id = $1', [koffi.userId])).rows[0].n).toBe(0);
     expect((await h.http().get('/v1/shop-invitations').set(koffi.auth).expect(200)).body.items).toEqual([]);
     await h.http().post('/v1/auth/switch-space').set(koffi.auth).send({ type: 'merchant', id: s.shopId }).expect(403);
+    await h.http().post('/v1/shop/team').set(s.auth).send({ username: koffi.username }).expect(201);
+    expect((await h.http().get('/v1/shop/team').set(s.auth).expect(200)).body.items.find((m: { userId: string }) => m.userId === koffi.userId)).toMatchObject({ status: 'invited', permissions: [] });
+
+    // Une invitation en attente ne permet pas de signaler les messages des clients de la boutique ; un employé non plus
+    // sans « répondre aux messages ».
+    const buyer = await client();
+    const conv = (await h.http().post('/v1/conversations/shop').set(buyer.auth).send({ shopSlug: `r-${s.shopId}` }).expect(201)).body;
+    const msg = (await h.http().post(`/v1/conversations/${conv.id}/messages`).set(buyer.auth).send({ text: 'Bonjour' }).expect(201)).body;
+    await h.http().post('/v1/content-reports').set(koffi.auth).send({ targetType: 'message', targetId: msg.id, reason: 'spam' }).expect(404);
+    await h.http().post('/v1/content-reports').set(awaShop).send({ targetType: 'message', targetId: msg.id, reason: 'spam' }).expect(404);
+    await h.http().put(`/v1/shop/team/${awa.userId}/permissions`).set(s.auth).send({ permissions: ['messages.reply'] }).expect(200);
+    await h.http().post('/v1/content-reports').set(awaShop).send({ targetType: 'message', targetId: msg.id, reason: 'spam' }).expect(201);
   });
 });

@@ -6,7 +6,7 @@ import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { inventoryMovements, productFavorites, productMedia, productRevisions, products, productVariants, shopCategories, shopFollows, shops } from '../../database/schema';
+import { inventoryMovements, productFavorites, productMedia, productRevisions, products, productVariants, ShopPermission, shopCategories, shopFollows, shops } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
@@ -157,6 +157,9 @@ export class MerchantCatalogService {
   private async resetReputation(tx: Tx, p: ProductRow, fields: ContentField[], previous: Record<string, unknown>, userId: string, meta: RequestMeta) {
     const version = p.contentVersion + 1;
     const now = new Date();
+    // Réputation de la version qui se termine, gardée dans l'historique (les lignes individuelles peuvent ensuite changer
+    // si la personne remet ou retire son cœur).
+    previous = { ...previous, reputation: { favorites: await this.activeFavorites(p, tx) } };
     await tx.update(products).set({ contentVersion: version, reputationResetAt: now }).where(eq(products.id, p.id));
     await tx.insert(productRevisions).values({ id: uuidv7(), productId: p.id, version, changedFields: fields.join(','), previous, changedBy: userId, createdAt: now });
     await this.audit.log(
@@ -202,10 +205,23 @@ export class MerchantCatalogService {
    * « visible par moi uniquement » (7-A, depuis « publié ») ; `archived` : retiré. Masquer et republier ne changent ni la
    * référence ni la version du contenu : la réputation est conservée.
    */
-  async setStatus(shopId: string, userId: string, productId: string, to: 'published' | 'hidden' | 'archived', meta: RequestMeta, apiBase: string, from?: ProductRow['status'][]) {
+  async setStatus(
+    shopId: string,
+    userId: string,
+    productId: string,
+    to: 'published' | 'hidden' | 'archived',
+    meta: RequestMeta,
+    apiBase: string,
+    from?: ProductRow['status'][],
+    /** Permission supplémentaire exigée pour republier un article masqué (7-A). */
+    republishPermission?: ShopPermission,
+  ) {
     const p = await this.own(shopId, productId);
+    if (republishPermission && p.status === 'hidden' && to === 'published' && !(await this.spaces.hasShopPermission(userId, shopId, republishPermission))) {
+      throw new AppError('SHOP_PERMISSION_REQUIRED', 'Le propriétaire de la boutique ne t’a pas donné cette permission.', HttpStatus.FORBIDDEN, { permission: republishPermission });
+    }
     const invalid = (status: string) => !!from && status !== to && !from.includes(status as ProductRow['status']);
-    if (invalid(p.status)) throw this.invalidStatus(to);
+    if (invalid(p.status)) throw this.invalidStatus(to, from);
     if (p.status === to) return this.detail(shopId, p.id, apiBase);
     if (to === 'published') {
       if (!p.categoryCode) throw Errors.validation({ fields: { categoryCode: ['Choisis une rubrique.'] } });
@@ -216,7 +232,7 @@ export class MerchantCatalogService {
       // Même verrou que les photos : on ne publie jamais un article dont la dernière photo vient d'être retirée.
       const [cur] = await tx.select({ status: products.status }).from(products).where(eq(products.id, p.id)).for('update');
       if (!cur || cur.status === 'archived') throw Errors.notFound('Article');
-      if (invalid(cur.status)) throw this.invalidStatus(to);
+      if (invalid(cur.status)) throw this.invalidStatus(to, from);
       if (to === 'published') {
         const [{ n }] = await tx.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, p.id));
         if (n === 0) throw Errors.validation({ fields: { photos: ['Ajoute au moins une photo avant de publier.'] } });
@@ -237,8 +253,14 @@ export class MerchantCatalogService {
     return this.detail(shopId, p.id, apiBase);
   }
 
-  private invalidStatus(to: string) {
-    return Errors.conflict('INVALID_PRODUCT_STATUS', to === 'hidden' ? 'Seul un article visible publiquement peut être masqué.' : 'Cet article n’est pas masqué.');
+  private invalidStatus(to: string, from?: ProductRow['status'][]) {
+    const message =
+      to === 'hidden'
+        ? 'Seul un article visible publiquement peut être masqué.'
+        : from?.includes('draft')
+          ? 'Cet article est déjà visible publiquement.'
+          : 'Cet article n’est pas masqué.';
+    return Errors.conflict('INVALID_PRODUCT_STATUS', message);
   }
 
   async addPhotos(shopId: string, productId: string, files: Express.Multer.File[], apiBase: string) {
@@ -298,7 +320,8 @@ export class MerchantCatalogService {
     const wanted = [...new Set(labels.map((l) => l.trim()).filter(Boolean))];
     const list = wanted.length ? wanted : ['Unique'];
     await this.db.transaction(async (tx) => {
-      const [p] = await tx.select().from(products).where(eq(products.id, productId)).for('update');
+      const [p] = await tx.select().from(products).where(and(eq(products.id, productId), eq(products.shopId, shopId), ne(products.status, 'archived'))).for('update');
+      if (!p) throw Errors.notFound('Article');
       const existing = await tx.select().from(productVariants).where(eq(productVariants.productId, p.id));
       const before = existing.filter((v) => v.active).sort((a, b) => a.position - b.position).map((v) => v.label);
       // Ajouter, retirer ou renommer une variante change l'article ; changer seulement l'ordre, non.

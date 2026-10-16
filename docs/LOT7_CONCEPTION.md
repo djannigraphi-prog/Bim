@@ -365,6 +365,10 @@ au-dessus du prix catalogue ?).
 - **Fiches créées pour une commande** [PROPOSÉ] : fiches ordinaires (§10, L7-03).
 - **Conséquences pour 7-B et 7-H** : chaque ligne de commande enregistre la référence **et** la version du contenu ;
   chaque avis aussi, pour ne jamais présenter l'avis d'une ancienne version comme concernant la nouvelle.
+- **Limites connues (7-A)** : le nombre de cœurs de la version qui se termine est conservé dans l'historique ; les
+  lignes individuelles restent en base mais changent si la personne remet son cœur (nouvelle version) ou le retire.
+  L'historique des modifications empêche de supprimer un article (aucune suppression n'existe ; à prévoir si une
+  purge des boutiques est un jour décidée).
 
 ## 11. Permissions de l'équipe d'une boutique [APPROUVÉ, A9]
 
@@ -372,7 +376,10 @@ au-dessus du prix catalogue ?).
 garde serveur `RequireShopPermission` revérifiée à chaque requête, journal avant / après. Catalogue : créer et
 modifier (`products.edit`), publier et retirer (`products.publish`), masquer ou republier (`products.visibility`) ;
 boîte de la boutique : `messages.reply` ; présentation, logo, équipe, demandes et offres de projet : propriétaire.
-Les permissions de commandes, livraisons et paiements existent et seront contrôlées par leurs sous-lots.
+Les permissions de commandes, livraisons et paiements existent et seront contrôlées par leurs sous-lots. Republier un article masqué exige « masquer ou republier », y compris par l'ancienne route de
+publication. Retirer définitivement un article (photos effacées) relève de « publier et retirer ». **Lecture** : tout
+employé ayant accepté l'invitation voit la boutique et son catalogue (brouillons et articles masqués compris), sans
+pouvoir rien modifier ; aucune permission de lecture distincte n'a été demandée [à confirmer].
 
 - Un employé ne reçoit **aucun droit du propriétaire par défaut** ; le propriétaire accorde chaque permission ; contrôle
   côté serveur ; actions sensibles attribuées et horodatées.

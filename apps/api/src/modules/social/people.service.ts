@@ -1,6 +1,6 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
@@ -189,8 +189,17 @@ export class PeopleService {
             .select({ senderId: messages.senderId })
             .from(messages)
             .innerJoin(conversations, and(eq(conversations.id, messages.conversationId), eq(conversations.kind, 'shop')))
-            .innerJoin(shopMembers, and(eq(shopMembers.shopId, conversations.shopId), eq(shopMembers.userId, viewerId), isNull(shopMembers.revokedAt)))
-            .where(and(eq(messages.id, dto.targetId), eq(messages.status, 'published'), isNull(messages.senderShopId), ne(messages.senderId, viewerId)));
+            .innerJoin(shopMembers, and(eq(shopMembers.shopId, conversations.shopId), eq(shopMembers.userId, viewerId), isNull(shopMembers.revokedAt), isNotNull(shopMembers.acceptedAt)))
+            .where(
+              and(
+                eq(messages.id, dto.targetId),
+                eq(messages.status, 'published'),
+                isNull(messages.senderShopId),
+                ne(messages.senderId, viewerId),
+                // 7-A : seul qui peut lire la boîte de la boutique (propriétaire ou permission « répondre aux messages »).
+                sql`(${shopMembers.role} = 'owner' OR EXISTS (SELECT 1 FROM shop_member_permissions p WHERE p.shop_id = ${shopMembers.shopId} AND p.user_id = ${viewerId} AND p.permission = 'messages.reply'))`,
+              ),
+            );
       const found = m ?? fromClient;
       if (!found) throw Errors.notFound('Message');
       targetUserId = found.senderId;

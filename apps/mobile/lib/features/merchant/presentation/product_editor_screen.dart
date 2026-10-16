@@ -135,6 +135,8 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     } on ApiException catch (e) {
       if (e.code != 'REPUTATION_RESET_REQUIRED' || !mounted) rethrow;
       final hearts = (e.details['activeFavorites'] as num?)?.toInt() ?? 0;
+      // Pas d'indicateur de chargement derrière la question : rien n'est en cours tant que le marchand n'a pas choisi.
+      setState(() => _busy = false);
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -152,6 +154,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         ),
       );
       if (ok != true) throw const _ResetCancelled();
+      if (mounted) setState(() => _busy = true);
       return call(true);
     }
   }

@@ -3620,7 +3620,7 @@
             "bearer": []
           }
         ],
-        "summary": "Publier sur le BimShop (une photo et une rubrique au moins ; boutique ouverte)",
+        "summary": "Publier sur le BimShop (une photo et une rubrique au moins ; boutique ouverte) ; un article masqué exige aussi « masquer ou republier »",
         "tags": [
           "Espace marchand"
         ]
