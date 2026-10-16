@@ -6,6 +6,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/brand.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
+import '../../bimshop/presentation/bimshop_view.dart';
 import '../../notifications/data/inbox_api.dart';
 import '../../social/presentation/feed_view.dart';
 
@@ -86,9 +87,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ],
       ),
       // Lot 4 : l'Accueil d'une personne connectée est le fil (écran 10), avec ses projets en tête.
+      // Lot 5-C : l'onglet BimShop (écran 32), visiteurs compris.
       body: _tab == 0
           ? FeedView(visitor: session is! SessionSignedIn)
-          : Center(
+          : _tab == 4
+              ? BimShopView(visitor: session is! SessionSignedIn)
+              : Center(
         child: Padding(
           padding: const EdgeInsets.all(BimSpacing.xl),
           child: Column(

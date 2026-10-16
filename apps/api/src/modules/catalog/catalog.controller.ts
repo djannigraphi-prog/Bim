@@ -8,6 +8,7 @@ import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, Public, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { ProductDto, StockDto, UpdateProductDto, UpdateShopDto, VariantsDto } from './dto';
+import { BimShopService, BimShopSort } from './bimshop.service';
 import { MAX_PRODUCT_IMAGES, MerchantCatalogService } from './merchant-catalog.service';
 
 const UPLOAD = { limits: { fileSize: 25 * 1024 * 1024 } };
@@ -128,5 +129,91 @@ export class ShopCategoriesController {
   @ApiOperation({ summary: 'Rubriques et sous-rubriques (écran 33)' })
   list() {
     return this.catalog.categories();
+  }
+}
+
+/** Lot 5-C — BimShop (écrans 32, 33, 34, 54). Parcourir est public (visiteurs compris) ; aucune commande ni paiement. */
+@ApiTags('BimShop')
+@Controller('v1/bimshop')
+export class BimShopController {
+  constructor(private readonly shop: BimShopService) {}
+
+  @Public()
+  @Get('categories')
+  @ApiOperation({ summary: 'Rubriques avec le nombre d’articles en ligne (écran 33)' })
+  categories() {
+    return this.shop.categories();
+  }
+
+  @Public()
+  @Get('products')
+  @ApiQuery({ name: 'category', required: false, description: 'Rubrique ou sous-rubrique' })
+  @ApiQuery({ name: 'q', required: false, description: 'Recherche dans le nom, la description et le nom de la boutique' })
+  @ApiQuery({ name: 'sort', required: false, enum: ['recent', 'price_asc', 'price_desc'] })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOperation({ summary: 'Articles en ligne (écran 32)' })
+  browse(@Req() req: Request, @Query('category') category?: string, @Query('q') q?: string, @Query('sort') sort?: string, @Query('cursor') cursor?: string) {
+    return this.shop.browse({ category: category?.slice(0, 40), q, sort: sort as BimShopSort, cursor }, apiBase(req));
+  }
+
+  @Public()
+  @Get('products/:id')
+  @ApiOperation({ summary: 'Fiche article (écran 34) ; disponibilité sans stock exact' })
+  product(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.shop.product(id, apiBase(req));
+  }
+
+  @Public()
+  @Get('shops/:slug')
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOperation({ summary: 'Profil public d’une boutique et ses articles (écran 54)' })
+  shopProfile(@Param('slug') slug: string, @Req() req: Request, @Query('cursor') cursor?: string) {
+    return this.shop.shop(slug.slice(0, 80), apiBase(req), cursor);
+  }
+
+  @ApiBearerAuth()
+  @Get('products/:id/me')
+  @ApiOperation({ summary: 'Article mis de côté ? Boutique suivie ?' })
+  productState(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.shop.productState(a.userId, id);
+  }
+
+  @ApiBearerAuth()
+  @Put('products/:id/favorite')
+  @ApiOperation({ summary: 'Mettre de côté (cœur)' })
+  favorite(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.shop.setFavorite(a.userId, id, true);
+  }
+
+  @ApiBearerAuth()
+  @Delete('products/:id/favorite')
+  unfavorite(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.shop.setFavorite(a.userId, id, false);
+  }
+
+  @ApiBearerAuth()
+  @Get('favorites')
+  @ApiOperation({ summary: 'Mes articles mis de côté' })
+  favorites(@CurrentAuth() a: AuthContext, @Req() req: Request) {
+    return this.shop.favorites(a.userId, apiBase(req));
+  }
+
+  @ApiBearerAuth()
+  @Get('shops/:slug/me')
+  shopState(@CurrentAuth() a: AuthContext, @Param('slug') slug: string) {
+    return this.shop.shopState(a.userId, slug.slice(0, 80));
+  }
+
+  @ApiBearerAuth()
+  @Put('shops/:slug/follow')
+  @ApiOperation({ summary: 'Suivre une boutique' })
+  follow(@CurrentAuth() a: AuthContext, @Param('slug') slug: string) {
+    return this.shop.setFollow(a.userId, slug.slice(0, 80), true);
+  }
+
+  @ApiBearerAuth()
+  @Delete('shops/:slug/follow')
+  unfollow(@CurrentAuth() a: AuthContext, @Param('slug') slug: string) {
+    return this.shop.setFollow(a.userId, slug.slice(0, 80), false);
   }
 }

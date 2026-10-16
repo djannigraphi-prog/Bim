@@ -26,6 +26,9 @@ import '../../features/projects/presentation/transformation_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/merchant/presentation/merchant_apply_screen.dart';
+import '../../features/bimshop/presentation/bimshop_view.dart';
+import '../../features/bimshop/presentation/product_screen.dart';
+import '../../features/bimshop/presentation/shop_profile_screen.dart';
 import '../../features/merchant/presentation/merchant_space_screen.dart';
 import '../../features/merchant/presentation/product_editor_screen.dart';
 import '../../features/social/presentation/composer_screen.dart';
@@ -56,7 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         SessionSignedIn(:final me) when me.activeSpaceType == 'merchant' => (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc)) ? '/shop' : null,
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc) || loc.startsWith('/shop')) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop'].any(loc.startsWith)) ? '/home' : null,
+          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop', '/bimshop/favorites'].any(loc.startsWith)) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -106,6 +109,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Lot 5-A — ouvrir une boutique (écrans 07 à 09).
       GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
       GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+      // Lot 5-C : BimShop (public, sauf « Mis de côté »).
+      GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
+      GoRoute(path: '/bimshop/favorites', builder: (_, __) => const ShopFavoritesScreen()),
+      GoRoute(path: '/bimshop/products/:id', builder: (_, s) => ShopProductScreen(productId: s.pathParameters['id']!)),
+      GoRoute(path: '/bimshop/shops/:slug', builder: (_, s) => ShopProfileScreen(slug: s.pathParameters['slug']!)),
       GoRoute(path: '/shop/products/new', builder: (_, __) => const ProductEditorScreen()),
       GoRoute(path: '/shop/products/:id', builder: (_, s) => ProductEditorScreen(productId: s.pathParameters['id'])),
       GoRoute(
