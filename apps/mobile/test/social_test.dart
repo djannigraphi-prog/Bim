@@ -9,6 +9,7 @@ import 'package:bim/features/social/presentation/composer_screen.dart';
 import 'package:bim/features/social/presentation/feed_view.dart';
 import 'package:bim/features/social/presentation/post_detail_screen.dart';
 import 'package:bim/features/social/presentation/profile_screen.dart';
+import 'package:bim/features/social/presentation/stories.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -52,6 +53,15 @@ class _FakeSocial extends SocialApi {
 
   @override
   Future<FeedPage> feed({required String tab, String? cursor}) async => FeedPage(items: tab == 'following' ? following : forYou);
+
+  @override
+  Future<FeedPage> publicFeed({String? cursor}) async {
+    calls.add('public');
+    return FeedPage(items: forYou);
+  }
+
+  @override
+  Future<void> viewStory(String id) async => calls.add('view $id');
 
   @override
   Future<({int likeCount, bool likedByMe})> like(String id, {required bool on}) async {
@@ -254,5 +264,52 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(social.calls, ['follow awa.k true']);
     expect(find.text('Abonné·e'), findsOneWidget);
+  });
+
+  testWidgets('écran 06 : un visiteur voit le fil public ; réagir ouvre l’invitation à créer un compte, sans appel', (tester) async {
+    final social = _FakeSocial();
+    await _pump(tester, const Scaffold(body: FeedView(visitor: true)), social);
+    expect(social.calls, ['public']);
+    expect(find.text('Awa Koné'), findsOneWidget);
+    expect(find.text('Partage un Bim…'), findsNothing); // pas de publication sans compte
+    expect(find.text('Suivre'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('like-p1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Rejoins BIM pour réagir'), findsOneWidget);
+    expect(social.calls, ['public']); // aucun j'aime envoyé
+  });
+
+  testWidgets('lecteur de stories : auteur, avancée au toucher, vue enregistrée, fermeture à la fin', (tester) async {
+    final social = _FakeSocial();
+    final groups = [
+      StoryGroup(author: _awa, allSeen: false, items: [
+        StoryItem(id: 's1', url: 'http://127.0.0.1:9/s1.jpg', createdAt: DateTime.now().subtract(const Duration(hours: 2)), seen: false),
+        StoryItem(id: 's2', url: 'http://127.0.0.1:9/s2.jpg', createdAt: DateTime.now().subtract(const Duration(hours: 1)), seen: true),
+      ],),
+    ];
+    await _pump(
+      tester,
+      Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryViewer(groups: groups))),
+            child: const Text('ouvrir'),
+          ),
+        ),
+      ),
+      social,
+    );
+    await tester.tap(find.text('ouvrir'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.textContaining('Awa Koné · il y a 2 h'), findsOneWidget);
+    expect(social.calls, ['view s1']);
+    await tester.tapAt(const Offset(700, 300)); // à droite : story suivante (déjà vue : rien n'est renvoyé)
+    await tester.pump();
+    expect(find.textContaining('Awa Koné · il y a 1 h'), findsOneWidget);
+    expect(social.calls, ['view s1']);
+    await tester.pump(const Duration(seconds: 6)); // fin de la dernière story : retour
+    await tester.pumpAndSettle();
+    expect(find.text('ouvrir'), findsOneWidget);
   });
 }

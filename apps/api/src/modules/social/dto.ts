@@ -28,14 +28,14 @@ export class CreateCommentDto {
 export const CONTENT_REASONS = ['spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'other'] as const;
 
 export class ReportContentDto {
-  @ApiProperty({ enum: ['post', 'comment', 'user'] }) @IsIn(['post', 'comment', 'user']) targetType!: 'post' | 'comment' | 'user';
+  @ApiProperty({ enum: ['post', 'comment', 'user', 'story'] }) @IsIn(['post', 'comment', 'user', 'story']) targetType!: 'post' | 'comment' | 'user' | 'story';
   @ApiProperty({ format: 'uuid' }) @IsUUID() targetId!: string;
   @ApiProperty({ enum: CONTENT_REASONS }) @IsIn(CONTENT_REASONS) reason!: (typeof CONTENT_REASONS)[number];
   @ApiPropertyOptional({ maxLength: 500 }) @IsOptional() @IsString() @MaxLength(500) message?: string;
 }
 
 export class ResolveContentReportDto {
-  @ApiProperty({ enum: ['none', 'hidden'], description: 'none : rien à reprocher ; hidden : publication ou commentaire masqué' })
+  @ApiProperty({ enum: ['none', 'hidden'], description: 'none : rien à reprocher ; hidden : publication, commentaire ou story masqué' })
   @IsIn(['none', 'hidden'])
   action!: 'none' | 'hidden';
   @ApiProperty({ maxLength: 500 }) @IsString() @Length(1, 500) resolution!: string;

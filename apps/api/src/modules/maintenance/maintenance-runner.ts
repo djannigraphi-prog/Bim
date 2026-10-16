@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { AccountPurgeService, PurgeResult } from './account-purge.service';
+import { StoriesService } from '../social/stories.service';
 import { PeniRetentionResult, PeniRetentionService } from './peni-retention.service';
 
 /** Heure du passage quotidien, à l'heure d'Abidjan (UTC) : la nuit, charge négligeable. */
@@ -22,6 +23,7 @@ export class MaintenanceRunner implements OnApplicationBootstrap, OnModuleDestro
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly purge: AccountPurgeService,
     private readonly peniRetention: PeniRetentionService,
+    private readonly stories: StoriesService,
   ) {}
 
   get active(): boolean {
@@ -37,7 +39,7 @@ export class MaintenanceRunner implements OnApplicationBootstrap, OnModuleDestro
    * Appelée toutes les 10 minutes ; chaque tâche garantit elle-même un seul passage par jour (verrou + journal).
    * Une tâche en erreur n'empêche pas l'autre.
    */
-  async runIfDue(now: Date = new Date()): Promise<{ purge: PurgeResult | null; peniRetention: PeniRetentionResult | null } | null> {
+  async runIfDue(now: Date = new Date()): Promise<{ purge: PurgeResult | null; peniRetention: PeniRetentionResult | null; stories: { deleted: number } | null } | null> {
     if (this.running || now.getUTCHours() !== PURGE_HOUR_UTC) return null;
     this.running = true;
     try {
@@ -49,7 +51,12 @@ export class MaintenanceRunner implements OnApplicationBootstrap, OnModuleDestro
         this.logger.error({ msg: 'maintenance.peni_retention.error', error: e.message });
         return null;
       });
-      return { purge, peniRetention };
+      // Stories (lot 4-B) : elles durent 24 h ; leurs fichiers sont effacés 24 h après l'expiration (sauf signalement ouvert).
+      const stories = await this.stories.cleanupExpired(now).catch((e: Error) => {
+        this.logger.error({ msg: 'maintenance.stories.error', error: e.message });
+        return null;
+      });
+      return { purge, peniRetention, stories };
     } finally {
       this.running = false;
     }

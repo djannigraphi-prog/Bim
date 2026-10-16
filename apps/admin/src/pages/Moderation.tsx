@@ -27,7 +27,7 @@ const REASONS: Record<string, string> = {
   false_info: 'Fausse information',
   other: 'Autre',
 };
-const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil' };
+const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story' };
 const STATUS: Record<string, string> = { published: 'en ligne', hidden: 'masqué', deleted: 'supprimé par son auteur' };
 
 /**

@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, postComments, postMedia, posts, users } from '../../database/schema';
+import { contentReports, postComments, postMedia, posts, stories, users } from '../../database/schema';
 import { AdminContext } from '../admin/admin.decorators';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../media/storage';
@@ -31,7 +31,9 @@ export class ModerationService {
       .limit(200);
     const postIds = rows.filter((x) => x.r.targetType === 'post').map((x) => x.r.targetId);
     const commentIds = rows.filter((x) => x.r.targetType === 'comment').map((x) => x.r.targetId);
+    const storyIds = rows.filter((x) => x.r.targetType === 'story').map((x) => x.r.targetId);
     const userIds = [...new Set(rows.map((x) => x.r.targetUserId).filter((x): x is string => !!x))];
+    const ss = storyIds.length ? await this.db.select().from(stories).where(inArray(stories.id, storyIds)) : [];
     const [ps, cs, us, media] = await Promise.all([
       postIds.length ? this.db.select().from(posts).where(inArray(posts.id, postIds)) : [],
       commentIds.length ? this.db.select().from(postComments).where(inArray(postComments.id, commentIds)) : [],
@@ -42,7 +44,9 @@ export class ModerationService {
     for (const { r, reporter } of rows) {
       const p = r.targetType === 'post' ? ps.find((x) => x.id === r.targetId) : undefined;
       const c = r.targetType === 'comment' ? cs.find((x) => x.id === r.targetId) : undefined;
-      const images = [];
+      const st = r.targetType === 'story' ? ss.find((x) => x.id === r.targetId) : undefined;
+      const images: string[] = [];
+      if (st && st.status !== 'deleted' && this.storage.available) images.push((await this.storage.temporaryUrl(st.storageKey, apiBase)).url);
       if (p && this.storage.available) {
         for (const m of media.filter((x) => x.postId === p.id)) images.push((await this.storage.temporaryUrl(m.storageKey, apiBase)).url);
       }
@@ -58,7 +62,9 @@ export class ModerationService {
           ? { kind: p.kind, text: p.text, status: p.status, images, visibility: p.visibility }
           : c
             ? { kind: 'comment', text: c.text, status: c.status, images: [], postId: c.postId }
-            : { kind: 'user', text: null, status: null, images: [] },
+            : st
+              ? { kind: 'story', text: null, status: st.status, images }
+              : { kind: 'user', text: null, status: null, images: [] },
         status: r.status,
         action: r.action,
         resolution: r.resolution,
@@ -76,7 +82,7 @@ export class ModerationService {
       throw Errors.validation({ fields: { action: ['Pour une personne, suspends son compte depuis l’écran Utilisateurs.'] } });
     }
     await this.db.transaction(async (tx) => {
-      if (action === 'hidden') await this.setVisibility(tx, r.targetType as 'post' | 'comment', r.targetId, 'hidden', resolution);
+      if (action === 'hidden') await this.setVisibility(tx, r.targetType as 'post' | 'comment' | 'story', r.targetId, 'hidden', resolution);
       // Tous les signalements ouverts sur ce même contenu sont clos par la même décision.
       await tx
         .update(contentReports)
@@ -91,7 +97,7 @@ export class ModerationService {
   }
 
   /** Rétablir un contenu masqué par erreur. */
-  async restore(a: AdminContext, type: 'post' | 'comment', id: string, meta: RequestMeta) {
+  async restore(a: AdminContext, type: 'post' | 'comment' | 'story', id: string, meta: RequestMeta) {
     await this.db.transaction(async (tx) => {
       const changed = await this.setVisibility(tx, type, id, 'published', null);
       if (!changed) throw Errors.conflict('NOT_HIDDEN', 'Ce contenu n’est pas masqué.');
@@ -101,8 +107,12 @@ export class ModerationService {
   }
 
   /** Passe un contenu de publié à masqué (ou l'inverse) en gardant le compteur de commentaires exact. */
-  private async setVisibility(tx: Pick<Database, 'update'>, type: 'post' | 'comment', id: string, to: 'hidden' | 'published', note: string | null): Promise<boolean> {
+  private async setVisibility(tx: Pick<Database, 'update'>, type: 'post' | 'comment' | 'story', id: string, to: 'hidden' | 'published', note: string | null): Promise<boolean> {
     const from = to === 'hidden' ? 'published' : 'hidden';
+    if (type === 'story') {
+      const done = await tx.update(stories).set({ status: to }).where(and(eq(stories.id, id), eq(stories.status, from))).returning({ id: stories.id });
+      return done.length > 0;
+    }
     if (type === 'post') {
       const done = await tx.update(posts).set({ status: to, moderationNote: note, updatedAt: new Date() }).where(and(eq(posts.id, id), eq(posts.status, from))).returning({ id: posts.id });
       return done.length > 0;

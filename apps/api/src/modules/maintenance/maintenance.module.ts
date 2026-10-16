@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SocialModule } from '../social/social.module';
 import { AccountPurgeService } from './account-purge.service';
 import { MaintenanceAdminController } from './maintenance-admin.controller';
 import { MaintenanceRunner } from './maintenance-runner';
@@ -9,6 +10,7 @@ import { PeniRetentionService } from './peni-retention.service';
  * conservation des discussions avec Peni (lot 3, inactive tant que la durée n'est pas validée).
  */
 @Module({
+  imports: [SocialModule],
   controllers: [MaintenanceAdminController],
   providers: [AccountPurgeService, PeniRetentionService, MaintenanceRunner],
   exports: [AccountPurgeService, PeniRetentionService],

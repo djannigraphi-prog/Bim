@@ -61,6 +61,7 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^peni\.conversation_retention_days$/, intIn(7, 3650, true)],
   [/^social\.posts_daily_limit$/, intIn(1, 500)],
   [/^social\.comments_daily_limit$/, intIn(1, 5000)],
+  [/^social\.stories_daily_limit$/, intIn(1, 200)],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

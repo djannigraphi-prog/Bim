@@ -5,11 +5,14 @@
  */
 import { reminderMessage } from './reminders';
 
-/** v2 (15/10/2026) : suit les textes v3 des rappels. */
+/**
+ * v2 (15/10/2026) : suit les textes v3 des rappels. Le 16/10/2026 (lot 4), types sociaux ajoutés (j'aime, commentaire,
+ * abonnement, contenu masqué) sans changer les textes existants : la version reste v2.
+ */
 export const INBOX_TEMPLATES_VERSION = 'v2';
 
-export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder';
-export type InboxCategory = 'projects' | 'support';
+export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden';
+export type InboxCategory = 'projects' | 'support' | 'social';
 
 export interface InboxSource {
   type: InboxType;
@@ -19,10 +22,15 @@ export interface InboxSource {
   taskTitle: string | null;
   attempt: number | null;
   lastAttempt: boolean;
+  /** Social : nom de la personne qui a agi ; extrait du commentaire ; type de contenu masqué. */
+  actorName?: string | null;
+  snippet?: string | null;
 }
 
-export const inboxCategory = (type: InboxType): InboxCategory => (type === 'report_answered' ? 'support' : 'projects');
-export const inboxSender = (type: InboxType): 'peni' | 'bim' => (type === 'report_answered' ? 'bim' : 'peni');
+const SOCIAL: InboxType[] = ['post_liked', 'post_commented', 'new_follower'];
+export const inboxCategory = (type: InboxType): InboxCategory =>
+  type === 'report_answered' || type === 'content_hidden' ? 'support' : SOCIAL.includes(type) ? 'social' : 'projects';
+export const inboxSender = (type: InboxType): 'peni' | 'bim' => (type === 'chest_opened' || type === 'task_reminder' ? 'peni' : 'bim');
 
 const quoted = (title: string | null) => (title ? `« ${title} »` : 'ton projet');
 
@@ -37,5 +45,17 @@ export function inboxText(s: InboxSource): string {
       return 'L’équipe BIM a répondu à ton signalement.';
     case 'task_reminder':
       return reminderMessage(s.taskTitle ?? '', s.attempt ?? 0, s.lastAttempt).body;
+    case 'post_liked':
+      return `${s.actorName ?? 'Quelqu’un'} a aimé ta publication.`;
+    case 'post_commented': {
+      const t = (s.snippet ?? '').trim();
+      return t ? `${s.actorName ?? 'Quelqu’un'} a commenté ta publication : « ${t.length > 80 ? `${t.slice(0, 79)}…` : t} »` : `${s.actorName ?? 'Quelqu’un'} a commenté ta publication.`;
+    }
+    case 'new_follower':
+      return `${s.actorName ?? 'Quelqu’un'} s’est abonné·e à toi.`;
+    case 'content_hidden': {
+      const what = s.snippet === 'comment' ? 'Un de tes commentaires a été masqué' : s.snippet === 'story' ? 'Une de tes stories a été masquée' : 'Une de tes publications a été masquée';
+      return `${what} par la modération de BIM, après un signalement. Si tu penses que c’est une erreur, écris-nous depuis « Résoudre un problème ».`;
+    }
   }
 }

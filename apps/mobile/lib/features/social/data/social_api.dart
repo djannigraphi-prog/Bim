@@ -11,6 +11,20 @@ class SocialApi {
   Future<FeedPage> feed({required String tab, String? cursor}) async =>
       FeedPage.fromJson(await _api.get('/v1/feed', query: {'tab': tab, if (cursor != null) 'cursor': cursor}));
 
+  /// Fil des visiteurs sans compte (écran 06) : publications « Tout le monde », en lecture.
+  Future<FeedPage> publicFeed({String? cursor}) async => FeedPage.fromJson(await _api.get('/v1/public/feed', query: {if (cursor != null) 'cursor': cursor}));
+
+  Future<StoryTray> stories() async => StoryTray.fromJson(await _api.get('/v1/stories'));
+
+  Future<void> createStory(List<int> bytes) {
+    final png = bytes.length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50;
+    return _api.upload('/v1/stories', field: 'photo', bytes: bytes, filename: png ? 'story.png' : 'story.jpg', contentType: png ? 'image/png' : 'image/jpeg');
+  }
+
+  Future<void> viewStory(String id) => _api.put('/v1/stories/$id/view');
+
+  Future<void> deleteStory(String id) => _api.delete('/v1/stories/$id');
+
   Future<FeedPost> post(String id) async => FeedPost.fromJson(await _api.get('/v1/posts/$id'));
 
   /// Publication simple : texte et 4 photos au plus.

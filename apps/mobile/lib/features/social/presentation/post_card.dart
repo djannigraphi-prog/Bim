@@ -14,11 +14,14 @@ import 'social_widgets.dart';
 /// Publication dans le fil (écran 10). Les changements (j'aime, abonnement, commentaires) remontent par [onChanged] ;
 /// une publication supprimée ou dont l'auteur est bloqué disparaît par [onGone].
 class PostCard extends ConsumerWidget {
-  const PostCard({super.key, required this.post, required this.onChanged, required this.onGone});
+  const PostCard({super.key, required this.post, required this.onChanged, required this.onGone, this.readOnlyAction});
 
   final FeedPost post;
   final ValueChanged<FeedPost> onChanged;
   final VoidCallback onGone;
+
+  /// Visiteur sans compte : toute action (j'aime, commentaires, suivre, ouvrir, menu) appelle ceci à la place.
+  final VoidCallback? readOnlyAction;
 
   Future<void> _like(BuildContext context, WidgetRef ref) async {
     final on = !post.likedByMe;
@@ -49,6 +52,14 @@ class PostCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final gate = readOnlyAction;
+    void open(String location) {
+      if (gate != null) {
+        gate();
+      } else {
+        context.push(location);
+      }
+    }
     final before = post.before;
     final after = post.after;
     return Padding(
@@ -60,11 +71,11 @@ class PostCard extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
             child: Row(
               children: [
-                GestureDetector(onTap: () => context.push('/people/${post.author.username}'), child: PersonAvatar(person: post.author, size: 44)),
+                GestureDetector(onTap: () => open('/people/${post.author.username}'), child: PersonAvatar(person: post.author, size: 44)),
                 const SizedBox(width: BimSpacing.md),
                 Expanded(
                   child: InkWell(
-                    onTap: () => context.push('/people/${post.author.username}'),
+                    onTap: () => open('/people/${post.author.username}'),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -82,7 +93,7 @@ class PostCard extends ConsumerWidget {
                 if (!post.isMine && !post.followingAuthor)
                   FilledButton(
                     key: ValueKey('follow-${post.id}'),
-                    onPressed: () => _follow(context, ref),
+                    onPressed: gate ?? () => _follow(context, ref),
                     style: FilledButton.styleFrom(
                       backgroundColor: BimColors.red,
                       foregroundColor: BimColors.white,
@@ -96,10 +107,11 @@ class PostCard extends ConsumerWidget {
                   key: ValueKey('post-menu-${post.id}'),
                   tooltip: 'Plus d’options',
                   icon: const Icon(Icons.more_horiz_rounded),
-                  onPressed: () async {
-                    final r = await showPostMenu(context, ref, post);
-                    if (r != null) onGone();
-                  },
+                  onPressed: gate ??
+                      () async {
+                        final r = await showPostMenu(context, ref, post);
+                        if (r != null) onGone();
+                      },
                 ),
               ],
             ),
@@ -109,7 +121,7 @@ class PostCard extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
               child: GestureDetector(
-                onTap: () => context.push('/posts/${post.id}'),
+                onTap: () => open('/posts/${post.id}'),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(BimRadius.card),
                   child: Stack(
@@ -126,7 +138,7 @@ class PostCard extends ConsumerWidget {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(BimSpacing.md, BimSpacing.xs, BimSpacing.screen, 0),
-            child: PostActions(post: post, onLike: () => _like(context, ref), onComments: () => _comments(context)),
+            child: PostActions(post: post, onLike: gate ?? () => _like(context, ref), onComments: gate ?? () => _comments(context)),
           ),
           if (post.isBim && post.journey != null && post.journey!.subject.isNotEmpty)
             Padding(
@@ -137,7 +149,7 @@ class PostCard extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.xs, BimSpacing.screen, 0),
               child: GestureDetector(
-                onTap: () => context.push('/posts/${post.id}'),
+                onTap: () => open('/posts/${post.id}'),
                 child: Text.rich(
                   TextSpan(children: [
                     TextSpan(text: '${post.author.fullName} ', style: const TextStyle(fontWeight: FontWeight.w700)),

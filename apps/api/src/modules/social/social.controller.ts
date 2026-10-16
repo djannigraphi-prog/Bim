@@ -7,12 +7,13 @@ import type { Request } from 'express';
 import { Errors } from '../../common/errors';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
-import { AuthContext, CurrentAuth } from '../auth/auth.decorators';
+import { AuthContext, CurrentAuth, Public } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { CreateBimPostDto, CreateCommentDto, CreatePostDto, ReportContentDto, ResolveContentReportDto, VISIBILITIES } from './dto';
 import { ModerationService } from './moderation.service';
 import { PeopleService } from './people.service';
 import { MAX_POST_IMAGES, PostsService } from './posts.service';
+import { StoriesService } from './stories.service';
 
 const UPLOAD_LIMIT = 25 * 1024 * 1024; // taille réelle contrôlée par le service (MEDIA_MAX_UPLOAD_MB), message clair
 
@@ -24,7 +25,47 @@ export class SocialController {
   constructor(
     private readonly posts: PostsService,
     private readonly people: PeopleService,
+    private readonly stories: StoriesService,
   ) {}
+
+  @Public()
+  @Get('public/feed')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOperation({ summary: 'Fil des visiteurs sans compte (écran 06) : publications « Tout le monde », en lecture' })
+  publicFeed(@Req() req: Request, @Query('cursor') cursor?: string) {
+    return this.posts.publicFeed(this.cursor(cursor), apiBase(req));
+  }
+
+  @Get('stories')
+  @ApiOperation({ summary: 'Stories (écran 10) : les miennes et celles des personnes suivies, 24 heures' })
+  storyTray(@CurrentAuth() a: AuthContext, @Req() req: Request) {
+    return this.stories.tray(a.userId, apiBase(req));
+  }
+
+  @Post('stories')
+  @Throttle({ default: { limit: 10, ttl: 600_000 } })
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: UPLOAD_LIMIT, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['photo'], properties: { photo: { type: 'string', format: 'binary' } } } })
+  @ApiOperation({ summary: 'Publier une story (photo, visible 24 h par mes abonnés)' })
+  createStory(@CurrentAuth() a: AuthContext, @UploadedFile() photo: Express.Multer.File | undefined, @ReqMeta() meta: RequestMeta) {
+    return this.stories.create(a.userId, photo, meta);
+  }
+
+  @Put('stories/:id/view')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Story vue (anneau gris)' })
+  viewStory(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.stories.markSeen(a.userId, id);
+  }
+
+  @Delete('stories/:id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Supprimer ma story' })
+  removeStory(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
+    return this.stories.remove(a.userId, id, meta);
+  }
 
   @Get('feed')
   @ApiQuery({ name: 'tab', enum: ['for_you', 'following'], required: false })
@@ -224,7 +265,7 @@ export class ModerationController {
   @AdminRoute('content.moderate')
   @ApiOperation({ summary: 'Rétablir une publication ou un commentaire masqué' })
   restore(@CurrentAdmin() a: AdminContext, @Param('type') type: string, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
-    if (type !== 'post' && type !== 'comment') throw Errors.validation({ fields: { type: ['« post » ou « comment ».'] } });
+    if (type !== 'post' && type !== 'comment' && type !== 'story') throw Errors.validation({ fields: { type: ['« post », « comment » ou « story ».'] } });
     return this.moderation.restore(a, type, id, meta);
   }
 }

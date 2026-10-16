@@ -13,6 +13,7 @@ import { StorageService } from '../media/storage';
 import { notBlockedBetween } from './access';
 import { ReportContentDto } from './dto';
 import { PostsService } from './posts.service';
+import { StoriesService } from './stories.service';
 
 /**
  * Personnes (lot 4) : profil (écran 52), recherche, abonnements, blocages, photo de profil (écrans 05 et 52) et
@@ -27,6 +28,7 @@ export class PeopleService {
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly storage: StorageService,
     private readonly posts: PostsService,
+    private readonly stories: StoriesService,
     private readonly audit: AuditService,
   ) {}
 
@@ -173,6 +175,8 @@ export class PeopleService {
         throw Errors.notFound('Commentaire');
       });
       targetUserId = c.userId;
+    } else if (dto.targetType === 'story') {
+      targetUserId = (await this.stories.visibleStory(viewerId, dto.targetId)).userId;
     } else {
       targetUserId = (await this.visiblePerson(viewerId, { id: dto.targetId })).id;
     }

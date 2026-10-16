@@ -251,6 +251,19 @@ class _FakeSocialApi extends SocialApi {
   Future<FeedPage> feed({required String tab, String? cursor}) async => FeedPage(items: tab == 'following' ? const [] : [_bim]);
 
   @override
+  Future<FeedPage> publicFeed({String? cursor}) async => FeedPage(items: [_bim]);
+
+  @override
+  Future<StoryTray> stories() async => StoryTray(items: [
+        for (final (i, n) in const [('Awa Koné', false), ('Nina Bamba', false), ('Coach Karim', true), ('Belle Rosette', true)].indexed)
+          StoryGroup(
+            author: PersonRef(id: 's$i', username: 'demo$i', fullName: n.$1),
+            allSeen: n.$2,
+            items: [StoryItem(id: 'st$i', url: '', createdAt: DateTime.now(), seen: n.$2)],
+          ),
+      ],);
+
+  @override
   Future<FeedPost> post(String id) async => _bim;
 
   @override

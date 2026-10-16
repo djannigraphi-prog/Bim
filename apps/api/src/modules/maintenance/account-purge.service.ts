@@ -39,6 +39,8 @@ export const PURGE_BLOCKING_TABLES = [
   'follows',
   'user_blocks',
   'content_reports',
+  'stories',
+  'story_views',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */

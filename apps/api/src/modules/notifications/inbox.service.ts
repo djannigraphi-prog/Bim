@@ -19,6 +19,10 @@ type Row = {
   task_title: string | null;
   day: string | null;
   attempt: number | null;
+  actor_name: string | null;
+  actor_username: string | null;
+  post_id: string | null;
+  snippet: string | null;
 };
 
 /**
@@ -35,17 +39,38 @@ export class InboxService {
   private sources(userId: string, since: Date) {
     return sql`
       SELECT 'chest:' || e.id AS id, 'chest_opened' AS type, e.created_at AS at, p.id AS project_id, p.title AS project_title,
-             e.payload AS chest, NULL::text AS task_title, NULL::text AS day, NULL::int AS attempt
+             e.payload AS chest, NULL::text AS task_title, NULL::text AS day, NULL::int AS attempt,
+             NULL::text AS actor_name, NULL::text AS actor_username, NULL::text AS post_id, NULL::text AS snippet
       FROM project_events e JOIN projects p ON p.id = e.project_id
       WHERE p.user_id = ${userId} AND e.type = 'chest_opened' AND e.created_at > ${since}
       UNION ALL
-      SELECT 'report:' || r.id, 'report_answered', r.resolved_at, r.project_id, NULL, NULL, NULL, NULL, NULL
+      SELECT 'report:' || r.id, 'report_answered', r.resolved_at, r.project_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
       FROM project_reports r
       WHERE r.user_id = ${userId} AND r.status = 'resolved' AND r.resolved_at > ${since}
       UNION ALL
-      SELECT 'reminder:' || d.id, 'task_reminder', d.sent_at, d.project_id, NULL, NULL, t.title, d.day::text, d.attempt
+      SELECT 'reminder:' || d.id, 'task_reminder', d.sent_at, d.project_id, NULL, NULL, t.title, d.day::text, d.attempt, NULL, NULL, NULL, NULL
       FROM notification_deliveries d JOIN project_tasks t ON t.id = d.task_id
-      WHERE d.user_id = ${userId} AND d.status = 'sent' AND d.sent_at > ${since}`;
+      WHERE d.user_id = ${userId} AND d.status = 'sent' AND d.sent_at > ${since}
+      -- Lot 4 : social. Personnes actives seulement, aucun blocage entre les deux, jamais ses propres actions.
+      UNION ALL
+      SELECT 'like:' || l.post_id || ':' || l.user_id, 'post_liked', l.created_at, NULL, NULL, NULL, NULL, NULL, NULL, u.full_name, u.username, p.id::text, NULL
+      FROM post_likes l JOIN posts p ON p.id = l.post_id JOIN users u ON u.id = l.user_id
+      WHERE p.user_id = ${userId} AND l.user_id <> ${userId} AND p.status = 'published' AND u.status = 'active' AND l.created_at > ${since}
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${userId}))
+      UNION ALL
+      SELECT 'comment:' || c.id, 'post_commented', c.created_at, NULL, NULL, NULL, NULL, NULL, NULL, u.full_name, u.username, p.id::text, left(c.text, 120)
+      FROM post_comments c JOIN posts p ON p.id = c.post_id JOIN users u ON u.id = c.user_id
+      WHERE p.user_id = ${userId} AND c.user_id <> ${userId} AND c.status = 'published' AND p.status = 'published' AND u.status = 'active' AND c.created_at > ${since}
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${userId}))
+      UNION ALL
+      SELECT 'follow:' || f.follower_id, 'new_follower', f.created_at, NULL, NULL, NULL, NULL, NULL, NULL, u.full_name, u.username, NULL, NULL
+      FROM follows f JOIN users u ON u.id = f.follower_id
+      WHERE f.followee_id = ${userId} AND u.status = 'active' AND f.created_at > ${since}
+      UNION ALL
+      SELECT 'moderation:' || r.target_type || ':' || r.target_id, 'content_hidden', max(r.resolved_at), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, r.target_type
+      FROM content_reports r
+      WHERE r.target_user_id = ${userId} AND r.action = 'hidden' AND r.resolved_at > ${since}
+      GROUP BY r.target_type, r.target_id`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {
@@ -62,7 +87,9 @@ export class InboxService {
       this.db.execute<Row>(sql`
         SELECT * FROM (${this.sources(userId, since)}) x
         WHERE (${opts.category ?? null}::text IS NULL
-               OR (CASE WHEN x.type = 'report_answered' THEN 'support' ELSE 'projects' END) = ${opts.category ?? null}::text)
+               OR (CASE WHEN x.type IN ('report_answered', 'content_hidden') THEN 'support'
+                        WHEN x.type IN ('post_liked', 'post_commented', 'new_follower') THEN 'social'
+                        ELSE 'projects' END) = ${opts.category ?? null}::text)
           AND (${opts.before ?? null}::timestamptz IS NULL OR x.at < ${opts.before ?? null}::timestamptz)
         ORDER BY x.at DESC, x.id DESC
         LIMIT ${limit + 1}`),
@@ -85,6 +112,8 @@ export class InboxService {
             taskTitle: r.task_title,
             attempt: r.attempt,
             lastAttempt: (r.attempt ?? 0) >= attempts - 1,
+            actorName: r.actor_name,
+            snippet: r.snippet,
           }),
           at: at.toISOString(),
           unread: seen === null || at > seen,
@@ -121,5 +150,12 @@ function link(r: Row): string | null {
       return r.project_id && r.day ? `/projects/${r.project_id}/day/${r.day}` : null;
     case 'report_answered':
       return '/reports';
+    case 'post_liked':
+    case 'post_commented':
+      return r.post_id ? `/posts/${r.post_id}` : null;
+    case 'new_follower':
+      return r.actor_username ? `/people/${r.actor_username}` : null;
+    case 'content_hidden':
+      return null;
   }
 }

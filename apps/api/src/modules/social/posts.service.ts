@@ -174,6 +174,25 @@ export class PostsService {
     return { items: await this.views(viewerId, page, apiBase), nextCursor: rows.length > PAGE ? page[page.length - 1].post.id : null };
   }
 
+  /**
+   * Fil des visiteurs sans compte (écran 06) : publications « Tout le monde » de comptes actifs seulement, en lecture.
+   * Aucune donnée sur la personne qui regarde (pas de j'aime, pas d'abonnement).
+   */
+  async publicFeed(cursor: string | undefined, apiBase: string) {
+    const conds = [eq(posts.status, 'published'), eq(posts.visibility, 'public'), eq(users.status, 'active')];
+    if (cursor) conds.push(lt(posts.id, cursor));
+    const rows = await this.db
+      .select({ post: posts, author: { id: users.id, username: users.username, fullName: users.fullName, avatarKey: users.avatarKey } })
+      .from(posts)
+      .innerJoin(users, eq(users.id, posts.userId))
+      .where(and(...conds))
+      .orderBy(desc(posts.id))
+      .limit(PAGE + 1);
+    const page = rows.slice(0, PAGE);
+    // Identifiant nul pour la personne qui regarde : aucun j'aime, aucun abonnement, rien n'est « à moi ».
+    return { items: await this.views('00000000-0000-0000-0000-000000000000', page, apiBase), nextCursor: rows.length > PAGE ? page[page.length - 1].post.id : null };
+  }
+
   /** Publications d'une personne visibles par `viewerId` (grille du profil, écran 52). */
   async byAuthor(viewerId: string, authorId: string, cursor: string | undefined, apiBase: string) {
     const conds = [postVisibleTo(viewerId), eq(posts.userId, authorId)];

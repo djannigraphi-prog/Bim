@@ -185,9 +185,47 @@ export const contentReports = pgTable(
     index('content_reports_status_idx').on(t.status, t.createdAt),
     index('content_reports_target_idx').on(t.targetType, t.targetId),
     uniqueIndex('content_reports_open_uq').on(t.reporterId, t.targetType, t.targetId).where(sql`${t.status} = 'open'`),
-    check('content_reports_target_ck', sql`${t.targetType} IN ('post', 'comment', 'user')`),
+    check('content_reports_target_ck', sql`${t.targetType} IN ('post', 'comment', 'user', 'story')`),
     check('content_reports_reason_ck', sql`${t.reason} IN ('spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'other')`),
     check('content_reports_status_ck', sql`${t.status} IN ('open', 'resolved')`),
     check('content_reports_action_ck', sql`${t.action} IS NULL OR ${t.action} IN ('none', 'hidden')`),
   ],
+);
+
+/**
+ * Story (lot 4-B, écran 10) : une photo visible 24 heures par les abonnés de la personne (et par elle-même).
+ * status : published, hidden (modération), deleted (supprimée par la personne). Les fichiers des stories expirées
+ * sont effacés par la maintenance quotidienne (sauf signalement ouvert, pour la modération).
+ */
+export const stories = pgTable(
+  'stories',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    storageKey: varchar('storage_key', { length: 200 }).notNull().unique(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    bytes: integer('bytes').notNull(),
+    status: varchar('status', { length: 10 }).notNull().default('published'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('stories_user_idx').on(t.userId, t.expiresAt), index('stories_expires_idx').on(t.expiresAt), check('stories_status_ck', sql`${t.status} IN ('published', 'hidden', 'deleted')`)],
+);
+
+/** Stories vues (anneau gris dans le fil) ; rien d'autre n'est enregistré sur la personne qui regarde. */
+export const storyViews = pgTable(
+  'story_views',
+  {
+    storyId: uuid('story_id')
+      .notNull()
+      .references(() => stories.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.storyId, t.userId] })],
 );

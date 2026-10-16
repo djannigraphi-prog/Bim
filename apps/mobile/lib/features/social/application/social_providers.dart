@@ -62,6 +62,12 @@ class FeedController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
 
 final feedProvider = AsyncNotifierProvider.autoDispose.family<FeedController, FeedState, String>(FeedController.new);
 
+/// Fil des visiteurs (écran 06), une page.
+final publicFeedProvider = FutureProvider.autoDispose<FeedPage>((ref) => ref.watch(socialApiProvider).publicFeed());
+
+/// Bandeau des stories (écran 10).
+final storiesProvider = FutureProvider.autoDispose<StoryTray>((ref) => ref.watch(socialApiProvider).stories());
+
 final postProvider = FutureProvider.autoDispose.family<FeedPost, String>((ref, id) => ref.watch(socialApiProvider).post(id));
 
 final profileProvider = FutureProvider.autoDispose.family<PublicProfile, String>((ref, username) => ref.watch(socialApiProvider).profile(username));

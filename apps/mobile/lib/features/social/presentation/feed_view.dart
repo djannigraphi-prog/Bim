@@ -7,17 +7,22 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../auth/application/session_controller.dart';
+import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../projects/application/projects_providers.dart';
 import '../../projects/presentation/my_projects_screen.dart';
 import '../application/social_providers.dart';
 import '../data/social_models.dart';
 import 'post_card.dart';
 import 'social_widgets.dart';
+import 'stories.dart';
 
 /// Écran 10 — Accueil : fils « Pour toi » et « Abonnés », « Partage un Bim… », et en tête mes projets (la carte du
 /// jour, ou l'invitation à créer un premier projet). Stories : prochaine étape du lot 4 ; pièces : lot 9.
 class FeedView extends ConsumerStatefulWidget {
-  const FeedView({super.key});
+  const FeedView({super.key, this.visitor = false});
+
+  /// Visiteur sans compte (écran 06) : fil public en lecture ; toute action ouvre l'invitation à créer un compte.
+  final bool visitor;
 
   @override
   ConsumerState<FeedView> createState() => _FeedViewState();
@@ -28,6 +33,7 @@ class _FeedViewState extends ConsumerState<FeedView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.visitor) return const _VisitorFeed();
     final async = ref.watch(feedProvider(_tab));
     final controller = ref.read(feedProvider(_tab).notifier);
     final header = <Widget>[
@@ -41,13 +47,17 @@ class _FeedViewState extends ConsumerState<FeedView> {
           ],
         ),
       ),
+      const StoriesBar(),
+      const SizedBox(height: BimSpacing.sm),
       const _ComposerRow(),
       const _MyProjectsHeader(),
     ];
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(myProjectsProvider);
-        ref.invalidate(feedProvider(_tab));
+        ref
+          ..invalidate(myProjectsProvider)
+          ..invalidate(storiesProvider)
+          ..invalidate(feedProvider(_tab));
         await ref.read(feedProvider(_tab).future);
       },
       child: async.when(
@@ -226,6 +236,42 @@ class _EmptyFeed extends StatelessWidget {
             BimButton(label: 'Trouver des personnes', icon: Icons.search_rounded, variant: BimButtonVariant.outline, onPressed: () => context.push('/search')),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Écran 06 — Fil des visiteurs : publications « Tout le monde », en lecture ; j'aime, commentaires, abonnement et
+/// publication ouvrent l'invitation à créer un compte (« Rejoins BIM pour réagir »).
+class _VisitorFeed extends ConsumerWidget {
+  const _VisitorFeed();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(publicFeedProvider);
+    void gate() => showVisitorGate(context, ref);
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(publicFeedProvider);
+        await ref.read(publicFeedProvider.future);
+      },
+      child: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => ListView(
+          padding: const EdgeInsets.all(BimSpacing.xl),
+          children: [
+            Text(e is ApiException ? e.message : ApiException.unknown.message, textAlign: TextAlign.center),
+            const SizedBox(height: BimSpacing.md),
+            BimButton(label: 'Réessayer', variant: BimButtonVariant.outline, onPressed: () => ref.invalidate(publicFeedProvider)),
+          ],
+        ),
+        data: (page) => ListView(
+          padding: const EdgeInsets.only(top: BimSpacing.md),
+          children: [
+            if (page.items.isEmpty) const _EmptyFeed(tab: 'for_you'),
+            for (final post in page.items) PostCard(key: ValueKey(post.id), post: post, onChanged: (_) {}, onGone: () {}, readOnlyAction: gate),
+          ],
+        ),
       ),
     );
   }

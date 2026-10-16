@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 import { uuidv7 } from '../src/common/uuid';
+import { StorageService } from '../src/modules/media/storage';
+import { StoriesService } from '../src/modules/social/stories.service';
 import { adminSession } from './admin-helpers';
 import { bearer, Harness, registerAndActivate, startHarness } from './harness';
 
@@ -293,6 +295,144 @@ describe('Social (e2e)', () => {
     const comReport = open.find((r: { targetType: string }) => r.targetType === 'comment');
     await h.http().post(`/admin/v1/content-reports/${comReport.id}/resolve`).set(moderator).send({ action: 'hidden', resolution: 'Propos haineux' }).expect(200);
     expect((await h.http().get(`/v1/posts/${p.id}/comments`).set(b.auth).expect(200)).body).toMatchObject({ total: 0, items: [] });
+  });
+
+
+  describe('lot 4-B : stories, fil des visiteurs, notifications sociales', () => {
+    const story = async (auth: Record<string, string>, status = 201) =>
+      (await h.http().post('/v1/stories').set(auth).attach('photo', await jpeg(), { filename: 's.jpg', contentType: 'image/jpeg' }).expect(status)).body;
+    const tray = async (auth: Record<string, string>) => (await h.http().get('/v1/stories').set(auth).expect(200)).body;
+
+    it('stories : visibles par soi et par ses abonnés seulement, 24 h ; vues ; blocage ; suppression', async () => {
+      const a = await user();
+      const fan = await user();
+      const other = await user();
+      await h.http().put(`/v1/people/${a.username}/follow`).set(fan.auth).expect(200);
+      const s1 = await story(a.auth);
+      expect(new Date(s1.expiresAt).getTime() - Date.now()).toBeGreaterThan(23.9 * 3600_000);
+      const mine = await tray(a.auth);
+      expect(mine.mine.items.map((x: { id: string }) => x.id)).toEqual([s1.id]);
+      expect(mine.mine.author.username).toBe(a.username);
+
+      let t = await tray(fan.auth);
+      const g = t.items.find((x: { author: { username: string } }) => x.author.username === a.username);
+      expect(g).toMatchObject({ allSeen: false });
+      const img = await h.http().get(new URL(g.items[0].url).pathname).expect(200);
+      expect((await sharp(img.body).metadata()).exif).toBeUndefined();
+      // Pas abonné : rien.
+      expect((await tray(other.auth)).items.find((x: { author: { username: string } }) => x.author.username === a.username)).toBeUndefined();
+      await h.http().put(`/v1/stories/${s1.id}/view`).set(other.auth).expect(404);
+
+      await h.http().put(`/v1/stories/${s1.id}/view`).set(fan.auth).expect(204);
+      t = await tray(fan.auth);
+      expect(t.items.find((x: { author: { username: string } }) => x.author.username === a.username)).toMatchObject({ allSeen: true });
+
+      // Expirée : plus visible.
+      const s2 = await story(a.auth);
+      await h.pool.query("update stories set expires_at = now() - interval '1 minute' where id = $1", [s2.id]);
+      expect((await tray(fan.auth)).items.find((x: { author: { username: string } }) => x.author.username === a.username).items.map((x: { id: string }) => x.id)).toEqual([s1.id]);
+
+      // Blocage : plus visible dans un sens ni dans l'autre.
+      await h.http().put(`/v1/people/${fan.username}/block`).set(a.auth).expect(200);
+      expect((await tray(fan.auth)).items).toEqual([]);
+      await h.http().delete(`/v1/people/${fan.username}/block`).set(a.auth).expect(200);
+
+      // Seule l'autrice supprime ; fichier effacé.
+      await h.http().delete(`/v1/stories/${s1.id}`).set(fan.auth).expect(404);
+      await h.http().delete(`/v1/stories/${s1.id}`).set(a.auth).expect(204);
+      await h.http().get(new URL(g.items[0].url).pathname).expect(404);
+      expect((await tray(a.auth)).mine).toBeNull();
+      // Contrôles.
+      await h.http().post('/v1/stories').set(a.auth).attach('photo', Buffer.from('%PDF'), { filename: 'a.pdf', contentType: 'application/pdf' }).expect(400);
+      await h.http().get('/v1/stories').expect(401);
+    });
+
+    it('stories : signalement et masquage par la modération ; maintenance qui efface les stories expirées (sauf signalement ouvert)', async () => {
+      const a = await user();
+      const fan = await user();
+      await h.http().put(`/v1/people/${a.username}/follow`).set(fan.auth).expect(200);
+      const s1 = await story(a.auth);
+      await h.http().post('/v1/content-reports').set(fan.auth).send({ targetType: 'story', targetId: s1.id, reason: 'nudity' }).expect(201);
+      const moderator = await adminSession(h, ['moderator']);
+      const rep = (await h.http().get('/admin/v1/content-reports').set(moderator).expect(200)).body.items.find((r: { targetId: string }) => r.targetId === s1.id);
+      expect(rep).toMatchObject({ targetType: 'story', content: { kind: 'story', status: 'published' } });
+      expect(rep.content.images).toHaveLength(1);
+      await h.http().post(`/admin/v1/content-reports/${rep.id}/resolve`).set(moderator).send({ action: 'hidden', resolution: 'Nudité' }).expect(200);
+      expect((await tray(fan.auth)).items.find((x: { author: { username: string } }) => x.author.username === a.username)).toBeUndefined();
+
+      // Maintenance : expirées depuis plus de 24 h → fichier et ligne effacés ; signalement ouvert → gardée.
+      const old = await story(a.auth);
+      const reported = await story(a.auth);
+      await h.http().post('/v1/content-reports').set(fan.auth).send({ targetType: 'story', targetId: reported.id, reason: 'spam' }).expect(201);
+      const keys = (await h.pool.query('select id, storage_key from stories where id = any($1::uuid[])', [[old.id, reported.id]])).rows;
+      await h.pool.query("update stories set expires_at = now() - interval '3 days' where id = any($1::uuid[])", [[old.id, reported.id]]);
+      const r = await h.app.get(StoriesService).cleanupExpired(new Date());
+      expect(r.deleted).toBeGreaterThanOrEqual(1);
+      const left = (await h.pool.query('select id from stories where id = any($1::uuid[])', [[old.id, reported.id]])).rows.map((x: { id: string }) => x.id);
+      expect(left).toEqual([reported.id]);
+      const oldKey = keys.find((k: { id: string }) => k.id === old.id).storage_key;
+      const link = await h.app.get(StorageService).temporaryUrl(oldKey, 'http://x');
+      await h.http().get(new URL(link.url).pathname).expect(404);
+    });
+
+    it('fil des visiteurs (écran 06) : sans compte, publications « Tout le monde » de comptes actifs, rien d’autre', async () => {
+      const a = await user();
+      const pub = (await post(a.auth, { text: 'visible des visiteurs' }, [await jpeg()])).body;
+      const fol = (await post(a.auth, { text: 'abonnés', visibility: 'followers' })).body;
+      const priv = (await post(a.auth, { text: 'moi', visibility: 'private' })).body;
+      const anon = (await h.http().get('/v1/public/feed').expect(200)).body;
+      const got = anon.items.map((x: { id: string }) => x.id);
+      expect(got).toContain(pub.id);
+      expect(got).not.toEqual(expect.arrayContaining([fol.id]));
+      expect(got).not.toEqual(expect.arrayContaining([priv.id]));
+      const item = anon.items.find((x: { id: string }) => x.id === pub.id);
+      expect(item).toMatchObject({ likedByMe: false, isMine: false, followingAuthor: false });
+      expect(item.media[0].url).toContain('/v1/media/');
+      await h.pool.query("update users set status = 'suspended' where id = $1", [a.userId]);
+      expect((await h.http().get('/v1/public/feed').expect(200)).body.items.map((x: { id: string }) => x.id)).not.toContain(pub.id);
+      await h.pool.query("update users set status = 'active' where id = $1", [a.userId]);
+      // Rien d'autre n'est ouvert sans compte.
+      await h.http().get('/v1/feed').expect(401);
+      await h.http().get(`/v1/posts/${pub.id}`).expect(401);
+    });
+
+    it('notifications sociales (écran 17) : j’aime, commentaire, abonnement, contenu masqué ; ni ses propres actions ni les personnes bloquées', async () => {
+      const a = await user();
+      const b = await user();
+      const c = await user();
+      const p = (await post(a.auth, { text: 'ma publication' })).body;
+      await h.http().put(`/v1/posts/${p.id}/like`).set(a.auth).expect(200); // sa propre action : ignorée
+      await h.http().post(`/v1/posts/${p.id}/comments`).set(a.auth).send({ text: 'moi-même' }).expect(201);
+      await h.http().put(`/v1/posts/${p.id}/like`).set(b.auth).expect(200);
+      await h.http().post(`/v1/posts/${p.id}/comments`).set(b.auth).send({ text: 'Bravo, quelle transformation !' }).expect(201);
+      await h.http().put(`/v1/people/${a.username}/follow`).set(b.auth).expect(200);
+      await h.http().put(`/v1/posts/${p.id}/like`).set(c.auth).expect(200);
+
+      const inbox = async (q = '') => (await h.http().get(`/v1/me/notifications${q}`).set(a.auth).expect(200)).body.items as Array<{ type: string; text: string; link: string | null; category: string; sender: string }>;
+      let items = await inbox('?category=social');
+      const bName = b.me.fullName as string;
+      expect(items.map((i) => i.type).sort()).toEqual(['new_follower', 'post_commented', 'post_liked', 'post_liked']);
+      expect(items.find((i) => i.type === 'post_commented')).toMatchObject({ text: `${bName} a commenté ta publication : « Bravo, quelle transformation ! »`, link: `/posts/${p.id}`, category: 'social', sender: 'bim' });
+      expect(items.find((i) => i.type === 'new_follower')).toMatchObject({ text: `${bName} s’est abonné·e à toi.`, link: `/people/${b.username}` });
+      expect((await h.http().get('/v1/me/notifications/unread-count').set(a.auth).expect(200)).body.count).toBe(4);
+
+      // Bloquer c : sa notification disparaît.
+      await h.http().put(`/v1/people/${c.username}/block`).set(a.auth).expect(200);
+      items = await inbox('?category=social');
+      expect(items.filter((i) => i.type === 'post_liked')).toHaveLength(1);
+
+      // Contenu masqué par la modération : la personne est prévenue (catégorie support, sans dire qui a signalé).
+      await h.http().post('/v1/content-reports').set(b.auth).send({ targetType: 'post', targetId: p.id, reason: 'spam' }).expect(201);
+      const moderator = await adminSession(h, ['moderator']);
+      const rep = (await h.http().get('/admin/v1/content-reports').set(moderator).expect(200)).body.items.find((r: { targetId: string }) => r.targetId === p.id);
+      await h.http().post(`/admin/v1/content-reports/${rep.id}/resolve`).set(moderator).send({ action: 'hidden', resolution: 'Spam' }).expect(200);
+      const support = await inbox('?category=support');
+      expect(support[0]).toMatchObject({ type: 'content_hidden', link: null, category: 'support' });
+      expect(support[0].text).toContain('Une de tes publications a été masquée par la modération de BIM');
+      expect(support[0].text).not.toContain(b.username);
+      // Publication masquée : ses j'aime et commentaires ne sont plus notifiés.
+      expect((await inbox('?category=social')).map((i) => i.type)).toEqual(['new_follower']);
+    });
   });
 
   it('compte suspendu : ses publications disparaissent du fil ; limite de publications par 24 h (réglage administrable)', async () => {

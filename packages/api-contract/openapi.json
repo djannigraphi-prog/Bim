@@ -1455,7 +1455,8 @@
               "type": "string",
               "enum": [
                 "projects",
-                "support"
+                "support",
+                "social"
               ]
             }
           },
@@ -1732,16 +1733,72 @@
         ]
       }
     },
-    "/v1/peni/conversations": {
+    "/v1/public/feed": {
+      "get": {
+        "operationId": "SocialController_publicFeed",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fil des visiteurs sans compte (écran 06) : publications « Tout le monde », en lecture",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/v1/stories": {
+      "get": {
+        "operationId": "SocialController_storyTray",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stories (écran 10) : les miennes et celles des personnes suivies, 24 heures",
+        "tags": [
+          "Social"
+        ]
+      },
       "post": {
-        "operationId": "PeniController_start",
+        "operationId": "SocialController_createStory",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/StartPeniConversationDto"
+                "type": "object",
+                "required": [
+                  "photo"
+                ],
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
               }
             }
           }
@@ -1756,15 +1813,15 @@
             "bearer": []
           }
         ],
-        "summary": "Commencer une discussion avec Peni (sans IA : réponses écrites par l’équipe BIM)",
+        "summary": "Publier une story (photo, visible 24 h par mes abonnés)",
         "tags": [
-          "Peni"
+          "Social"
         ]
       }
     },
-    "/v1/peni/conversations/{id}": {
-      "get": {
-        "operationId": "PeniController_get",
+    "/v1/stories/{id}/view": {
+      "put": {
+        "operationId": "SocialController_viewStory",
         "parameters": [
           {
             "name": "id",
@@ -1776,7 +1833,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -1785,15 +1842,15 @@
             "bearer": []
           }
         ],
-        "summary": "Relire une discussion avec Peni",
+        "summary": "Story vue (anneau gris)",
         "tags": [
-          "Peni"
+          "Social"
         ]
       }
     },
-    "/v1/peni/conversations/{id}/messages": {
-      "post": {
-        "operationId": "PeniController_send",
+    "/v1/stories/{id}": {
+      "delete": {
+        "operationId": "SocialController_removeStory",
         "parameters": [
           {
             "name": "id",
@@ -1804,18 +1861,8 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PeniMessageDto"
-              }
-            }
-          }
-        },
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -1824,98 +1871,9 @@
             "bearer": []
           }
         ],
-        "summary": "Répondre à Peni (message libre ou réponse rapide) ; renvoie le brouillon de projet quand tout est noté",
+        "summary": "Supprimer ma story",
         "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/peni/projects/{projectId}/encouragement": {
-      "get": {
-        "operationId": "PeniController_encouragement",
-        "parameters": [
-          {
-            "name": "projectId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "context",
-            "required": true,
-            "in": "query",
-            "description": "day : écran 27 (journée) ; map : écran 26 (carte du projet)",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "day",
-                "map"
-              ]
-            }
-          },
-          {
-            "name": "day",
-            "required": false,
-            "in": "query",
-            "description": "Jour affiché (écran 27) ; aujourd’hui par défaut",
-            "schema": {
-              "example": "2026-10-15",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Encouragement de Peni pour la journée (27) ou la carte (26) ; heures calmes respectées, aucune notification",
-        "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/peni/projects/{projectId}/tasks/{taskId}/explanation": {
-      "get": {
-        "operationId": "PeniController_explainTask",
-        "parameters": [
-          {
-            "name": "projectId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "taskId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte",
-        "tags": [
-          "Peni"
+          "Social"
         ]
       }
     },
@@ -2754,6 +2712,193 @@
         "summary": "Rétablir une publication ou un commentaire masqué",
         "tags": [
           "Administration — modération"
+        ]
+      }
+    },
+    "/v1/peni/conversations": {
+      "post": {
+        "operationId": "PeniController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPeniConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer une discussion avec Peni (sans IA : réponses écrites par l’équipe BIM)",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/conversations/{id}": {
+      "get": {
+        "operationId": "PeniController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Relire une discussion avec Peni",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/conversations/{id}/messages": {
+      "post": {
+        "operationId": "PeniController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeniMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Répondre à Peni (message libre ou réponse rapide) ; renvoie le brouillon de projet quand tout est noté",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/projects/{projectId}/encouragement": {
+      "get": {
+        "operationId": "PeniController_encouragement",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "context",
+            "required": true,
+            "in": "query",
+            "description": "day : écran 27 (journée) ; map : écran 26 (carte du projet)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "map"
+              ]
+            }
+          },
+          {
+            "name": "day",
+            "required": false,
+            "in": "query",
+            "description": "Jour affiché (écran 27) ; aujourd’hui par défaut",
+            "schema": {
+              "example": "2026-10-15",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encouragement de Peni pour la journée (27) ou la carte (26) ; heures calmes respectées, aucune notification",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/projects/{projectId}/tasks/{taskId}/explanation": {
+      "get": {
+        "operationId": "PeniController_explainTask",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte",
+        "tags": [
+          "Peni"
         ]
       }
     },
@@ -4071,58 +4216,6 @@
           }
         }
       },
-      "StartPeniConversationDto": {
-        "type": "object",
-        "properties": {
-          "purpose": {
-            "type": "string",
-            "enum": [
-              "new_project",
-              "choose_goal"
-            ],
-            "description": "new_project : construire tout le projet (écrans 19, 20, 25) ; choose_goal : seulement l’objectif (« Pas sûr ? », écran 21)"
-          },
-          "categoryCode": {
-            "type": "string",
-            "example": "sport",
-            "description": "Catégorie déjà choisie à l’écran 20 (choose_goal)"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "eco",
-              "premium"
-            ],
-            "description": "Mode déjà choisi à l’écran 19 (Peni ne le redemande pas)"
-          },
-          "budget": {
-            "type": "string",
-            "enum": [
-              "small",
-              "medium",
-              "boosted"
-            ]
-          }
-        },
-        "required": [
-          "purpose"
-        ]
-      },
-      "PeniMessageDto": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string",
-            "example": "Je veux perdre du ventre avant mon mariage en décembre",
-            "description": "Message libre (exclusif de « choice »)"
-          },
-          "choice": {
-            "type": "string",
-            "example": "sessions:2",
-            "description": "Identifiant d’une réponse rapide proposée par le dernier message de Peni"
-          }
-        }
-      },
       "CreateBimPostDto": {
         "type": "object",
         "properties": {
@@ -4174,7 +4267,8 @@
             "enum": [
               "post",
               "comment",
-              "user"
+              "user",
+              "story"
             ]
           },
           "targetId": {
@@ -4214,7 +4308,7 @@
               "none",
               "hidden"
             ],
-            "description": "none : rien à reprocher ; hidden : publication ou commentaire masqué"
+            "description": "none : rien à reprocher ; hidden : publication, commentaire ou story masqué"
           },
           "resolution": {
             "type": "string",
@@ -4225,6 +4319,58 @@
           "action",
           "resolution"
         ]
+      },
+      "StartPeniConversationDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "new_project",
+              "choose_goal"
+            ],
+            "description": "new_project : construire tout le projet (écrans 19, 20, 25) ; choose_goal : seulement l’objectif (« Pas sûr ? », écran 21)"
+          },
+          "categoryCode": {
+            "type": "string",
+            "example": "sport",
+            "description": "Catégorie déjà choisie à l’écran 20 (choose_goal)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "eco",
+              "premium"
+            ],
+            "description": "Mode déjà choisi à l’écran 19 (Peni ne le redemande pas)"
+          },
+          "budget": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "boosted"
+            ]
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "PeniMessageDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "Je veux perdre du ventre avant mon mariage en décembre",
+            "description": "Message libre (exclusif de « choice »)"
+          },
+          "choice": {
+            "type": "string",
+            "example": "sessions:2",
+            "description": "Identifiant d’une réponse rapide proposée par le dernier message de Peni"
+          }
+        }
       },
       "AdminLoginDto": {
         "type": "object",

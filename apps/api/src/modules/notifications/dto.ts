@@ -28,7 +28,7 @@ export class NotificationPreferencesDto {
 
 /** Centre de notifications : filtre (Tout = sans catégorie), page suivante (`before`), taille de page. */
 export class InboxQueryDto {
-  @ApiPropertyOptional({ enum: ['projects', 'support'] }) @IsOptional() @IsIn(['projects', 'support']) category?: 'projects' | 'support';
+  @ApiPropertyOptional({ enum: ['projects', 'support', 'social'] }) @IsOptional() @IsIn(['projects', 'support', 'social']) category?: 'projects' | 'support' | 'social';
   @ApiPropertyOptional({ description: 'Date de la dernière notification reçue (page suivante)' })
   @IsOptional()
   @Type(() => Date)

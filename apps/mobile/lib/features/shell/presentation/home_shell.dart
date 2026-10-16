@@ -86,8 +86,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ],
       ),
       // Lot 4 : l'Accueil d'une personne connectée est le fil (écran 10), avec ses projets en tête.
-      body: _tab == 0 && session is SessionSignedIn
-          ? const FeedView()
+      body: _tab == 0
+          ? FeedView(visitor: session is! SessionSignedIn)
           : Center(
         child: Padding(
           padding: const EdgeInsets.all(BimSpacing.xl),

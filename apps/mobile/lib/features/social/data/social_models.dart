@@ -309,3 +309,49 @@ String compactCount(int n) {
   if (n < 1000000) return '${one(n / 1000)} k';
   return '${one(n / 1000000)} M';
 }
+
+/// Story (lot 4-B) : une photo visible 24 heures par la personne et ses abonnés.
+class StoryItem {
+  const StoryItem({required this.id, required this.url, required this.createdAt, required this.seen});
+
+  final String id;
+  final String url;
+  final DateTime createdAt;
+  final bool seen;
+
+  factory StoryItem.fromJson(Map<String, dynamic> j) => StoryItem(
+        id: j['id'] as String,
+        url: (j['url'] ?? '') as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        seen: (j['seen'] ?? false) as bool,
+      );
+}
+
+class StoryGroup {
+  const StoryGroup({required this.author, required this.items, required this.allSeen});
+
+  final PersonRef author;
+  final List<StoryItem> items;
+  final bool allSeen;
+
+  factory StoryGroup.fromJson(Map<String, dynamic> j) => StoryGroup(
+        author: PersonRef.fromJson(j['author'] as Map<String, dynamic>),
+        items: ((j['items'] ?? const <dynamic>[]) as List<dynamic>).map((e) => StoryItem.fromJson(e as Map<String, dynamic>)).toList(),
+        allSeen: (j['allSeen'] ?? false) as bool,
+      );
+}
+
+class StoryTray {
+  const StoryTray({required this.items, this.mine});
+
+  /// Mes stories (null : aucune en cours).
+  final StoryGroup? mine;
+
+  /// Personnes suivies, non vues d'abord.
+  final List<StoryGroup> items;
+
+  factory StoryTray.fromJson(Map<String, dynamic> j) => StoryTray(
+        mine: j['mine'] is Map<String, dynamic> ? StoryGroup.fromJson(j['mine'] as Map<String, dynamic>) : null,
+        items: ((j['items'] ?? const <dynamic>[]) as List<dynamic>).map((e) => StoryGroup.fromJson(e as Map<String, dynamic>)).toList(),
+      );
+}
