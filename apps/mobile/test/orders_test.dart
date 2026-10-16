@@ -20,7 +20,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -37,6 +37,7 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       events: [OrderEvent(type: 'created', actorType: 'customer', at: DateTime.utc(2026, 10, 16, 9))],
       actions: actions,
       payment: payment,
+      reviews: reviews,
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
@@ -81,6 +82,12 @@ class _FakeOrders extends OrdersApi {
   Future<OrderDetail> declarePayment(String id, {String? reference}) async {
     calls.add('declare $id ${reference ?? '-'}');
     return current = _detail(status: 'delivered', actions: const [], payment: const OrderPayment(method: 'mobile_money', amountFcfa: 40000, status: 'declared_by_customer', declaredReference: 'WV-1'));
+  }
+
+  @override
+  Future<OrderDetail> review(String id, {int? position, required int rating, String? comment}) async {
+    calls.add('review ${position ?? 'shop'} $rating ${comment ?? ''}'.trim());
+    return current = _detail(status: 'completed', actions: const [], reviews: OrderReviews(open: true, itemRatings: [position == 0 ? rating : null], shopRating: position == null ? rating : null));
   }
 
   @override
@@ -252,5 +259,22 @@ void main() {
     expect(shop.calls, ['payment/cash 40000', 'payment/confirm']);
     expect(find.text('Terminée'), findsOneWidget);
     expect(find.text('Paiement : Confirmé par la boutique'), findsOneWidget);
+  });
+
+  testWidgets('7-H évaluer un article après la remise : note obligatoire, commentaire facultatif, une seule fois', (tester) async {
+    final api = _FakeOrders()..current = _detail(status: 'completed', actions: const [], reviews: const OrderReviews(open: true, itemRatings: [null]));
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byKey(const ValueKey('review-item-0')), matching: find.text('Évaluer')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextButton>(find.byKey(const ValueKey('review-send'))).onPressed, isNull);
+    await tester.tap(find.byKey(const ValueKey('star-4')));
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('review-comment')), 'Belle robe');
+    await tester.tap(find.byKey(const ValueKey('review-send')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['review 0 4 Belle robe']);
+    expect(find.text('★★★★☆'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const ValueKey('review-item-0')), matching: find.text('Évaluer')), findsNothing);
   });
 }

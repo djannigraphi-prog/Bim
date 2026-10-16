@@ -4,7 +4,7 @@ import { Errors } from '../../common/errors';
 import { recountComments } from './access';
 import type { RequestMeta } from '../../common/request-meta';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, messages, postComments, postMedia, posts, stories, users } from '../../database/schema';
+import { contentReports, messages, postComments, postMedia, posts, reviews, stories, users } from '../../database/schema';
 import { AdminContext } from '../admin/admin.decorators';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../media/storage';
@@ -39,6 +39,9 @@ export class ModerationService {
     for (const m of ms) {
       await this.audit.log({ actorType: 'admin', actorId: admin?.adminId ?? null, action: 'admin.reported_message_viewed', targetType: 'message', targetId: m.id, ip: meta?.ip ?? null, userAgent: meta?.userAgent ?? null });
     }
+    // Lot 7-H : évaluations d'articles et de boutiques signalées.
+    const reviewIds = rows.filter((x) => x.r.targetType === 'review').map((x) => x.r.targetId);
+    const rs = reviewIds.length ? await this.db.select().from(reviews).where(inArray(reviews.id, reviewIds)) : [];
     const userIds = [...new Set(rows.map((x) => x.r.targetUserId).filter((x): x is string => !!x))];
     const ss = storyIds.length ? await this.db.select().from(stories).where(inArray(stories.id, storyIds)) : [];
     const [ps, cs, us, media] = await Promise.all([
@@ -53,6 +56,7 @@ export class ModerationService {
       const c = r.targetType === 'comment' ? cs.find((x) => x.id === r.targetId) : undefined;
       const st = r.targetType === 'story' ? ss.find((x) => x.id === r.targetId) : undefined;
       const msg = r.targetType === 'message' ? ms.find((x) => x.id === r.targetId) : undefined;
+      const rv = r.targetType === 'review' ? rs.find((x) => x.id === r.targetId) : undefined;
       const images: string[] = [];
       if (msg?.kind === 'photo' && msg.mediaKey && this.storage.available) images.push((await this.storage.temporaryUrl(msg.mediaKey, apiBase)).url);
       if (st && st.status !== 'deleted' && this.storage.available) images.push((await this.storage.temporaryUrl(st.storageKey, apiBase)).url);
@@ -75,7 +79,9 @@ export class ModerationService {
               ? { kind: 'story', text: null, status: st.status, images }
               : msg
                 ? { kind: 'message', text: msg.text, status: msg.status, images }
-                : { kind: 'user', text: null, status: null, images: [] },
+                : rv
+                  ? { kind: 'review', text: `${rv.rating}/5${rv.productReference ? ` · ${rv.productReference}` : ' · boutique'}${rv.comment ? ` — ${rv.comment}` : ''}`, status: rv.status, images: [] }
+                  : { kind: 'user', text: null, status: null, images: [] },
         status: r.status,
         action: r.action,
         resolution: r.resolution,
@@ -93,7 +99,7 @@ export class ModerationService {
       throw Errors.validation({ fields: { action: ['Pour une personne, suspends son compte depuis l’écran Utilisateurs.'] } });
     }
     await this.db.transaction(async (tx) => {
-      if (action === 'hidden') await this.setVisibility(tx, r.targetType as 'post' | 'comment' | 'story' | 'message', r.targetId, 'hidden', resolution);
+      if (action === 'hidden') await this.setVisibility(tx, r.targetType as 'post' | 'comment' | 'story' | 'message' | 'review', r.targetId, 'hidden', resolution);
       // Tous les signalements ouverts sur ce même contenu sont clos par la même décision.
       await tx
         .update(contentReports)
@@ -108,7 +114,7 @@ export class ModerationService {
   }
 
   /** Rétablir un contenu masqué par erreur. */
-  async restore(a: AdminContext, type: 'post' | 'comment' | 'story' | 'message', id: string, meta: RequestMeta) {
+  async restore(a: AdminContext, type: 'post' | 'comment' | 'story' | 'message' | 'review', id: string, meta: RequestMeta) {
     await this.db.transaction(async (tx) => {
       const changed = await this.setVisibility(tx, type, id, 'published', null);
       if (!changed) throw Errors.conflict('NOT_HIDDEN', 'Ce contenu n’est pas masqué.');
@@ -118,10 +124,14 @@ export class ModerationService {
   }
 
   /** Passe un contenu de publié à masqué (ou l'inverse) en gardant le compteur de commentaires exact. */
-  private async setVisibility(tx: Pick<Database, 'update' | 'execute'>, type: 'post' | 'comment' | 'story' | 'message', id: string, to: 'hidden' | 'published', note: string | null): Promise<boolean> {
+  private async setVisibility(tx: Pick<Database, 'update' | 'execute'>, type: 'post' | 'comment' | 'story' | 'message' | 'review', id: string, to: 'hidden' | 'published', note: string | null): Promise<boolean> {
     const from = to === 'hidden' ? 'published' : 'hidden';
     if (type === 'message') {
       const done = await tx.update(messages).set({ status: to }).where(and(eq(messages.id, id), eq(messages.status, from))).returning({ id: messages.id });
+      return done.length > 0;
+    }
+    if (type === 'review') {
+      const done = await tx.update(reviews).set({ status: to }).where(and(eq(reviews.id, id), eq(reviews.status, from))).returning({ id: reviews.id });
       return done.length > 0;
     }
     if (type === 'story') {

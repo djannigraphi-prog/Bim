@@ -265,8 +265,8 @@ export class ModerationController {
   @AdminRoute('content.moderate')
   @ApiOperation({ summary: 'Rétablir une publication ou un commentaire masqué' })
   restore(@CurrentAdmin() a: AdminContext, @Param('type') type: string, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
-    if (type !== 'post' && type !== 'comment' && type !== 'story' && type !== 'message') {
-      throw Errors.validation({ fields: { type: ['« post », « comment », « story » ou « message ».'] } });
+    if (type !== 'post' && type !== 'comment' && type !== 'story' && type !== 'message' && type !== 'review') {
+      throw Errors.validation({ fields: { type: ['« post », « comment », « story », « message » ou « review ».'] } });
     }
     return this.moderation.restore(a, type, id, meta);
   }

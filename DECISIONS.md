@@ -189,6 +189,8 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
   espace livreur fermé à tout le reste de BIM (fil, profils, messagerie, boutiques) sauf compte et support — choix de
   réalisation de L7-04 ; relation proposée par la boutique et acceptée par le livreur ; un seul emploi actif.
   Permission d'administration proposée `couriers.review` (rôle principal, support).
+- **7-H (partie sans livraison)** : avis d'article et de boutique selon la proposition du §13 ; délai d'évaluation
+  provisoire 30 jours (`reviews.window_days`) ; aucune moyenne, étoiles de boutique ni statut Gold calculés (A17).
 - **Non réalisé, en attente** : livraisons (7-F, arbitrage annonces / sélection L7-04), paiements réels (lot 8).
 
 ### L7-04 — Livreurs, fiches des articles et réputation : corrections (16/10/2026) · Fondateur · **décidé** ; fiches **réalisées**, livreurs **verrouillés** (aucune route livreur encore)

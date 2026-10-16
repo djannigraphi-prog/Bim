@@ -6,7 +6,7 @@ import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers, conversations, shopMembers } from '../../database/schema';
+import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers, conversations, shopMembers, reviews } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
@@ -205,6 +205,11 @@ export class PeopleService {
       targetUserId = found.senderId;
     } else if (dto.targetType === 'story') {
       targetUserId = (await this.stories.visibleStory(viewerId, dto.targetId)).userId;
+    } else if (dto.targetType === 'review') {
+      // Lot 7-H : une évaluation publiée (article ou boutique), visible de tous.
+      const [r] = await this.db.select({ authorId: reviews.authorId }).from(reviews).where(and(eq(reviews.id, dto.targetId), eq(reviews.status, 'published')));
+      if (!r) throw Errors.notFound('Évaluation');
+      targetUserId = r.authorId;
     } else {
       targetUserId = (await this.visiblePerson(viewerId, { id: dto.targetId })).id;
     }

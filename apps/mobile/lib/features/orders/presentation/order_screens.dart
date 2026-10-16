@@ -311,6 +311,21 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     super.dispose();
   }
 
+  Future<void> _review(OrderDetail o, {int? position, required String about}) async {
+    final r = await showDialog<({int rating, String comment})>(context: context, builder: (_) => _ReviewDialog(about: about));
+    if (r == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(ordersApiProvider).review(o.id, position: position, rating: r.rating, comment: r.comment);
+      if (mounted) showBimSnack(context, 'Merci pour ton avis');
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      ref.invalidate(_orderProvider(o.id));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _declare(OrderDetail o) async {
     setState(() => _busy = true);
     try {
@@ -423,6 +438,31 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                   ),
                 ],
                 if (o.conversationId != null) TextButton(onPressed: () => context.push('/messages/${o.conversationId}'), child: const Text('Voir la conversation')),
+                // 7-H : évaluer chaque article et la boutique, une fois, après la remise.
+                if (o.reviews != null && (o.reviews!.open || o.reviews!.itemRatings.any((r) => r != null) || o.reviews!.shopRating != null)) ...[
+                  const SizedBox(height: BimSpacing.md),
+                  Text('Ton avis', style: theme.textTheme.titleMedium),
+                  for (final (i, item) in o.items.indexed)
+                    if (i < o.reviews!.itemRatings.length)
+                      ListTile(
+                        key: ValueKey('review-item-$i'),
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: o.reviews!.itemRatings[i] != null ? Text(stars(o.reviews!.itemRatings[i]!)) : null,
+                        trailing: o.reviews!.itemRatings[i] == null && o.reviews!.open
+                            ? TextButton(onPressed: _busy ? null : () => _review(o, position: i, about: item.title), child: const Text('Évaluer'))
+                            : null,
+                      ),
+                  ListTile(
+                    key: const ValueKey('review-shop'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('La boutique ${o.shopName}'),
+                    subtitle: o.reviews!.shopRating != null ? Text(stars(o.reviews!.shopRating!)) : null,
+                    trailing: o.reviews!.shopRating == null && o.reviews!.open
+                        ? TextButton(onPressed: _busy ? null : () => _review(o, about: 'la boutique ${o.shopName}'), child: const Text('Évaluer'))
+                        : null,
+                  ),
+                ],
               ],
             ),
           ),
@@ -544,5 +584,60 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
             ),
           ),
         ),
+      );
+}
+
+/// Note sur 5 en étoiles pleines et vides (affichage d'un avis ; aucune moyenne, A17).
+String stars(int rating) => '${'★' * rating}${'☆' * (5 - rating)}';
+
+/// Évaluation : une note de 1 à 5 et un commentaire facultatif. Le champ appartient à la boîte de dialogue.
+class _ReviewDialog extends StatefulWidget {
+  const _ReviewDialog({required this.about});
+  final String about;
+
+  @override
+  State<_ReviewDialog> createState() => _ReviewDialogState();
+}
+
+class _ReviewDialogState extends State<_ReviewDialog> {
+  final _c = TextEditingController();
+  int _rating = 0;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('Évaluer ${widget.about}', maxLines: 2, overflow: TextOverflow.ellipsis),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var n = 1; n <= 5; n++)
+                  IconButton(
+                    key: ValueKey('star-$n'),
+                    tooltip: '$n sur 5',
+                    icon: Icon(n <= _rating ? Icons.star_rounded : Icons.star_border_rounded, color: BimColors.red),
+                    onPressed: () => setState(() => _rating = n),
+                  ),
+              ],
+            ),
+            TextField(key: const ValueKey('review-comment'), controller: _c, maxLength: 1000, maxLines: 3, decoration: const InputDecoration(hintText: 'Ton commentaire (facultatif)')),
+            const Text('Ton avis est public et ne se modifie plus ; tu pourras le retirer.'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(
+            key: const ValueKey('review-send'),
+            onPressed: _rating == 0 ? null : () => Navigator.pop(context, (rating: _rating, comment: _c.text.trim())),
+            child: const Text('Publier'),
+          ),
+        ],
       );
 }

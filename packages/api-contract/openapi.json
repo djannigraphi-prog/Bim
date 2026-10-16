@@ -5773,6 +5773,92 @@
         ]
       }
     },
+    "/v1/orders/{id}/reviews/items/{position}": {
+      "post": {
+        "operationId": "OrdersController_reviewItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "position",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Évaluer un article de la commande (une fois par ligne, après la remise, dans le délai)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders/{id}/reviews/shop": {
+      "post": {
+        "operationId": "OrdersController_reviewShop",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Évaluer la boutique pour cette commande (une fois)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/orders/preview": {
       "post": {
         "operationId": "OrdersController_preview",
@@ -6485,6 +6571,96 @@
         ],
         "tags": [
           "Administration"
+        ]
+      }
+    },
+    "/v1/reviews/{id}": {
+      "delete": {
+        "operationId": "MyReviewsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/bimshop/products/{id}/reviews": {
+      "get": {
+        "operationId": "PublicReviewsController_product",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/shops/{slug}/reviews": {
+      "get": {
+        "operationId": "PublicReviewsController_shop",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BimShop"
         ]
       }
     },
@@ -8367,7 +8543,8 @@
               "comment",
               "user",
               "story",
-              "message"
+              "message",
+              "review"
             ]
           },
           "targetId": {
@@ -8927,6 +9104,23 @@
         },
         "required": [
           "minutes"
+        ]
+      },
+      "ReviewDto": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "rating"
         ]
       },
       "OrderLineDto": {

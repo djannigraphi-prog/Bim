@@ -1,12 +1,13 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
-import { AuthContext, CurrentAuth, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
+import { AuthContext, CurrentAuth, Public, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
-import { AcceptProposalDto, CashReceivedDto, CreateOrderDto, DeclarePaymentDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto, ReviewNoteDto } from './dto';
+import { AcceptProposalDto, CashReceivedDto, CreateOrderDto, DeclarePaymentDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto, ReviewDto, ReviewNoteDto } from './dto';
+import { ReviewsService } from './reviews.service';
 import { PaymentsService } from './payments.service';
 import { OrdersService } from './orders.service';
 
@@ -19,7 +20,24 @@ export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly payments: PaymentsService,
+    private readonly reviews: ReviewsService,
   ) {}
+
+  @Post(':id/reviews/items/:position')
+  @Throttle({ default: { limit: 30, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Évaluer un article de la commande (une fois par ligne, après la remise, dans le délai)' })
+  async reviewItem(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Param('position', ParseIntPipe) position: number, @Body() dto: ReviewDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.reviews.reviewItem(a.userId, id, position, dto.rating, dto.comment, meta);
+    return this.orders.getForCustomer(a.userId, id, apiBase(req));
+  }
+
+  @Post(':id/reviews/shop')
+  @Throttle({ default: { limit: 30, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Évaluer la boutique pour cette commande (une fois)' })
+  async reviewShop(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReviewDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.reviews.reviewShop(a.userId, id, dto.rating, dto.comment, meta);
+    return this.orders.getForCustomer(a.userId, id, apiBase(req));
+  }
 
   @Post('preview')
   @HttpCode(200)
@@ -215,5 +233,41 @@ export class PaymentsAdminController {
   @AdminRoute('payments.review')
   reviewed(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReviewNoteDto, @ReqMeta() meta: RequestMeta) {
     return this.payments.markReviewed(a, id, dto.note.trim(), meta);
+  }
+}
+
+/** Lot 7-H — Retirer sa propre évaluation (elle reste en base, non affichée). */
+@ApiTags('Commandes')
+@ApiBearerAuth()
+@RequireSpace('user')
+@Controller('v1/reviews')
+export class MyReviewsController {
+  constructor(private readonly reviews: ReviewsService) {}
+
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
+    await this.reviews.remove(a.userId, id, meta);
+  }
+}
+
+/** Lot 7-H — Évaluations publiques d'un article et d'une boutique (aucune moyenne : A17). */
+@ApiTags('BimShop')
+@Controller('v1/bimshop')
+export class PublicReviewsController {
+  constructor(private readonly reviews: ReviewsService) {}
+
+  @Public()
+  @Get('products/:id/reviews')
+  @ApiQuery({ name: 'before', required: false })
+  product(@Param('id', ParseUUIDPipe) id: string, @Query('before') before?: string) {
+    return this.reviews.forProduct(id, before);
+  }
+
+  @Public()
+  @Get('shops/:slug/reviews')
+  @ApiQuery({ name: 'before', required: false })
+  shop(@Param('slug') slug: string, @Query('before') before?: string) {
+    return this.reviews.forShop(slug, before);
   }
 }

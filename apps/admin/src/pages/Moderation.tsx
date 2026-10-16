@@ -28,7 +28,7 @@ const REASONS: Record<string, string> = {
   other: 'Autre',
 };
 // Lot 6-A : un message privé n'apparaît ici que s'il a été signalé ; chaque affichage est journalisé par l'API.
-const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé' };
+const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé', review: 'Évaluation' };
 const STATUS: Record<string, string> = { published: 'en ligne', hidden: 'masqué', deleted: 'supprimé par son auteur' };
 
 /**

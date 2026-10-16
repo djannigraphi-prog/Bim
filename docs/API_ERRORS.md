@@ -31,6 +31,8 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `COURIER_NOT_FOUND` | 404 | 7-E : aucun livreur vérifié avec ce nom d'utilisateur |
 | `RELATION_EXISTS` | 409 | 7-E : relation (ou proposition) déjà en cours entre ce livreur et la boutique |
 | `ALREADY_EMPLOYED` | 409 | 7-E : le livreur a déjà un emploi actif (au plus un, contrainte de la base) |
+| `REVIEW_NOT_ALLOWED` | 409 | 7-H : évaluation impossible (avant la remise, délai `reviews.window_days` passé, paiement contesté, membre de la boutique) ; motif dans le message |
+| `ALREADY_REVIEWED` | 409 | 7-H : cette ligne (ou la boutique pour cette commande) est déjà évaluée |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |
 | `PRODUCT_CONTENT_LOCKED` | 409 | L7-04 : nom, description et prix normal ne se modifient plus après la création ; rubrique, durée et variantes plus après la première publication ; créer une nouvelle fiche ; `details.fields` (liste des champs refusés) |
 | `REPUTATION_RESET_REQUIRED` | 409 | **Retiré (L7-04)** : n'est plus renvoyé ; `confirmReputationReset` est refusé (400) |

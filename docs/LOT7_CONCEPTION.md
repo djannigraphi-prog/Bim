@@ -492,6 +492,12 @@ Tous réglables dans `app_settings` (modification réservée à `settings.write`
   interne du livreur, E11). Éligibilité : commande `terminée` (ou livrée sans contestation en cours) du client lui-même,
   une évaluation par ligne, délai limité ; jamais par un membre de la boutique ni un livreur de la commande ; signalement
   et modération ; une mauvaise livraison ne baisse pas la note de l'article.
+- **Réalisé en 7-H (sans livraison)** : évaluation d'un article par ligne de commande (référence et version
+  enregistrées) et de la boutique par commande ; client de la commande seulement, après la remise (commande terminée, ou
+  remise sans contestation du paiement en cours), dans `reviews.window_days` (30 j, provisoire), une fois, jamais un
+  membre de la boutique ; note de 1 à 5 et commentaire, non réécrits (déclencheur), retirables par l'auteur ;
+  signalement et modération (masquer, rétablir) ; affichage des avis individuels, **aucune moyenne ni étoiles de
+  boutique** (A17). Évaluation de la livraison : avec 7-F.
 - **À définir** [ARBITRAGE A17] : critères d'obtention de Gold ; maintien et retrait ; calcul des étoiles (moyenne
   pondérée par le nombre d'avis proposée) ; prévention des avis frauduleux ; prise en compte des commandes contestées.
 

@@ -32,6 +32,7 @@ import { SettingsService } from '../settings/settings.service';
 import { DeliveryMode } from '../tariffs/pricing';
 import { TariffsService } from '../tariffs/tariffs.service';
 import { PaymentsService } from './payments.service';
+import { ReviewsService } from './reviews.service';
 
 type Order = typeof orders.$inferSelect;
 type Item = typeof orderItems.$inferSelect;
@@ -83,6 +84,7 @@ export class OrdersService {
     private readonly messaging: MessagingService,
     private readonly audit: AuditService,
     private readonly payments: PaymentsService,
+    private readonly reviews: ReviewsService,
   ) {
     // Clé de chiffrement des codes de remise, dérivée du secret des codes (aucun nouveau secret à fournir).
     this.codeKey = createHmac('sha256', cfg.OTP_SECRET).update('bim-handover-code-key-v1').digest().toString('base64');
@@ -718,6 +720,8 @@ export class OrdersService {
       handoverCodeStatus: code ? code.status : null,
       events: events.map((e) => ({ type: e.type, actorType: e.actorType, fromStatus: e.fromStatus, toStatus: e.toStatus, at: e.createdAt, reason: (e.data as { reason?: string }).reason ?? null })),
       payment: await this.payments.view(o, party),
+      // 7-H : évaluations du client (articles et boutique), après la remise et dans le délai.
+      reviews: party === 'customer' ? await this.reviews.orderState(o) : null,
       actions: [...OrdersService.actions(o, party), ...PaymentsService.actions(o, await this.payments.forOrder(o.id), party)],
     };
   }

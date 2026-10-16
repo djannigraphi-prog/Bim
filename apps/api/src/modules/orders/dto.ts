@@ -59,6 +59,11 @@ export class CashReceivedDto {
   @ApiProperty() @IsInt() @Min(1) amountFcfa!: number;
 }
 
+export class ReviewDto {
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) rating!: number;
+  @ApiPropertyOptional({ maxLength: 1000 }) @IsOptional() @IsString() @Length(0, 1000) comment?: string;
+}
+
 export class ReviewNoteDto {
   @ApiProperty() @IsString() @Length(3, 300) note!: string;
 }

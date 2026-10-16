@@ -6,6 +6,7 @@ import 'package:bim/features/auth/data/models.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
 import 'package:bim/features/bimshop/presentation/product_screen.dart';
+import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/bimshop/presentation/shop_profile_screen.dart';
 import 'package:bim/features/messaging/data/messaging_api.dart';
@@ -93,6 +94,13 @@ class _FakeMessaging extends MessagingApi {
   }
 }
 
+/// 7-H : avis publics d'un article (notes individuelles, aucune moyenne).
+class _FakeOrders extends OrdersApi {
+  _FakeOrders() : super(_client());
+  @override
+  Future<List<PublicReview>> productReviews(String productId) async => [PublicReview(rating: 4, comment: 'Belle robe', authorName: 'Koffi Yao', createdAt: DateTime.utc(2026, 10, 16))];
+}
+
 class _SignedIn extends SessionController {
   @override
   SessionState build() => SessionSignedIn(Me.fromJson(const {'id': 'u1', 'fullName': 'Awa Koné', 'username': 'awa.kone', 'city': 'Cocody', 'contacts': <dynamic>[]}));
@@ -127,6 +135,7 @@ Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool
       apiClientProvider.overrideWithValue(_client()),
       bimShopApiProvider.overrideWithValue(api),
       messagingApiProvider.overrideWithValue(messaging ?? _FakeMessaging()),
+      ordersApiProvider.overrideWithValue(_FakeOrders()),
       sessionProvider.overrideWith(signedIn ? _SignedIn.new : _Visitor.new),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
@@ -195,6 +204,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('checkout '), findsOneWidget);
     expect(find.textContaining(' p1 v1 1 '), findsOneWidget);
+  });
+
+  testWidgets('7-H écran 34 : avis des clients, notes individuelles, sans moyenne', (tester) async {
+    await _pump(tester, _FakeBimShop(), '/bimshop/products/p1');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-reviews')), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Avis des clients (1)'), findsOneWidget);
+    expect(find.text('★★★★☆  Koffi Yao'), findsOneWidget);
+    expect(find.textContaining('moyenne'), findsNothing);
   });
 
   testWidgets('visiteur : le cœur invite à créer un compte, rien n’est envoyé', (tester) async {

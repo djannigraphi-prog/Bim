@@ -174,6 +174,38 @@ String paymentStatusLabel(String s) => switch (s) {
 
 String operatorLabel(String? o) => switch (o) { 'wave' => 'Wave', 'orange' => 'Orange Money', 'mtn' => 'MTN MoMo', 'moov' => 'Moov Money', _ => 'Mobile Money' };
 
+/// 7-H — Évaluations d'une commande par son client : une par ligne et une pour la boutique.
+class OrderReviews {
+  const OrderReviews({required this.open, required this.itemRatings, this.shopRating, this.reason});
+  final bool open;
+  /// Note donnée à chaque ligne (null = pas encore évaluée).
+  final List<int?> itemRatings;
+  final int? shopRating;
+  final String? reason;
+  factory OrderReviews.fromJson(Map<String, dynamic> j) => OrderReviews(
+        open: j['open'] as bool,
+        reason: j['reason'] as String?,
+        itemRatings: [for (final i in (j['items'] as List<dynamic>).cast<Map<String, dynamic>>()) (i['review'] as Map<String, dynamic>?)?['rating'] as int?],
+        shopRating: (j['shop'] as Map<String, dynamic>?)?['rating'] as int?,
+      );
+}
+
+class PublicReview {
+  const PublicReview({required this.rating, required this.authorName, required this.createdAt, this.comment, this.aboutCurrentVersion = true});
+  final int rating;
+  final String? comment;
+  final String authorName;
+  final DateTime createdAt;
+  final bool aboutCurrentVersion;
+  factory PublicReview.fromJson(Map<String, dynamic> j) => PublicReview(
+        rating: j['rating'] as int,
+        comment: j['comment'] as String?,
+        authorName: (j['author'] as Map<String, dynamic>)['fullName'] as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        aboutCurrentVersion: (j['aboutCurrentVersion'] ?? true) as bool,
+      );
+}
+
 class OrderDetail {
   const OrderDetail({
     required this.id,
@@ -202,6 +234,7 @@ class OrderDetail {
     this.endedBy,
     this.endReason,
     this.payment,
+    this.reviews,
   });
 
   final String id;
@@ -229,6 +262,7 @@ class OrderDetail {
   final String? endedBy;
   final String? endReason;
   final OrderPayment? payment;
+  final OrderReviews? reviews;
   final List<OrderEvent> events;
   /// Actions possibles maintenant, calculées par le serveur.
   final List<String> actions;
@@ -264,6 +298,7 @@ class OrderDetail {
       endedBy: ended?['byType'] as String?,
       endReason: ended?['reason'] as String?,
       payment: j['payment'] == null ? null : OrderPayment.fromJson(j['payment'] as Map<String, dynamic>),
+      reviews: j['reviews'] == null ? null : OrderReviews.fromJson(j['reviews'] as Map<String, dynamic>),
       events: [for (final e in (j['events'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) OrderEvent.fromJson(e)],
       actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
     );
@@ -384,6 +419,16 @@ class OrdersApi {
   Future<OrderDetail> declarePayment(String id, {String? reference}) async =>
       OrderDetail.fromJson(await _api.post('/v1/orders/$id/payment/declare', body: {if (reference != null && reference.isNotEmpty) 'reference': reference}));
 
+  /// `position` : ligne évaluée ; null = la boutique.
+  Future<OrderDetail> review(String id, {int? position, required int rating, String? comment}) async => OrderDetail.fromJson(
+        await _api.post(position == null ? '/v1/orders/$id/reviews/shop' : '/v1/orders/$id/reviews/items/$position', body: {'rating': rating, if (comment != null && comment.isNotEmpty) 'comment': comment}),
+      );
+
+  Future<List<PublicReview>> productReviews(String productId) async {
+    final r = await _api.get('/v1/bimshop/products/$productId/reviews');
+    return [for (final x in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) PublicReview.fromJson(x)];
+  }
+
   Future<OrderDetail> cancel(String id, {String? reason}) async => OrderDetail.fromJson(await _api.post('/v1/orders/$id/cancel', body: {if (reason != null) 'reason': reason}));
 }
 
@@ -416,6 +461,7 @@ class ShopOrdersApi {
 
 final ordersApiProvider = Provider<OrdersApi>((ref) => OrdersApi(ref.watch(apiClientProvider)));
 final shopOrdersApiProvider = Provider<ShopOrdersApi>((ref) => ShopOrdersApi(ref.watch(apiClientProvider)));
+final productReviewsProvider = FutureProvider.autoDispose.family<List<PublicReview>, String>((ref, id) => ref.watch(ordersApiProvider).productReviews(id));
 final communesProvider = FutureProvider.autoDispose<List<Commune>>((ref) => ref.watch(ordersApiProvider).communes());
 final myOrdersProvider = FutureProvider.autoDispose<List<OrderSummary>>((ref) => ref.watch(ordersApiProvider).mine());
 final shopOrdersProvider = FutureProvider.autoDispose.family<List<OrderSummary>, String>((ref, box) => ref.watch(shopOrdersApiProvider).list(box));

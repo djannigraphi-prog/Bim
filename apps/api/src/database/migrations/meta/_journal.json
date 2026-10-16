@@ -239,6 +239,13 @@
       "when": 1792185829282,
       "tag": "0033_couriers",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792186806723,
+      "tag": "0034_reviews",
+      "breakpoints": true
     }
   ]
 }

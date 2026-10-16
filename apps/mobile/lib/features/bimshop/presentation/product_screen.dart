@@ -14,6 +14,7 @@ import '../../merchant/data/shop_api.dart' show formatFcfa;
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
 import '../../orders/data/orders_api.dart';
 import '../../orders/presentation/checkout_screen.dart';
+import '../../orders/presentation/order_screens.dart' show stars;
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
@@ -238,6 +239,8 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                         ),
                       ),
                     ),
+                    // 7-H : avis des clients (notes individuelles ; aucune moyenne tant que A17 n'est pas tranché).
+                    _Reviews(productId: p.id),
                     if (p.moreFromShop.isNotEmpty) ...[
                       const SizedBox(height: BimSpacing.xl),
                       Text('Du même marchand', style: theme.textTheme.titleMedium),
@@ -311,5 +314,33 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
     final h = minutes ~/ 60;
     final m = minutes % 60;
     return m == 0 ? '$h h' : '$h h ${m.toString().padLeft(2, '0')}';
+  }
+}
+
+class _Reviews extends ConsumerWidget {
+  const _Reviews({required this.productId});
+  final String productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final items = ref.watch(productReviewsProvider(productId)).valueOrNull ?? const <PublicReview>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      key: const ValueKey('product-reviews'),
+      padding: const EdgeInsets.only(top: BimSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Avis des clients (${items.length})', style: theme.textTheme.titleMedium),
+          for (final r in items.take(5))
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('${stars(r.rating)}  ${r.authorName}'),
+              subtitle: Text([if (r.comment != null) r.comment!, if (!r.aboutCurrentVersion) 'Concerne une version précédente de la fiche'].join('\n')),
+            ),
+        ],
+      ),
+    );
   }
 }
