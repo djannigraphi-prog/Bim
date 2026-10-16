@@ -79,7 +79,7 @@ class _CourierApplyScreenState extends ConsumerState<CourierApplyScreen> {
             : ListView(
                 padding: const EdgeInsets.all(BimSpacing.screen),
                 children: [
-                  Row(children: [const BimBackButton(), const SizedBox(width: BimSpacing.sm), Text('Devenir livreur', style: theme.textTheme.titleLarge)]),
+                  Row(children: [const BimBackButton(), const SizedBox(width: BimSpacing.sm), Expanded(child: Text('Devenir livreur', style: theme.textTheme.titleLarge))]),
                   const SizedBox(height: BimSpacing.md),
                   Text(
                     'L’équipe BIM vérifie ta pièce d’identité et ton selfie à la main. Ces documents sont chiffrés et ne sont vus que par les '
@@ -249,11 +249,12 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
                         Text('${relationLabel(r.relation)}${r.place != null && r.place!.isNotEmpty ? ' · ${r.place}' : ''} · ${r.status == 'pending' ? 'proposition à accepter' : 'en cours'}'),
                         if (r.relation == 'employee') Text('Employé : tu peux recevoir des espèces pour cette boutique, selon ses règles.', style: theme.textTheme.bodySmall),
                         const SizedBox(height: BimSpacing.sm),
-                        Row(
+                        Wrap(
+                          spacing: BimSpacing.sm,
+                          runSpacing: BimSpacing.xs,
                           children: [
                             if (r.status == 'pending') ...[
                               FilledButton(key: ValueKey('relation-accept-${r.id}'), onPressed: _busy ? null : () => _do((api) => api.relation(r.id, 'accept'), done: 'Relation acceptée'), child: const Text('Accepter')),
-                              const SizedBox(width: BimSpacing.sm),
                               OutlinedButton(key: ValueKey('relation-decline-${r.id}'), onPressed: _busy ? null : () => _do((api) => api.relation(r.id, 'decline')), child: const Text('Refuser')),
                             ] else
                               TextButton(key: ValueKey('relation-end-${r.id}'), onPressed: _busy ? null : () => _do((api) => api.relation(r.id, 'end'), done: 'Relation terminée'), child: const Text('Mettre fin')),
@@ -359,7 +360,7 @@ class _ShopCouriersScreenState extends ConsumerState<ShopCouriersScreen> {
         child: ListView(
           padding: const EdgeInsets.all(BimSpacing.screen),
           children: [
-            Row(children: [const BimBackButton(), const SizedBox(width: BimSpacing.sm), Text('Livreurs', style: theme.textTheme.titleLarge)]),
+            Row(children: [const BimBackButton(), const SizedBox(width: BimSpacing.sm), Expanded(child: Text('Livreurs', style: theme.textTheme.titleLarge))]),
             const SizedBox(height: BimSpacing.sm),
             Text(
               'Seuls tes livreurs employés peuvent recevoir des espèces pour ta boutique. Un partenaire ou un indépendant, jamais. '
