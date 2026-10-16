@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, index, pgEnum, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, boolean, check, index, pgEnum, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './identity';
 
 /**
@@ -55,8 +55,52 @@ export const shopMembers = pgTable(
     role: shopMemberRole('role').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    /**
+     * 7-A : invitation acceptée par la personne (null = invitation en attente : aucun accès à la boutique).
+     * Le propriétaire et les membres existants sont acceptés (valeur par défaut).
+     */
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow(),
+    /** 7-A : propriétaire qui a invité la personne. */
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
   },
   (t) => [uniqueIndex('shop_members_shop_user_uq').on(t.shopId, t.userId), index('shop_members_user_idx').on(t.userId)],
+);
+
+/**
+ * 7-A (A16) — Permissions d'un employé, accordées et retirées par le propriétaire uniquement. Le propriétaire a tous
+ * les droits ; un employé n'a que les permissions listées ici (aucune par défaut). Aucune permission ne donne le droit
+ * d'encaisser des espèces : cela dépend du statut réel du livreur (F3 bis), jamais d'un droit de la boutique.
+ */
+export const SHOP_PERMISSIONS = [
+  'orders.read',
+  'orders.prepare',
+  'products.edit',
+  'products.publish',
+  'products.visibility',
+  'messages.reply',
+  'deliveries.select_courier',
+  'deliveries.settings',
+  'payments.decide',
+] as const;
+export type ShopPermission = (typeof SHOP_PERMISSIONS)[number];
+
+export const shopMemberPermissions = pgTable(
+  'shop_member_permissions',
+  {
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    permission: varchar('permission', { length: 32 }).notNull(),
+    grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+    grantedAt: timestamp('granted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.shopId, t.userId, t.permission] }),
+    check('shop_member_permissions_ck', sql`${t.permission} IN (${sql.raw(SHOP_PERMISSIONS.map((p) => `'${p}'`).join(', '))})`),
+  ],
 );
 
 export const courierAccounts = pgTable(

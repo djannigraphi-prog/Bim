@@ -82,8 +82,12 @@ describe('Catalogue des boutiques (e2e)', () => {
     const last = await h.http().delete(`/v1/shop/products/${p.id}/photos/${d.photos[1].id}`).set(m.auth!).expect(409);
     expect(last.body.error.code).toBe('LAST_PHOTO');
 
-    // Variantes (tailles) puis stock par variante.
-    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L'] }).expect(200)).body;
+    // Variantes (tailles) puis stock par variante. Article déjà publié : changer les variantes remet sa réputation à
+    // zéro (7-A) — refusé tant que ce n'est pas confirmé, rien n'est enregistré.
+    const unconfirmed = await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L'] }).expect(409);
+    expect(unconfirmed.body.error).toMatchObject({ code: 'REPUTATION_RESET_REQUIRED', details: { fields: ['variants'] } });
+    expect((await h.http().get(`/v1/shop/products/${p.id}`).set(m.auth!).expect(200)).body.variants.map((v: { label: string }) => v.label)).toEqual(['Unique']);
+    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L'], confirmReputationReset: true }).expect(200)).body;
     expect(d.variants.map((v: { label: string }) => v.label)).toEqual(['S', 'M', 'L']);
     const vM = d.variants[1].id;
     d = (await h.http().put(`/v1/shop/products/${p.id}/variants/${vM}/stock`).set(m.auth!).send({ quantity: 7 }).expect(200)).body;

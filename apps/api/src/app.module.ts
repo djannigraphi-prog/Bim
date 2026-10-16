@@ -21,6 +21,7 @@ import { MerchantsModule } from './modules/merchants/merchants.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { OffersModule } from './modules/offers/offers.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
+import { ShopTeamModule } from './modules/shop-team/shop-team.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
@@ -74,6 +75,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     CatalogModule,
     OffersModule,
     MessagingModule,
+    ShopTeamModule,
     AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

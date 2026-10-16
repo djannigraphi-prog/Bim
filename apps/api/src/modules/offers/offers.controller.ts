@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
-import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
+import { AuthContext, CurrentAuth, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { OfferDto, ReceiveOffersDto } from './dto';
 import { OffersService } from './offers.service';
@@ -12,6 +12,8 @@ import { OffersService } from './offers.service';
 @ApiTags('Espace marchand')
 @ApiBearerAuth()
 @RequireSpace('merchant')
+// 7-A (A16) : les demandes et offres de projet ne figurent pas parmi les permissions des employés : propriétaire seul.
+@RequireShopPermission('owner')
 @Controller('v1/shop')
 export class ShopOffersController {
   constructor(private readonly offers: OffersService) {}

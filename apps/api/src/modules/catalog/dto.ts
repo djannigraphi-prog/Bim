@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
 
 export class ProductDto {
   @ApiPropertyOptional({ enum: ['product', 'service'], default: 'product' }) @IsOptional() @IsIn(['product', 'service']) kind?: 'product' | 'service';
@@ -18,6 +18,10 @@ export class UpdateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(100_000_000) priceFcfa?: number;
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsInt() @Min(2) @Max(100_000_000) compareAtFcfa?: number | null;
   @ApiPropertyOptional({ nullable: true }) @IsOptional() @IsInt() @Min(5) @Max(1440) durationMinutes?: number | null;
+  @ApiPropertyOptional({ description: '7-A : confirmation, après avertissement, de la remise à zéro de la réputation d’un article déjà publié' })
+  @IsOptional()
+  @IsBoolean()
+  confirmReputationReset?: boolean;
 }
 
 export class VariantsDto {
@@ -28,6 +32,10 @@ export class VariantsDto {
   @IsString({ each: true })
   @Length(1, 60, { each: true })
   labels!: string[];
+  @ApiPropertyOptional({ description: '7-A : confirmation de la remise à zéro de la réputation (variantes ajoutées, retirées ou renommées)' })
+  @IsOptional()
+  @IsBoolean()
+  confirmReputationReset?: boolean;
 }
 
 export class StockDto {

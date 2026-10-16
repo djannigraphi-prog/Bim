@@ -1,12 +1,13 @@
-import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { and, eq } from 'drizzle-orm';
-import { Errors } from '../../common/errors';
+import { AppError, Errors } from '../../common/errors';
 import { DB, Database } from '../../database/database.module';
 import { users } from '../../database/schema';
 import { SpacesService } from '../spaces/spaces.service';
 import { ADMIN_ROUTE } from '../admin/admin.decorators';
-import { AuthedRequest, IS_PUBLIC, REQUIRED_SPACE, REQUIRED_STEP_UP, StepUpScope } from './auth.decorators';
+import type { ShopPermission } from '../../database/schema';
+import { AuthedRequest, IS_PUBLIC, REQUIRED_SHOP_PERMISSION, REQUIRED_SPACE, REQUIRED_STEP_UP, StepUpScope } from './auth.decorators';
 import { SessionService, SpaceType } from './session.service';
 import { StepUpService } from './step-up.service';
 
@@ -14,7 +15,8 @@ import { StepUpService } from './step-up.service';
  * Garde globale, appliquée à toutes les routes :
  *  1. jeton d'accès valide, session non révoquée, compte actif ;
  *  2. si la route l'exige, espace actif du bon type ET appartenance revérifiée en base ;
- *  3. si la route l'exige, autorisation d'opération sensible (step-up) consommée.
+ *  3. si la route l'exige, permission dans la boutique active (7-A) ;
+ *  4. si la route l'exige, autorisation d'opération sensible (step-up) consommée.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -47,6 +49,19 @@ export class AuthGuard implements CanActivate {
     if (requiredSpace) {
       if (claims.space.type !== requiredSpace || !(await this.spaces.canUse(claims.sub, claims.space))) {
         throw Errors.forbidden("Cet espace n'est pas accessible avec ton compte.");
+      }
+    }
+
+    // 7-A : permission de l'employé dans la boutique active (le propriétaire a tout), revérifiée en base.
+    const shopPermission = this.reflector.getAllAndOverride<ShopPermission | 'owner'>(REQUIRED_SHOP_PERMISSION, targets);
+    if (shopPermission) {
+      if (claims.space.type !== 'merchant' || !(await this.spaces.hasShopPermission(claims.sub, claims.space.id, shopPermission))) {
+        throw new AppError(
+          'SHOP_PERMISSION_REQUIRED',
+          shopPermission === 'owner' ? 'Seul le propriétaire de la boutique peut faire cette action.' : 'Le propriétaire de la boutique ne t’a pas donné cette permission.',
+          HttpStatus.FORBIDDEN,
+          { permission: shopPermission },
+        );
       }
     }
 

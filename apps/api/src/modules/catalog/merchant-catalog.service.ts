@@ -1,19 +1,25 @@
 /// <reference types="multer" />
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
-import { Errors } from '../../common/errors';
+import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { inventoryMovements, productMedia, products, productVariants, shopCategories, shopFollows, shops } from '../../database/schema';
+import { inventoryMovements, productFavorites, productMedia, productRevisions, products, productVariants, shopCategories, shopFollows, shops } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
+import { SpacesService } from '../spaces/spaces.service';
 import { ProductDto, UpdateProductDto, UpdateShopDto } from './dto';
 
 export const MAX_PRODUCT_IMAGES = 6;
 type ProductRow = typeof products.$inferSelect;
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/** 7-A — Champs dont la modification change le contenu (et donc l'identité) d'un article déjà publié. */
+const CONTENT_FIELDS = ['title', 'description', 'categoryCode', 'priceFcfa', 'compareAtFcfa', 'durationMinutes'] as const;
+type ContentField = (typeof CONTENT_FIELDS)[number] | 'variants';
 
 /**
  * Lot 5-B — Espace marchand (écran 55) : la boutique et son catalogue. Toutes les routes exigent l'espace marchand
@@ -27,6 +33,7 @@ export class MerchantCatalogService {
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly storage: StorageService,
     private readonly audit: AuditService,
+    private readonly spaces: SpacesService,
   ) {}
 
   private async url(key: string | null, apiBase: string) {
@@ -36,13 +43,15 @@ export class MerchantCatalogService {
 
   // ------------------------------------------------------------------------------------------------ Boutique
 
-  async dashboard(shopId: string, apiBase: string) {
+  async dashboard(shopId: string, userId: string, apiBase: string) {
     const [shop] = await this.db.select().from(shops).where(eq(shops.id, shopId));
     if (!shop) throw Errors.notFound('Boutique');
-    const [[published], [drafts], [followers]] = await Promise.all([
+    const [[published], [drafts], [hidden], [followers], viewer] = await Promise.all([
       this.db.select({ n: count() }).from(products).where(and(eq(products.shopId, shopId), eq(products.status, 'published'))),
       this.db.select({ n: count() }).from(products).where(and(eq(products.shopId, shopId), eq(products.status, 'draft'))),
+      this.db.select({ n: count() }).from(products).where(and(eq(products.shopId, shopId), eq(products.status, 'hidden'))),
       this.db.select({ n: count() }).from(shopFollows).where(eq(shopFollows.shopId, shopId)),
+      this.spaces.shopAccess(userId, shopId),
     ]);
     return {
       id: shop.id,
@@ -54,17 +63,19 @@ export class MerchantCatalogService {
       commune: shop.commune,
       verified: !!shop.verifiedAt,
       logoUrl: await this.url(shop.logoKey, apiBase),
-      counts: { published: published.n, drafts: drafts.n, followers: followers.n },
+      counts: { published: published.n, drafts: drafts.n, hidden: hidden.n, followers: followers.n },
+      /** 7-A : mon rôle et mes permissions dans cette boutique (l'app adapte ses boutons ; le serveur contrôle). */
+      viewer: viewer ?? { role: 'staff', permissions: [] },
     };
   }
 
-  async updateShop(shopId: string, dto: UpdateShopDto, apiBase: string) {
+  async updateShop(shopId: string, userId: string, dto: UpdateShopDto, apiBase: string) {
     const set: Partial<typeof shops.$inferInsert> = { updatedAt: new Date() };
     if (dto.description !== undefined) set.description = dto.description.trim() || null;
     if (dto.city !== undefined) set.city = dto.city.trim();
     if (dto.commune !== undefined) set.commune = dto.commune.trim() || null;
     await this.db.update(shops).set(set).where(eq(shops.id, shopId));
-    return this.dashboard(shopId, apiBase);
+    return this.dashboard(shopId, userId, apiBase);
   }
 
   async setLogo(shopId: string, userId: string, file: Express.Multer.File | undefined, meta: RequestMeta, apiBase: string) {
@@ -76,7 +87,7 @@ export class MerchantCatalogService {
     await this.db.update(shops).set({ logoKey: key, updatedAt: new Date() }).where(eq(shops.id, shopId));
     await this.audit.log({ actorType: 'user', actorId: userId, action: 'shop.logo_changed', targetType: 'shop', targetId: shopId, ip: meta.ip, userAgent: meta.userAgent });
     if (prev?.key) await this.storage.remove(prev.key).catch(() => undefined);
-    return this.dashboard(shopId, apiBase);
+    return this.dashboard(shopId, userId, apiBase);
   }
 
   // ------------------------------------------------------------------------------------------------ Articles
@@ -119,29 +130,83 @@ export class MerchantCatalogService {
     return this.detail(shopId, id, apiBase);
   }
 
-  async update(shopId: string, productId: string, dto: UpdateProductDto, apiBase: string) {
-    const p = await this.own(shopId, productId);
+  /** Cœurs donnés à la version courante du contenu (réputation active). */
+  private async activeFavorites(p: ProductRow, tx: Tx | Database = this.db) {
+    const [{ n }] = await tx
+      .select({ n: count() })
+      .from(productFavorites)
+      .where(and(eq(productFavorites.productId, p.id), eq(productFavorites.productVersion, p.contentVersion)));
+    return n;
+  }
+
+  /**
+   * 7-A — Une modification du contenu d'un article déjà publié (même masqué) remet sa réputation à zéro. Le serveur
+   * l'exige confirmée (avertissement affiché par l'app) : sans `confirmReputationReset`, rien n'est enregistré.
+   */
+  private async requireResetConfirmation(p: ProductRow, fields: ContentField[], confirmed: boolean | undefined, tx: Tx) {
+    if (!p.publishedAt || !fields.length || confirmed === true) return;
+    throw new AppError(
+      'REPUTATION_RESET_REQUIRED',
+      'Modifier le contenu de cet article remet à zéro ses j’aime, commentaires et recommandations. Confirme pour continuer, ou annule pour le garder tel quel.',
+      HttpStatus.CONFLICT,
+      { fields, activeFavorites: await this.activeFavorites(p, tx) },
+    );
+  }
+
+  /** Nouvelle version du contenu : la réputation de l'ancienne reste en base mais n'est plus comptée ni affichée. */
+  private async resetReputation(tx: Tx, p: ProductRow, fields: ContentField[], previous: Record<string, unknown>, userId: string, meta: RequestMeta) {
+    const version = p.contentVersion + 1;
+    const now = new Date();
+    await tx.update(products).set({ contentVersion: version, reputationResetAt: now }).where(eq(products.id, p.id));
+    await tx.insert(productRevisions).values({ id: uuidv7(), productId: p.id, version, changedFields: fields.join(','), previous, changedBy: userId, createdAt: now });
+    await this.audit.log(
+      { actorType: 'user', actorId: userId, action: 'shop.product_content_changed', targetType: 'product', targetId: p.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { reference: p.reference, fields, version, reputationReset: true } },
+      tx,
+    );
+  }
+
+  private snapshot(p: ProductRow) {
+    return { title: p.title, description: p.description, categoryCode: p.categoryCode, priceFcfa: p.priceFcfa, compareAtFcfa: p.compareAtFcfa, durationMinutes: p.durationMinutes };
+  }
+
+  async update(shopId: string, userId: string, productId: string, dto: UpdateProductDto, meta: RequestMeta, apiBase: string) {
+    await this.own(shopId, productId);
     if (dto.categoryCode !== undefined) await this.checkCategory(dto.categoryCode);
-    const price = dto.priceFcfa ?? p.priceFcfa;
-    const compareAt = dto.compareAtFcfa === undefined ? p.compareAtFcfa : dto.compareAtFcfa;
-    this.checkPrices(price, compareAt);
-    await this.db
-      .update(products)
-      .set({
+    await this.db.transaction(async (tx) => {
+      // Ligne verrouillée : deux modifications simultanées ne peuvent pas se partager une seule remise à zéro.
+      const [p] = await tx.select().from(products).where(and(eq(products.id, productId), eq(products.shopId, shopId), ne(products.status, 'archived'))).for('update');
+      if (!p) throw Errors.notFound('Article');
+      const price = dto.priceFcfa ?? p.priceFcfa;
+      const compareAt = dto.compareAtFcfa === undefined ? p.compareAtFcfa : dto.compareAtFcfa;
+      this.checkPrices(price, compareAt);
+      const next = {
         title: dto.title?.trim() ?? p.title,
         description: dto.description === undefined ? p.description : dto.description.trim() || null,
         categoryCode: dto.categoryCode ?? p.categoryCode,
         priceFcfa: price,
         compareAtFcfa: compareAt,
         durationMinutes: p.kind === 'service' ? (dto.durationMinutes === undefined ? p.durationMinutes : dto.durationMinutes) : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(products.id, productId));
+      };
+      // Seuls les champs réellement changés comptent : renvoyer les mêmes valeurs ne remet rien à zéro.
+      const fields: ContentField[] = CONTENT_FIELDS.filter((f) => (next[f] ?? null) !== (p[f] ?? null));
+      if (!fields.length) return;
+      await this.requireResetConfirmation(p, fields, dto.confirmReputationReset, tx);
+      await tx.update(products).set({ ...next, updatedAt: new Date() }).where(eq(products.id, p.id));
+      if (p.publishedAt) await this.resetReputation(tx, p, fields, this.snapshot(p), userId, meta);
+    });
     return this.detail(shopId, productId, apiBase);
   }
 
-  async setStatus(shopId: string, userId: string, productId: string, to: 'published' | 'draft' | 'archived', meta: RequestMeta, apiBase: string) {
+  /**
+   * Statut d'un article. `published` : première publication (brouillon) ou republication (masqué) ; `hidden` :
+   * « visible par moi uniquement » (7-A, depuis « publié ») ; `archived` : retiré. Masquer et republier ne changent ni la
+   * référence ni la version du contenu : la réputation est conservée.
+   */
+  async setStatus(shopId: string, userId: string, productId: string, to: 'published' | 'hidden' | 'archived', meta: RequestMeta, apiBase: string, from?: ProductRow['status'][]) {
     const p = await this.own(shopId, productId);
+    const invalid = (status: string) => !!from && status !== to && !from.includes(status as ProductRow['status']);
+    if (invalid(p.status)) throw this.invalidStatus(to);
+    if (p.status === to) return this.detail(shopId, p.id, apiBase);
     if (to === 'published') {
       if (!p.categoryCode) throw Errors.validation({ fields: { categoryCode: ['Choisis une rubrique.'] } });
       const [shop] = await this.db.select({ status: shops.status }).from(shops).where(eq(shops.id, shopId));
@@ -149,7 +214,9 @@ export class MerchantCatalogService {
     }
     await this.db.transaction(async (tx) => {
       // Même verrou que les photos : on ne publie jamais un article dont la dernière photo vient d'être retirée.
-      await tx.select({ id: products.id }).from(products).where(eq(products.id, p.id)).for('update');
+      const [cur] = await tx.select({ status: products.status }).from(products).where(eq(products.id, p.id)).for('update');
+      if (!cur || cur.status === 'archived') throw Errors.notFound('Article');
+      if (invalid(cur.status)) throw this.invalidStatus(to);
       if (to === 'published') {
         const [{ n }] = await tx.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, p.id));
         if (n === 0) throw Errors.validation({ fields: { photos: ['Ajoute au moins une photo avant de publier.'] } });
@@ -168,6 +235,10 @@ export class MerchantCatalogService {
       return null;
     }
     return this.detail(shopId, p.id, apiBase);
+  }
+
+  private invalidStatus(to: string) {
+    return Errors.conflict('INVALID_PRODUCT_STATUS', to === 'hidden' ? 'Seul un article visible publiquement peut être masqué.' : 'Cet article n’est pas masqué.');
   }
 
   async addPhotos(shopId: string, productId: string, files: Express.Multer.File[], apiBase: string) {
@@ -222,12 +293,17 @@ export class MerchantCatalogService {
   }
 
   /** Variantes : la liste donnée remplace les actives (une variante retirée est désactivée, son historique gardé). */
-  async setVariants(shopId: string, productId: string, labels: string[], apiBase: string) {
-    const p = await this.own(shopId, productId);
+  async setVariants(shopId: string, userId: string, productId: string, labels: string[], confirm: boolean | undefined, meta: RequestMeta, apiBase: string) {
+    await this.own(shopId, productId);
     const wanted = [...new Set(labels.map((l) => l.trim()).filter(Boolean))];
     const list = wanted.length ? wanted : ['Unique'];
-    const existing = await this.db.select().from(productVariants).where(eq(productVariants.productId, p.id));
     await this.db.transaction(async (tx) => {
+      const [p] = await tx.select().from(products).where(eq(products.id, productId)).for('update');
+      const existing = await tx.select().from(productVariants).where(eq(productVariants.productId, p.id));
+      const before = existing.filter((v) => v.active).sort((a, b) => a.position - b.position).map((v) => v.label);
+      // Ajouter, retirer ou renommer une variante change l'article ; changer seulement l'ordre, non.
+      const changed = before.length !== list.length || before.some((l) => !list.includes(l));
+      if (changed) await this.requireResetConfirmation(p, ['variants'], confirm, tx);
       for (const v of existing) {
         const pos = list.indexOf(v.label);
         await tx.update(productVariants).set({ active: pos >= 0, position: pos >= 0 ? pos : v.position }).where(eq(productVariants.id, v.id));
@@ -235,8 +311,9 @@ export class MerchantCatalogService {
       for (const [i, label] of list.entries()) {
         if (!existing.some((v) => v.label === label)) await tx.insert(productVariants).values({ id: uuidv7(), productId: p.id, label, position: i });
       }
+      if (changed && p.publishedAt) await this.resetReputation(tx, p, ['variants'], { ...this.snapshot(p), variants: before }, userId, meta);
     });
-    return this.detail(shopId, p.id, apiBase);
+    return this.detail(shopId, productId, apiBase);
   }
 
   /** Stock d'une variante fixé à `quantity` : un mouvement d'ajustement de la différence est enregistré. */
@@ -254,7 +331,7 @@ export class MerchantCatalogService {
 
   async list(shopId: string, status: string | undefined, apiBase: string) {
     const conds = [eq(products.shopId, shopId), ne(products.status, 'archived')];
-    if (status === 'published' || status === 'draft') conds.push(eq(products.status, status));
+    if (status === 'published' || status === 'draft' || status === 'hidden') conds.push(eq(products.status, status));
     const rows = await this.db.select().from(products).where(and(...conds)).orderBy(desc(products.updatedAt)).limit(200);
     return { items: await this.summaries(rows, apiBase) };
   }
@@ -277,6 +354,7 @@ export class MerchantCatalogService {
       const first = media.find((m) => m.productId === r.id);
       out.push({
         id: r.id,
+        reference: r.reference,
         kind: r.kind,
         title: r.title,
         priceFcfa: r.priceFcfa,
@@ -306,6 +384,7 @@ export class MerchantCatalogService {
     for (const m of media) photos.push({ id: m.id, url: await this.url(m.storageKey, apiBase), width: m.width, height: m.height });
     return {
       id: p.id,
+      reference: p.reference,
       kind: p.kind,
       title: p.title,
       description: p.description,
@@ -315,6 +394,10 @@ export class MerchantCatalogService {
       durationMinutes: p.durationMinutes,
       status: p.status,
       publishedAt: p.publishedAt,
+      /** 7-A : réputation active de la version courante du contenu. */
+      contentVersion: p.contentVersion,
+      reputationResetAt: p.reputationResetAt,
+      activeFavorites: await this.activeFavorites(p),
       photos,
       variants: variants.map((v) => ({ id: v.id, label: v.label, stock: p.kind === 'service' ? null : v.stock })),
     };

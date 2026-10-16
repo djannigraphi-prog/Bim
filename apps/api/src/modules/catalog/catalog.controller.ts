@@ -5,7 +5,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
-import { AuthContext, CurrentAuth, Public, RequireSpace } from '../auth/auth.decorators';
+import { AuthContext, CurrentAuth, Public, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { ProductDto, StockDto, UpdateProductDto, UpdateShopDto, VariantsDto } from './dto';
 import { BimShopService, BimShopSort } from './bimshop.service';
@@ -28,16 +28,18 @@ export class MerchantCatalogController {
   @Get()
   @ApiOperation({ summary: 'Ma boutique : présentation, compteurs' })
   dashboard(@CurrentAuth() a: AuthContext, @Req() req: Request) {
-    return this.catalog.dashboard(this.shop(a), apiBase(req));
+    return this.catalog.dashboard(this.shop(a), a.userId, apiBase(req));
   }
 
   @Patch()
-  @ApiOperation({ summary: 'Modifier la présentation de la boutique' })
+  @RequireShopPermission('owner')
+  @ApiOperation({ summary: 'Modifier la présentation de la boutique (propriétaire)' })
   update(@CurrentAuth() a: AuthContext, @Body() dto: UpdateShopDto, @Req() req: Request) {
-    return this.catalog.updateShop(this.shop(a), dto, apiBase(req));
+    return this.catalog.updateShop(this.shop(a), a.userId, dto, apiBase(req));
   }
 
   @Put('logo')
+  @RequireShopPermission('owner')
   @Throttle({ default: { limit: 10, ttl: 600_000 } })
   @UseInterceptors(FileInterceptor('photo', { ...UPLOAD, limits: { ...UPLOAD.limits, files: 1 } }))
   @ApiConsumes('multipart/form-data')
@@ -47,14 +49,15 @@ export class MerchantCatalogController {
   }
 
   @Get('products')
-  @ApiQuery({ name: 'status', enum: ['published', 'draft'], required: false })
+  @ApiQuery({ name: 'status', enum: ['published', 'draft', 'hidden'], required: false })
   @ApiOperation({ summary: 'Mes articles et prestations (hors retirés)' })
   list(@CurrentAuth() a: AuthContext, @Req() req: Request, @Query('status') status?: string) {
     return this.catalog.list(this.shop(a), status, apiBase(req));
   }
 
   @Post('products')
-  @ApiOperation({ summary: 'Créer un article ou une prestation (brouillon)' })
+  @RequireShopPermission('products.edit')
+  @ApiOperation({ summary: 'Créer un article ou une prestation (brouillon) ; la référence BIM-… est attribuée par le serveur' })
   create(@CurrentAuth() a: AuthContext, @Body() dto: ProductDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
     return this.catalog.create(this.shop(a), a.userId, dto, meta, apiBase(req));
   }
@@ -65,25 +68,48 @@ export class MerchantCatalogController {
   }
 
   @Patch('products/:id')
-  updateProduct(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProductDto, @Req() req: Request) {
-    return this.catalog.update(this.shop(a), id, dto, apiBase(req));
+  @RequireShopPermission('products.edit')
+  @ApiOperation({
+    summary: 'Modifier le contenu ; un article déjà publié perd sa réputation (REPUTATION_RESET_REQUIRED tant que confirmReputationReset n’est pas envoyé)',
+  })
+  updateProduct(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProductDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    return this.catalog.update(this.shop(a), a.userId, id, dto, meta, apiBase(req));
   }
 
   @Post('products/:id/publish')
+  @RequireShopPermission('products.publish')
   @HttpCode(200)
   @ApiOperation({ summary: 'Publier sur le BimShop (une photo et une rubrique au moins ; boutique ouverte)' })
   publish(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
-    return this.catalog.setStatus(this.shop(a), a.userId, id, 'published', meta, apiBase(req));
+    return this.catalog.setStatus(this.shop(a), a.userId, id, 'published', meta, apiBase(req), ['draft', 'hidden']);
+  }
+
+  @Post('products/:id/hide')
+  @RequireShopPermission('products.visibility')
+  @HttpCode(200)
+  @ApiOperation({ summary: '« Visible par moi uniquement » : masqué du BimShop, référence et réputation conservées' })
+  hide(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    return this.catalog.setStatus(this.shop(a), a.userId, id, 'hidden', meta, apiBase(req), ['published']);
+  }
+
+  @Post('products/:id/show')
+  @RequireShopPermission('products.visibility')
+  @HttpCode(200)
+  @ApiOperation({ summary: '« Visible publiquement » : republier un article masqué, avec sa réputation' })
+  show(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    return this.catalog.setStatus(this.shop(a), a.userId, id, 'published', meta, apiBase(req), ['hidden']);
   }
 
   @Post('products/:id/unpublish')
+  @RequireShopPermission('products.visibility')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Repasser en brouillon (plus visible sur le BimShop)' })
+  @ApiOperation({ summary: 'Ancien nom de « hide » : masquer un article publié (réputation conservée)' })
   unpublish(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
-    return this.catalog.setStatus(this.shop(a), a.userId, id, 'draft', meta, apiBase(req));
+    return this.catalog.setStatus(this.shop(a), a.userId, id, 'hidden', meta, apiBase(req), ['published']);
   }
 
   @Delete('products/:id')
+  @RequireShopPermission('products.publish')
   @HttpCode(204)
   @ApiOperation({ summary: 'Retirer l’article (photos effacées)' })
   async archive(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
@@ -91,27 +117,31 @@ export class MerchantCatalogController {
   }
 
   @Post('products/:id/photos')
+  @RequireShopPermission('products.edit')
   @Throttle({ default: { limit: 30, ttl: 600_000 } })
   @UseInterceptors(FilesInterceptor('photos', MAX_PRODUCT_IMAGES, UPLOAD))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { photos: { type: 'array', items: { type: 'string', format: 'binary' }, maxItems: MAX_PRODUCT_IMAGES } } } })
-  @ApiOperation({ summary: 'Ajouter des photos (6 au plus par article), ré-encodées sans métadonnées' })
+  @ApiOperation({ summary: 'Ajouter des photos (6 au plus), ré-encodées sans métadonnées ; la photo seule ne touche pas à la réputation' })
   addPhotos(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @UploadedFiles() photos: Express.Multer.File[] | undefined, @Req() req: Request) {
     return this.catalog.addPhotos(this.shop(a), id, photos ?? [], apiBase(req));
   }
 
   @Delete('products/:id/photos/:photoId')
+  @RequireShopPermission('products.edit')
   removePhoto(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Param('photoId', ParseUUIDPipe) photoId: string, @Req() req: Request) {
     return this.catalog.removePhoto(this.shop(a), id, photoId, apiBase(req));
   }
 
   @Put('products/:id/variants')
-  @ApiOperation({ summary: 'Variantes (tailles, couleurs…) ; vide : « Unique »' })
-  variants(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VariantsDto, @Req() req: Request) {
-    return this.catalog.setVariants(this.shop(a), id, dto.labels, apiBase(req));
+  @RequireShopPermission('products.edit')
+  @ApiOperation({ summary: 'Variantes (tailles, couleurs…) ; vide : « Unique ». Les changer sur un article déjà publié remet sa réputation à zéro (confirmation)' })
+  variants(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VariantsDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    return this.catalog.setVariants(this.shop(a), a.userId, id, dto.labels, dto.confirmReputationReset, meta, apiBase(req));
   }
 
   @Put('products/:id/variants/:variantId/stock')
+  @RequireShopPermission('products.edit')
   @ApiOperation({ summary: 'Fixer le stock d’une variante (mouvement d’ajustement enregistré)' })
   stock(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Param('variantId', ParseUUIDPipe) variantId: string, @Body() dto: StockDto, @Req() req: Request) {
     return this.catalog.setStock(this.shop(a), a.userId, id, variantId, dto.quantity, apiBase(req));

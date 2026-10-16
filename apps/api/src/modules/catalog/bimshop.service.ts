@@ -53,6 +53,7 @@ export class BimShopService {
       const first = media.find((m) => m.productId === p.id);
       out.push({
         id: p.id,
+        reference: p.reference,
         kind: p.kind,
         title: p.title,
         priceFcfa: p.priceFcfa,
@@ -203,6 +204,7 @@ export class BimShopService {
     const service = p.kind === 'service';
     return {
       id: p.id,
+      reference: p.reference,
       kind: p.kind,
       title: p.title,
       description: p.description,
@@ -273,22 +275,39 @@ export class BimShopService {
 
   /** État personnel sur une fiche : article mis de côté, boutique suivie. */
   async productState(userId: string, id: string) {
-    const { s } = await this.visibleProduct(id);
+    const { p, s } = await this.visibleProduct(id);
     const [[fav], [follow]] = await Promise.all([
-      this.db.select({ n: count() }).from(productFavorites).where(and(eq(productFavorites.userId, userId), eq(productFavorites.productId, id))),
+      // 7-A : un cœur donné à une version précédente du contenu ne compte plus (réputation remise à zéro).
+      this.db
+        .select({ n: count() })
+        .from(productFavorites)
+        .where(and(eq(productFavorites.userId, userId), eq(productFavorites.productId, id), eq(productFavorites.productVersion, p.contentVersion))),
       this.db.select({ n: count() }).from(shopFollows).where(and(eq(shopFollows.userId, userId), eq(shopFollows.shopId, s.id))),
     ]);
     return { favorite: fav.n > 0, followingShop: follow.n > 0 };
   }
 
   async setFavorite(userId: string, id: string, on: boolean) {
-    await this.visibleProduct(id);
-    if (on) await this.db.insert(productFavorites).values({ userId, productId: id }).onConflictDoNothing();
+    const { p } = await this.visibleProduct(id);
+    if (on) {
+      // Cœur rattaché à la version courante du contenu ; un ancien cœur (version précédente) est remplacé.
+      await this.db
+        .insert(productFavorites)
+        .values({ userId, productId: id, productVersion: p.contentVersion })
+        .onConflictDoUpdate({
+          target: [productFavorites.userId, productFavorites.productId],
+          set: { productVersion: p.contentVersion, createdAt: new Date() },
+          where: sql`${productFavorites.productVersion} <> ${p.contentVersion}`,
+        });
+    }
     else await this.db.delete(productFavorites).where(and(eq(productFavorites.userId, userId), eq(productFavorites.productId, id)));
     return { favorite: on };
   }
 
-  /** Articles mis de côté encore visibles (les autres restent enregistrés mais ne s'affichent pas). */
+  /**
+   * Articles mis de côté encore visibles, pour la version courante de leur contenu (les autres restent enregistrés mais
+   * ne s'affichent pas : article masqué, ou contenu modifié depuis — 7-A).
+   */
   async favorites(userId: string, apiBase: string) {
     const rows = await this.db
       .select({ p: products, s: shops })
@@ -296,7 +315,7 @@ export class BimShopService {
       .innerJoin(products, eq(products.id, productFavorites.productId))
       .innerJoin(shops, eq(shops.id, products.shopId))
       .innerJoin(users, eq(users.id, shops.ownerUserId))
-      .where(and(eq(productFavorites.userId, userId), this.visible()))
+      .where(and(eq(productFavorites.userId, userId), eq(productFavorites.productVersion, products.contentVersion), this.visible()))
       .orderBy(desc(productFavorites.createdAt))
       .limit(200);
     return { items: await this.cards(rows, apiBase) };

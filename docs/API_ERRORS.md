@@ -13,6 +13,8 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INVALID_CREDENTIALS` | 401 | identifiant ou mot de passe incorrect |
 | `SESSION_INVALID` | 401 | rafraîchissement impossible ; `details.reason` = invalid · revoked · reuse · expired |
 | `FORBIDDEN` | 403 | action ou espace non autorisé |
+| `SHOP_PERMISSION_REQUIRED` | 403 | 7-A : permission de boutique manquante (propriétaire seul, ou permission non accordée à l'employé) ; `details.permission` |
+| `REPUTATION_RESET_REQUIRED` | 409 | 7-A : la modification du contenu d'un article déjà publié remet sa réputation à zéro ; renvoyer avec `confirmReputationReset: true` après avertissement ; `details.fields`, `details.activeFavorites` |
 | `STEP_UP_REQUIRED` | 403 | opération sensible : obtenir une autorisation via `/v1/auth/step-up` ; `details.scope` |
 | `CONTACT_NOT_VERIFIED` | 403 | compte non activé ; `details.verification` = nouveau défi |
 | `ACCOUNT_SUSPENDED` | 403 | compte suspendu |

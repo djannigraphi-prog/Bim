@@ -1,6 +1,6 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
@@ -174,7 +174,7 @@ export class MessagingService {
     const [member] = await this.db
       .select({ x: shopMembers.userId })
       .from(shopMembers)
-      .where(and(eq(shopMembers.shopId, shop.id), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt)));
+      .where(and(eq(shopMembers.shopId, shop.id), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt), isNotNull(shopMembers.acceptedAt)));
     if (member) throw Errors.conflict('OWN_SHOP', 'Tu fais partie de cette boutique : réponds à ses clients depuis l’espace boutique.');
     let contextProductId: string | null = null;
     let contextOfferId: string | null = null;

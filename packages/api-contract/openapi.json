@@ -3399,7 +3399,7 @@
             "bearer": []
           }
         ],
-        "summary": "Modifier la présentation de la boutique",
+        "summary": "Modifier la présentation de la boutique (propriétaire)",
         "tags": [
           "Espace marchand"
         ]
@@ -3454,7 +3454,8 @@
             "schema": {
               "enum": [
                 "published",
-                "draft"
+                "draft",
+                "hidden"
               ],
               "type": "string"
             }
@@ -3498,7 +3499,7 @@
             "bearer": []
           }
         ],
-        "summary": "Créer un article ou une prestation (brouillon)",
+        "summary": "Créer un article ou une prestation (brouillon) ; la référence BIM-… est attribuée par le serveur",
         "tags": [
           "Espace marchand"
         ]
@@ -3563,6 +3564,7 @@
             "bearer": []
           }
         ],
+        "summary": "Modifier le contenu ; un article déjà publié perd sa réputation (REPUTATION_RESET_REQUIRED tant que confirmReputationReset n’est pas envoyé)",
         "tags": [
           "Espace marchand"
         ]
@@ -3624,6 +3626,64 @@
         ]
       }
     },
+    "/v1/shop/products/{id}/hide": {
+      "post": {
+        "operationId": "MerchantCatalogController_hide",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "« Visible par moi uniquement » : masqué du BimShop, référence et réputation conservées",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/show": {
+      "post": {
+        "operationId": "MerchantCatalogController_show",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "« Visible publiquement » : republier un article masqué, avec sa réputation",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
     "/v1/shop/products/{id}/unpublish": {
       "post": {
         "operationId": "MerchantCatalogController_unpublish",
@@ -3647,7 +3707,7 @@
             "bearer": []
           }
         ],
-        "summary": "Repasser en brouillon (plus visible sur le BimShop)",
+        "summary": "Ancien nom de « hide » : masquer un article publié (réputation conservée)",
         "tags": [
           "Espace marchand"
         ]
@@ -3696,7 +3756,7 @@
             "bearer": []
           }
         ],
-        "summary": "Ajouter des photos (6 au plus par article), ré-encodées sans métadonnées",
+        "summary": "Ajouter des photos (6 au plus), ré-encodées sans métadonnées ; la photo seule ne touche pas à la réputation",
         "tags": [
           "Espace marchand"
         ]
@@ -3771,7 +3831,7 @@
             "bearer": []
           }
         ],
-        "summary": "Variantes (tailles, couleurs…) ; vide : « Unique »",
+        "summary": "Variantes (tailles, couleurs…) ; vide : « Unique ». Les changer sur un article déjà publié remet sa réputation à zéro (confirmation)",
         "tags": [
           "Espace marchand"
         ]
@@ -5194,6 +5254,200 @@
         "summary": "Retirer la marque",
         "tags": [
           "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/team": {
+      "get": {
+        "operationId": "ShopTeamController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "L’équipe : propriétaire, employés et invitations, avec leurs permissions",
+        "tags": [
+          "Équipe de la boutique"
+        ]
+      },
+      "post": {
+        "operationId": "ShopTeamController_invite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Inviter une personne (aucun accès avant son accord, aucune permission par défaut)",
+        "tags": [
+          "Équipe de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/team/{userId}/permissions": {
+      "put": {
+        "operationId": "ShopTeamController_permissions",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberPermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Permissions d’un employé (ensemble complet)",
+        "tags": [
+          "Équipe de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/team/{userId}": {
+      "delete": {
+        "operationId": "ShopTeamController_remove",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer un employé ou annuler une invitation",
+        "tags": [
+          "Équipe de la boutique"
+        ]
+      }
+    },
+    "/v1/shop-invitations": {
+      "get": {
+        "operationId": "ShopInvitationsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invitations à rejoindre l’équipe d’une boutique",
+        "tags": [
+          "Équipe de la boutique"
+        ]
+      }
+    },
+    "/v1/shop-invitations/{shopId}/accept": {
+      "post": {
+        "operationId": "ShopInvitationsController_accept",
+        "parameters": [
+          {
+            "name": "shopId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accepter : la boutique apparaît dans mes espaces",
+        "tags": [
+          "Équipe de la boutique"
+        ]
+      }
+    },
+    "/v1/shop-invitations/{shopId}/decline": {
+      "post": {
+        "operationId": "ShopInvitationsController_decline",
+        "parameters": [
+          {
+            "name": "shopId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser l’invitation",
+        "tags": [
+          "Équipe de la boutique"
         ]
       }
     },
@@ -6867,6 +7121,10 @@
           "durationMinutes": {
             "type": "object",
             "nullable": true
+          },
+          "confirmReputationReset": {
+            "type": "boolean",
+            "description": "7-A : confirmation, après avertissement, de la remise à zéro de la réputation d’un article déjà publié"
           }
         }
       },
@@ -6886,6 +7144,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "confirmReputationReset": {
+            "type": "boolean",
+            "description": "7-A : confirmation de la remise à zéro de la réputation (variantes ajoutées, retirées ou renommées)"
           }
         },
         "required": [
@@ -6982,6 +7244,45 @@
         },
         "required": [
           "text"
+        ]
+      },
+      "InviteMemberDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "awa.kone",
+            "description": "Nom d’utilisateur de la personne invitée"
+          }
+        },
+        "required": [
+          "username"
+        ]
+      },
+      "MemberPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "description": "Ensemble complet des permissions de l’employé (remplace le précédent)",
+            "items": {
+              "type": "string",
+              "enum": [
+                "orders.read",
+                "orders.prepare",
+                "products.edit",
+                "products.publish",
+                "products.visibility",
+                "messages.reply",
+                "deliveries.select_courier",
+                "deliveries.settings",
+                "payments.decide"
+              ]
+            }
+          }
+        },
+        "required": [
+          "permissions"
         ]
       },
       "AdminLoginDto": {

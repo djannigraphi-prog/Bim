@@ -5,7 +5,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
-import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
+import { AuthContext, CurrentAuth, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { QuickReplyDto, SendMessageDto } from './dto';
 import { ShopInboxBox, ShopInboxService } from './shop-inbox.service';
@@ -16,6 +16,8 @@ const BOXES: ShopInboxBox[] = ['all', 'unread', 'archived', 'marked'];
 @ApiTags('Messages de la boutique')
 @ApiBearerAuth()
 @RequireSpace('merchant')
+// 7-A (A16) : « Répondre aux messages des clients » (propriétaire, ou employé à qui il l'a accordé).
+@RequireShopPermission('messages.reply')
 @Controller('v1/shop/inbox')
 export class ShopInboxController {
   constructor(private readonly inbox: ShopInboxService) {}

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './identity';
 import { shops } from './spaces';
 
@@ -21,11 +21,27 @@ export const shopCategories = pgTable(
   (t) => [index('shop_categories_parent_idx').on(t.parentCode, t.sortOrder)],
 );
 
-/** Article (product) ou prestation (service) d'une boutique. status : draft · published · archived. */
+/**
+ * Article (product) ou prestation (service) d'une boutique.
+ * status : draft (jamais publié) · published (visible publiquement) · hidden (7-A : déjà publié, « visible par moi
+ * uniquement », réputation conservée) · archived (retiré).
+ * 7-A — `reference` : référence publique BIM-000001…, attribuée par la base à la création (séquence), unique,
+ * jamais modifiée (déclencheur) ni réattribuée ; elle ne remplace pas l'identifiant interne.
+ * 7-A — `contentVersion` : version du contenu. Une modification confirmée du contenu d'un article déjà publié
+ * (nom, prix, description, rubrique, durée, variantes…) l'incrémente : la réputation active (cœurs, plus tard avis et
+ * recommandations) ne compte que ce qui a été donné à la version courante. Photo seule, masquage, republication et
+ * stock ne changent pas la version.
+ */
 export const products = pgTable(
   'products',
   {
     id: uuid('id').primaryKey(),
+    reference: varchar('reference', { length: 20 })
+      .notNull()
+      .default(sql`bim_product_reference(nextval('product_reference_seq'))`),
+    contentVersion: integer('content_version').notNull().default(1),
+    /** Dernière remise à zéro de la réputation (modification confirmée du contenu). */
+    reputationResetAt: timestamp('reputation_reset_at', { withTimezone: true }),
     shopId: uuid('shop_id')
       .notNull()
       .references(() => shops.id, { onDelete: 'cascade' }),
@@ -47,8 +63,9 @@ export const products = pgTable(
   (t) => [
     index('products_shop_idx').on(t.shopId, t.status),
     index('products_catalog_idx').on(t.status, t.categoryCode, t.publishedAt),
+    uniqueIndex('products_reference_uq').on(t.reference),
     check('products_kind_ck', sql`${t.kind} IN ('product', 'service')`),
-    check('products_status_ck', sql`${t.status} IN ('draft', 'published', 'archived')`),
+    check('products_status_ck', sql`${t.status} IN ('draft', 'published', 'hidden', 'archived')`),
     check('products_price_ck', sql`${t.priceFcfa} > 0 AND ${t.priceFcfa} <= 100000000`),
     check('products_compare_ck', sql`${t.compareAtFcfa} IS NULL OR ${t.compareAtFcfa} > ${t.priceFcfa}`),
     check('products_duration_ck', sql`${t.durationMinutes} IS NULL OR (${t.durationMinutes} BETWEEN 5 AND 1440)`),
@@ -131,6 +148,30 @@ export const productFavorites = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** 7-A : version du contenu de l'article au moment du cœur ; seuls les cœurs de la version courante comptent. */
+    productVersion: integer('product_version').notNull().default(1),
   },
   (t) => [primaryKey({ columns: [t.userId, t.productId] }), index('product_favorites_product_idx').on(t.productId)],
+);
+
+/**
+ * 7-A — Historique des modifications de contenu d'un article déjà publié (trace conservée, jamais réécrite) : version
+ * créée, champs modifiés, contenu précédent, auteur, date. La réputation de l'ancienne version reste en base (traçabilité)
+ * mais n'est plus affichée.
+ */
+export const productRevisions = pgTable(
+  'product_revisions',
+  {
+    id: uuid('id').primaryKey(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id),
+    /** Version créée par la modification (l'ancienne est `version - 1`). */
+    version: integer('version').notNull(),
+    changedFields: varchar('changed_fields', { length: 200 }).notNull(),
+    previous: jsonb('previous').notNull(),
+    changedBy: uuid('changed_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('product_revisions_version_uq').on(t.productId, t.version)],
 );

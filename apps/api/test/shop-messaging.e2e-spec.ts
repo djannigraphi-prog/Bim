@@ -32,9 +32,11 @@ describe('Messagerie des boutiques (e2e)', () => {
     return { shopId, slug, ownerId: owner.userId, ownerUser, auth };
   }
   type S = Awaited<ReturnType<typeof shop>>;
-  async function staff(s: S) {
+  /** Employé ; depuis 7-A (A16), il ne répond aux clients que si le propriétaire lui en a donné la permission. */
+  async function staff(s: S, permissions: string[] = ['messages.reply']) {
     const u = await registerAndActivate(h);
     await h.pool.query("insert into shop_members (shop_id, user_id, role) values ($1, $2, 'staff')", [s.shopId, u.userId]);
+    for (const p of permissions) await h.pool.query('insert into shop_member_permissions (shop_id, user_id, permission) values ($1, $2, $3)', [s.shopId, u.userId, p]);
     const auth = bearer((await h.http().post('/v1/auth/switch-space').set(bearer(u.tokens.accessToken)).send({ type: 'merchant', id: s.shopId }).expect(200)).body.accessToken) as Auth;
     return { userId: u.userId, auth };
   }
@@ -123,6 +125,11 @@ describe('Messagerie des boutiques (e2e)', () => {
     await h.http().delete(`/v1/messages/${byOwner.id}`).set(a.auth).expect(404);
     const texts = (await h.http().get(`/v1/conversations/${c.id}/messages`).set(a.auth).expect(200)).body.items.map((m: { status: string }) => m.status);
     expect(texts).toEqual(['published', 'deleted', 'published']);
+
+    // Employé sans la permission « répondre aux messages » (7-A) : boîte refusée.
+    const noPerm = await staff(s, []);
+    expect((await h.http().get('/v1/shop/inbox').set(noPerm.auth).expect(403)).body.error).toMatchObject({ code: 'SHOP_PERMISSION_REQUIRED', details: { permission: 'messages.reply' } });
+    await reply(noPerm.auth, c.id, 'Sans permission', 403);
 
     // Employé retiré : plus d'accès, revérifié à chaque requête.
     await h.pool.query('update shop_members set revoked_at = now() where shop_id = $1 and user_id = $2', [s.shopId, e.userId]);

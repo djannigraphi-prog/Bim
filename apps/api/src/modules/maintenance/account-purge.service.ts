@@ -47,6 +47,9 @@ export const PURGE_BLOCKING_TABLES = [
   'inventory_movements',
   'shop_follows',
   'product_favorites',
+  // Lot 7-A : faire partie de l'équipe d'une boutique, modifier un article.
+  'shop_member_permissions',
+  'product_revisions',
   // Lot 6 : écrire ou recevoir des messages est une activité.
   'conversations',
   'conversation_members',
@@ -62,6 +65,9 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   inventory_movements: ['created_by'],
   conversations: ['created_by'],
   messages: ['sender_id'],
+  shop_member_permissions: ['user_id', 'granted_by'],
+  product_revisions: ['changed_by'],
+  shop_members: ['user_id', 'invited_by'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [
