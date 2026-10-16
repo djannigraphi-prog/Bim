@@ -20,7 +20,7 @@ Conception · Interface · Backend · Intégration · Tests exécutés · Tests 
 | Authentification (inscription, code, connexion, sessions, mot de passe oublié) | Terminée | Fait | Fait | **Testée sur émulateur Android contre l'API** | API + Android : réussis | Fournisseur SMS réel : **prérequis du lancement public** (décision du 15/10, T-030), dépense à autoriser |
 | F15 — âges par capacité | Terminée | Fait (réglages `age.*`) | — | — | Exécutés, réussis | Vérifications légales (DECISIONS.md) |
 | F16 — récupération vérifiée, step-up | Terminée | Fait | Coordonnées, mot de passe, appareils | **Testée sur Android** (ajout d'un e-mail vérifié, nouveau mot de passe) | API + Android : réussis | — |
-| Espaces (utilisateur / boutique / livreur) | Terminée | Contrôle d'accès et bascule faits ; création de boutique et de compte livreur : lots 5 et 7 | Écran 53 fait | Bascule vers l'espace utilisateur seulement (aucune boutique ni compte livreur avant les lots 5 et 7) | API : réussis ; capture | KYC (lot 5), `age.min_merchant` / `age.min_courier` |
+| Espaces (utilisateur / boutique / livreur) | Terminée | Contrôle d'accès et bascule faits ; création de boutique faite (lot 5-A, ouverture fermée tant que l'âge minimum des marchands n'est pas décidé) ; compte livreur : lot 7 | Écran 53 fait | Bascule vers l'espace utilisateur seulement (aucune boutique ni compte livreur avant les lots 5 et 7) | API : réussis ; capture | KYC (lot 5), `age.min_merchant` / `age.min_courier` |
 | Connexions Google / Apple / Facebook | Terminée | Préparées, **désactivées** (`NOT_CONFIGURED`) | Boutons affichés, « Bientôt disponible » | — | Exécutés (indisponibilité honnête) | Comptes développeur + clés |
 | Thème clair / sombre | Terminée | Préférence enregistrée | Compilé, capture sombre vérifiée | Écrit | — | — |
 | Administration (API `/admin/v1` + application web React) | Terminée | Fait : connexion + TOTP, rôles, réglages, audit, utilisateurs, programmes types, comptes admin | Web : fait | **Testée dans Chromium contre l'API** | API : 8 unitaires + 13 e2e ; web : unitaires + 5 scénarios navigateur | Rôles à valider (T-019) ; hébergement AWS |
@@ -100,6 +100,16 @@ Prochaines étapes possibles du lot 3 (sans dépense) : reprise d'une discussion
 
 Hors du lot 4 : pièces, « Encourager », donateurs et médailles (lot 9) ; Reels et vidéo (lot 11) ; « Produits et services utilisés » (lot 5) ; identifier des personnes et ajouter un lieu (non prévus tant qu'aucune règle de confidentialité ne les couvre). Décision à prendre : visibilité par défaut des publications des 16-17 ans (aujourd'hui « Tout le monde » pour tous, comme les maquettes).
 
+## Lot 5 — Boutiques et BimShop (commencé le 16/10/2026)
+
+Aucun paiement en ligne, aucune transaction réelle, aucun service payant ni fournisseur externe dans ce lot.
+
+| Étape | Contenu | Tests | CI |
+| --- | --- | --- | --- |
+| 5-A | **Ouvrir une boutique** (écrans 07 à 09) : présentation de la boutique, puis « Sécurise ta boutique » (pièce d'identité recto / verso selon le type, selfie à l'appareil avant, numéro Mobile Money **confirmé par code SMS**, adresse facultative), envoi pour vérification, refus motivé puis correction, validation. **Pièces chiffrées dans l'application** (AES-256-GCM, clé `KYC_ENCRYPTION_KEY` hors Git ; sans clé, le service est fermé) et ré-encodées sans métadonnées ; **consultation réservée** à la permission `merchants.review` ; **chaque consultation d'une pièce est journalisée** (`admin.kyc_document_viewed`). Page **Boutiques** de l'administration (photos chargées par l'API, jamais par lien public). Notifications « boutique ouverte » / « à corriger ». Ouverture **fermée tant que `age.min_merchant` n'est pas décidé**. Migration 0021 (additive) | API : 3 e2e (suite : 317 réussis) ; admin : 1 test navigateur (10 réussis) ; Flutter : 4 + capture 07 ; défaut d'affichage sur petit écran (écran 09) détecté en CI et corrigé | verte (branche lot5-wip, run 38840943665) |
+
+Décisions en attente (lot 5) : âge minimum des marchands (`age.min_merchant`, ouverture fermée d'ici là) ; durée de conservation des pièces (`kyc.document_retention_days`, non fixée : rien n'est effacé automatiquement) ; rôles autorisés à vérifier les boutiques (`merchants.review` : super_admin et support **proposés**).
+
 ## Lot 2 — avancement (15/10/2026, partie sans dépense)
 
 Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'aucune décision en attente. **Rien n'est activé** : `WORKER_MODE=off`, `PUSH_PROVIDER=none` par défaut, réglage `notifications.reminders_enabled` = false (« en attente »), aucun projet Firebase, aucune ressource AWS.
@@ -123,7 +133,7 @@ Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'a
 | N | **Décisions du 15/10, 15 h 44 (T-030)** : heures calmes option B (rappel à l'heure choisie envoyé, relances bloquées, jamais reportées) ; textes de Peni v3 (tâche en tête, pose encourageante), provisoires ; bouton « Les 3 textes de Peni » pour les téléphones (T17) | unitaires (7 cas d'heures calmes, nuit minute par minute, textes, copie de l'app identique au serveur) ; e2e (relance bloquée après coup, rappel initial envoyé, aucun doublon) ; Flutter | voir `docs/CLOTURE_LOT2.md` |
 | O | **Purge des comptes jamais vérifiés** (30 jours), **désactivée et en simulation par défaut** : verrou, plafond de 500, aucun code récent, audit sans donnée personnelle, page Maintenance de l'administration (simulation à la demande) ; migration 0016 | 9 e2e (dont : comptes actifs, suspendus, supprimés, récents, utilisés jamais touchés ; simulation ; plafond ; passages simultanés ; tables liées classées) ; test navigateur de l'administration | voir `docs/CLOTURE_LOT2.md` |
 
-Suite API locale : 314 tests réussis le 16/10 après le lot 4-B (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
+Suite API locale : 317 tests réussis le 16/10 après le lot 5-A (314 après le lot 4-B) (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
 ## Tests exécutés (session 1, 14/10/2026)
 
