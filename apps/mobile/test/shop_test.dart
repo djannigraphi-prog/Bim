@@ -114,8 +114,8 @@ class _FakeShop extends ShopApi {
   }
 }
 
-Future<void> _pump(WidgetTester tester, _FakeShop api, String location) async {
-  tester.view.physicalSize = const Size(1170, 2532);
+Future<void> _pump(WidgetTester tester, _FakeShop api, String location, {double height = 2532}) async {
+  tester.view.physicalSize = Size(1170, height);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final router = GoRouter(initialLocation: location, routes: [
@@ -174,10 +174,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('save-product')));
     await tester.pumpAndSettle();
     expect(api.calls, ['create product Robe soirée à plumes vetements_soiree 45000']);
+    // Fiche créée : un encart « nouvelle fiche » apparaît au-dessus ; la section des variantes est plus bas.
+    await tester.scrollUntilVisible(find.text('Tailles, couleurs et stock'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.text('Tailles, couleurs et stock'), findsOneWidget);
     await tester.drag(find.byType(Scrollable).first, const Offset(0, 2000));
     await tester.pumpAndSettle();
     expect(find.text('Brouillon'), findsOneWidget);
+    expect(find.byKey(const ValueKey('identity-locked')), findsOneWidget);
   });
 
   testWidgets('publication refusée sans photo : le motif s’affiche ; avec photo : « En ligne »', (tester) async {
@@ -228,30 +231,23 @@ void main() {
 
   testWidgets('L7-04 : nom, description et prix normal en lecture seule ; promotion modifiée, réputation conservée', (tester) async {
     final api = _FakeShop()..current = _detail(status: 'published', everPublished: true, hearts: 3, photos: const [ProductPhoto(id: 'm1', url: null)]);
-    await _pump(tester, api, '/shop/products/x1');
+    // Écran haut : tout le formulaire est construit d'un coup.
+    await _pump(tester, api, '/shop/products/x1', height: 7200);
     expect(tester.widget<Text>(find.byKey(const ValueKey('product-reference'))).data, 'Réf. BIM-000123');
     // Une nouvelle fiche est proposée pour changer le nom, la description ou le prix normal.
     expect(find.byKey(const ValueKey('identity-locked')), findsOneWidget);
     expect(find.byKey(const ValueKey('new-sheet')), findsOneWidget);
-    // Les champs sont construits à l'approche : on fait défiler jusqu'à chacun avant de le lire.
-    Future<TextField> field(String key) async {
-      final f = find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField));
-      await tester.scrollUntilVisible(f, 150, scrollable: find.byType(Scrollable).first);
-      return tester.widget<TextField>(f);
+    TextField field(String key) => tester.widget<TextField>(find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField)));
+    for (final k in ['product-title', 'product-price', 'product-description']) {
+      expect(field(k).readOnly, isTrue, reason: k);
     }
-    expect((await field('product-title')).readOnly, isTrue);
+    expect(field('product-promo').readOnly, isFalse);
     // Rubrique et variantes figées depuis la publication ; le stock reste modifiable.
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-category')), 150, scrollable: find.byType(Scrollable).first);
     expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const ValueKey('product-category'))).onChanged, isNull);
-    expect((await field('product-price')).readOnly, isTrue);
-    expect((await field('product-promo')).readOnly, isFalse);
-    expect((await field('product-description')).readOnly, isTrue);
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('variants-frozen')), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.byKey(const ValueKey('variants-frozen')), findsOneWidget);
     expect(find.text('Mettre à jour les variantes'), findsNothing);
 
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-promo')), -300, scrollable: find.byType(Scrollable).first);
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '39000');
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('save-product')));
     await tester.pumpAndSettle();
     // Seule la promotion part ; ni le nom ni le prix normal, ni la rubrique d'une fiche publiée.
