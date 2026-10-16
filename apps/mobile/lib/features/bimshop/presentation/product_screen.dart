@@ -117,8 +117,10 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                   Positioned(
                     right: BimSpacing.sm,
                     top: BimSpacing.sm,
-                    child: CircleAvatar(
-                      backgroundColor: scheme.surface,
+                    // Le bouton garde sa taille de toucher (48 px) : un cercle de 40 px le masquait.
+                    child: Material(
+                      color: scheme.surface,
+                      shape: const CircleBorder(),
                       child: IconButton(
                         key: const ValueKey('favorite'),
                         tooltip: favorite ? 'Retirer des articles mis de côté' : 'Mettre de côté',
