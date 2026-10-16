@@ -114,7 +114,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nouvel article'), findsOneWidget);
     FilledButton save() => tester.widget<FilledButton>(find.descendant(of: find.byKey(const ValueKey('save-product')), matching: find.byType(FilledButton)));
+    final list = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: list);
     expect(save().onPressed, isNull);
+    await tester.drag(list, const Offset(0, 2000));
+    await tester.pumpAndSettle();
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-title')), matching: find.byType(TextField)), 'Robe soirée à plumes');
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-price')), matching: find.byType(TextField)), '45000');
     await tester.tap(find.byKey(const ValueKey('product-category')));
