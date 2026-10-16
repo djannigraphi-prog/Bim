@@ -77,7 +77,7 @@ jobs:
           # En production : documentation désactivée, SMS factices refusés.
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/docs)" = "404"
           docker rm -f bim-api
-          if docker run --rm -e NODE_ENV=production -e SMS_PROVIDER=console -e DATABASE_URL=postgres://x:y@localhost/z \
+          if docker run --rm -e NODE_ENV=production -e TRUST_PROXY=1 -e SMS_PROVIDER=console -e DATABASE_URL=postgres://x:y@localhost/z \
                -e JWT_ACCESS_SECRET=ci-docker-access-secret-0123456789-abcd -e OTP_SECRET=ci-docker-otp-secret-0123456789-abcdefgh \
                -e ADMIN_TOTP_ENCRYPTION_KEY=Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE= bim-api:ci; then
             echo "La production a démarré avec des SMS factices" && exit 1

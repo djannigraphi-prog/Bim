@@ -47,6 +47,7 @@ describe('loadConfig', () => {
     const prod = { ...base, NODE_ENV: 'production', SMS_PROVIDER: 'none', EMAIL_PROVIDER: 'none' };
     expect(() => loadConfig(prod)).toThrow(/TRUST_PROXY/);
     expect(loadConfig({ ...prod, TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
+    expect(loadConfig({ ...prod, WORKER_MODE: 'standalone', PUSH_PROVIDER: 'fcm', FCM_SERVICE_ACCOUNT_JSON: JSON.stringify({ project_id: 'p', client_email: 'x@p.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' }) }).WORKER_MODE).toBe('standalone');
     expect(() => loadConfig({ ...base, KYC_ENCRYPTION_KEY: base.ADMIN_TOTP_ENCRYPTION_KEY })).toThrow(/KYC_ENCRYPTION_KEY/);
   });
 });

@@ -69,7 +69,9 @@ class AuthInterceptor extends QueuedInterceptor {
       return handler.next(err);
     }
     var access = tokens['accessToken'] as String;
-    await storage.save(accessToken: access, refreshToken: tokens['refreshToken'] as String);
+    final newRefresh = tokens['refreshToken'] as String;
+    // Le nouveau jeton de rafraîchissement est enregistré tout de suite (l'ancien n'est plus valable).
+    await storage.save(accessToken: access, refreshToken: newRefresh);
     // Le serveur rend un jeton dans l'espace « utilisateur » ; si la personne était dans l'espace de sa boutique,
     // on redemande cet espace (revérifié par le serveur), sinon la boutique deviendrait inaccessible (audit, E-3).
     final space = _space(sentWith is String ? sentWith.replaceFirst('Bearer ', '') : current);
@@ -81,7 +83,7 @@ class AuthInterceptor extends QueuedInterceptor {
           options: Options(headers: {'Authorization': 'Bearer $access'}),
         );
         access = res.data!['accessToken'] as String;
-        await storage.saveAccess(access);
+        await storage.save(accessToken: access, refreshToken: newRefresh);
       } catch (_) {
         // Espace refusé (boutique suspendue) ou réseau : on garde l'espace utilisateur, l'écran l'indiquera.
       }

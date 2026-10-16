@@ -362,9 +362,10 @@ export class PostsService {
       if (!parent) throw Errors.notFound('Commentaire');
       if (parent.parentId) dto.parentId = parent.parentId;
     }
-    const id = uuidv7(this.clock.now().getTime());
+    const now = this.clock.now();
+    const id = uuidv7(now.getTime());
     await this.db.transaction(async (tx) => {
-      await tx.insert(postComments).values({ id, postId, userId: viewerId, parentId: dto.parentId ?? null, text, createdAt: this.clock.now() });
+      await tx.insert(postComments).values({ id, postId, userId: viewerId, parentId: dto.parentId ?? null, text, createdAt: now });
       await tx.update(posts).set({ commentCount: sql`${posts.commentCount} + 1` }).where(eq(posts.id, post.id));
       await this.audit.log({ actorType: 'user', actorId: viewerId, action: 'social.comment_created', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent, metadata: { commentId: id } }, tx);
     });
@@ -375,7 +376,7 @@ export class PostsService {
       id,
       parentId: dto.parentId ?? null,
       text,
-      createdAt: this.clock.now(),
+      createdAt: now,
       author: { id: me.id, username: me.username, fullName: me.fullName, avatarUrl: await this.avatarUrl(me.avatarKey, apiBase) },
       likeCount: 0,
       likedByMe: false,

@@ -243,7 +243,11 @@ export class MerchantsService {
         .delete(merchantApplications)
         .where(and(eq(merchantApplications.id, a.id), ne(merchantApplications.status, 'approved')))
         .returning({ id: merchantApplications.id });
-      if (!gone.length) throw Errors.conflict('APPLICATION_LOCKED', 'Ta boutique est déjà ouverte.');
+      if (!gone.length) {
+        const [still] = await tx.select({ status: merchantApplications.status }).from(merchantApplications).where(eq(merchantApplications.id, a.id));
+        if (still?.status === 'approved') throw Errors.conflict('APPLICATION_LOCKED', 'Ta boutique est déjà ouverte.');
+        throw Errors.notFound('Demande');
+      }
       await tx.update(shops).set({ status: 'closed', updatedAt: new Date() }).where(eq(shops.id, a.shopId));
       await this.audit.log({ actorType: 'user', actorId: userId, action: 'merchant.application_withdrawn', targetType: 'shop', targetId: a.shopId, ip: meta.ip, userAgent: meta.userAgent }, tx);
     });

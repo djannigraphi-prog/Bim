@@ -48,8 +48,12 @@ class SessionController extends Notifier<SessionState> {
     } on ApiException catch (e) {
       // Seul un refus explicite de la session déconnecte. Le rafraîchissement refusé efface déjà les jetons ;
       // une coupure réseau, une erreur serveur ou une limite atteinte gardent la session et proposent de réessayer.
-      final refused = await storage.refreshToken() == null || (e.status == 401 && e.code == 'SESSION_INVALID');
-      if (!refused) {
+      // « Momentané » : réseau, erreur serveur (5xx), limite atteinte (429), ou 401 alors que le rafraîchissement n'a
+      // pas pu aboutir (jetons encore présents). Toute autre réponse (403, 404…) déconnecte comme avant.
+      final stillStored = await storage.refreshToken() != null;
+      final status = e.status ?? 0;
+      final transient = e.isNetwork || status >= 500 || status == 429 || (status == 401 && e.code != 'SESSION_INVALID' && stillStored);
+      if (transient && stillStored) {
         state = const SessionUnknown(unreachable: true);
         return;
       }

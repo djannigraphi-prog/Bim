@@ -49,8 +49,11 @@ class SocialApi {
   Future<CommentsPage> comments(String postId, {String? cursor}) async =>
       CommentsPage.fromJson(await _api.get('/v1/posts/$postId/comments', query: {if (cursor != null) 'cursor': cursor}));
 
-  Future<void> comment(String postId, String text, {String? parentId}) =>
-      _api.post('/v1/posts/$postId/comments', body: {'text': text, if (parentId != null) 'parentId': parentId});
+  /// Publie un commentaire ; renvoie le commentaire créé (null si la réponse ne le contient pas).
+  Future<PostComment?> comment(String postId, String text, {String? parentId}) async {
+    final r = await _api.post('/v1/posts/$postId/comments', body: {'text': text, if (parentId != null) 'parentId': parentId});
+    return r['id'] is String ? PostComment.fromJson(r) : null;
+  }
 
   Future<void> deleteComment(String id) => _api.delete('/v1/comments/$id');
 

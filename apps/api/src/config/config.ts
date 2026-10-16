@@ -155,7 +155,8 @@ const schema = z
     }
     // Derrière le répartiteur de charge, sans TRUST_PROXY toutes les requêtes viendraient de son adresse : limites de
     // débit communes à tout le monde et adresses fausses dans le journal d'audit (audit, C-3).
-    if (!devLike && cfg.TRUST_PROXY === 0) {
+    // Le service séparé des rappels (dist/worker.js) ne reçoit aucune requête : la règle ne le concerne pas.
+    if (!devLike && cfg.TRUST_PROXY === 0 && cfg.WORKER_MODE !== 'standalone') {
       ctx.addIssue({ code: 'custom', path: ['TRUST_PROXY'], message: 'TRUST_PROXY doit être indiqué hors développement (1 derrière le répartiteur de charge)' });
     }
     if (cfg.KYC_ENCRYPTION_KEY && cfg.KYC_ENCRYPTION_KEY === cfg.ADMIN_TOTP_ENCRYPTION_KEY) {

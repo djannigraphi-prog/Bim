@@ -76,11 +76,28 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
     if (text.isEmpty) return;
     setState(() => _sending = true);
     try {
-      await ref.read(socialApiProvider).comment(widget.postId, text, parentId: _replyTo?.id);
+      final created = await ref.read(socialApiProvider).comment(widget.postId, text, parentId: _replyTo?.id);
       if (!mounted) return;
       _input.clear();
-      setState(() => _replyTo = null);
-      await _load(pages: 20);
+      final page = _page;
+      if (created != null && page != null) {
+        // Ajout local, à sa place (réponse sous son commentaire, sinon à la fin) : visible même au-delà des
+        // 30 premiers, sans recharger toutes les pages (audit, M-6).
+        final items = [...page.items];
+        var at = items.length;
+        if (created.parentId != null) {
+          final i = items.lastIndexWhere((c) => c.id == created.parentId || c.parentId == created.parentId);
+          if (i >= 0) at = i + 1;
+        }
+        items.insert(at, created);
+        setState(() {
+          _replyTo = null;
+          _page = CommentsPage(total: page.total + 1, nextCursor: page.nextCursor, items: items);
+        });
+      } else {
+        setState(() => _replyTo = null);
+        await _load();
+      }
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
@@ -96,7 +113,14 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
     setState(() => _loadingMore = true);
     try {
       final next = await ref.read(socialApiProvider).comments(widget.postId, cursor: page!.nextCursor);
-      if (mounted) setState(() => _page = CommentsPage(total: next.total, nextCursor: next.nextCursor, items: [...page.items, ...next.items]));
+      if (mounted) {
+        setState(() {
+          // Toujours à partir de la liste actuelle ; un commentaire ajouté localement n'apparaît pas deux fois.
+          final current = _page ?? page;
+          final known = current.items.map((c) => c.id).toSet();
+          _page = CommentsPage(total: next.total, nextCursor: next.nextCursor, items: [...current.items, ...next.items.where((c) => !known.contains(c.id))]);
+        });
+      }
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {

@@ -49,6 +49,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 onPressed: () => ref.read(sessionProvider.notifier).restore(),
                 child: const Text('Réessayer'),
               ),
+              // Issue toujours disponible : se déconnecter de cet appareil et revenir à l'écran de bienvenue.
+              TextButton(
+                key: const ValueKey('splash-sign-out'),
+                onPressed: () => ref.read(sessionProvider.notifier).signOut(),
+                child: const Text('Se déconnecter', style: TextStyle(color: BimColors.grey600)),
+              ),
               const SizedBox(height: BimSpacing.lg),
             ],
             Text(
