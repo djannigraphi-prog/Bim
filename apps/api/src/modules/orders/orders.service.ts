@@ -11,6 +11,9 @@ import {
   communes,
   conversationMembers,
   conversations,
+  deliveries,
+  deliveryEvents,
+  deliveryOffers,
   inventoryMovements,
   messages,
   orderEvents,
@@ -58,7 +61,7 @@ export interface FulfilmentInput {
 }
 
 /** Statuts où la commande est encore ouverte côté client (code visible, annulation possible…). */
-const ACTIVE = ['confirmed', 'preparing', 'ready'] as const;
+const ACTIVE = ['confirmed', 'preparing', 'ready', 'in_delivery'] as const;
 const ENDED = ['declined', 'expired', 'cancelled'];
 const MAX_LINES = 20;
 
@@ -296,7 +299,7 @@ export class OrdersService {
     );
   }
 
-  private event(tx: DbOrTx, orderId: string, type: string, actorType: string, actorId: string | null, from: string | null, to: string | null, data: Record<string, unknown> = {}) {
+  event(tx: DbOrTx, orderId: string, type: string, actorType: string, actorId: string | null, from: string | null, to: string | null, data: Record<string, unknown> = {}) {
     return tx.insert(orderEvents).values({ id: uuidv7(), orderId, type, actorType, actorId, fromStatus: from, toStatus: to, data });
   }
 
@@ -440,7 +443,7 @@ export class OrdersService {
   // ------------------------------------------------------------------ Transitions
 
   /** Transition conditionnelle : sans effet (409) si la commande n'est plus dans un statut attendu. */
-  private async move(tx: Tx, orderId: string, from: readonly string[], to: string, set: Partial<Order>, ev: { type: string; actorType: string; actorId: string | null; data?: Record<string, unknown> }) {
+  async move(tx: Tx, orderId: string, from: readonly string[], to: string, set: Partial<Order>, ev: { type: string; actorType: string; actorId: string | null; data?: Record<string, unknown> }) {
     const [before] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
     if (!before) throw Errors.notFound('Commande');
     if (!from.includes(before.status)) throw stateChanged(before.status);
@@ -548,32 +551,46 @@ export class OrdersService {
   async handover(staffId: string, shopId: string, orderId: string, code: string) {
     const o = await this.ownedByShop(shopId, orderId);
     if (o.deliveryMode !== 'pickup') throw new AppError('NOT_PICKUP', 'Cette commande est livrée : le code est saisi par le livreur.', HttpStatus.CONFLICT);
-    const max = await this.intSetting('orders.handover_code_max_attempts', 5);
     const result = await this.db.transaction(async (tx) => {
-      const [c] = await tx.select().from(orderHandoverCodes).where(eq(orderHandoverCodes.orderId, orderId)).for('update').limit(1);
       const [cur] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
       if (!cur) throw Errors.notFound('Commande');
-      if (!c || cur.status !== 'ready') throw stateChanged(cur.status);
-      if (c.status === 'blocked') return { ok: false as const, code: 'HANDOVER_CODE_BLOCKED' };
-      if (c.status !== 'active') throw stateChanged(cur.status);
-      const ok = /^\d{4}$/.test(code) && safeEqualHex(c.codeHash, hmacSha256(this.otpSecret, `handover:${orderId}:${code}`));
-      if (!ok) {
-        const failed = c.failedAttempts + 1;
-        const blocked = failed >= max;
-        await tx.update(orderHandoverCodes).set({ failedAttempts: failed, status: blocked ? 'blocked' : 'active' }).where(eq(orderHandoverCodes.orderId, orderId));
-        await this.event(tx, orderId, blocked ? 'code_blocked' : 'code_failed', 'shop', staffId, null, null, { attempt: failed });
-        return { ok: false as const, code: blocked ? 'HANDOVER_CODE_BLOCKED' : 'HANDOVER_CODE_INVALID', remaining: Math.max(0, max - failed) };
-      }
-      const now = new Date();
-      await tx.update(orderHandoverCodes).set({ status: 'used', usedAt: now, usedBy: staffId }).where(eq(orderHandoverCodes.orderId, orderId));
-      await this.event(tx, orderId, 'code_validated', 'shop', staffId, null, null);
-      await this.move(tx, orderId, ['ready'], 'delivered', { deliveredAt: now }, { type: 'handed_over', actorType: 'shop', actorId: staffId });
-      return { ok: true as const };
+      if (cur.status !== 'ready') throw stateChanged(cur.status);
+      const r = await this.checkHandoverCode(tx, orderId, code, 'shop', staffId);
+      if (!r.ok) return r;
+      await this.move(tx, orderId, ['ready'], 'delivered', { deliveredAt: new Date() }, { type: 'handed_over', actorType: 'shop', actorId: staffId });
+      return r;
     });
-    if (!result.ok) {
-      if (result.code === 'HANDOVER_CODE_BLOCKED') throw new AppError('HANDOVER_CODE_BLOCKED', 'Trop d’essais : ce code est bloqué. Le support peut le recréer.', HttpStatus.CONFLICT);
-      throw new AppError('HANDOVER_CODE_INVALID', 'Code incorrect.', HttpStatus.BAD_REQUEST, { remaining: result.remaining });
+    OrdersService.throwCodeResult(result);
+  }
+
+  /**
+   * Vérifie le code de remise d'une commande (retrait au comptoir ou livraison) : empreinte comparée à temps constant,
+   * essais faux comptés et code bloqué au-delà, usage unique. Le code n'apparaît jamais dans l'historique. Le résultat
+   * d'un échec est renvoyé (et non levé) pour que le compteur d'essais soit enregistré avec la transaction.
+   */
+  async checkHandoverCode(tx: Tx, orderId: string, code: string, actorType: 'shop' | 'courier', actorId: string): Promise<{ ok: true } | { ok: false; code: string; remaining?: number }> {
+    const max = await this.intSetting('orders.handover_code_max_attempts', 5);
+    const [c] = await tx.select().from(orderHandoverCodes).where(eq(orderHandoverCodes.orderId, orderId)).for('update').limit(1);
+    if (!c) throw stateChanged('no_code');
+    if (c.status === 'blocked') return { ok: false, code: 'HANDOVER_CODE_BLOCKED' };
+    if (c.status !== 'active') throw new AppError('HANDOVER_CODE_USED', 'Ce code a déjà servi ou n’est plus valable.', HttpStatus.CONFLICT);
+    const ok = /^\d{4}$/.test(code) && safeEqualHex(c.codeHash, hmacSha256(this.otpSecret, `handover:${orderId}:${code}`));
+    if (!ok) {
+      const failed = c.failedAttempts + 1;
+      const blocked = failed >= max;
+      await tx.update(orderHandoverCodes).set({ failedAttempts: failed, status: blocked ? 'blocked' : 'active' }).where(eq(orderHandoverCodes.orderId, orderId));
+      await this.event(tx, orderId, blocked ? 'code_blocked' : 'code_failed', actorType, actorId, null, null, { attempt: failed });
+      return { ok: false, code: blocked ? 'HANDOVER_CODE_BLOCKED' : 'HANDOVER_CODE_INVALID', remaining: Math.max(0, max - failed) };
     }
+    await tx.update(orderHandoverCodes).set({ status: 'used', usedAt: new Date(), usedBy: actorType === 'shop' ? actorId : null }).where(eq(orderHandoverCodes.orderId, orderId));
+    await this.event(tx, orderId, 'code_validated', actorType, actorId, null, null);
+    return { ok: true };
+  }
+
+  static throwCodeResult(result: { ok: true } | { ok: false; code: string; remaining?: number }) {
+    if (result.ok) return;
+    if (result.code === 'HANDOVER_CODE_BLOCKED') throw new AppError('HANDOVER_CODE_BLOCKED', 'Trop d’essais : ce code est bloqué. Le support peut le recréer.', HttpStatus.CONFLICT);
+    throw new AppError('HANDOVER_CODE_INVALID', 'Code incorrect.', HttpStatus.BAD_REQUEST, { remaining: result.remaining });
   }
 
   /** Annulation par le client : proposition refusée, ou commande annulée avant la préparation. */
@@ -598,6 +615,13 @@ export class OrdersService {
       const [cur] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1);
       const { before } = await this.move(tx, orderId, ['proposed', 'confirmed', 'preparing', 'ready'], 'cancelled', { closedAt: new Date(), endedByType: 'shop', endedById: staffId, endReason: reason, endedFromStatus: cur.status, expiresAt: null }, { type: cur.status === 'proposed' ? 'proposal_withdrawn' : 'cancelled', actorType: 'shop', actorId: staffId, data: { reason } });
       await this.returnStock(tx, before, staffId);
+      // 7-F : la livraison non encore prise en charge est annulée, son état figé (le colis n'a pas quitté la boutique).
+      const [d] = await tx.select().from(deliveries).where(eq(deliveries.orderId, orderId)).for('update').limit(1);
+      if (d && !['closed', 'refused_by_client', 'client_absent', 'cancelled'].includes(d.status)) {
+        await tx.update(deliveryOffers).set({ status: 'withdrawn', answeredAt: new Date() }).where(and(eq(deliveryOffers.deliveryId, d.id), eq(deliveryOffers.status, 'offered')));
+        await tx.update(deliveries).set({ status: 'cancelled', endedAt: new Date(), endReason: 'Commande annulée par la boutique' }).where(eq(deliveries.id, d.id));
+        await tx.insert(deliveryEvents).values({ id: uuidv7(), deliveryId: d.id, type: 'cancelled', actorType: 'shop', actorId: staffId, data: { fromStatus: d.status } });
+      }
       await tx.update(orderHandoverCodes).set({ status: 'cancelled' }).where(and(eq(orderHandoverCodes.orderId, orderId), eq(orderHandoverCodes.status, 'active')));
       await this.payments.cancel(tx, orderId);
     });
@@ -722,7 +746,7 @@ export class OrdersService {
       payment: await this.payments.view(o, party),
       // 7-H : évaluations du client (articles et boutique), après la remise et dans le délai.
       reviews: party === 'customer' ? await this.reviews.orderState(o) : null,
-      actions: [...OrdersService.actions(o, party), ...PaymentsService.actions(o, await this.payments.forOrder(o.id), party)],
+      actions: [...OrdersService.actions(o, party), ...PaymentsService.actions(o, await this.payments.forOrder(o.id), party, await this.payments.payable(o))],
     };
   }
 

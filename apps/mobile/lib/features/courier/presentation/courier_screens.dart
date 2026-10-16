@@ -13,6 +13,7 @@ import '../../auth/application/session_controller.dart';
 import '../../orders/data/orders_api.dart' show communesProvider;
 import '../../projects/application/photo_source.dart';
 import '../data/courier_api.dart';
+import 'courier_courses.dart';
 
 /// Lot 7-E — Devenir livreur : pièce d'identité et selfie (chiffrés), moyen de transport, envoi pour vérification.
 class CourierApplyScreen extends ConsumerStatefulWidget {
@@ -145,7 +146,7 @@ class _CourierApplyScreenState extends ConsumerState<CourierApplyScreen> {
 }
 
 /// Lot 7-E — Espace livreur : disponibilité, capacité, communes desservies, relations avec les boutiques.
-/// Aucune commande de boutique ici (L7-04) : les annonces de livraison arrivent avec 7-F.
+/// Aucune commande de boutique ici (L7-04) : seulement les missions proposées à ce livreur et ses courses (7-F).
 class CourierSpaceScreen extends ConsumerStatefulWidget {
   const CourierSpaceScreen({super.key});
 
@@ -160,7 +161,9 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
     setState(() => _busy = true);
     try {
       await f(ref.read(courierApiProvider));
-      ref.invalidate(courierProfileProvider);
+      ref
+        ..invalidate(courierProfileProvider)
+        ..invalidate(missionsProvider);
       if (done != null && mounted) showBimSnack(context, done);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
@@ -208,8 +211,10 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
             children: [
               Text('Espace livreur', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
               const SizedBox(height: BimSpacing.xs),
-              Text('Les annonces de livraison des boutiques arrivent bientôt. Tu ne verras que les courses publiées et celles que tu acceptes.', style: theme.textTheme.bodySmall),
+              Text('Tu ne vois que les missions qui te sont proposées, tes courses et ton historique.', style: theme.textTheme.bodySmall),
               const SizedBox(height: BimSpacing.lg),
+              const CourierWorkSection(),
+              const Divider(height: BimSpacing.xl),
               SwitchListTile(
                 key: const ValueKey('courier-available'),
                 contentPadding: EdgeInsets.zero,

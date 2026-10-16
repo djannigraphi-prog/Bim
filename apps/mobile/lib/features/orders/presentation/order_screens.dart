@@ -8,6 +8,8 @@ import '../../../core/util/date_fr.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../courier/data/courier_api.dart' show vehicleLabel;
+import '../../courier/presentation/courier_courses.dart' show IncidentDialog;
 import '../../merchant/data/shop_api.dart' show formatFcfa;
 import '../data/orders_api.dart';
 import 'checkout_screen.dart';
@@ -19,7 +21,7 @@ final _orderProvider = FutureProvider.autoDispose.family<OrderDetail, String>((r
 final _shopOrderProvider = FutureProvider.autoDispose.family<OrderDetail, String>((ref, id) => ref.watch(shopOrdersApiProvider).order(id));
 
 Color _statusColor(String s) => switch (s) {
-      'delivered' => BimColors.success,
+      'delivered' || 'completed' => BimColors.success,
       'declined' || 'expired' || 'cancelled' => BimColors.grey800,
       _ => BimColors.red,
     };
@@ -144,8 +146,9 @@ class ShopOrdersScreen extends ConsumerWidget {
 
 /// Détail commun : lignes figées, mode, frais, total, historique.
 class _OrderBody extends StatelessWidget {
-  const _OrderBody({required this.o, required this.top, required this.actions, this.asShop = false});
+  const _OrderBody({required this.o, required this.top, required this.actions, this.asShop = false, this.onSupport});
   final OrderDetail o;
+  final void Function(String incidentId)? onSupport;
   final List<Widget> top;
   final List<Widget> actions;
   final bool asShop;
@@ -167,6 +170,7 @@ class _OrderBody extends StatelessWidget {
         const SizedBox(height: BimSpacing.xs),
         Text(asShop ? 'Client : ${o.customerName ?? ''}' : o.shopName, style: theme.textTheme.bodySmall),
         ...top,
+        if (o.tracking != null) _TrackingCard(t: o.tracking!, asShop: asShop),
         const SizedBox(height: BimSpacing.lg),
         for (final i in o.items)
           Padding(
@@ -214,6 +218,22 @@ class _OrderBody extends StatelessWidget {
         ],
         const SizedBox(height: BimSpacing.lg),
         ...actions,
+        if (o.incidents.isNotEmpty) ...[
+          const SizedBox(height: BimSpacing.lg),
+          Text('Incidents', style: theme.textTheme.titleMedium),
+          for (final i in o.incidents)
+            ListTile(
+              key: ValueKey('incident-${i.id}'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(incidentReasonLabel(i.reason)),
+              subtitle: Text(incidentStatusLabel(i.status)),
+              trailing: i.status == 'open' && onSupport != null
+                  ? TextButton(key: ValueKey('incident-support-${i.id}'), onPressed: () => onSupport!(i.id), child: const Text('Transmettre au support'))
+                  : null,
+            ),
+          Text('Aucune pénalité ni remboursement automatique : le support examine le dossier.', style: theme.textTheme.bodySmall),
+        ],
         const SizedBox(height: BimSpacing.lg),
         Text('Historique', style: theme.textTheme.titleMedium),
         for (final e in o.events.reversed)
@@ -292,6 +312,99 @@ class _ReasonDialogState extends State<_ReasonDialog> {
       );
 }
 
+/// 7-F — Suivi de la livraison : état, livreur (prénom pour le client), délai de réponse du livreur sollicité.
+class _TrackingCard extends StatelessWidget {
+  const _TrackingCard({required this.t, required this.asShop});
+  final DeliveryTracking t;
+  final bool asShop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const ValueKey('delivery-tracking'),
+      margin: const EdgeInsets.only(top: BimSpacing.md),
+      padding: const EdgeInsets.all(BimSpacing.md),
+      decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outline), borderRadius: BorderRadius.circular(BimRadius.card)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Livraison : ${deliveryStatusLabel(t.status)}', key: const ValueKey('delivery-status'), style: const TextStyle(fontWeight: FontWeight.w700)),
+          if (t.courierName != null)
+            Text(
+              [
+                'Livreur : ${t.courierName}',
+                if (t.vehicle != null) vehicleLabel(t.vehicle),
+                if (asShop && t.category != null) courierCategoryLabel(t.category!),
+              ].join(' · '),
+              key: const ValueKey('delivery-courier'),
+            ),
+          if (asShop && t.requestExpiresAt != null) Text('Réponse attendue avant ${formatDateTimeFr(t.requestExpiresAt!)}', style: theme.textTheme.bodySmall),
+          if (t.refusalReason != null) Text('Motif du refus : ${refusalReasonLabel(t.refusalReason!)}', style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+String refusalReasonLabel(String r) => const {'incorrect': 'Article incorrect', 'damaged': 'Article endommagé', 'incomplete': 'Article incomplet', 'other': 'Autre'}[r] ?? r;
+
+const _customerIncidentReasons = ['item_incorrect', 'item_damaged', 'item_incomplete', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other'];
+const _shopIncidentReasons = ['courier_absent', 'delay', 'payment', 'behaviour', 'other'];
+
+/// Un incident concerne une commande confirmée (revérifié par le serveur).
+bool _incidentPossible(OrderDetail o) => !const ['proposed', 'pending_shop', 'declined', 'expired'].contains(o.status);
+
+/// Refus de la remise après examen : motif obligatoire, précision pour « Autre ». Le champ appartient à la boîte.
+class _RefuseDialog extends StatefulWidget {
+  const _RefuseDialog();
+
+  @override
+  State<_RefuseDialog> createState() => _RefuseDialogState();
+}
+
+class _RefuseDialogState extends State<_RefuseDialog> {
+  final _c = TextEditingController();
+  String? _reason;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Refuser la remise ?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: BimSpacing.sm,
+                runSpacing: BimSpacing.xs,
+                children: [
+                  for (final r in const ['incorrect', 'damaged', 'incomplete', 'other'])
+                    ChoiceChip(key: ValueKey('refuse-$r'), label: Text(refusalReasonLabel(r)), selected: _reason == r, onSelected: (_) => setState(() => _reason = r)),
+                ],
+              ),
+              TextField(key: const ValueKey('refuse-details'), controller: _c, maxLength: 300, decoration: const InputDecoration(hintText: 'Précision'), onChanged: (_) => setState(() {})),
+              const Text('Ne donne pas ton code. Un incident est ouvert ; aucun remboursement automatique.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Retour')),
+          TextButton(
+            key: const ValueKey('refuse-send'),
+            onPressed: _reason != null && (_reason != 'other' || _c.text.trim().length >= 3) ? () => Navigator.pop(context, (reason: _reason!, details: _c.text.trim())) : null,
+            child: const Text('Refuser'),
+          ),
+        ],
+      );
+}
+
 /// Détail d'une commande (client) : code de remise visible tant qu'il peut servir ; accepter ou refuser une proposition.
 class OrderScreen extends ConsumerStatefulWidget {
   const OrderScreen({super.key, required this.orderId});
@@ -324,6 +437,37 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       ref.invalidate(_orderProvider(o.id));
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _call(OrderDetail o, Future<void> Function(OrdersApi api) f, {String? done}) async {
+    setState(() => _busy = true);
+    try {
+      await f(ref.read(ordersApiProvider));
+      if (done != null && mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        showBimSnack(context, done);
+      }
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      ref.invalidate(_orderProvider(o.id));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _refuse(OrderDetail o) async {
+    final r = await showDialog<({String reason, String details})>(context: context, builder: (_) => const _RefuseDialog());
+    if (r != null && mounted) await _call(o, (api) => api.refuseDelivery(o.id, r.reason, details: r.details), done: 'Remise refusée');
+  }
+
+  Future<void> _incident(OrderDetail o) async {
+    final r = await showDialog<({String reason, String description})>(context: context, builder: (_) => const IncidentDialog(reasons: _customerIncidentReasons));
+    if (r != null && mounted) await _call(o, (api) => api.openIncident(o.id, r.reason, description: r.description), done: 'Incident signalé');
+  }
+
+  Future<void> _reviewDelivery(OrderDetail o) async {
+    final r = await showDialog<({int rating, String comment})>(context: context, builder: (_) => const _ReviewDialog(about: 'la livraison'));
+    if (r != null && mounted) await _call(o, (api) => api.reviewDelivery(o.id, rating: r.rating, comment: r.comment), done: 'Merci pour ton avis');
   }
 
   Future<void> _declare(OrderDetail o) async {
@@ -381,6 +525,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             onRefresh: () async => ref.invalidate(_orderProvider(widget.orderId)),
             child: _OrderBody(
               o: o,
+              onSupport: (id) => _call(o, (api) => api.incidentToSupport(id), done: 'Dossier transmis au support'),
               top: [
                 if (o.handoverCode != null)
                   Container(
@@ -437,6 +582,17 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                     onPressed: _busy ? null : () => _cancel(o),
                   ),
                 ],
+                // 7-F : à l'arrivée du livreur, examiner l'article ; refuser la remise si besoin (le code n'est pas donné).
+                if (o.can('refuse_delivery')) ...[
+                  const SizedBox(height: BimSpacing.sm),
+                  BimButton(key: const ValueKey('delivery-refuse'), label: 'Refuser la remise', variant: BimButtonVariant.outline, onPressed: _busy ? null : () => _refuse(o)),
+                ],
+                if (o.can('review_delivery') && o.tracking?.reviewRating == null) ...[
+                  const SizedBox(height: BimSpacing.sm),
+                  BimButton(key: const ValueKey('delivery-review'), label: 'Évaluer la livraison', variant: BimButtonVariant.outline, onPressed: _busy ? null : () => _reviewDelivery(o)),
+                ],
+                if (o.tracking?.reviewRating != null) Text('Ton évaluation de la livraison : ${stars(o.tracking!.reviewRating!)}', key: const ValueKey('delivery-review-done')),
+                if (_incidentPossible(o)) TextButton(key: const ValueKey('order-incident'), onPressed: _busy ? null : () => _incident(o), child: const Text('Signaler un problème')),
                 if (o.conversationId != null) TextButton(onPressed: () => context.push('/messages/${o.conversationId}'), child: const Text('Voir la conversation')),
                 // 7-H : évaluer chaque article et la boutique, une fois, après la remise.
                 if (o.reviews != null && (o.reviews!.open || o.reviews!.itemRatings.any((r) => r != null) || o.reviews!.shopRating != null)) ...[
@@ -517,6 +673,34 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
     }
   }
 
+  Future<void> _shopIncident(OrderDetail o) async {
+    final r = await showDialog<({String reason, String description})>(context: context, builder: (_) => const IncidentDialog(reasons: _shopIncidentReasons));
+    if (r == null || !mounted) return;
+    await _call(() => ref.read(shopOrdersApiProvider).openIncident(o.id, r.reason, description: r.description), done: 'Incident signalé');
+  }
+
+  Future<void> _call(Future<void> Function() f, {String? done}) async {
+    setState(() => _busy = true);
+    try {
+      await f();
+      if (done != null && mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        showBimSnack(context, done);
+      }
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      ref.invalidate(_shopOrderProvider(widget.orderId));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _selectCourier(OrderDetail o) async {
+    final done = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, builder: (_) => _CandidatesSheet(orderId: o.id));
+    ref.invalidate(_shopOrderProvider(widget.orderId));
+    if (done == true && mounted) showBimSnack(context, 'Livreur sollicité : il doit accepter la mission.');
+  }
+
   Future<void> _withReason(String action, String title, String label) async {
     final r = await _askReason(context, title: title, action: label);
     if (r != null && mounted) await _act(action, reason: r);
@@ -530,6 +714,7 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
             (o) => _OrderBody(
               o: o,
               asShop: true,
+              onSupport: (id) => _call(() => ref.read(shopOrdersApiProvider).incidentToSupport(id), done: 'Dossier transmis au support'),
               top: [
                 if (o.status == 'pending_shop' && o.expiresAt != null)
                   Padding(padding: const EdgeInsets.only(top: BimSpacing.sm), child: Text('À confirmer avant le ${formatDateTimeFr(o.expiresAt!)}, sinon elle expire.')),
@@ -538,6 +723,18 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
                 if (o.can('confirm')) BimButton(key: const ValueKey('shop-order-confirm'), label: 'Confirmer la commande', loading: _busy, onPressed: _busy ? null : () => _act('confirm', done: 'Commande confirmée')),
                 if (o.can('prepare')) BimButton(key: const ValueKey('shop-order-prepare'), label: 'Commencer la préparation', loading: _busy, onPressed: _busy ? null : () => _act('prepare')),
                 if (o.can('ready')) BimButton(key: const ValueKey('shop-order-ready'), label: 'Marquer prête', loading: _busy, onPressed: _busy ? null : () => _act('ready', done: 'Commande prête')),
+                // 7-F : lancer la recherche, solliciter un livreur éligible (calculé par le serveur), retirer la demande.
+                if (o.can('start_delivery'))
+                  BimButton(key: const ValueKey('delivery-start'), label: 'Chercher un livreur', loading: _busy, onPressed: _busy ? null : () => _act('delivery/start')),
+                if (o.can('select_courier')) BimButton(key: const ValueKey('delivery-select'), label: 'Choisir un livreur', onPressed: _busy ? null : () => _selectCourier(o)),
+                if (o.can('withdraw_request'))
+                  BimButton(
+                    key: const ValueKey('delivery-withdraw'),
+                    label: 'Retirer la demande au livreur',
+                    variant: BimButtonVariant.outline,
+                    loading: _busy,
+                    onPressed: _busy ? null : () => _act('delivery/withdraw', done: 'Demande retirée'),
+                  ),
                 if (o.can('handover')) ...[
                   TextField(
                     key: const ValueKey('handover-input'),
@@ -579,9 +776,99 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
                     onPressed: _busy ? null : () => _withReason('cancel', o.can('withdraw') ? 'Retirer la proposition ?' : 'Annuler la commande ?', 'Confirmer'),
                   ),
                 ],
+                if (_incidentPossible(o)) TextButton(key: const ValueKey('shop-order-incident'), onPressed: _busy ? null : () => _shopIncident(o), child: const Text('Signaler un problème')),
                 if (o.conversationId != null) TextButton(onPressed: () => context.push('/shop/messages/${o.conversationId}'), child: const Text('Voir la conversation')),
               ],
             ),
+          ),
+        ),
+      );
+}
+
+/// Livreurs éligibles, dans l'ordre du serveur : employés, puis partenaires, puis indépendants. En rapide, seuls les
+/// meilleurs disponibles sont sélectionnables ; en économique, passer un prioritaire demande un motif.
+class _CandidatesSheet extends ConsumerStatefulWidget {
+  const _CandidatesSheet({required this.orderId});
+  final String orderId;
+
+  @override
+  ConsumerState<_CandidatesSheet> createState() => _CandidatesSheetState();
+}
+
+class _CandidatesSheetState extends ConsumerState<_CandidatesSheet> {
+  late Future<List<CourierCandidate>> _list = ref.read(shopOrdersApiProvider).candidates(widget.orderId);
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _offer(CourierCandidate c) async {
+    String? reason;
+    if (c.reasonRequired) {
+      reason = await _askReason(context, title: 'Pourquoi passer un livreur prioritaire ?', action: 'Solliciter');
+      if (reason == null || !mounted) return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(shopOrdersApiProvider).offer(widget.orderId, c.courierId, reason: reason);
+      if (mounted) Navigator.pop(context, true);
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _busy = false;
+          _list = ref.read(shopOrdersApiProvider).candidates(widget.orderId);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(BimSpacing.screen),
+          child: FutureBuilder<List<CourierCandidate>>(
+            future: _list,
+            builder: (context, snap) {
+              final items = snap.data;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Livreurs éligibles', style: Theme.of(context).textTheme.titleLarge),
+                  const Text('Le livreur choisi doit accepter la mission dans le délai ; sinon, choisis-en un autre.'),
+                  const SizedBox(height: BimSpacing.sm),
+                  if (snap.hasError) Text(snap.error is ApiException ? (snap.error! as ApiException).message : ApiException.unknown.message),
+                  if (items == null && !snap.hasError) const Center(child: CircularProgressIndicator()),
+                  if (items != null && items.isEmpty) const Text('Aucun livreur éligible disponible pour le moment.', key: ValueKey('candidates-empty')),
+                  if (items != null)
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final c in items)
+                            ListTile(
+                              key: ValueKey('candidate-${c.courierId}'),
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(c.fullName),
+                              subtitle: Text([
+                                courierCategoryLabel(c.category),
+                                if (c.vehicle != null) vehicleLabel(c.vehicle),
+                                if (!c.selectable) 'un livreur prioritaire est disponible',
+                                if (c.selectable && c.reasonRequired) 'motif demandé',
+                              ].join(' · ')),
+                              trailing: const Icon(Icons.chevron_right),
+                              enabled: c.selectable && !_busy,
+                              onTap: c.selectable && !_busy ? () => _offer(c) : null,
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (_error != null) Text(_error!, key: const ValueKey('candidates-error'), style: const TextStyle(color: BimColors.red)),
+                ],
+              );
+            },
           ),
         ),
       );

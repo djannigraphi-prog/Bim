@@ -43,15 +43,30 @@ describe('Accès des livreurs (e2e)', () => {
   it('aucune route n’est ouverte à l’espace livreur ; toutes les routes des boutiques exigent l’espace boutique', () => {
     const all = routes();
     expect(all.length).toBeGreaterThan(100);
-    // 7-E : les seules routes de l'espace livreur sont sous /v1/courier/ (profil, relations) ; aucune ne touche aux
-    // commandes. Les annonces publiées, les courses acceptées et l'historique personnel arriveront avec 7-F.
+    // 7-E / 7-F : les seules routes de l'espace livreur sont sous /v1/courier/ : profil, relations, missions qui lui
+    // sont proposées, ses courses, son historique ; aucune route de commandes de boutique.
     const courierRoutes = all.filter((r) => r.space === 'courier');
     expect(courierRoutes.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
+      'GET /v1/courier/courses',
+      'GET /v1/courier/courses/:id',
       'GET /v1/courier/me',
+      'GET /v1/courier/missions',
       'PATCH /v1/courier/me',
+      'POST /v1/courier/courses/:id/arrived',
+      'POST /v1/courier/courses/:id/cash',
+      'POST /v1/courier/courses/:id/client-absent',
+      'POST /v1/courier/courses/:id/close',
+      'POST /v1/courier/courses/:id/code',
+      'POST /v1/courier/courses/:id/incidents',
+      'POST /v1/courier/courses/:id/picked-up',
+      'POST /v1/courier/incidents/:id/notes',
+      'POST /v1/courier/incidents/:id/support',
+      'POST /v1/courier/missions/:offerId/accept',
+      'POST /v1/courier/missions/:offerId/decline',
       'POST /v1/courier/relations/:id/accept',
       'POST /v1/courier/relations/:id/decline',
       'POST /v1/courier/relations/:id/end',
+      'POST /v1/courier/reviews/:id/report',
     ]);
     const shopRoutes = all.filter((r) => r.path.startsWith('/v1/shop/') || r.path === '/v1/shop');
     expect(shopRoutes.length).toBeGreaterThan(20);
@@ -61,7 +76,8 @@ describe('Accès des livreurs (e2e)', () => {
     const orderRoutes = all.filter((r) => /\/orders\b/.test(r.path));
     expect(orderRoutes.length).toBeGreaterThan(5);
     expect(orderRoutes.filter((r) => !(r.path.startsWith('/v1/orders') ? r.space === 'user' : r.path.startsWith('/v1/shop/orders') && r.space === 'merchant'))).toEqual([]);
-    expect(all.filter((r) => /\/(deliveries|courses)\b/.test(r.path))).toEqual([]);
+    // Courses : seulement dans l'espace livreur ; livraisons d'une commande : client et boutique via leurs commandes.
+    expect(all.filter((r) => /\/(deliveries|courses|missions)\b/.test(r.path) && r.space !== 'courier')).toEqual([]);
   });
 
   it('un compte livreur actif n’accède à aucune donnée d’une boutique ni à la messagerie des clients', async () => {

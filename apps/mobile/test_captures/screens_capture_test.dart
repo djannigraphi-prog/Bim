@@ -63,6 +63,9 @@ import 'package:bim/features/social/presentation/composer_screen.dart';
 import 'package:bim/features/social/presentation/post_detail_screen.dart';
 import 'package:bim/features/social/presentation/profile_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:bim/features/courier/data/courier_api.dart';
+import 'package:bim/features/courier/presentation/courier_courses.dart';
+import 'package:bim/features/courier/presentation/courier_screens.dart';
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/orders/presentation/order_screens.dart';
@@ -760,6 +763,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     shopTeamApiProvider.overrideWithValue(_FakeShopTeamApi(client)),
     ordersApiProvider.overrideWithValue(_FakeOrdersApi(client)),
     shopOrdersApiProvider.overrideWithValue(_FakeShopOrdersApi(client)),
+    courierApiProvider.overrideWithValue(_FakeCourierApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -793,6 +797,8 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
     GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
     GoRoute(path: '/orders/o1', builder: (_, __) => const OrderScreen(orderId: 'o1')),
+    GoRoute(path: '/courier', builder: (_, __) => const CourierSpaceScreen()),
+    GoRoute(path: '/courier/courses/d1', builder: (_, __) => const CourseScreen(deliveryId: 'd1')),
     GoRoute(path: '/shop/orders/o1', builder: (_, __) => const ShopOrderScreen(orderId: 'o1')),
     GoRoute(
       path: '/orders/checkout',
@@ -883,6 +889,38 @@ class _FakeShopOrdersApi extends ShopOrdersApi {
   Future<({int toConfirm, int toPrepare, int ready, int payments})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 1, payments: 1);
   @override
   Future<OrderDetail> order(String id) async => _order(shop: true);
+}
+
+/// 7-F — Espace livreur simulé : une mission proposée, une course en cours.
+class _FakeCourierApi extends CourierApi {
+  _FakeCourierApi(super.api);
+  static const _course = Mission(id: '', deliveryId: 'd1', mode: 'express', fromShop: 'Boutique Élégance', fromPlace: 'Cocody, Abidjan', toPlace: 'Yopougon, Abidjan', itemsCount: 1, feeFcfa: 1700, estimatedMinutes: 30, status: 'arrived', number: 'CMD-000042');
+  @override
+  Future<CourierProfile> profile() async => const CourierProfile(
+        available: true,
+        capacity: 2,
+        vehicle: 'moto',
+        communes: [(code: 'abidjan-yopougon', label: 'Yopougon (Abidjan)')],
+        relations: [CourierRelation(id: 'r1', shopName: 'Boutique Élégance', relation: 'partner', status: 'active', place: 'Cocody, Abidjan')],
+      );
+  @override
+  Future<List<Mission>> missions() async => [
+        Mission(id: 'of1', deliveryId: 'd2', mode: 'economy', fromShop: 'Maison Awa', fromPlace: 'Plateau, Abidjan', toPlace: 'Marcory, Abidjan', itemsCount: 2, feeFcfa: 1200, estimatedMinutes: 45, expiresAt: DateTime(2026, 10, 16, 15, 5)),
+      ];
+  @override
+  Future<List<Mission>> courses({bool history = false}) async => history ? const [] : const [_course];
+  @override
+  Future<CourseDetail> course(String deliveryId) async => const CourseDetail(
+        mission: _course,
+        status: 'arrived',
+        category: 'partner',
+        clientName: 'Awa',
+        clientPhone: '+2250700000000',
+        address: 'Rue des jardins, villa 12',
+        items: [(title: 'Robe soirée à plumes', variant: 'M', quantity: 1)],
+        paymentMethod: 'mobile_money',
+        actions: ['validate_code', 'client_absent', 'report_incident'],
+      );
 }
 
 Future<void> _capture(WidgetTester tester, String name) =>
@@ -1208,6 +1246,14 @@ void main() {
   testWidgets('7-B récapitulatif avant confirmation', (t) async {
     await _show(t, '/orders/checkout');
     await _capture(t, 'x25_recapitulatif_commande');
+  });
+  testWidgets('7-F espace livreur : missions et courses', (t) async {
+    await _show(t, '/courier');
+    await _capture(t, 'x26_espace_livreur');
+  });
+  testWidgets('7-F course du livreur : saisie du code', (t) async {
+    await _show(t, '/courier/courses/d1');
+    await _capture(t, 'x27_course_livreur');
   });
   testWidgets('7-A équipe de la boutique', (t) async {
     await _show(t, '/shop/team');

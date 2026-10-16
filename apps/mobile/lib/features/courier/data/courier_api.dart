@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 
 /// Lot 7-E — Livreurs. Demande vérifiée par l'équipe BIM (pièces chiffrées), profil de travail, relations avec les
-/// boutiques. Aucun accès aux commandes d'une boutique : annonces et courses arrivent avec 7-F.
+/// boutiques. Lot 7-F — missions proposées, courses et historique : seulement ce qui concerne ce livreur, jamais les
+/// commandes privées d'une boutique.
 
 class CourierApplication {
   const CourierApplication({required this.id, required this.stage, required this.identity, required this.selfie, required this.details, this.idDocType, this.vehicle, this.rejectReason});
@@ -88,6 +89,86 @@ class ShopCourier {
       );
 }
 
+/// Course vue par le livreur avant acceptation : départ, commune d'arrivée, frais, nombre d'articles. Ni adresse, ni client.
+class Mission {
+  const Mission({required this.id, required this.deliveryId, required this.mode, required this.fromShop, required this.itemsCount, this.fromPlace, this.toPlace, this.feeFcfa, this.estimatedMinutes, this.expiresAt, this.status, this.number});
+  /// Identifiant de la proposition (missions) ; vide pour une course.
+  final String id;
+  final String deliveryId;
+  final String? mode;
+  final String fromShop;
+  final String? fromPlace;
+  final String? toPlace;
+  final int? feeFcfa;
+  final int? estimatedMinutes;
+  final int itemsCount;
+  final DateTime? expiresAt;
+  final String? status;
+  final String? number;
+  factory Mission.fromJson(Map<String, dynamic> j) {
+    final f = j['from'] as Map<String, dynamic>;
+    final t = j['to'] as Map<String, dynamic>?;
+    String? place(Map<String, dynamic>? m) => m == null ? null : [m['commune'], m['city']].whereType<String>().where((x) => x.isNotEmpty).join(', ');
+    return Mission(
+      id: (j['offerId'] as String?) ?? '',
+      deliveryId: j['deliveryId'] as String,
+      mode: j['mode'] as String?,
+      fromShop: f['shop'] as String,
+      fromPlace: place(f),
+      toPlace: place(t),
+      feeFcfa: j['feeFcfa'] as int?,
+      estimatedMinutes: j['estimatedMinutes'] as int?,
+      itemsCount: j['itemsCount'] as int,
+      expiresAt: j['expiresAt'] == null ? null : DateTime.parse(j['expiresAt'] as String),
+      status: j['status'] as String?,
+      number: j['number'] as String?,
+    );
+  }
+}
+
+/// Détail d'une course attribuée : contact et adresse du client seulement pendant la course ; jamais le code.
+class CourseDetail {
+  const CourseDetail({required this.mission, required this.status, required this.items, required this.actions, this.category, this.clientName, this.clientPhone, this.address, this.paymentMethod, this.amountToCollectFcfa, this.declaredByCustomer = false, this.cashReceived = false, this.reviewId, this.reviewRating, this.reviewComment});
+  final Mission mission;
+  final String status;
+  final String? category;
+  final String? clientName;
+  final String? clientPhone;
+  final String? address;
+  final List<({String title, String variant, int quantity})> items;
+  final String? paymentMethod;
+  final int? amountToCollectFcfa;
+  final bool declaredByCustomer;
+  final bool cashReceived;
+  final String? reviewId;
+  final int? reviewRating;
+  final String? reviewComment;
+  final List<String> actions;
+  bool can(String a) => actions.contains(a);
+  factory CourseDetail.fromJson(Map<String, dynamic> j) {
+    final c = j['client'] as Map<String, dynamic>?;
+    final p = j['payment'] as Map<String, dynamic>?;
+    final r = j['review'] as Map<String, dynamic>?;
+    return CourseDetail(
+      mission: Mission.fromJson(j),
+      status: j['status'] as String,
+      category: j['category'] as String?,
+      clientName: c?['firstName'] as String?,
+      clientPhone: c?['phone'] as String?,
+      address: c?['address'] as String?,
+      items: [for (final i in (j['items'] as List<dynamic>).cast<Map<String, dynamic>>()) (title: i['title'] as String, variant: i['variantLabel'] as String, quantity: i['quantity'] as int)],
+      paymentMethod: p?['method'] as String?,
+      amountToCollectFcfa: p?['amountToCollectFcfa'] as int?,
+      declaredByCustomer: (p?['declaredByCustomer'] ?? false) as bool,
+      cashReceived: (p?['cashReceived'] ?? false) as bool,
+      reviewId: r?['id'] as String?,
+      reviewRating: r?['rating'] as int?,
+      reviewComment: r?['comment'] as String?,
+      actions: (j['actions'] as List<dynamic>).cast<String>(),
+    );
+  }
+}
+
 String relationLabel(String r) => r == 'employee' ? 'Employé' : 'Partenaire';
 String vehicleLabel(String? v) => const {'moto': 'Moto', 'velo': 'Vélo', 'voiture': 'Voiture', 'pied': 'À pied'}[v] ?? '—';
 
@@ -118,6 +199,24 @@ class CourierApi {
         await _api.patch('/v1/courier/me', body: {if (available != null) 'available': available, if (capacity != null) 'capacity': capacity, if (communes != null) 'communes': communes}),
       );
   Future<CourierProfile> relation(String id, String action) async => CourierProfile.fromJson(await _api.post('/v1/courier/relations/$id/$action'));
+
+  List<Mission> _missions(Map<String, dynamic> r) => [for (final m in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) Mission.fromJson(m)];
+
+  Future<List<Mission>> missions() async => _missions(await _api.get('/v1/courier/missions'));
+  /// Accepter : le serveur revérifie l'éligibilité (disponibilité, capacité, priorité) à cet instant.
+  Future<void> accept(String offerId) => _api.post('/v1/courier/missions/$offerId/accept');
+  Future<void> decline(String offerId) => _api.post('/v1/courier/missions/$offerId/decline');
+  Future<List<Mission>> courses({bool history = false}) async => _missions(await _api.get('/v1/courier/courses${history ? '?box=history' : ''}'));
+  Future<CourseDetail> course(String deliveryId) async => CourseDetail.fromJson(await _api.get('/v1/courier/courses/$deliveryId'));
+
+  /// `step` : picked-up, arrived, close.
+  Future<CourseDetail> step(String deliveryId, String step) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/$step'));
+  Future<CourseDetail> code(String deliveryId, String code) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/code', body: {'code': code}));
+  Future<CourseDetail> cash(String deliveryId, int amountFcfa) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/cash', body: {'amountFcfa': amountFcfa}));
+  Future<void> clientAbsent(String deliveryId, {String? note}) => _api.post('/v1/courier/courses/$deliveryId/client-absent', body: {if (note != null && note.isNotEmpty) 'note': note});
+  Future<void> incident(String deliveryId, String reason, {String? description}) =>
+      _api.post('/v1/courier/courses/$deliveryId/incidents', body: {'reason': reason, if (description != null && description.isNotEmpty) 'description': description});
+  Future<void> reportReview(String reviewId, String reason) => _api.post('/v1/courier/reviews/$reviewId/report', body: {'reason': reason});
 }
 
 class ShopCouriersApi {
@@ -134,4 +233,7 @@ class ShopCouriersApi {
 final courierApiProvider = Provider<CourierApi>((ref) => CourierApi(ref.watch(apiClientProvider)));
 final shopCouriersApiProvider = Provider<ShopCouriersApi>((ref) => ShopCouriersApi(ref.watch(apiClientProvider)));
 final courierProfileProvider = FutureProvider.autoDispose<CourierProfile>((ref) => ref.watch(courierApiProvider).profile());
+final missionsProvider = FutureProvider.autoDispose<List<Mission>>((ref) => ref.watch(courierApiProvider).missions());
+final coursesProvider = FutureProvider.autoDispose.family<List<Mission>, bool>((ref, history) => ref.watch(courierApiProvider).courses(history: history));
+final courseProvider = FutureProvider.autoDispose.family<CourseDetail, String>((ref, id) => ref.watch(courierApiProvider).course(id));
 final shopCouriersProvider = FutureProvider.autoDispose<List<ShopCourier>>((ref) => ref.watch(shopCouriersApiProvider).list());

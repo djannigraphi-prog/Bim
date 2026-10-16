@@ -72,6 +72,7 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^orders\.(proposal_ttl_hours|shop_confirm_ttl_hours)$/, intIn(1, 168)],
   [/^orders\.handover_code_max_attempts$/, intIn(3, 10)],
   [/^reviews\.window_days$/, intIn(1, 365)],
+  [/^deliveries\.(mission_accept_minutes|client_absent_after_minutes)$/, intIn(1, 240)],
   [/^delivery\.wait_fees_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
 ];
 

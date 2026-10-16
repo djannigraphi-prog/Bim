@@ -13,6 +13,7 @@ import { Maintenance } from './pages/Maintenance';
 import { Moderation } from './pages/Moderation';
 import { Merchants } from './pages/Merchants';
 import { Deliveries } from './pages/Deliveries';
+import { Incidents } from './pages/Incidents';
 import { Payments } from './pages/Payments';
 import { Couriers } from './pages/Couriers';
 
@@ -26,6 +27,7 @@ const NAV: Array<{ to: string; label: string; perm: Permission }> = [
   { to: '/livreurs', label: 'Livreurs', perm: 'couriers.review' },
   { to: '/livraisons', label: 'Tarifs de livraison', perm: 'delivery_tariffs.read' },
   { to: '/paiements', label: 'Paiements à vérifier', perm: 'payments.review' },
+  { to: '/incidents', label: 'Incidents', perm: 'incidents.review' },
   { to: '/utilisateurs', label: 'Utilisateurs', perm: 'users.read' },
   { to: '/audit', label: "Journal d'audit", perm: 'audit.read' },
   { to: '/administrateurs', label: 'Administrateurs', perm: 'admins.manage' },
@@ -92,6 +94,7 @@ export function App() {
           {can('couriers.review') && <Route path="/livreurs" element={<Couriers />} />}
           {can('delivery_tariffs.read') && <Route path="/livraisons" element={<Deliveries canWrite={can('delivery_tariffs.write')} />} />}
           {can('payments.review') && <Route path="/paiements" element={<Payments />} />}
+          {can('incidents.review') && <Route path="/incidents" element={<Incidents />} />}
           {can('users.read') && <Route path="/utilisateurs" element={<Users canSuspend={can('users.suspend')} />} />}
           {can('audit.read') && <Route path="/audit" element={<Audit />} />}
           {can('admins.manage') && <Route path="/administrateurs" element={<Admins me={me} />} />}

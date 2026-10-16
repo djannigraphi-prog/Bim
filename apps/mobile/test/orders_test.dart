@@ -20,7 +20,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const []}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -38,6 +38,8 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       actions: actions,
       payment: payment,
       reviews: reviews,
+      tracking: tracking,
+      incidents: incidents,
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
@@ -91,6 +93,36 @@ class _FakeOrders extends OrdersApi {
   }
 
   @override
+  Future<OrderDetail> refuseDelivery(String id, String reason, {String? details}) async {
+    calls.add('refuse $reason ${details ?? ''}'.trim());
+    return current = _detail(
+      status: 'in_delivery',
+      mode: 'express',
+      actions: const [],
+      tracking: const DeliveryTracking(status: 'refused_by_client', courierName: 'Koffi', refusalReason: 'damaged'),
+      incidents: const [IncidentSummary(id: 'i1', status: 'open', reason: 'item_damaged')],
+    );
+  }
+
+  @override
+  Future<void> incidentToSupport(String incidentId) async {
+    calls.add('support $incidentId');
+    current = _detail(
+      status: 'in_delivery',
+      mode: 'express',
+      actions: const [],
+      tracking: const DeliveryTracking(status: 'refused_by_client', courierName: 'Koffi', refusalReason: 'damaged'),
+      incidents: const [IncidentSummary(id: 'i1', status: 'with_support', reason: 'item_damaged')],
+    );
+  }
+
+  @override
+  Future<OrderDetail> reviewDelivery(String id, {required int rating, String? comment}) async {
+    calls.add('review delivery $rating');
+    return current = _detail(status: 'delivered', mode: 'express', actions: const [], tracking: DeliveryTracking(status: 'closed', courierName: 'Koffi', reviewRating: rating));
+  }
+
+  @override
   Future<OrderDetail> cancel(String id, {String? reason}) async {
     calls.add('cancel $id ${reason ?? '-'}');
     return current = _detail(status: 'cancelled', actions: const []);
@@ -117,7 +149,22 @@ class _FakeShopOrders extends ShopOrdersApi {
     if (action == 'handover' && code != '4821') {
       throw const ApiException(code: 'HANDOVER_CODE_INVALID', message: 'Code incorrect.', status: 400, details: {'remaining': 4});
     }
+    if (action == 'delivery/start') {
+      return current = _detail(status: 'ready', mode: 'economy', actions: const ['cancel', 'select_courier'], customer: 'Awa Koné', tracking: const DeliveryTracking(status: 'searching'));
+    }
     return current = _detail(status: 'delivered', actions: const [], customer: 'Awa Koné');
+  }
+
+  @override
+  Future<List<CourierCandidate>> candidates(String id) async => const [
+        CourierCandidate(courierId: 'emp', fullName: 'Yao Employé', category: 'employee', selectable: true, reasonRequired: false),
+        CourierCandidate(courierId: 'ind', fullName: 'Ibrahim Indépendant', category: 'independent', selectable: true, reasonRequired: true),
+      ];
+
+  @override
+  Future<OrderDetail> offer(String id, String courierId, {String? reason}) async {
+    calls.add('offer $courierId ${reason ?? ''}'.trim());
+    return current = _detail(status: 'ready', mode: 'economy', actions: const ['cancel', 'withdraw_request'], customer: 'Awa Koné', tracking: const DeliveryTracking(status: 'offered'));
   }
 }
 
@@ -276,5 +323,63 @@ void main() {
     expect(api.calls, ['review 0 4 Belle robe']);
     expect(find.text('★★★★☆'), findsOneWidget);
     expect(find.descendant(of: find.byKey(const ValueKey('review-item-0')), matching: find.text('Évaluer')), findsNothing);
+  });
+
+  testWidgets('7-F boutique : recherche lancée, livreurs éligibles du serveur, passer un prioritaire demande un motif', (tester) async {
+    final shop = _FakeShopOrders()..current = _detail(status: 'ready', mode: 'economy', actions: const ['cancel', 'start_delivery'], customer: 'Awa Koné');
+    await _pump(tester, const ShopOrderScreen(orderId: 'o1'), shop: shop);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('delivery-start')));
+    await tester.pumpAndSettle();
+    expect(find.text('Livraison : Recherche d’un livreur'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('delivery-select')));
+    await tester.pumpAndSettle();
+    expect(find.text('Employé de la boutique'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('candidate-ind')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('reason-input')), 'Employé trop loin');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('reason-confirm')));
+    await tester.pumpAndSettle();
+    expect(shop.calls, ['delivery/start', 'offer ind Employé trop loin']);
+    expect(find.text('Livraison : Livreur sollicité, en attente de sa réponse'), findsOneWidget);
+    expect(find.byKey(const ValueKey('delivery-withdraw')), findsOneWidget);
+  });
+
+  testWidgets('7-F/7-G client : refuser la remise avec un motif ouvre un incident, transmis au support', (tester) async {
+    final api = _FakeOrders()
+      ..current = _detail(status: 'in_delivery', mode: 'express', code: '4821', actions: const ['refuse_delivery', 'report_incident'], tracking: const DeliveryTracking(status: 'arrived', courierName: 'Koffi', vehicle: 'moto'));
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    expect(find.text('Livreur : Koffi · Moto'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('delivery-refuse')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextButton>(find.byKey(const ValueKey('refuse-send'))).onPressed, isNull);
+    await tester.tap(find.byKey(const ValueKey('refuse-damaged')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('refuse-send')));
+    await tester.pumpAndSettle();
+    expect(find.text('Motif du refus : Article endommagé'), findsOneWidget);
+    expect(find.text('Ouvert'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('incident-support-i1')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['refuse damaged', 'support i1']);
+    expect(find.text('Transmis au support'), findsOneWidget);
+    expect(find.byKey(const ValueKey('incident-support-i1')), findsNothing);
+  });
+
+  testWidgets('7-F évaluation de la livraison : après la clôture, une seule fois', (tester) async {
+    final api = _FakeOrders()..current = _detail(status: 'delivered', mode: 'express', actions: const ['review_delivery'], tracking: const DeliveryTracking(status: 'closed', courierName: 'Koffi'));
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('delivery-review')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('star-5')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('review-send')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['review delivery 5']);
+    expect(find.byKey(const ValueKey('delivery-review')), findsNothing);
+    expect(find.text('Ton évaluation de la livraison : ★★★★★'), findsOneWidget);
   });
 }

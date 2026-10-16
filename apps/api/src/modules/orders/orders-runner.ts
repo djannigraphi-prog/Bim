@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { OrdersService } from './orders.service';
+import { DeliveriesService } from './deliveries.service';
 import { PaymentsService } from './payments.service';
 
 /**
@@ -18,6 +19,7 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly orders: OrdersService,
     private readonly payments: PaymentsService,
+    private readonly deliveries: DeliveriesService,
   ) {}
 
   get active(): boolean {
@@ -38,6 +40,7 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       const expired = await this.orders.expireDue(now);
       await this.payments.queueOverdue(now);
+      await this.deliveries.expireOffers(now);
       return expired;
     } catch (e) {
       this.logger.error(`Expiration des commandes : ${(e as Error).message}`);

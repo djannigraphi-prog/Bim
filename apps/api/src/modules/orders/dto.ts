@@ -67,3 +67,36 @@ export class ReviewDto {
 export class ReviewNoteDto {
   @ApiProperty() @IsString() @Length(3, 300) note!: string;
 }
+
+export class RefuseDeliveryDto {
+  @ApiProperty({ enum: ['incorrect', 'damaged', 'incomplete', 'other'] }) @IsIn(['incorrect', 'damaged', 'incomplete', 'other']) reason!: 'incorrect' | 'damaged' | 'incomplete' | 'other';
+  @ApiPropertyOptional({ maxLength: 300 }) @IsOptional() @IsString() @Length(0, 300) details?: string;
+}
+
+export class OfferCourierDto {
+  @ApiProperty() @IsUUID() courierId!: string;
+  @ApiPropertyOptional({ description: 'Motif obligatoire en économique si un livreur prioritaire disponible est passé' }) @IsOptional() @IsString() @Length(0, 300) reason?: string;
+}
+
+export class IncidentDto {
+  @ApiProperty({ enum: ['item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other'] })
+  @IsIn(['item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other'])
+  reason!: 'item_incorrect' | 'item_damaged' | 'item_incomplete' | 'client_absent' | 'courier_absent' | 'courier_not_there' | 'delay' | 'payment' | 'behaviour' | 'other';
+  @ApiPropertyOptional({ maxLength: 1000 }) @IsOptional() @IsString() @Length(0, 1000) description?: string;
+}
+
+export class IncidentNoteDto {
+  @ApiProperty() @IsString() @Length(2, 1000) note!: string;
+}
+
+export class CodeDto {
+  @ApiProperty({ example: '1234' }) @IsString() @Length(1, 8) code!: string;
+}
+
+export class CourierNoteDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @Length(0, 300) note?: string;
+}
+
+export class ReportReviewDto {
+  @ApiProperty({ enum: ['spam', 'harassment', 'hate', 'false_info', 'other'] }) @IsIn(['spam', 'harassment', 'hate', 'false_info', 'other']) reason!: string;
+}

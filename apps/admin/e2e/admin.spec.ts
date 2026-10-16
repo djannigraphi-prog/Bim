@@ -251,6 +251,17 @@ test('paiements à vérifier (7-C) : page accessible, aucune confirmation implic
   await expect(page.getByText('Aucun paiement à vérifier.')).toBeVisible();
 });
 
+test('incidents (7-G) : page accessible au support, aucune sanction automatique annoncée', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Incidents' }).click();
+  await expect(page.getByRole('heading', { name: 'Incidents' })).toBeVisible();
+  await expect(page.getByText('Aucune pénalité, aucun frais ni remboursement automatique')).toBeVisible();
+  await expect(page.getByText('Aucun incident.')).toBeVisible();
+  await page.getByRole('tab', { name: 'Résolus' }).click();
+  await expect(page.getByRole('tab', { name: 'Résolus' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Aucun incident.')).toBeVisible();
+});
+
 test('livreurs (7-E) : page de vérification accessible, aucune demande au départ', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Livreurs' }).click();

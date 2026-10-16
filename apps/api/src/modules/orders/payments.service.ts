@@ -4,7 +4,7 @@ import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database, DbOrTx } from '../../database/database.module';
-import { merchantApplications, orderEvents, orderPayments, orders, shops, users } from '../../database/schema';
+import { deliveries, merchantApplications, orderEvents, orderPayments, orders, shops, users } from '../../database/schema';
 import type { AdminContext } from '../admin/admin.decorators';
 import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
@@ -69,10 +69,18 @@ export class PaymentsService {
   }
 
   /** Vue du paiement pour une partie ; le numéro de la boutique n'est montré au client qu'au moment de payer. */
+  /** Le client peut payer : remise faite (retrait), ou code validé par le livreur (livraison, 7-F). */
+  async payable(o: Order, tx: DbOrTx = this.db) {
+    if (o.status === 'delivered') return true;
+    if (o.status !== 'in_delivery') return false;
+    const [d] = await tx.select({ status: deliveries.status }).from(deliveries).where(eq(deliveries.orderId, o.id)).limit(1);
+    return d?.status === 'code_validated';
+  }
+
   async view(o: Order, party: 'customer' | 'shop') {
     const p = await this.forOrder(o.id);
     if (!p) return null;
-    const payNow = party === 'customer' && o.status === 'delivered' && p.method === 'mobile_money' && p.failure === 'none' && p.decision === 'pending';
+    const payNow = party === 'customer' && (await this.payable(o)) && p.method === 'mobile_money' && p.failure === 'none' && p.decision === 'pending';
     return {
       kind: p.kind,
       method: p.method,
@@ -91,9 +99,10 @@ export class PaymentsService {
   }
 
   /** Actions de paiement possibles maintenant (le serveur revérifie, dont la permission « payments.decide »). */
-  static actions(o: Order, p: Payment | null, party: 'customer' | 'shop'): string[] {
-    if (!p || o.status !== 'delivered' || p.failure !== 'none' || p.decision !== 'pending') return [];
-    if (party === 'customer') return p.method === 'mobile_money' && !p.declaredAt ? ['declare_payment'] : [];
+  static actions(o: Order, p: Payment | null, party: 'customer' | 'shop', payable = o.status === 'delivered'): string[] {
+    if (!p || p.failure !== 'none' || p.decision !== 'pending') return [];
+    if (party === 'customer') return payable && p.method === 'mobile_money' && !p.declaredAt ? ['declare_payment'] : [];
+    if (o.status !== 'delivered') return [];
     if (p.method === 'cash' && !p.cashObservedAt) return ['cash_received'];
     return ['confirm_payment', 'contest_payment'];
   }
@@ -115,7 +124,7 @@ export class PaymentsService {
       const { o, p } = await this.lockOrder(tx, orderId);
       if (o.customerId !== customerId) throw Errors.notFound('Commande');
       if (p.declaredAt) return; // déjà déclaré : sans effet
-      if (o.status !== 'delivered' || p.method !== 'mobile_money' || p.failure !== 'none' || p.decision !== 'pending') {
+      if (!(await this.payable(o, tx)) || p.method !== 'mobile_money' || p.failure !== 'none' || p.decision !== 'pending') {
         throw notAllowed('Le paiement se déclare après la remise de l’article, pour un paiement Mobile Money.');
       }
       await tx.update(orderPayments).set({ declaredAt: new Date(), declaredReference: reference ?? null }).where(eq(orderPayments.id, p.id));

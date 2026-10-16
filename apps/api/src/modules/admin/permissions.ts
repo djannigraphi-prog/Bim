@@ -26,6 +26,8 @@ export const ADMIN_PERMISSIONS = {
   'payments.review': ['super_admin', 'support', 'finance'],
   /** 7-E : vérification des livreurs (pièces d'identité, lecture journalisée). */
   'couriers.review': ['super_admin', 'support'],
+  /** 7-G : incidents transmis au support (lecture journalisée, décision notée). */
+  'incidents.review': ['super_admin', 'support'],
   'admins.manage': ['super_admin'],
   /** Surveillance technique (état du worker des rappels…) : exploitation, pas d'accès aux données des personnes. */
   'system.health': ['super_admin', 'tech', 'support'],

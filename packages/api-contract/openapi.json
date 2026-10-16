@@ -5773,6 +5773,149 @@
         ]
       }
     },
+    "/v1/orders/{id}/delivery/refuse": {
+      "post": {
+        "operationId": "OrdersController_refuse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefuseDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser la remise après examen (motif obligatoire ; ouvre un incident ; jamais « livrée »)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders/{id}/delivery/review": {
+      "post": {
+        "operationId": "OrdersController_reviewDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Évaluer la livraison (une fois, après la clôture ; distincte de l’article et de la boutique)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders/{id}/incidents": {
+      "get": {
+        "operationId": "OrdersController_incidentsList",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Commandes"
+        ]
+      },
+      "post": {
+        "operationId": "OrdersController_openIncident",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Signaler un incident (motif, description) ; aucune pénalité ni remboursement automatique",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/orders/{id}/reviews/items/{position}": {
       "post": {
         "operationId": "OrdersController_reviewItem",
@@ -6089,6 +6232,195 @@
         "summary": "Refuser une proposition, ou annuler avant la préparation",
         "tags": [
           "Commandes"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/delivery/start": {
+      "post": {
+        "operationId": "ShopOrdersController_startDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lancer la recherche d’un livreur pour une commande prête",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/delivery/candidates": {
+      "get": {
+        "operationId": "ShopOrdersController_candidates",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Livreurs éligibles, calculés par le serveur (employés, puis partenaires, puis indépendants)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/delivery/offer": {
+      "post": {
+        "operationId": "ShopOrdersController_offer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferCourierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Solliciter un livreur éligible (il doit accepter dans le délai) ; motif si un prioritaire est passé (économique)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/delivery/withdraw": {
+      "post": {
+        "operationId": "ShopOrdersController_withdrawOffer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/incidents": {
+      "get": {
+        "operationId": "ShopOrdersController_incidentsList",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "post": {
+        "operationId": "ShopOrdersController_openIncident",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
         ]
       }
     },
@@ -6661,6 +6993,692 @@
         },
         "tags": [
           "BimShop"
+        ]
+      }
+    },
+    "/v1/incidents/{id}/notes": {
+      "post": {
+        "operationId": "MyIncidentsController_note",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/incidents/{id}/support": {
+      "post": {
+        "operationId": "MyIncidentsController_transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Transmettre l’incident au support",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/shop/incidents/{id}/notes": {
+      "post": {
+        "operationId": "ShopIncidentsController_note",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/incidents/{id}/support": {
+      "post": {
+        "operationId": "ShopIncidentsController_transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/courier/missions": {
+      "get": {
+        "operationId": "CourierDeliveriesController_missions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Missions qui me sont proposées (sans adresse ni client avant acceptation)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/missions/{offerId}/accept": {
+      "post": {
+        "operationId": "CourierDeliveriesController_accept",
+        "parameters": [
+          {
+            "name": "offerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/missions/{offerId}/decline": {
+      "post": {
+        "operationId": "CourierDeliveriesController_decline",
+        "parameters": [
+          {
+            "name": "offerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses": {
+      "get": {
+        "operationId": "CourierDeliveriesController_courses",
+        "parameters": [
+          {
+            "name": "box",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "current",
+                "history"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes courses en cours ou mon historique (seulement mes propres livraisons)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}": {
+      "get": {
+        "operationId": "CourierDeliveriesController_course",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/picked-up": {
+      "post": {
+        "operationId": "CourierDeliveriesController_pickedUp",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/arrived": {
+      "post": {
+        "operationId": "CourierDeliveriesController_arrived",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "« Je suis arrivé » (heure du serveur, début de l’attente)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/code": {
+      "post": {
+        "operationId": "CourierDeliveriesController_code",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Saisir le code donné par le client après examen (essais limités, usage unique ; pas une preuve de paiement)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/cash": {
+      "post": {
+        "operationId": "CourierDeliveriesController_cash",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashReceivedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Espèces reçues (employé actif de la boutique seulement)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/close": {
+      "post": {
+        "operationId": "CourierDeliveriesController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clôturer la livraison (code validé, paiement déclaré ou espèces constatées, aucun incident ouvert)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/client-absent": {
+      "post": {
+        "operationId": "CourierDeliveriesController_absent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourierNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/incidents": {
+      "post": {
+        "operationId": "CourierDeliveriesController_incident",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/incidents/{id}/notes": {
+      "post": {
+        "operationId": "CourierDeliveriesController_incidentNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/incidents/{id}/support": {
+      "post": {
+        "operationId": "CourierDeliveriesController_incidentSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/reviews/{id}/report": {
+      "post": {
+        "operationId": "CourierDeliveriesController_reportReview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Signaler l’évaluation reçue pour une de mes courses (modération)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/admin/v1/incidents": {
+      "get": {
+        "operationId": "IncidentsAdminController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "with_support",
+                "open",
+                "resolved"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/incidents/{id}/resolve": {
+      "post": {
+        "operationId": "IncidentsAdminController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
         ]
       }
     },
@@ -9106,6 +10124,27 @@
           "minutes"
         ]
       },
+      "RefuseDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "incorrect",
+              "damaged",
+              "incomplete",
+              "other"
+            ]
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "ReviewDto": {
         "type": "object",
         "properties": {
@@ -9121,6 +10160,33 @@
         },
         "required": [
           "rating"
+        ]
+      },
+      "IncidentDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "item_incorrect",
+              "item_damaged",
+              "item_incomplete",
+              "client_absent",
+              "courier_absent",
+              "courier_not_there",
+              "delay",
+              "payment",
+              "behaviour",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "OrderLineDto": {
@@ -9285,6 +10351,21 @@
           }
         }
       },
+      "OfferCourierDto": {
+        "type": "object",
+        "properties": {
+          "courierId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Motif obligatoire en économique si un livreur prioritaire disponible est passé"
+          }
+        },
+        "required": [
+          "courierId"
+        ]
+      },
       "ProposalLineDto": {
         "type": "object",
         "properties": {
@@ -9373,6 +10454,55 @@
         },
         "required": [
           "note"
+        ]
+      },
+      "IncidentNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "CodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "1234"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "CourierNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportReviewDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "harassment",
+              "hate",
+              "false_info",
+              "other"
+            ]
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "CourierApplicationDto": {

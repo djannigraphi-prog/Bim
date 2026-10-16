@@ -65,6 +65,10 @@ export function inboxText(s: InboxSource): string {
         cancelled: `${shop} a annulé ta commande ${n}.`,
         proposal_withdrawn: `${shop} a retiré sa proposition ${n}.`,
         expired: `La commande ${n} a expiré sans confirmation.`,
+        courier_assigned: `Un livreur a accepté de livrer ta commande ${n}.`,
+        picked_up: `Ta commande ${n} est en route.`,
+        courier_arrived: `Le livreur est arrivé avec ta commande ${n}. Vérifie l’article avant de donner ton code.`,
+        delivered: `Ta commande ${n} est livrée. Merci !`,
       };
       return texts[s.snippet ?? ''] ?? `Ta commande ${n} a été mise à jour.`;
     }

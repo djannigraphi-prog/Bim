@@ -1,8 +1,11 @@
 import 'package:bim/core/network/api_client.dart';
+import 'package:bim/core/network/api_exception.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
 import 'package:bim/features/courier/data/courier_api.dart';
+import 'package:bim/features/courier/presentation/courier_courses.dart';
 import 'package:bim/features/courier/presentation/courier_screens.dart';
+import 'package:bim/features/merchant/data/shop_api.dart' show formatFcfa;
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/projects/application/photo_source.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +92,72 @@ class _FakeCourier extends CourierApi {
       relations: const [CourierRelation(id: 'r1', shopName: 'Boutique Élégance', relation: 'employee', status: 'active')],
     );
   }
+
+  // 7-F — missions et courses simulées.
+  var missionList = <Mission>[];
+  var current = <Mission>[];
+  CourseDetail? detail;
+
+  @override
+  Future<List<Mission>> missions() async => missionList;
+  @override
+  Future<List<Mission>> courses({bool history = false}) async => history ? const [] : current;
+  @override
+  Future<void> accept(String offerId) async {
+    calls.add('accept mission $offerId');
+    final m = missionList.single;
+    missionList = [];
+    current = [Mission(id: '', deliveryId: m.deliveryId, mode: m.mode, fromShop: m.fromShop, toPlace: m.toPlace, itemsCount: m.itemsCount, status: 'accepted', number: 'CMD-000042')];
+  }
+
+  @override
+  Future<void> decline(String offerId) async {
+    calls.add('decline mission $offerId');
+    missionList = [];
+  }
+
+  @override
+  Future<CourseDetail> course(String deliveryId) async => detail!;
+
+  CourseDetail _detail(String status, List<String> actions, {bool cashDone = false}) => detail = CourseDetail(
+        mission: const Mission(id: '', deliveryId: 'd1', mode: 'express', fromShop: 'Boutique Élégance', toPlace: 'Yopougon, Abidjan', itemsCount: 2, number: 'CMD-000042'),
+        status: status,
+        category: 'employee',
+        clientName: 'Awa',
+        clientPhone: '+2250700000000',
+        address: 'Rue des jardins',
+        items: const [(title: 'Robe soirée à plumes', variant: 'M', quantity: 2)],
+        paymentMethod: 'cash',
+        amountToCollectFcfa: 40000,
+        cashReceived: cashDone,
+        actions: actions,
+      );
+
+  @override
+  Future<CourseDetail> step(String deliveryId, String step) async {
+    calls.add('step $step');
+    return switch (step) {
+      'picked-up' => _detail('picked_up', const ['arrived']),
+      'arrived' => _detail('arrived', const ['validate_code', 'client_absent', 'report_incident']),
+      _ => _detail('closed', const []),
+    };
+  }
+
+  @override
+  Future<CourseDetail> code(String deliveryId, String code) async {
+    calls.add('code $code');
+    if (code != '4821') throw const ApiException(code: 'HANDOVER_CODE_INVALID', message: 'Code incorrect.', status: 400, details: {'remaining': 4});
+    return _detail('code_validated', const ['cash_received', 'close', 'report_incident']);
+  }
+
+  @override
+  Future<CourseDetail> cash(String deliveryId, int amountFcfa) async {
+    calls.add('cash $amountFcfa');
+    return _detail('code_validated', const ['close', 'report_incident'], cashDone: true);
+  }
+
+  @override
+  Future<void> incident(String deliveryId, String reason, {String? description}) async => calls.add('incident $reason ${description ?? ''}'.trim());
 }
 
 class _FakeShopCouriers extends ShopCouriersApi {
@@ -175,6 +244,62 @@ void main() {
     expect(api.calls, ['profile true', 'profile 2', 'accept r1']);
     expect(find.textContaining('en cours'), findsOneWidget);
     expect(find.textContaining('Commande'), findsNothing);
+  });
+
+  testWidgets('7-F missions : proposée sans adresse ni client, acceptée, puis course en cours ; refus possible', (tester) async {
+    final api = _FakeCourier()
+      ..missionList = [
+        Mission(id: 'of1', deliveryId: 'd1', mode: 'express', fromShop: 'Boutique Élégance', fromPlace: 'Cocody, Abidjan', toPlace: 'Yopougon, Abidjan', itemsCount: 2, feeFcfa: 1700, estimatedMinutes: 30, expiresAt: DateTime.utc(2026, 10, 16, 10)),
+      ];
+    await _pump(tester, const CourierSpaceScreen(), courier: api);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mission-of1')), findsOneWidget);
+    expect(find.textContaining('Rue des jardins'), findsNothing);
+    expect(find.textContaining(formatFcfa(1700)), findsOneWidget);
+    expect(find.byKey(const ValueKey('courses-empty')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('mission-accept-of1')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['accept mission of1']);
+    expect(find.byKey(const ValueKey('missions-empty')), findsOneWidget);
+    expect(find.byKey(const ValueKey('course-d1')), findsOneWidget);
+  });
+
+  testWidgets('7-F course : prise en charge, arrivée, code faux puis bon, espèces (employé), clôture ; incident', (tester) async {
+    final api = _FakeCourier();
+    api._detail('accepted', const ['picked_up']);
+    await _pump(tester, const CourseScreen(deliveryId: 'd1'), courier: api);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('course-client')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('course-picked-up')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('course-arrived')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('n’est pas une preuve de paiement'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('course-code-input')), '1111');
+    await tester.tap(find.byKey(const ValueKey('course-code')));
+    await tester.pumpAndSettle();
+    expect(find.text('Code incorrect. Essais restants : 4.'), findsOneWidget);
+    // Incident : « Autre » exige une description.
+    await tester.tap(find.byKey(const ValueKey('course-incident')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('incident-other')));
+    await tester.pump();
+    expect(tester.widget<TextButton>(find.byKey(const ValueKey('incident-send'))).onPressed, isNull);
+    await tester.enterText(find.byKey(const ValueKey('incident-description')), 'Portail fermé');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('incident-send')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('course-code-input')), '4821');
+    await tester.tap(find.byKey(const ValueKey('course-code')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('course-close')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('course-cash')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('course-cash')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('course-close')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['step picked-up', 'step arrived', 'code 1111', 'incident other Portail fermé', 'code 4821', 'cash 40000', 'step close']);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('course-status'))).data, 'Livraison terminée');
   });
 
   testWidgets('7-E livreurs de la boutique : proposer un emploi, puis y mettre fin', (tester) async {

@@ -33,6 +33,20 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `ALREADY_EMPLOYED` | 409 | 7-E : le livreur a déjà un emploi actif (au plus un, contrainte de la base) |
 | `REVIEW_NOT_ALLOWED` | 409 | 7-H : évaluation impossible (avant la remise, délai `reviews.window_days` passé, paiement contesté, membre de la boutique) ; motif dans le message |
 | `ALREADY_REVIEWED` | 409 | 7-H : cette ligne (ou la boutique pour cette commande) est déjà évaluée |
+| `HANDOVER_CODE_USED` | 409 | 7-B / 7-F : code déjà utilisé ou plus valable |
+| `NOT_A_DELIVERY` | 409 | 7-F : commande à retirer en boutique, sans livraison |
+| `DELIVERY_NOT_STARTED` | 409 | 7-F : la recherche d'un livreur n'est pas lancée (ou n'est plus en cours) |
+| `DELIVERY_STATE_CHANGED` | 409 | 7-F : la livraison n'est plus dans un état qui permet l'action (requête tardive ou répétée) ; `details.status` |
+| `COURIER_NOT_ELIGIBLE` | 409 | 7-F : livreur non éligible (disponibilité, commune, capacité, relation, déjà sollicité, espèces) — à la sollicitation ou, revérifié, à l'acceptation |
+| `COURIER_NOT_PRIORITY` | 409 | 7-F : livraison rapide, un livreur d'une catégorie prioritaire disponible doit être sollicité d'abord (en économique : motif obligatoire, 400) |
+| `MISSION_UNAVAILABLE` | 409 | 7-F : mission retirée, expirée ou déjà traitée ; `details.status` |
+| `CASH_NOT_ALLOWED` | 403 | 7-F : seul un livreur employé actif de la boutique peut recevoir des espèces pour elle (F3 bis) |
+| `PAYMENT_CONDITION_MISSING` | 409 | 7-F : clôture impossible avant « J'ai payé » du client (Mobile Money) ou les espèces reçues par un employé |
+| `TOO_EARLY` | 409 | 7-F : « client absent » avant le délai `deliveries.client_absent_after_minutes` ; `details.afterMinutes` |
+| `INCIDENT_OPEN` | 409 | 7-G : un incident est ouvert sur la livraison (code et clôture bloqués) |
+| `INCIDENT_NOT_ALLOWED` | 409 | 7-G : un incident concerne une commande confirmée |
+| `INCIDENT_STATE_CHANGED` | 409 | 7-G : incident déjà transmis au support ou résolu |
+| `INCIDENT_RESOLVED` | 409 | 7-G : incident résolu, plus de précision possible |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |
 | `PRODUCT_CONTENT_LOCKED` | 409 | L7-04 : nom, description et prix normal ne se modifient plus après la création ; rubrique, durée et variantes plus après la première publication ; créer une nouvelle fiche ; `details.fields` (liste des champs refusés) |
 | `REPUTATION_RESET_REQUIRED` | 409 | **Retiré (L7-04)** : n'est plus renvoyé ; `confirmReputationReset` est refusé (400) |

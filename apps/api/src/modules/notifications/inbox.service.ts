@@ -88,8 +88,8 @@ export class InboxService {
       UNION ALL
       SELECT 'order:' || e.id, 'order_update', e.created_at, NULL, NULL, o.number, NULL, NULL, NULL, s.name, NULL, o.id::text, e.type
       FROM order_events e JOIN orders o ON o.id = e.order_id JOIN shops s ON s.id = o.shop_id
-      WHERE o.customer_id = ${userId} AND e.actor_type IN ('shop', 'system') AND e.created_at > ${since}
-        AND e.type IN ('proposed', 'confirmed', 'declined', 'ready', 'handed_over', 'cancelled', 'proposal_withdrawn', 'expired')`;
+      WHERE o.customer_id = ${userId} AND e.actor_type IN ('shop', 'system', 'courier') AND e.created_at > ${since}
+        AND e.type IN ('proposed', 'confirmed', 'declined', 'ready', 'handed_over', 'cancelled', 'proposal_withdrawn', 'expired', 'courier_assigned', 'picked_up', 'courier_arrived', 'delivered')`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {

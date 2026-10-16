@@ -166,6 +166,43 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-06 — Attribution des livraisons, 7-F, 7-G, évaluation des livraisons (16/10/2026, 22 h 27) · Fondateur · **décidé** ; **réalisé** ; choix de réalisation à confirmer
+
+- **Décision de référence (remplace l'arbitrage annonces / sélection de L7-04, §8 bis)** : la commande prête, le marchand
+  déclenche la recherche ; le serveur calcule les livreurs éligibles (mode, disponibilité, communes desservies,
+  capacité, relation avec la boutique) et les classe : **employés, puis partenaires, puis indépendants** ; le marchand
+  sollicite un livreur parmi eux ; le livreur sollicité **doit accepter** dans le délai ; s'il refuse ou ne répond pas,
+  la recherche continue. Un livreur ne voit que les missions qui lui sont proposées, ses courses et son historique.
+- **Réalisation (choix à confirmer)** :
+  - « Annonces de livraison accessibles » = **missions proposées nommément** au livreur choisi par le marchand (une à
+    la fois par livraison, contrainte de la base) ; aucune liste publique d'annonces. Avant acceptation, le livreur ne
+    voit ni l'adresse, ni le client, ni le prix des articles.
+  - **Rapide** : seuls les livreurs de la meilleure catégorie disponible sont sélectionnables. **Économique** : passer un
+    livreur d'une catégorie prioritaire disponible exige un motif (enregistré). L'employé passe avant le partenaire
+    (proposition A4-b appliquée). **Éligibilité revérifiée à l'acceptation** : un livreur devenu inéligible ne peut pas
+    accepter (la sollicitation est close et la recherche reprend).
+  - Délai de réponse du livreur : `deliveries.mission_accept_minutes` = **5 min (provisoire, A10)** ; « client absent »
+    possible 15 min après l'arrivée (`deliveries.client_absent_after_minutes`, **provisoire**).
+  - Parcours : acceptée → prise en charge (commande « en livraison ») → « je suis arrivé » (heure du serveur) → le client
+    examine, accepte et donne son code (5 essais, usage unique, refusé si un incident est ouvert ; **pas une preuve de
+    paiement**) → espèces reçues (**employé de la boutique seulement**, vérifié dans la transaction) ou « J'ai payé »
+    du client (Mobile Money au numéro de la boutique) → clôture par le livreur (commande « livrée ») → confirmation par la
+    boutique (commande « terminée », 7-C). Refus du client après examen : motif obligatoire, incident ouvert, la commande
+    n'est jamais « livrée ». Attente enregistrée, non facturée (A2-c inchangé).
+  - **Incidents (7-G)** : ouverts par le client, la boutique (permission « préparer les commandes ») ou le livreur
+    attribué, après la confirmation de la commande ; motif dans une liste propre à chaque partie, description
+    (obligatoire pour « Autre ») ; ouvert → transmis au support → résolu ; historique en écriture seule (base) ;
+    consultation et décision du support journalisées (permission d'administration `incidents.review` : rôle principal,
+    support). **Aucune pénalité, aucun frais, aucun remboursement automatique** : la décision du support est une note.
+  - **Évaluation de la livraison** : client concerné seulement, après la clôture, une fois (contrainte de la base),
+    distincte des avis d'article et de boutique, non publique, signalable par le livreur (modération existante) ; aucune
+    note moyenne ni conséquence pour le livreur.
+- **Décisions restant ouvertes** : (1) **preuves des incidents** (photos) : non réalisées faute de règle de stockage et
+  de conservation ; (2) **espèces à la livraison** : la règle de 7-B (espèces seulement au retrait) rend impossible un
+  paiement en espèces à la livraison, même par un employé ; proposition : autoriser les espèces en livraison quand la
+  boutique a au moins un employé actif, attribution alors limitée aux employés ; rien n'est changé sans accord ;
+  (3) **frais de livraison des freelances** (A3-b) : aucun registre de frais de livraison n'est créé.
+
 ### L7-05 — Lot 7 : développement de 7-D et 7-B (16/10/2026) · Fondateur (« code sans attendre ») · **réalisé** ; choix de réalisation à confirmer
 
 - **7-D** : propositions A2-b et A2-c appliquées (grilles, communes et durées saisies par BIM dans l'administration ;
@@ -191,7 +228,7 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
   Permission d'administration proposée `couriers.review` (rôle principal, support).
 - **7-H (partie sans livraison)** : avis d'article et de boutique selon la proposition du §13 ; délai d'évaluation
   provisoire 30 jours (`reviews.window_days`) ; aucune moyenne, étoiles de boutique ni statut Gold calculés (A17).
-- **Non réalisé, en attente** : livraisons (7-F, arbitrage annonces / sélection L7-04), paiements réels (lot 8).
+- **Non réalisé, en attente** : livraisons (7-F, arbitrage annonces / sélection L7-04 — tranché par L7-06), paiements réels (lot 8).
 
 ### L7-04 — Livreurs, fiches des articles et réputation : corrections (16/10/2026) · Fondateur · **décidé** ; fiches **réalisées**, livreurs **verrouillés** (aucune route livreur encore)
 

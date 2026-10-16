@@ -71,7 +71,7 @@ export const orders = pgTable(
     index('orders_customer_idx').on(t.customerId, t.createdAt),
     index('orders_expiry_idx').on(t.expiresAt).where(sql`${t.status} IN ('proposed', 'pending_shop')`),
     check('orders_source_ck', sql`${t.source} IN ('bimshop', 'conversation')`),
-    check('orders_status_ck', sql`${t.status} IN ('proposed', 'pending_shop', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'declined', 'expired', 'cancelled')`),
+    check('orders_status_ck', sql`${t.status} IN ('proposed', 'pending_shop', 'confirmed', 'preparing', 'ready', 'in_delivery', 'delivered', 'completed', 'declined', 'expired', 'cancelled')`),
     check('orders_mode_ck', sql`${t.deliveryMode} IS NULL OR ${t.deliveryMode} IN ('pickup', 'express', 'economy')`),
     check('orders_payment_ck', sql`${t.paymentMethod} IS NULL OR ${t.paymentMethod} IN ('mobile_money', 'cash')`),
     // Espèces : retrait en boutique seulement à ce stade (les livreurs employés arrivent au 7-E / 7-F).

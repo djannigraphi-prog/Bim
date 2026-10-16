@@ -298,7 +298,13 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 
 ---
 
-## 8. Priorité et sélection des livreurs [APPROUVÉ, A4 et A5 ; **à réconcilier avec L7-04, voir §8 bis**]
+## 8. Priorité et sélection des livreurs [APPROUVÉ, A4 et A5 ; **tranché par L7-06, réalisé en 7-F**]
+
+> **L7-06 (16/10/2026, 22 h 27)** : le marchand déclenche la recherche et sollicite un livreur parmi les éligibles
+> calculés par le serveur (employés, puis partenaires, puis indépendants) ; le livreur sollicité accepte ou refuse dans
+> le délai ; sinon la recherche continue. Réalisation : tables `deliveries`, `delivery_offers` (une sollicitation en
+> cours par livraison), `delivery_events` ; routes livreur `/v1/courier/missions`, `/v1/courier/courses` ; aucune liste
+> publique d'annonces.
 
 - Le **marchand choisit** le livreur parmi les **livreurs éligibles calculés par le serveur** (mode, disponibilité,
   capacité, délai, autorisations, sécurité). Le serveur contrôle l'éligibilité et les permissions à la sélection.
@@ -345,7 +351,13 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 
 ---
 
-## 9. Incidents [APPROUVÉ : principes A1, A8 ; PROPOSÉ : tableau]
+## 9. Incidents [APPROUVÉ : principes A1, A8 ; PROPOSÉ : tableau ; **socle réalisé en 7-G**]
+
+> **7-G réalisé** : tables `incidents` et `incident_events` (écriture seule), motifs par partie, description, suivi
+> ouvert → au support → résolu, page d'administration journalisée (`incidents.review`). Réalisé du tableau ci-dessous :
+> refus de l'article (motif, incident, code et clôture bloqués), client absent (après le délai), code bloqué (7-B).
+> Non réalisé : statuts de commande « incident » / « litige », réattribution, retour en boutique, pièces jointes
+> (stockage et conservation des preuves à décider) ; aucun effet financier automatique.
 
 Aucun frais d'annulation, remboursement ou pénalité automatique sans règle commerciale explicite (A8). Chaque incident
 enregistre : auteur, heure, motif, **état de la livraison au moment de l'incident**, pièces éventuelles. Le support agit
@@ -640,5 +652,7 @@ attribué, support journalisé), suspension pendant une livraison, reprise aprè
   - **A11** : politique de conservation par catégorie, durées à vérifier.
   - **A12** : 18 ans proposé pour commander, livrer, ouvrir une boutique.
   - **Nouveau** : références `BIM-…` des articles et prestations, lignes de commande, rattachement des évaluations.
+- **Version 4 (16/10/2026, soir)** : L7-06 — attribution (marchand sollicite, livreur accepte) ; 7-F, 7-G et évaluation des
+  livraisons réalisés ; §8 et §9 annotés.
 - **Version 3 (16/10/2026)** : corrections L7-04 — §8 bis (accès des livreurs ; arbitrage avec A4 / A5) ; §10 bis
   (fiches figées après création, promotion, réputation conservée ; remplace la remise à zéro avec avertissement).

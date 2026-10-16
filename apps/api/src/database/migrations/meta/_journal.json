@@ -246,6 +246,13 @@
       "when": 1792186806723,
       "tag": "0034_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792189762003,
+      "tag": "0035_deliveries",
+      "breakpoints": true
     }
   ]
 }

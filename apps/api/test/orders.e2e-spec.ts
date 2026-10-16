@@ -210,7 +210,8 @@ describe('Commandes (e2e)', () => {
     await h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(s.auth).expect(200);
     await h.http().post(`/v1/shop/orders/${o.id}/prepare`).set(s.auth).expect(200);
     const so = (await h.http().post(`/v1/shop/orders/${o.id}/ready`).set(s.auth).expect(200)).body;
-    expect(so.actions).toEqual(['cancel']);
+    // 7-F : prête et livrée à domicile : la boutique lance la recherche d'un livreur (ou annule).
+    expect(so.actions).toEqual(['cancel', 'start_delivery']);
     expect((await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code: '1234' }).expect(409)).body.error.code).toBe('NOT_PICKUP');
   });
 
