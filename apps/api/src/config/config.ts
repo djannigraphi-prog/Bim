@@ -153,6 +153,14 @@ const schema = z
     if (cfg.WORKER_MODE !== 'off' && cfg.PUSH_PROVIDER === 'none') {
       ctx.addIssue({ code: 'custom', path: ['PUSH_PROVIDER'], message: 'Un worker de rappels sans fournisseur de notifications ne servirait à rien (PUSH_PROVIDER)' });
     }
+    // Derrière le répartiteur de charge, sans TRUST_PROXY toutes les requêtes viendraient de son adresse : limites de
+    // débit communes à tout le monde et adresses fausses dans le journal d'audit (audit, C-3).
+    if (!devLike && cfg.TRUST_PROXY === 0) {
+      ctx.addIssue({ code: 'custom', path: ['TRUST_PROXY'], message: 'TRUST_PROXY doit être indiqué hors développement (1 derrière le répartiteur de charge)' });
+    }
+    if (cfg.KYC_ENCRYPTION_KEY && cfg.KYC_ENCRYPTION_KEY === cfg.ADMIN_TOTP_ENCRYPTION_KEY) {
+      ctx.addIssue({ code: 'custom', path: ['KYC_ENCRYPTION_KEY'], message: 'KYC_ENCRYPTION_KEY doit différer de ADMIN_TOTP_ENCRYPTION_KEY' });
+    }
     if (cfg.JWT_ACCESS_SECRET === cfg.OTP_SECRET) {
       ctx.addIssue({ code: 'custom', path: ['OTP_SECRET'], message: 'OTP_SECRET doit différer de JWT_ACCESS_SECRET' });
     }

@@ -1,6 +1,6 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { decryptBytes, encryptBytes } from '../../common/crypto';
 import { Errors } from '../../common/errors';
@@ -80,6 +80,13 @@ export class MerchantsService {
     const id = uuidv7();
     const base = slugify(dto.name);
     await this.db.transaction(async (tx) => {
+      // Deux envois simultanés : un seul passe (verrou par personne, puis index unique en dernier rempart).
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('merchant_application'), hashtext(${userId}))`);
+      const again = await tx
+        .select({ id: merchantApplications.id })
+        .from(merchantApplications)
+        .where(and(eq(merchantApplications.userId, userId), inArray(merchantApplications.status, OPEN_STATUSES)));
+      if (again.length) throw Errors.conflict('APPLICATION_IN_PROGRESS', 'Tu as déjà une demande d’ouverture de boutique en cours.');
       await tx.insert(shops).values({
         id: shopId,
         ownerUserId: userId,
@@ -153,13 +160,23 @@ export class MerchantsService {
     const docId = uuidv7();
     const storageKey = `kyc/${a.id}/${docId}.bin`;
     await this.storage.put(storageKey, encryptBytes(img.data, key), 'application/octet-stream');
-    const [prev] = await this.db.select().from(merchantDocuments).where(and(eq(merchantDocuments.applicationId, a.id), eq(merchantDocuments.kind, kind)));
-    await this.db.transaction(async (tx) => {
-      if (prev) await tx.delete(merchantDocuments).where(eq(merchantDocuments.id, prev.id));
-      await tx.insert(merchantDocuments).values({ id: docId, applicationId: a.id, kind, storageKey, width: img.width, height: img.height, bytes: img.bytes });
-      await tx.update(merchantApplications).set({ updatedAt: new Date() }).where(eq(merchantApplications.id, a.id));
-      await this.audit.log({ actorType: 'user', actorId: userId, action: 'merchant.document_uploaded', targetType: 'merchant_application', targetId: a.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { kind } }, tx);
-    });
+    let prev: typeof merchantDocuments.$inferSelect | undefined;
+    try {
+      await this.db.transaction(async (tx) => {
+        // Demande verrouillée : deux envois simultanés de la même pièce se suivent au lieu de se heurter.
+        const [locked] = await tx.select({ status: merchantApplications.status }).from(merchantApplications).where(eq(merchantApplications.id, a.id)).for('update');
+        if (!locked || !['draft', 'rejected'].includes(locked.status)) throw Errors.conflict('APPLICATION_LOCKED', 'Ta demande ne peut plus être modifiée.');
+        [prev] = await tx.select().from(merchantDocuments).where(and(eq(merchantDocuments.applicationId, a.id), eq(merchantDocuments.kind, kind)));
+        if (prev) await tx.delete(merchantDocuments).where(eq(merchantDocuments.id, prev.id));
+        await tx.insert(merchantDocuments).values({ id: docId, applicationId: a.id, kind, storageKey, width: img.width, height: img.height, bytes: img.bytes });
+        await tx.update(merchantApplications).set({ updatedAt: new Date() }).where(eq(merchantApplications.id, a.id));
+        await this.audit.log({ actorType: 'user', actorId: userId, action: 'merchant.document_uploaded', targetType: 'merchant_application', targetId: a.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { kind } }, tx);
+      });
+    } catch (e) {
+      // Pas de pièce chiffrée orpheline dans le stockage (audit, D-4).
+      await this.storage.remove(storageKey).catch(() => undefined);
+      throw e;
+    }
     if (prev) await this.storage.remove(prev.storageKey).catch(() => undefined);
     return { application: await this.view(await this.own(userId, id)) };
   }
@@ -203,7 +220,12 @@ export class MerchantsService {
       });
     }
     await this.db.transaction(async (tx) => {
-      await tx.update(merchantApplications).set({ status: 'submitted', submittedAt: new Date(), rejectionReason: null, updatedAt: new Date() }).where(eq(merchantApplications.id, a.id));
+      const sent = await tx
+        .update(merchantApplications)
+        .set({ status: 'submitted', submittedAt: new Date(), rejectionReason: null, updatedAt: new Date() })
+        .where(and(eq(merchantApplications.id, a.id), inArray(merchantApplications.status, ['draft', 'rejected'])))
+        .returning({ id: merchantApplications.id });
+      if (!sent.length) throw Errors.conflict('APPLICATION_LOCKED', 'Ta demande ne peut plus être modifiée.');
       await tx.update(shops).set({ status: 'pending_verification', updatedAt: new Date() }).where(eq(shops.id, a.shopId));
       await this.audit.log({ actorType: 'user', actorId: userId, action: 'merchant.application_submitted', targetType: 'merchant_application', targetId: a.id, ip: meta.ip, userAgent: meta.userAgent }, tx);
     });
@@ -216,7 +238,12 @@ export class MerchantsService {
     if (a.status === 'approved') throw Errors.conflict('APPLICATION_LOCKED', 'Ta boutique est déjà ouverte.');
     const docs = await this.db.select().from(merchantDocuments).where(eq(merchantDocuments.applicationId, a.id));
     await this.db.transaction(async (tx) => {
-      await tx.delete(merchantApplications).where(eq(merchantApplications.id, a.id));
+      // Une validation simultanée l'emporte : rien n'est supprimé si la demande vient d'être validée (audit, D-1).
+      const gone = await tx
+        .delete(merchantApplications)
+        .where(and(eq(merchantApplications.id, a.id), ne(merchantApplications.status, 'approved')))
+        .returning({ id: merchantApplications.id });
+      if (!gone.length) throw Errors.conflict('APPLICATION_LOCKED', 'Ta boutique est déjà ouverte.');
       await tx.update(shops).set({ status: 'closed', updatedAt: new Date() }).where(eq(shops.id, a.shopId));
       await this.audit.log({ actorType: 'user', actorId: userId, action: 'merchant.application_withdrawn', targetType: 'shop', targetId: a.shopId, ip: meta.ip, userAgent: meta.userAgent }, tx);
     });
@@ -253,13 +280,15 @@ export class MerchantsService {
     };
   }
 
-  async adminDetail(id: string) {
+  /** Fiche complète (date de naissance, numéro, adresse) : chaque consultation est journalisée (audit, A-2). */
+  async adminDetail(admin: AdminContext, id: string, meta: RequestMeta) {
     const [r] = await this.db
       .select({ a: merchantApplications, u: { username: users.username, fullName: users.fullName, birthDate: users.birthDate, city: users.city } })
       .from(merchantApplications)
       .innerJoin(users, eq(users.id, merchantApplications.userId))
       .where(eq(merchantApplications.id, id));
     if (!r) throw Errors.notFound('Demande');
+    await this.audit.log({ actorType: 'admin', actorId: admin.adminId, action: 'admin.merchant_application_viewed', targetType: 'merchant_application', targetId: id, ip: meta.ip, userAgent: meta.userAgent });
     const v = await this.view(r.a);
     return {
       ...v,
@@ -279,11 +308,18 @@ export class MerchantsService {
   }
 
   async approve(a: AdminContext, id: string, meta: RequestMeta) {
-    const [app] = await this.db.select().from(merchantApplications).where(and(eq(merchantApplications.id, id), eq(merchantApplications.status, 'submitted')));
-    if (!app) throw Errors.conflict('APPLICATION_NOT_SUBMITTED', 'Cette demande n’est pas en attente de vérification.');
     const now = new Date();
     await this.db.transaction(async (tx) => {
-      await tx.update(merchantApplications).set({ status: 'approved', reviewedBy: a.adminId, reviewedAt: now, rejectionReason: null, updatedAt: now }).where(eq(merchantApplications.id, id));
+      // Vérification et changement d'état en une seule écriture : un refus, un retrait ou une autre validation
+      // simultanés ne peuvent pas aboutir à une boutique ouverte sans demande valide (audit, D-1).
+      const [app] = await tx
+        .update(merchantApplications)
+        .set({ status: 'approved', reviewedBy: a.adminId, reviewedAt: now, rejectionReason: null, updatedAt: now })
+        .where(and(eq(merchantApplications.id, id), eq(merchantApplications.status, 'submitted')))
+        .returning();
+      if (!app) throw Errors.conflict('APPLICATION_NOT_SUBMITTED', 'Cette demande n’est pas en attente de vérification.');
+      const [owner] = await tx.select({ status: users.status }).from(users).where(eq(users.id, app.userId));
+      if (owner?.status !== 'active') throw Errors.conflict('ACCOUNT_NOT_ACTIVE', 'Le compte de cette personne n’est pas actif.');
       await tx.update(shops).set({ status: 'active', verifiedAt: now, updatedAt: now }).where(eq(shops.id, app.shopId));
       await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.merchant_approved', targetType: 'shop', targetId: app.shopId, ip: meta.ip, userAgent: meta.userAgent, metadata: { applicationId: id } }, tx);
     });
@@ -291,11 +327,14 @@ export class MerchantsService {
   }
 
   async reject(a: AdminContext, id: string, reason: string, meta: RequestMeta) {
-    const [app] = await this.db.select().from(merchantApplications).where(and(eq(merchantApplications.id, id), eq(merchantApplications.status, 'submitted')));
-    if (!app) throw Errors.conflict('APPLICATION_NOT_SUBMITTED', 'Cette demande n’est pas en attente de vérification.');
     const now = new Date();
     await this.db.transaction(async (tx) => {
-      await tx.update(merchantApplications).set({ status: 'rejected', reviewedBy: a.adminId, reviewedAt: now, rejectionReason: reason.trim(), updatedAt: now }).where(eq(merchantApplications.id, id));
+      const [app] = await tx
+        .update(merchantApplications)
+        .set({ status: 'rejected', reviewedBy: a.adminId, reviewedAt: now, rejectionReason: reason.trim(), updatedAt: now })
+        .where(and(eq(merchantApplications.id, id), eq(merchantApplications.status, 'submitted')))
+        .returning();
+      if (!app) throw Errors.conflict('APPLICATION_NOT_SUBMITTED', 'Cette demande n’est pas en attente de vérification.');
       await tx.update(shops).set({ status: 'draft', updatedAt: now }).where(and(eq(shops.id, app.shopId), isNull(shops.verifiedAt)));
       await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.merchant_rejected', targetType: 'shop', targetId: app.shopId, ip: meta.ip, userAgent: meta.userAgent, metadata: { applicationId: id } }, tx);
     });

@@ -85,6 +85,11 @@ class _FeedViewState extends ConsumerState<FeedView> {
             final k = i - header.length;
             if (s.items.isEmpty) return _EmptyFeed(tab: _tab);
             if (k >= s.items.length) {
+              if (s.pageError) {
+                return Center(
+                  child: TextButton(key: const ValueKey('feed-retry'), onPressed: () => controller.loadMore(retry: true), child: const Text('Réessayer')),
+                );
+              }
               // Fin de la liste chargée : page suivante.
               WidgetsBinding.instance.addPostFrameCallback((_) => controller.loadMore().ignore());
               return const Padding(padding: EdgeInsets.all(BimSpacing.lg), child: Center(child: CircularProgressIndicator()));

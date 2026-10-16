@@ -63,6 +63,21 @@ class _FakeShop extends ShopApi {
   }
 
   @override
+  Future<ProductDetail> update(String id, ProductInput input) async {
+    calls.add('update $id ${input.title} ${input.priceFcfa}');
+    return current = ProductDetail(
+      id: id,
+      kind: 'product',
+      title: input.title,
+      categoryCode: input.categoryCode,
+      priceFcfa: input.priceFcfa,
+      status: current?.status ?? 'draft',
+      photos: current?.photos ?? const [],
+      variants: current?.variants ?? const [],
+    );
+  }
+
+  @override
   Future<ProductDetail> publish(String id) async {
     calls.add('publish $id');
     if (publishError != null) throw publishError!;
@@ -162,4 +177,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('En ligne'), findsOneWidget);
   });
+
+  testWidgets('audit M-8 : publier enregistre d’abord les changements du formulaire', (tester) async {
+    final api = _FakeShop()..current = _detail();
+    await _pump(tester, api, '/shop/products/x1');
+    await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-price')), matching: find.byType(TextField)), '39000');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('publish-product')), 300, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const ValueKey('publish-product')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['update x1 Robe soirée à plumes 39000', 'publish x1']);
+  });
+
+  testWidgets('audit M-9 : article introuvable : message et « Réessayer », jamais un formulaire de création', (tester) async {
+    final api = _MissingShop();
+    await _pump(tester, api, '/shop/products/x9');
+    expect(find.byKey(const ValueKey('product-load-error')), findsOneWidget);
+    expect(find.text('Nouvel article'), findsNothing);
+    expect(api.calls, isEmpty);
+  });
+}
+
+class _MissingShop extends _FakeShop {
+  @override
+  Future<ProductDetail> product(String id) async => throw const ApiException(code: 'NOT_FOUND', message: 'Article introuvable.', status: 404);
 }

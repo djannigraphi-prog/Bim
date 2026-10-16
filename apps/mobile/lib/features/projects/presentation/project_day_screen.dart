@@ -39,6 +39,7 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
     setState(() => _pending.add(t.id));
     try {
       final next = await ref.read(projectsApiProvider).setDone(widget.projectId, widget.day, t.id, done: !t.done);
+      if (!mounted) return;
       setState(() => _local = next);
       refreshProject(ref, widget.projectId);
     } on ApiException catch (e) {

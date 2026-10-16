@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { randomToken, sha256 } from '../../common/crypto';
 import { AppError } from '../../common/errors';
@@ -37,7 +37,9 @@ export class StepUpService {
         and(
           eq(stepUpGrants.tokenHash, sha256(token)),
           eq(stepUpGrants.userId, userId),
-          eq(stepUpGrants.sessionId, sessionId),
+          // Même appareil : la session courante ou une session antérieure de la même famille. Le renouvellement du
+          // jeton crée une nouvelle ligne de session, il ne doit pas invalider la confirmation (audit, A-5).
+          sql`${stepUpGrants.sessionId} IN (SELECT s.id FROM sessions s WHERE s.family_id = (SELECT c.family_id FROM sessions c WHERE c.id = ${sessionId}))`,
           eq(stepUpGrants.scope, scope),
           isNull(stepUpGrants.consumedAt),
           gt(stepUpGrants.expiresAt, new Date()),

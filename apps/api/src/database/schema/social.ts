@@ -184,6 +184,8 @@ export const contentReports = pgTable(
   (t) => [
     index('content_reports_status_idx').on(t.status, t.createdAt),
     index('content_reports_target_idx').on(t.targetType, t.targetId),
+    // Centre de notifications : branche « contenu masqué » de chaque lecture (audit, D-8).
+    index('content_reports_target_user_idx').on(t.targetUserId, t.resolvedAt).where(sql`${t.action} = 'hidden'`),
     uniqueIndex('content_reports_open_uq').on(t.reporterId, t.targetType, t.targetId).where(sql`${t.status} = 'open'`),
     check('content_reports_target_ck', sql`${t.targetType} IN ('post', 'comment', 'user', 'story')`),
     check('content_reports_reason_ck', sql`${t.reason} IN ('spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'other')`),

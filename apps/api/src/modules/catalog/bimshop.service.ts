@@ -110,6 +110,8 @@ export class BimShopService {
         conds.push(or(lt(products.publishedAt, at), and(eq(products.publishedAt, at), lt(products.id, c.id)))!);
       } else {
         const v = Number(c.v);
+        // Curseur forgé (prix non entier) : 400 et non une erreur de la base (audit, A-11).
+        if (!Number.isSafeInteger(v)) throw Errors.validation({ fields: { cursor: ['Curseur invalide.'] } });
         conds.push(sort === 'price_asc' ? or(gt(products.priceFcfa, v), and(eq(products.priceFcfa, v), gt(products.id, c.id)))! : or(lt(products.priceFcfa, v), and(eq(products.priceFcfa, v), lt(products.id, c.id)))!);
       }
     }

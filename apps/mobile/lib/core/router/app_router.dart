@@ -58,7 +58,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       return switch (session) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         // Espace boutique actif (lot 5-B) : l'accueil est l'espace marchand (écran 55) ; ailleurs, pas d'espace marchand.
-        SessionSignedIn(:final me) when me.activeSpaceType == 'merchant' => (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc)) ? '/shop' : null,
+        // Les projets et Peni sont réservés à l'espace utilisateur (le serveur répond 403 sinon, audit M-10).
+        SessionSignedIn(:final me) when me.activeSpaceType == 'merchant' =>
+          (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc) || loc.startsWith('/projects') || loc.startsWith('/peni')) ? '/shop' : null,
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc) || loc.startsWith('/shop')) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
           (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop', '/bimshop/favorites'].any(loc.startsWith)) ? '/home' : null,

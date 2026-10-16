@@ -120,12 +120,39 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         final p = _product;
         if (p != null) return api.update(p.id, _input);
         var created = await api.create(_input);
+        // L'article existe désormais : un échec des photos ne doit pas conduire à le recréer (audit, M-7).
+        _apply(created);
         if (_pending.isNotEmpty) {
           created = await api.addPhotos(created.id, List.of(_pending));
           _pending.clear();
         }
         return created;
       }, done: 'Enregistré',);
+
+  /// Le formulaire diffère de l'article enregistré (titre, prix, rubrique…).
+  bool get _dirty {
+    final p = _product;
+    if (p == null) return false;
+    return _title.text.trim() != p.title ||
+        _price.text != '${p.priceFcfa}' ||
+        _compare.text != (p.compareAtFcfa?.toString() ?? '') ||
+        (p.isService && _duration.text != (p.durationMinutes?.toString() ?? '')) ||
+        _description.text.trim() != (p.description ?? '') ||
+        _category != p.categoryCode;
+  }
+
+  /// Les autres actions (publier, variantes, stock, photos) enregistrent d'abord les changements du formulaire :
+  /// sinon la réponse du serveur les effacerait, ou l'ancienne version serait publiée (audit, M-8).
+  Future<void> _act(Future<ProductDetail?> Function(ShopApi api, ProductDetail p) action, {String? done}) {
+    final p = _product!;
+    return _run((api) async {
+      if (_dirty) {
+        if (!_valid) throw const ApiException(code: 'VALIDATION_FAILED', message: 'Complète le nom, le prix et la rubrique avant de continuer.');
+        await api.update(p.id, _input);
+      }
+      return action(api, p);
+    }, done: done,);
+  }
 
   Future<void> _addPhoto() async {
     final camera = await showModalBottomSheet<bool>(
@@ -148,7 +175,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
       setState(() => _pending.add(bytes));
       return;
     }
-    await _run((api) => api.addPhotos(p.id, [bytes]));
+    await _act((api, p) => api.addPhotos(p.id, [bytes]));
   }
 
   Future<void> _archive() async {
@@ -178,6 +205,28 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     final p = _product;
     final e = _error;
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    // Article introuvable ou inaccessible : jamais un formulaire de création à la place (audit, M-9).
+    if (widget.productId != null && p == null) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(BimSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(e?.message ?? ApiException.unknown.message, key: const ValueKey('product-load-error'), textAlign: TextAlign.center),
+                  const SizedBox(height: BimSpacing.lg),
+                  BimButton(label: 'Réessayer', variant: BimButtonVariant.outline, onPressed: () => _load(widget.productId!)),
+                  const SizedBox(height: BimSpacing.sm),
+                  const BimBackButton(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final photoCount = p?.photos.length ?? _pending.length;
     return Scaffold(
       body: SafeArea(
@@ -214,7 +263,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                   if (p != null)
                     for (final ph in p.photos)
                       _Thumb(
-                        onRemove: _busy ? null : () => _run((api) => api.removePhoto(p.id, ph.id)),
+                        onRemove: _busy ? null : () => _act((api, p) => api.removePhoto(p.id, ph.id)),
                         child: ph.url == null ? const Icon(Icons.image_outlined) : Image.network(ph.url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                       )
                   else
@@ -298,7 +347,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                 variant: BimButtonVariant.outline,
                 onPressed: _busy
                     ? null
-                    : () => _run((api) => api.setVariants(p.id, _variants.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList())),
+                    : () => _act((api, p) => api.setVariants(p.id, _variants.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList())),
               ),
               const SizedBox(height: BimSpacing.md),
               for (final v in p.variants)
@@ -321,7 +370,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                       IconButton(
                         tooltip: 'Enregistrer le stock',
                         icon: const Icon(Icons.check),
-                        onPressed: _busy ? null : () => _run((api) => api.setStock(p.id, v.id, int.tryParse(_stock[v.id]!.text) ?? 0), done: 'Stock mis à jour'),
+                        onPressed: _busy ? null : () => _act((api, p) => api.setStock(p.id, v.id, int.tryParse(_stock[v.id]!.text) ?? 0), done: 'Stock mis à jour'),
                       ),
                     ],
                   ),
@@ -330,13 +379,13 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
             if (p != null) ...[
               const SizedBox(height: BimSpacing.xl),
               if (p.status == 'published')
-                BimButton(label: 'Retirer du BimShop (brouillon)', variant: BimButtonVariant.outline, onPressed: _busy ? null : () => _run((api) => api.unpublish(p.id)))
+                BimButton(label: 'Retirer du BimShop (brouillon)', variant: BimButtonVariant.outline, onPressed: _busy ? null : () => _act((api, p) => api.unpublish(p.id)))
               else
                 BimButton(
                   key: const ValueKey('publish-product'),
                   label: 'Publier sur le BimShop',
                   variant: BimButtonVariant.dark,
-                  onPressed: _busy ? null : () => _run((api) => api.publish(p.id), done: 'Article en ligne'),
+                  onPressed: _busy ? null : () => _act((api, p) => api.publish(p.id), done: 'Article en ligne'),
                 ),
               // Ce qui manque pour publier, rappelé à côté du bouton (la photo est en haut de l'écran).
               if (e?.fieldError('photos') ?? e?.fieldError('categoryCode') ?? (e?.code == 'SHOP_NOT_ACTIVE' ? e?.message : null) case final String why) ...[

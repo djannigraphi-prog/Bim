@@ -5,18 +5,21 @@ import '../data/social_models.dart';
 
 /// État d'un fil : publications chargées et curseur de la page suivante.
 class FeedState {
-  const FeedState({required this.items, this.nextCursor, this.loadingMore = false});
+  const FeedState({required this.items, this.nextCursor, this.loadingMore = false, this.pageError = false});
 
   final List<FeedPost> items;
   final String? nextCursor;
   final bool loadingMore;
+  /// La page suivante a échoué : on attend un « Réessayer » au lieu de relancer en boucle (audit, M-5).
+  final bool pageError;
 
   bool get hasMore => nextCursor != null;
 
-  FeedState copyWith({List<FeedPost>? items, String? nextCursor, bool clearCursor = false, bool? loadingMore}) => FeedState(
+  FeedState copyWith({List<FeedPost>? items, String? nextCursor, bool clearCursor = false, bool? loadingMore, bool? pageError}) => FeedState(
         items: items ?? this.items,
         nextCursor: clearCursor ? null : (nextCursor ?? this.nextCursor),
         loadingMore: loadingMore ?? this.loadingMore,
+        pageError: pageError ?? this.pageError,
       );
 }
 
@@ -28,16 +31,16 @@ class FeedController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
     return FeedState(items: page.items, nextCursor: page.nextCursor);
   }
 
-  Future<void> loadMore() async {
+  /// Page suivante ; `retry` après un échec signalé à l'écran.
+  Future<void> loadMore({bool retry = false}) async {
     final s = state.valueOrNull;
-    if (s == null || !s.hasMore || s.loadingMore) return;
-    state = AsyncData(s.copyWith(loadingMore: true));
+    if (s == null || !s.hasMore || s.loadingMore || (s.pageError && !retry)) return;
+    state = AsyncData(s.copyWith(loadingMore: true, pageError: false));
     try {
       final page = await ref.read(socialApiProvider).feed(tab: arg, cursor: s.nextCursor);
       state = AsyncData(FeedState(items: [...s.items, ...page.items], nextCursor: page.nextCursor));
     } catch (_) {
-      state = AsyncData(s.copyWith(loadingMore: false));
-      rethrow;
+      state = AsyncData(s.copyWith(loadingMore: false, pageError: true));
     }
   }
 

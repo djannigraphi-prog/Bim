@@ -2,6 +2,8 @@
  * Client de l'API d'administration (/admin/v1). La session est gardée dans sessionStorage :
  * elle disparaît à la fermeture de l'onglet et expire côté serveur (8 h par défaut).
  */
+// En production, l'adresse de l'API est obligatoire à la compilation (vite.config.ts) : jamais de repli silencieux
+// sur localhost (audit, C-17).
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000';
 
 const KEY = 'bim.admin.session';
@@ -67,6 +69,11 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 export async function apiBlob(path: string): Promise<Blob> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (res.status === 401) {
+    // Session expirée : même traitement que les autres appels (retour à la connexion, audit C-16).
+    setToken(null);
+    onUnauthorized();
+  }
   if (!res.ok) throw new ApiError(res.status, 'UNKNOWN', 'Fichier illisible.', {});
   return res.blob();
 }

@@ -57,8 +57,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       // Affichées une fois avec leur état « non vu », puis marquées vues : la pastille de la cloche disparaît.
       if (!_markedSeen) {
         _markedSeen = true;
-        await _api.markSeen();
-        ref.invalidate(inboxUnreadProvider);
+        // Un échec ici ne doit pas masquer la liste déjà affichée (audit, M-11) : on réessaiera à la prochaine ouverture.
+        try {
+          await _api.markSeen();
+          ref.invalidate(inboxUnreadProvider);
+        } catch (_) {
+          _markedSeen = false;
+        }
       }
     } catch (e) {
       if (mounted) {

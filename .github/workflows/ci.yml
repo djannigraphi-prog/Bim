@@ -7,9 +7,16 @@ on:
   # Relance manuelle sur un commit existant (vérification répétée du parcours Android, diagnostic).
   workflow_dispatch:
 
+# Audit (16/10/2026) : jeton en lecture seule par défaut. Seul le job « publish-captures », lancé uniquement sur un
+# push vers main, peut écrire (branches de captures) ; le code d'une demande de fusion ne s'exécute jamais avec un
+# jeton en écriture.
+permissions:
+  contents: read
+
 jobs:
   api:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: apps/api
@@ -25,6 +32,8 @@ jobs:
           --health-cmd "pg_isready -U bim" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -76,14 +85,15 @@ jobs:
 
   mobile:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # uniquement pour publier les captures sur la branche ci-captures
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
       - run: flutter --version
@@ -106,11 +116,15 @@ jobs:
         run: |
           export FLUTTER_ROOT="$(dirname "$(dirname "$(command -v flutter)")")"
           flutter test test_captures --update-goldens
-      - name: Publier les captures (branche ci-captures)
+      - name: Captures transmises au job de publication (push sur main seulement)
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ../../.github/scripts/publish-captures.sh
+        run: flutter --version | head -1 > test_captures/captures/FLUTTER_VERSION.txt
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
+        with:
+          name: flutter-captures
+          path: apps/mobile/test_captures/captures
+          retention-days: 3
       # Le NDK imposé par Flutter était téléchargé chez Google à chaque compilation ; une archive tronquée faisait
       # échouer la compilation par intermittence. Il n'est plus téléchargé qu'une fois par version (cache GitHub).
       - name: Paquets Android lourds (versions et clés du cache)
@@ -138,8 +152,6 @@ jobs:
   android-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    permissions:
-      contents: write   # uniquement pour publier les captures réelles de l'émulateur (branche ci-captures-android)
     services:
       postgres:
         image: postgres:16-alpine
@@ -166,6 +178,8 @@ jobs:
       MEDIA_LOCAL_DIR: /tmp/bim-media
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -181,7 +195,7 @@ jobs:
           nohup python3 ../../.github/scripts/otp-relay.py "$RUNNER_TEMP/api.log" 3999 "$RUNNER_TEMP/android-shots" > "$RUNNER_TEMP/relay.log" 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:3000/health && break; sleep 1; done
           curl -sf localhost:3000/health
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
       - name: Activer KVM (émulateur accéléré)
@@ -210,7 +224,7 @@ jobs:
           key: ${{ steps.android-pkgs.outputs.image_key }}
       - run: echo "::notice title=cache android::NDK ${{ steps.android-pkgs.outputs.ndk_version }} repris du cache = ${{ steps.ndk-cache.outputs.cache-hit == 'true' }} ; image système reprise du cache = ${{ steps.image-cache.outputs.cache-hit == 'true' }}"
       - name: Parcours inscription / connexion sur émulateur Android
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
           arch: x86_64
@@ -221,16 +235,19 @@ jobs:
       - name: Diagnostic de l'émulateur (en cas d'échec seulement)
         if: ${{ failure() }}
         run: bash .github/scripts/android-diagnostic.sh
-      - name: Publier les captures réelles de l'émulateur (branche ci-captures-android)
+      - name: Captures réelles de l'émulateur transmises au job de publication (push sur main seulement)
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ls "$RUNNER_TEMP"/android-shots/*.png >/dev/null 2>&1; then
-            bash .github/scripts/publish-captures.sh "$RUNNER_TEMP/android-shots" ci-captures-android "émulateur Android 14, API 34, rendu réel"
-          else
+          if ! ls "$RUNNER_TEMP"/android-shots/*.png >/dev/null 2>&1; then
             echo "::warning title=captures android::Aucune capture réelle produite"; cat "$RUNNER_TEMP/relay.log" || true
           fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
+        with:
+          name: android-captures
+          path: ${{ runner.temp }}/android-shots/*.png
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Résumé (annotations lisibles hors des journaux)
         if: ${{ always() }}
         run: |
@@ -271,6 +288,8 @@ jobs:
       ADMIN_TOTP_ENCRYPTION_KEY: Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -283,6 +302,8 @@ jobs:
       - run: npm test
         working-directory: apps/admin
       - run: npm run build
+        env:
+          VITE_API_URL: http://localhost:3000   # compilation de contrôle (CI) ; l'adresse réelle est fournie au déploiement
         working-directory: apps/admin
       - run: npx playwright install --with-deps chromium
         working-directory: apps/admin
@@ -294,3 +315,42 @@ jobs:
         run: |
           grep -vE "^\s*$" "$RUNNER_TEMP/admin-e2e.log" | tail -150 | cut -c1-200 > "$RUNNER_TEMP/admin.short" || true
           python3 .github/scripts/annotate-chunks.py "admin e2e" "$RUNNER_TEMP/admin.short" 6
+
+  # Publication des captures sur les branches ci-captures et ci-captures-android : seul job avec un jeton en
+  # écriture, uniquement après un push sur main (jamais pour une demande de fusion), sans exécuter le code testé.
+  publish-captures:
+    needs: [mobile, android-e2e]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: flutter-captures
+          path: ${{ runner.temp }}/flutter-captures
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: android-captures
+          path: ${{ runner.temp }}/android-captures
+      - name: Publier les captures
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ls "$RUNNER_TEMP"/flutter-captures/*.png >/dev/null 2>&1; then
+            bash .github/scripts/publish-captures.sh "$RUNNER_TEMP/flutter-captures" ci-captures "$(cat "$RUNNER_TEMP/flutter-captures/FLUTTER_VERSION.txt" 2>/dev/null || echo Flutter)"
+          else
+            echo "::warning title=captures::Aucune capture Flutter à publier"
+          fi
+          if ls "$RUNNER_TEMP"/android-captures/*.png >/dev/null 2>&1; then
+            bash .github/scripts/publish-captures.sh "$RUNNER_TEMP/android-captures" ci-captures-android "émulateur Android 14, API 34, rendu réel"
+          else
+            echo "::warning title=captures android::Aucune capture réelle à publier"
+          fi

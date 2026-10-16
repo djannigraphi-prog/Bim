@@ -50,9 +50,16 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// Première page ; `pages` > 1 recharge aussi les suivantes (après un envoi, pour voir son commentaire
+  /// même au-delà des 30 premiers, audit M-6).
+  Future<void> _load({int pages = 1}) async {
     try {
-      final p = await ref.read(socialApiProvider).comments(widget.postId);
+      final api = ref.read(socialApiProvider);
+      var p = await api.comments(widget.postId);
+      for (var i = 1; i < pages && p.nextCursor != null; i++) {
+        final next = await api.comments(widget.postId, cursor: p.nextCursor);
+        p = CommentsPage(total: next.total, nextCursor: next.nextCursor, items: [...p.items, ...next.items]);
+      }
       if (mounted) {
         setState(() {
           _page = p;
@@ -70,9 +77,10 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
     setState(() => _sending = true);
     try {
       await ref.read(socialApiProvider).comment(widget.postId, text, parentId: _replyTo?.id);
+      if (!mounted) return;
       _input.clear();
       setState(() => _replyTo = null);
-      await _load();
+      await _load(pages: 20);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
@@ -80,9 +88,26 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
     }
   }
 
+  bool _loadingMore = false;
+
+  Future<void> _more() async {
+    final page = _page;
+    if (page?.nextCursor == null || _loadingMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final next = await ref.read(socialApiProvider).comments(widget.postId, cursor: page!.nextCursor);
+      if (mounted) setState(() => _page = CommentsPage(total: next.total, nextCursor: next.nextCursor, items: [...page.items, ...next.items]));
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
   Future<void> _like(PostComment c) async {
     try {
       final r = await ref.read(socialApiProvider).likeComment(c.id, on: !c.likedByMe);
+      if (!mounted) return;
       setState(() {
         _page = CommentsPage(
           total: _page!.total,
@@ -165,7 +190,17 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
                         ? Center(child: Text('Sois la première personne à commenter 💬', style: theme.textTheme.bodyMedium))
                         : ListView(
                             padding: const EdgeInsets.symmetric(vertical: BimSpacing.sm),
-                            children: [for (final c in page.items) _CommentTile(comment: c, onLike: () => _like(c), onReply: () => _reply(c), onMore: () => _menu(c))],
+                            children: [
+                              for (final c in page.items) _CommentTile(comment: c, onLike: () => _like(c), onReply: () => _reply(c), onMore: () => _menu(c)),
+                              if (page.nextCursor != null)
+                                Center(
+                                  child: TextButton(
+                                    key: const ValueKey('comments-more'),
+                                    onPressed: _loadingMore ? null : _more,
+                                    child: const Text('Voir plus de commentaires'),
+                                  ),
+                                ),
+                            ],
                           ),
           ),
           if (_replyTo != null)

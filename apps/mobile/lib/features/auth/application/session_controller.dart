@@ -12,7 +12,10 @@ sealed class SessionState {
 }
 
 class SessionUnknown extends SessionState {
-  const SessionUnknown();
+  const SessionUnknown({this.unreachable = false});
+  /// Vrai si la session enregistrée n'a pas pu être revalidée (hors connexion, serveur indisponible) :
+  /// la session est gardée et l'écran d'accueil propose de réessayer (audit, constats M-2 et M-3).
+  final bool unreachable;
 }
 
 class SessionSignedOut extends SessionState {
@@ -39,12 +42,15 @@ class SessionController extends Notifier<SessionState> {
       state = const SessionSignedOut();
       return;
     }
+    if (state is SessionUnknown) state = const SessionUnknown();
     try {
       _signedIn(await _api.me());
     } on ApiException catch (e) {
-      if (e.isNetwork) {
-        // Hors connexion : on ne déconnecte pas ; l'écran affichera l'erreur réseau et pourra réessayer.
-        state = const SessionSignedOut();
+      // Seul un refus explicite de la session déconnecte. Le rafraîchissement refusé efface déjà les jetons ;
+      // une coupure réseau, une erreur serveur ou une limite atteinte gardent la session et proposent de réessayer.
+      final refused = await storage.refreshToken() == null || (e.status == 401 && e.code == 'SESSION_INVALID');
+      if (!refused) {
+        state = const SessionUnknown(unreachable: true);
         return;
       }
       await storage.clear();

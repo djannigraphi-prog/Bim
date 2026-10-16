@@ -80,8 +80,9 @@ export class InboxService {
       -- Lot 5-D : offre d'une boutique (ouverte) pour un de mes projets.
       UNION ALL
       SELECT 'offer:' || o.id, 'project_offer', o.created_at, p.id, p.title, NULL, NULL, NULL, NULL, NULL, NULL, NULL, s.name
-      FROM project_offers o JOIN projects p ON p.id = o.project_id JOIN shops s ON s.id = o.shop_id
-      WHERE p.user_id = ${userId} AND o.status = 'sent' AND s.status = 'active' AND o.created_at > ${since}`;
+      FROM project_offers o JOIN projects p ON p.id = o.project_id JOIN shops s ON s.id = o.shop_id JOIN users so ON so.id = s.owner_user_id
+      WHERE p.user_id = ${userId} AND o.status = 'sent' AND s.status = 'active' AND so.status = 'active' AND o.created_at > ${since}
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = so.id) OR (b.blocker_id = so.id AND b.blocked_id = ${userId}))`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {

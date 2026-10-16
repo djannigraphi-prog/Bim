@@ -1,3 +1,4 @@
+import { Errors } from '../../common/errors';
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -90,7 +91,16 @@ export class AdminController {
   @AdminRoute('audit.read')
   @ApiOperation({ summary: 'Journal d’audit (lecture seule), du plus récent au plus ancien' })
   audit(@Query('action') action?: string, @Query('actorId') actorId?: string, @Query('targetId') targetId?: string, @Query('before') before?: string, @Query('limit') limit?: string) {
-    return this.admin.listAudit({ action, actorId, targetId, before, limit: limit ? Number(limit) : undefined });
+    // Paramètres contrôlés : un filtre mal formé répond 400 au lieu d'une erreur de la base (audit, A-11).
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const fields: Record<string, string[]> = {};
+    if (actorId && !uuid.test(actorId)) fields.actorId = ['Identifiant invalide.'];
+    if (targetId && !uuid.test(targetId)) fields.targetId = ['Identifiant invalide.'];
+    if (before && Number.isNaN(new Date(before).getTime())) fields.before = ['Date invalide.'];
+    const n = limit === undefined ? undefined : Number(limit);
+    if (n !== undefined && (!Number.isInteger(n) || n < 1 || n > 200)) fields.limit = ['Entier entre 1 et 200.'];
+    if (Object.keys(fields).length) throw Errors.validation({ fields });
+    return this.admin.listAudit({ action: action?.slice(0, 80), actorId, targetId, before, limit: n });
   }
 
   @Get('users')

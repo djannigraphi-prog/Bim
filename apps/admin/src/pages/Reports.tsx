@@ -33,6 +33,8 @@ const REASONS: Record<string, string> = {
  * L'image jointe est lue par un lien temporaire ; la réponse est visible par la personne dans l'app.
  */
 export function Reports({ canResolve }: { canResolve: boolean }) {
+  // Une action à la fois : pas de double envoi pendant la requête (audit, C-15).
+  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<'open' | 'resolved'>('open');
   const [items, setItems] = useState<Report[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -48,12 +50,16 @@ export function Reports({ canResolve }: { canResolve: boolean }) {
   }, [status]);
 
   async function resolve(id: string) {
+    if (busy) return;
+    setBusy(true);
     try {
       await api(`/admin/v1/reports/${id}/resolve`, { method: 'POST', body: { resolution: answers[id] ?? '' } });
       setError(null);
       await load();
     } catch (e) {
       setError(errorText(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -94,7 +100,7 @@ export function Reports({ canResolve }: { canResolve: boolean }) {
                   Réponse à la personne
                   <textarea rows={2} value={answers[r.id] ?? ''} onChange={(e) => setAnswers({ ...answers, [r.id]: e.target.value })} />
                 </label>
-                <button disabled={(answers[r.id] ?? '').trim().length < 3} onClick={() => resolve(r.id)}>Répondre et clore</button>
+                <button disabled={busy || (answers[r.id] ?? '').trim().length < 3} onClick={() => resolve(r.id)}>Répondre et clore</button>
               </>
             )
           )}

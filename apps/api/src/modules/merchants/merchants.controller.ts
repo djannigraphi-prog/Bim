@@ -92,8 +92,8 @@ export class MerchantReviewController {
 
   @Get(':id')
   @AdminRoute('merchants.review')
-  detail(@Param('id', ParseUUIDPipe) id: string) {
-    return this.merchants.adminDetail(id);
+  detail(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
+    return this.merchants.adminDetail(a, id, meta);
   }
 
   @Get(':id/documents/:kind')

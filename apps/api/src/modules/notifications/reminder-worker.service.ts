@@ -59,8 +59,11 @@ export class ReminderWorkerService {
     const recovered = await this.recover(now);
     const planned = await this.plan(now, s);
     let dispatched = 0;
+    const started = Date.now();
     for (let i = 0; i < 50; i++) {
-      const n = await this.dispatch(now, s);
+      // Le bail de chaque lot part du moment où il est pris, pas du début du tour : un tour long ne laisse pas
+      // un autre worker reprendre des rappels en cours d'envoi (audit, D-7).
+      const n = await this.dispatch(now, s, new Date(now.getTime() + (Date.now() - started)));
       dispatched += n;
       if (n < BATCH) break;
     }
@@ -117,7 +120,7 @@ export class ReminderWorkerService {
   }
 
   /** Prend un lot de rappels dus (verrou SKIP LOCKED : jamais le même rappel pour deux workers) et les envoie. */
-  async dispatch(now: Date, s?: Settings): Promise<number> {
+  async dispatch(now: Date, s?: Settings, claimAt: Date = now): Promise<number> {
     s ??= await this.settings();
     const claimed = await this.db.transaction(async (tx) => {
       const ids = await tx.execute<{ id: string }>(sql`
@@ -127,7 +130,7 @@ export class ReminderWorkerService {
       if (!ids.rows.length) return [];
       return tx
         .update(notificationDeliveries)
-        .set({ status: 'sending', claimedAt: now, claimedBy: this.workerId, sendTries: sql`${notificationDeliveries.sendTries} + 1` })
+        .set({ status: 'sending', claimedAt: claimAt, claimedBy: this.workerId, sendTries: sql`${notificationDeliveries.sendTries} + 1` })
         .where(inArray(notificationDeliveries.id, ids.rows.map((r) => r.id)))
         .returning();
     });
@@ -139,7 +142,8 @@ export class ReminderWorkerService {
     await this.db
       .update(notificationDeliveries)
       .set({ status, reason, claimedAt: null, claimedBy: null, sentAt: status === 'sent' ? now : null, retryAt: retryAt ?? null })
-      .where(eq(notificationDeliveries.id, id));
+      // Seulement si ce worker détient toujours le bail : jamais l'écrasement d'un rappel repris ailleurs.
+      .where(and(eq(notificationDeliveries.id, id), eq(notificationDeliveries.status, 'sending'), eq(notificationDeliveries.claimedBy, this.workerId)));
   }
 
   private async deliver(d: typeof notificationDeliveries.$inferSelect, now: Date, s: Settings) {

@@ -239,11 +239,22 @@ export class AuthService {
     if (!user || !target) {
       return { ...(await this.verification.createDecoy(announcedChannel, meta.ip, visibility, scope ?? null)), message };
     }
-    const { challenge, deliver } = await this.verification.createDeferred(
-      { purpose: 'password_reset', channel: target.type, destination: target.value, userId: user.id, scope, ip: meta.ip },
-      this.db,
-      visibility,
-    );
+    let created: Awaited<ReturnType<VerificationService['createDeferred']>>;
+    try {
+      created = await this.verification.createDeferred(
+        { purpose: 'password_reset', channel: target.type, destination: target.value, userId: user.id, scope, ip: meta.ip },
+        this.db,
+        visibility,
+      );
+    } catch (e) {
+      // Plafond d'envois atteint pour cette coordonnée : même réponse qu'un compte inconnu, sinon le 429 révélerait
+      // que le compte existe (audit, A-8). Aucun code n'est envoyé.
+      if (e instanceof AppError && e.code === 'TOO_MANY_ATTEMPTS') {
+        return { ...(await this.verification.createDecoy(announcedChannel, meta.ip, visibility, scope ?? null)), message };
+      }
+      throw e;
+    }
+    const { challenge, deliver } = created;
     void deliver().catch((err: unknown) => this.logger.error(`Envoi du code de réinitialisation impossible : ${(err as Error).message}`));
     await this.audit.log({ actorType: 'user', actorId: user.id, action: 'auth.password_reset_requested', targetType: 'user', targetId: user.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { channel: target.type } });
     return { ...challenge, message };

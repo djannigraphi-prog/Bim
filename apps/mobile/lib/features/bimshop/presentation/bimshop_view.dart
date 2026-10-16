@@ -170,7 +170,17 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
                     ]
                   : [
                       ShopCardGrid(cards: page.items),
-                      if (page.loadingMore) const Padding(padding: EdgeInsets.all(BimSpacing.lg), child: Center(child: CircularProgressIndicator())),
+                      if (page.loadingMore)
+                        const Padding(padding: EdgeInsets.all(BimSpacing.lg), child: Center(child: CircularProgressIndicator()))
+                      else if (page.hasMore)
+                        // Toujours accessible, même si la première page ne remplit pas l'écran.
+                        Center(
+                          child: TextButton(
+                            key: const ValueKey('bimshop-more'),
+                            onPressed: () => ref.read(bimShopResultsProvider.notifier).loadMore(retry: true),
+                            child: Text(page.pageError ? 'Réessayer' : 'Voir plus'),
+                          ),
+                        ),
                     ],
             ),
           ],

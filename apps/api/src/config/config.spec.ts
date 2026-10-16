@@ -42,4 +42,11 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...base, PUSH_PROVIDER: 'fcm', FCM_SERVICE_ACCOUNT_JSON: account }).PUSH_PROVIDER).toBe('fcm');
     expect(() => loadConfig({ ...base, NODE_ENV: 'production', FCM_API_BASE_URL: 'http://127.0.0.1:9' })).toThrow(/FCM_API_BASE_URL/);
   });
+
+  it('audit : TRUST_PROXY obligatoire hors développement ; clés de chiffrement distinctes', () => {
+    const prod = { ...base, NODE_ENV: 'production', SMS_PROVIDER: 'none', EMAIL_PROVIDER: 'none' };
+    expect(() => loadConfig(prod)).toThrow(/TRUST_PROXY/);
+    expect(loadConfig({ ...prod, TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
+    expect(() => loadConfig({ ...base, KYC_ENCRYPTION_KEY: base.ADMIN_TOTP_ENCRYPTION_KEY })).toThrow(/KYC_ENCRYPTION_KEY/);
+  });
 });

@@ -46,8 +46,16 @@ export class DeliveryService {
     await this.send({ channel, destination, subject: 'Ton code BIM', body, code, sentAt: new Date() });
   }
 
+  /**
+   * Alerte de sécurité, envoyée après une opération déjà enregistrée : un canal indisponible ne doit ni transformer
+   * la réussite en erreur, ni empêcher les alertes vers les autres coordonnées (audit, A-7). L'échec est journalisé.
+   */
   async sendSecurityAlert(channel: Channel, destination: string, body: string): Promise<void> {
-    await this.send({ channel, destination, subject: 'Alerte de sécurité BIM', body, sentAt: new Date() });
+    try {
+      await this.send({ channel, destination, subject: 'Alerte de sécurité BIM', body, sentAt: new Date() });
+    } catch (e) {
+      this.logger.error(`Alerte de sécurité non envoyée (${channel}) : ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   private async send(msg: OutboundMessage): Promise<void> {

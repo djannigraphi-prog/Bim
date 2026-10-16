@@ -351,7 +351,13 @@ export class PostsService {
     const [{ n }] = await this.db.select({ n: count() }).from(postComments).where(and(eq(postComments.userId, viewerId), gt(postComments.createdAt, this.since24h())));
     if (n >= max) throw Errors.tooMany('Tu as déjà beaucoup commenté aujourd’hui 😊 Réessaie demain.', { reason: 'SOCIAL_COMMENTS_DAILY_LIMIT', limit: max });
     if (dto.parentId) {
-      const [parent] = await this.db.select().from(postComments).where(and(eq(postComments.id, dto.parentId), eq(postComments.postId, postId), eq(postComments.status, 'published')));
+      // Réponse impossible à un commentaire masqué, d'un compte inactif ou d'une personne bloquée (audit, A-9).
+      const [row] = await this.db
+        .select({ c: postComments })
+        .from(postComments)
+        .innerJoin(users, eq(users.id, postComments.userId))
+        .where(and(eq(postComments.id, dto.parentId), eq(postComments.postId, postId), eq(postComments.status, 'published'), eq(users.status, 'active'), notBlockedBetween(viewerId, postComments.userId)));
+      const parent = row?.c;
       // Un seul niveau de réponses : répondre à une réponse revient à répondre au commentaire d'origine.
       if (!parent) throw Errors.notFound('Commentaire');
       if (parent.parentId) dto.parentId = parent.parentId;
@@ -362,8 +368,20 @@ export class PostsService {
       await tx.update(posts).set({ commentCount: sql`${posts.commentCount} + 1` }).where(eq(posts.id, post.id));
       await this.audit.log({ actorType: 'user', actorId: viewerId, action: 'social.comment_created', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent, metadata: { commentId: id } }, tx);
     });
-    const list = await this.comments(viewerId, postId, undefined, apiBase);
-    return list.items.find((c) => c.id === id) ?? null;
+    // Vue construite directement : au-delà des 30 premiers commentaires, la relecture de la première page ne le
+    // contenait pas et l'API répondait « null » (audit, A-4).
+    const [me] = await this.db.select({ id: users.id, username: users.username, fullName: users.fullName, avatarKey: users.avatarKey }).from(users).where(eq(users.id, viewerId));
+    return {
+      id,
+      parentId: dto.parentId ?? null,
+      text,
+      createdAt: this.clock.now(),
+      author: { id: me.id, username: me.username, fullName: me.fullName, avatarUrl: await this.avatarUrl(me.avatarKey, apiBase) },
+      likeCount: 0,
+      likedByMe: false,
+      canDelete: true,
+      isMine: true,
+    };
   }
 
   private async visibleComment(viewerId: string, commentId: string) {
@@ -392,6 +410,13 @@ export class PostsService {
 
   async likeComment(viewerId: string, commentId: string, on: boolean) {
     await this.visibleComment(viewerId, commentId);
+    // Comme à l'affichage : pas de réaction au commentaire d'un compte inactif ou d'une personne bloquée (audit, A-9).
+    const [author] = await this.db
+      .select({ id: users.id })
+      .from(postComments)
+      .innerJoin(users, eq(users.id, postComments.userId))
+      .where(and(eq(postComments.id, commentId), eq(users.status, 'active'), notBlockedBetween(viewerId, postComments.userId)));
+    if (!author) throw Errors.notFound('Commentaire');
     await this.db.transaction(async (tx) => {
       if (on) {
         const ins = await tx.insert(commentLikes).values({ commentId, userId: viewerId }).onConflictDoNothing().returning({ id: commentLikes.commentId });

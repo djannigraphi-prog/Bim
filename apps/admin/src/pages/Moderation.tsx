@@ -35,6 +35,8 @@ const STATUS: Record<string, string> = { published: 'en ligne', hidden: 'masqué
  * reprocher, ou contenu masqué (réversible). Pour une personne, la mesure est la suspension (page Utilisateurs).
  */
 export function Moderation({ canModerate }: { canModerate: boolean }) {
+  // Une action à la fois : pas de double envoi pendant la requête (audit, C-15).
+  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<'open' | 'resolved'>('open');
   const [items, setItems] = useState<ContentReport[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -50,12 +52,16 @@ export function Moderation({ canModerate }: { canModerate: boolean }) {
   }, [status]);
 
   async function act(path: string, body?: unknown) {
+    if (busy) return;
+    setBusy(true);
     try {
       await api(path, { method: 'POST', body });
       setError(null);
       await load();
     } catch (e) {
       setError(errorText(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -107,11 +113,11 @@ export function Moderation({ canModerate }: { canModerate: boolean }) {
                   </label>
                   <div className="actions">
                     {r.targetType !== 'user' && (
-                      <button disabled={note.length < 3} onClick={() => act(`/admin/v1/content-reports/${r.id}/resolve`, { action: 'hidden', resolution: note })}>
+                      <button disabled={busy || note.length < 3} onClick={() => act(`/admin/v1/content-reports/${r.id}/resolve`, { action: 'hidden', resolution: note })}>
                         Masquer le contenu
                       </button>
                     )}
-                    <button className="secondary" disabled={note.length < 3} onClick={() => act(`/admin/v1/content-reports/${r.id}/resolve`, { action: 'none', resolution: note })}>
+                    <button className="secondary" disabled={busy || note.length < 3} onClick={() => act(`/admin/v1/content-reports/${r.id}/resolve`, { action: 'none', resolution: note })}>
                       Rien à reprocher
                     </button>
                   </div>

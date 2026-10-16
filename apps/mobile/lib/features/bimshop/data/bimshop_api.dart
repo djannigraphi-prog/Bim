@@ -215,11 +215,12 @@ final shopFavoritesProvider = FutureProvider.autoDispose<List<ShopCard>>((ref) =
 
 /// Résultats de l'écran 32 : articles chargés et page suivante (mêmes principes que le fil, lot 4).
 class BimShopPage {
-  const BimShopPage({required this.items, this.nextCursor, this.loadingMore = false});
+  const BimShopPage({required this.items, this.nextCursor, this.loadingMore = false, this.pageError = false});
 
   final List<ShopCard> items;
   final String? nextCursor;
   final bool loadingMore;
+  final bool pageError;
 
   bool get hasMore => nextCursor != null;
 }
@@ -231,16 +232,16 @@ class BimShopController extends AutoDisposeAsyncNotifier<BimShopPage> {
     return BimShopPage(items: page.items, nextCursor: page.nextCursor);
   }
 
-  Future<void> loadMore() async {
+  /// Page suivante ; après un échec, seul un « Réessayer » explicite relance (audit, M-5 / M-17).
+  Future<void> loadMore({bool retry = false}) async {
     final s = state.valueOrNull;
-    if (s == null || !s.hasMore || s.loadingMore) return;
+    if (s == null || !s.hasMore || s.loadingMore || (s.pageError && !retry)) return;
     state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor, loadingMore: true));
     try {
       final page = await ref.read(bimShopApiProvider).browse(ref.read(bimShopQueryProvider), cursor: s.nextCursor);
       state = AsyncData(BimShopPage(items: [...s.items, ...page.items], nextCursor: page.nextCursor));
     } catch (_) {
-      state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor));
-      rethrow;
+      state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor, pageError: true));
     }
   }
 }

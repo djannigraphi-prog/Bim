@@ -65,6 +65,8 @@ export function Merchants() {
   const [open, setOpen] = useState<Detail | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Une décision à la fois : pas de double envoi pendant la requête (audit, C-15).
+  const [busy, setBusy] = useState(false);
 
   const load = (s = status) =>
     api<{ items: Row[] }>(`/admin/v1/merchant-applications?status=${s}`)
@@ -87,6 +89,8 @@ export function Merchants() {
   }
 
   async function decide(id: string, action: 'approve' | 'reject') {
+    if (busy) return;
+    setBusy(true);
     try {
       await api(`/admin/v1/merchant-applications/${id}/${action}`, { method: 'POST', body: action === 'reject' ? { reason } : undefined });
       setOpen(null);
@@ -94,6 +98,8 @@ export function Merchants() {
       await load();
     } catch (e) {
       setError(errorText(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -144,8 +150,8 @@ export function Merchants() {
                     <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
                   </label>
                   <div className="actions">
-                    <button onClick={() => decide(r.id, 'approve')}>Valider et ouvrir la boutique</button>
-                    <button className="secondary" disabled={reason.trim().length < 3} onClick={() => decide(r.id, 'reject')}>
+                    <button disabled={busy} onClick={() => decide(r.id, 'approve')}>Valider et ouvrir la boutique</button>
+                    <button className="secondary" disabled={busy || reason.trim().length < 3} onClick={() => decide(r.id, 'reject')}>
                       Demander une correction
                     </button>
                   </div>

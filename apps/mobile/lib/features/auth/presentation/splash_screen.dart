@@ -23,6 +23,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(sessionProvider);
+    final unreachable = state is SessionUnknown && state.unreachable;
     return Scaffold(
       backgroundColor: BimColors.white,
       body: SafeArea(
@@ -31,6 +33,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             const Spacer(),
             const Center(child: BimLogo(height: 92)),
             const Spacer(),
+            if (unreachable) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: BimSpacing.xl),
+                child: Text(
+                  'Impossible de joindre BIM pour le moment. Vérifie ta connexion : ta session est gardée.',
+                  key: ValueKey('splash-unreachable'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: BimColors.grey800),
+                ),
+              ),
+              const SizedBox(height: BimSpacing.md),
+              TextButton(
+                key: const ValueKey('splash-retry'),
+                onPressed: () => ref.read(sessionProvider.notifier).restore(),
+                child: const Text('Réessayer'),
+              ),
+              const SizedBox(height: BimSpacing.lg),
+            ],
             Text(
               'Beauté · Image · Motivation',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: BimColors.grey600, fontWeight: FontWeight.w600, fontSize: 13),

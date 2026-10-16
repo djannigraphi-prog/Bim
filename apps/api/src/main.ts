@@ -6,8 +6,8 @@ import { APP_CONFIG, AppConfig } from './config/config';
 async function main(): Promise<void> {
   const app = await createApp();
   const cfg = app.get<AppConfig>(APP_CONFIG);
-  // Documentation interactive : uniquement hors production.
-  if (cfg.NODE_ENV !== 'production') SwaggerModule.setup('docs', app, buildOpenApi(app));
+  // Documentation interactive : développement et tests seulement (ni recette ni production, audit C-11).
+  if (cfg.NODE_ENV === 'development' || cfg.NODE_ENV === 'test') SwaggerModule.setup('docs', app, buildOpenApi(app));
   await app.listen(cfg.PORT);
 }
 

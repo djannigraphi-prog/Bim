@@ -3,6 +3,7 @@ import sharp, { OutputInfo } from 'sharp';
 import { Errors } from '../../common/errors';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
+const REAL_FORMATS = ['jpeg', 'png', 'webp'];
 
 export interface PrivateImage {
   data: Buffer;
@@ -20,6 +21,14 @@ export async function encodePrivateImage(file: Express.Multer.File | undefined, 
   if (!file) throw Errors.validation({ fields: { [field]: ['Image manquante.'] } });
   if (file.size > maxMb * 1024 * 1024) throw Errors.validation({ fields: { [field]: [`Image trop lourde (${maxMb} Mo au plus).`] } });
   if (!ACCEPTED.includes(file.mimetype)) throw Errors.validation({ fields: { [field]: ['Formats acceptés : JPEG, PNG, WebP.'] } });
+  // Le type annoncé vient du client : on vérifie le contenu réel avant tout décodage (pas de SVG, TIFF… audit A-14).
+  let format: string | undefined;
+  try {
+    format = (await sharp(file.buffer, { limitInputPixels: 50_000_000 }).metadata()).format;
+  } catch {
+    throw Errors.validation({ fields: { [field]: ['Image illisible.'] } });
+  }
+  if (!format || !REAL_FORMATS.includes(format)) throw Errors.validation({ fields: { [field]: ['Formats acceptés : JPEG, PNG, WebP.'] } });
   let out: { data: Buffer; info: OutputInfo };
   try {
     out = await sharp(file.buffer, { failOn: 'error', limitInputPixels: 50_000_000 })

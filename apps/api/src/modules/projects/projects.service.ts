@@ -491,7 +491,7 @@ export class ProjectsService {
       } else {
         await tx.delete(taskCompletions).where(and(eq(taskCompletions.taskId, taskId), eq(taskCompletions.day, day)));
       }
-      for (const c of opened) await tx.insert(projectEvents).values({ id: uuidv7(), projectId: p.id, type: 'chest_opened', payload: chestCode(c) });
+      for (const c of opened) await tx.insert(projectEvents).values({ id: uuidv7(), projectId: p.id, type: 'chest_opened', payload: chestCode(c) }).onConflictDoNothing();
     });
     return this.day(userId, projectId, day);
   }

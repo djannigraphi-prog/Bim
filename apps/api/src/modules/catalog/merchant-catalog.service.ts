@@ -143,13 +143,17 @@ export class MerchantCatalogService {
   async setStatus(shopId: string, userId: string, productId: string, to: 'published' | 'draft' | 'archived', meta: RequestMeta, apiBase: string) {
     const p = await this.own(shopId, productId);
     if (to === 'published') {
-      const [{ n }] = await this.db.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, p.id));
-      if (n === 0) throw Errors.validation({ fields: { photos: ['Ajoute au moins une photo avant de publier.'] } });
       if (!p.categoryCode) throw Errors.validation({ fields: { categoryCode: ['Choisis une rubrique.'] } });
       const [shop] = await this.db.select({ status: shops.status }).from(shops).where(eq(shops.id, shopId));
       if (shop?.status !== 'active') throw Errors.conflict('SHOP_NOT_ACTIVE', 'Ta boutique doit être ouverte pour publier.');
     }
     await this.db.transaction(async (tx) => {
+      // Même verrou que les photos : on ne publie jamais un article dont la dernière photo vient d'être retirée.
+      await tx.select({ id: products.id }).from(products).where(eq(products.id, p.id)).for('update');
+      if (to === 'published') {
+        const [{ n }] = await tx.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, p.id));
+        if (n === 0) throw Errors.validation({ fields: { photos: ['Ajoute au moins une photo avant de publier.'] } });
+      }
       await tx
         .update(products)
         .set({ status: to, publishedAt: to === 'published' ? (p.publishedAt ?? new Date()) : p.publishedAt, updatedAt: new Date() })
@@ -170,30 +174,49 @@ export class MerchantCatalogService {
     if (!this.storage.available) throw Errors.notConfigured('Le stockage des photos');
     const p = await this.own(shopId, productId);
     if (!files.length) throw Errors.validation({ fields: { photos: ['Ajoute au moins une photo.'] } });
-    const [{ n, max }] = await this.db
-      .select({ n: count(), max: sql<number>`coalesce(max(${productMedia.position}), -1)`.mapWith(Number) })
-      .from(productMedia)
-      .where(eq(productMedia.productId, p.id));
-    if (n + files.length > MAX_PRODUCT_IMAGES) throw Errors.validation({ fields: { photos: [`${MAX_PRODUCT_IMAGES} photos au plus par article.`] } });
-    const images = [];
+    if (files.length > MAX_PRODUCT_IMAGES) throw Errors.validation({ fields: { photos: [`${MAX_PRODUCT_IMAGES} photos au plus par article.`] } });
+    const images: Awaited<ReturnType<typeof encodePrivateImage>>[] = [];
     for (const f of files) images.push(await encodePrivateImage(f, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photos'));
-    let pos = max;
-    for (const img of images) {
-      const id = uuidv7();
-      const key = `products/${p.id}/${id}.jpg`;
-      await this.storage.put(key, img.data, 'image/jpeg');
-      await this.db.insert(productMedia).values({ id, productId: p.id, position: ++pos, storageKey: key, width: img.width, height: img.height, bytes: img.bytes });
+    const stored: string[] = [];
+    try {
+      for (const img of images) {
+        const key = `products/${p.id}/${uuidv7()}.jpg`;
+        await this.storage.put(key, img.data, 'image/jpeg');
+        stored.push(key);
+      }
+      // Article verrouillé : deux envois simultanés ne dépassent pas 6 photos ni ne prennent la même place (audit, D-3).
+      await this.db.transaction(async (tx) => {
+        await tx.select({ id: products.id }).from(products).where(eq(products.id, p.id)).for('update');
+        const [{ n, max }] = await tx
+          .select({ n: count(), max: sql<number>`coalesce(max(${productMedia.position}), -1)`.mapWith(Number) })
+          .from(productMedia)
+          .where(eq(productMedia.productId, p.id));
+        if (n + images.length > MAX_PRODUCT_IMAGES) throw Errors.validation({ fields: { photos: [`${MAX_PRODUCT_IMAGES} photos au plus par article.`] } });
+        let pos = max;
+        await tx.insert(productMedia).values(
+          images.map((img, i) => ({ id: uuidv7(), productId: p.id, position: ++pos, storageKey: stored[i], width: img.width, height: img.height, bytes: img.bytes })),
+        );
+      });
+    } catch (e) {
+      // Aucun fichier orphelin dans le stockage.
+      for (const key of stored) await this.storage.remove(key).catch(() => undefined);
+      throw e;
     }
     return this.detail(shopId, p.id, apiBase);
   }
 
   async removePhoto(shopId: string, productId: string, mediaId: string, apiBase: string) {
     const p = await this.own(shopId, productId);
-    const [m] = await this.db.select().from(productMedia).where(and(eq(productMedia.id, mediaId), eq(productMedia.productId, p.id)));
-    if (!m) throw Errors.notFound('Photo');
-    const [{ n }] = await this.db.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, p.id));
-    if (p.status === 'published' && n <= 1) throw Errors.conflict('LAST_PHOTO', 'Un article publié garde au moins une photo.');
-    await this.db.delete(productMedia).where(eq(productMedia.id, m.id));
+    const m = await this.db.transaction(async (tx) => {
+      // Verrou : deux suppressions simultanées ne laissent pas un article publié sans photo (audit, D-3).
+      const [locked] = await tx.select({ status: products.status }).from(products).where(eq(products.id, p.id)).for('update');
+      const [row] = await tx.select().from(productMedia).where(and(eq(productMedia.id, mediaId), eq(productMedia.productId, p.id)));
+      if (!row) throw Errors.notFound('Photo');
+      const [{ n }] = await tx.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, p.id));
+      if (locked?.status === 'published' && n <= 1) throw Errors.conflict('LAST_PHOTO', 'Un article publié garde au moins une photo.');
+      await tx.delete(productMedia).where(eq(productMedia.id, row.id));
+      return row;
+    });
     await this.storage.remove(m.storageKey).catch(() => undefined);
     return this.detail(shopId, p.id, apiBase);
   }

@@ -8,7 +8,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `NODE_ENV` | **aucun (obligatoire)** | development · test · staging · production | un oubli empêche le démarrage |
 | `PORT` | 3000 | port HTTP | |
 | `LOG_LEVEL` | info | niveau des journaux JSON | |
-| `TRUST_PROXY` | 0 | **nombre** de proxys de confiance devant l'API | `1` derrière l'ALB AWS ; jamais `true` (le client pourrait choisir son IP via X-Forwarded-For) |
+| `TRUST_PROXY` | 0 | **nombre** de proxys de confiance devant l'API | `1` derrière l'ALB AWS ; jamais `true` (le client pourrait choisir son IP via X-Forwarded-For). **Obligatoire (≥ 1) hors développement** : l'API refuse de démarrer sinon (audit du 16/10/2026) |
 | `CORS_ORIGINS` | (vide) | origines web autorisées, séparées par des virgules | admin web uniquement |
 | `HTTP_THROTTLE_ENABLED` | true | limitation de débit HTTP | `false` refusé en staging/production |
 | `DATABASE_URL` | — | connexion PostgreSQL | obligatoire |
@@ -30,6 +30,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `MEDIA_LOCAL_DIR` | ./.media | dossier du stockage local | |
 | `MEDIA_URL_TTL_SECONDS` | 300 | durée de validité d'un lien de photo | 30 à 3600 |
 | `MEDIA_MAX_UPLOAD_MB` | 10 | taille maximale d'une photo envoyée | 1 à 25 |
+| `KYC_ENCRYPTION_KEY` | (vide) | clé de chiffrement des pièces d'identité des marchands (lot 5), 32 octets en base64 | Différente de `ADMIN_TOTP_ENCRYPTION_KEY` ; sans elle, l'ouverture des boutiques répond « non configurée ». En production : AWS Secrets Manager, jamais dans Git |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | — , eu-west-3, — | compartiment privé (S3_ENDPOINT seulement pour un stockage compatible, ex. MinIO en test) ; identifiants par le rôle IAM de la tâche ECS | `S3_BUCKET` obligatoire si `s3` |
 | `ADMIN_TOTP_ENCRYPTION_KEY` | — | clé de chiffrement des secrets de double authentification des administrateurs | **obligatoire**, 32 octets en base64 (`openssl rand -base64 32`) ; ne jamais la changer sans réenrôler les admins |
 | `ADMIN_SESSION_TTL_MINUTES` | 480 | durée d'une session d'administration | 15 à 720 |

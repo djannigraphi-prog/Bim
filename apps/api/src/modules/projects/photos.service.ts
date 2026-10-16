@@ -1,5 +1,5 @@
 /// <reference types="multer" />
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
@@ -20,6 +20,8 @@ import { userTimezone } from './timezone';
  */
 @Injectable()
 export class ProjectPhotosService {
+  private readonly logger = new Logger('ProjectPhotos');
+
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
@@ -42,16 +44,25 @@ export class ProjectPhotosService {
     const id = uuidv7();
     const key = `projects/${projectId}/${id}.jpg`;
     await this.storage.put(key, out.data, 'image/jpeg');
-    const previous = await this.db
-      .select({ id: projectPhotos.id, key: projectPhotos.storageKey })
-      .from(projectPhotos)
-      .where(and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.kind, kind), isNull(projectPhotos.deletedAt)));
-    await this.db.transaction(async (tx) => {
-      await tx.insert(projectPhotos).values({ id, projectId, userId, kind, storageKey: key, width: out.width, height: out.height, bytes: out.bytes, takenDay: today(new Date(), await userTimezone(this.db, userId)) });
-      for (const p of previous) await tx.update(projectPhotos).set({ deletedAt: new Date() }).where(eq(projectPhotos.id, p.id));
-      await this.audit.log({ actorType: 'user', actorId: userId, action: 'project.photo_added', targetType: 'project', targetId: projectId, ip: meta.ip, userAgent: meta.userAgent, metadata: { kind } }, tx);
-    });
-    for (const p of previous) await this.storage.remove(p.key);
+    const takenDay = today(new Date(), await userTimezone(this.db, userId));
+    let previous: { id: string; key: string }[] = [];
+    try {
+      await this.db.transaction(async (tx) => {
+        // Projet verrouillé : deux envois simultanés laissent une seule photo « avant » (ou « après ») active (audit, D-5).
+        await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for('update');
+        previous = await tx
+          .select({ id: projectPhotos.id, key: projectPhotos.storageKey })
+          .from(projectPhotos)
+          .where(and(eq(projectPhotos.projectId, projectId), eq(projectPhotos.kind, kind), isNull(projectPhotos.deletedAt)));
+        for (const p of previous) await tx.update(projectPhotos).set({ deletedAt: new Date() }).where(eq(projectPhotos.id, p.id));
+        await tx.insert(projectPhotos).values({ id, projectId, userId, kind, storageKey: key, width: out.width, height: out.height, bytes: out.bytes, takenDay });
+        await this.audit.log({ actorType: 'user', actorId: userId, action: 'project.photo_added', targetType: 'project', targetId: projectId, ip: meta.ip, userAgent: meta.userAgent, metadata: { kind } }, tx);
+      });
+    } catch (e) {
+      await this.storage.remove(key).catch(() => undefined);
+      throw e;
+    }
+    for (const p of previous) await this.storage.remove(p.key).catch(() => undefined);
     return this.list(userId, projectId, apiBase);
   }
 
@@ -88,7 +99,8 @@ export class ProjectPhotosService {
     const rows = await this.db.select().from(projectPhotos).where(and(eq(projectPhotos.projectId, projectId), isNull(projectPhotos.deletedAt)));
     for (const r of rows) {
       await this.db.update(projectPhotos).set({ deletedAt: new Date() }).where(eq(projectPhotos.id, r.id));
-      await this.storage.remove(r.storageKey);
+      // Une erreur du stockage n'interrompt pas l'effacement des autres photos (audit, D-5) ; elle est signalée.
+      await this.storage.remove(r.storageKey).catch((e: unknown) => this.logger.error(`Photo de projet non effacée du stockage (${r.id}) : ${String(e)}`));
     }
   }
 }

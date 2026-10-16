@@ -11,6 +11,7 @@ import {
   smallint,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -166,6 +167,8 @@ export const projects = pgTable(
   },
   (t) => [
     index('projects_user_status_idx').on(t.userId, t.status),
+    // Demandes de projet vues par les boutiques (lot 5-D, audit D-15).
+    index('projects_offer_requests_idx').on(t.createdAt).where(sql`${t.receiveMerchantOffers} AND ${t.status} = 'active'`),
     check('projects_duration_ck', sql`${t.durationDays} BETWEEN 7 AND 365`),
     check('projects_sessions_ck', sql`${t.sessionsPerWeek} IS NULL OR ${t.sessionsPerWeek} BETWEEN 1 AND 7`),
     check('projects_budget_mode_ck', sql`${t.mode} = 'premium' OR ${t.budget} IS NULL`),
@@ -258,7 +261,11 @@ export const projectEvents = pgTable(
     payload: text('payload'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('project_events_project_idx').on(t.projectId, t.createdAt)],
+  (t) => [
+    index('project_events_project_idx').on(t.projectId, t.createdAt),
+    // Un coffre ne s'ouvre qu'une fois : pas de notification en double (audit, D-6).
+    uniqueIndex('project_events_chest_uq').on(t.projectId, t.payload).where(sql`${t.type} = 'chest_opened'`),
+  ],
 );
 
 
@@ -348,5 +355,10 @@ export const projectPhotos = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('project_photos_project_idx').on(t.projectId, t.kind), check('project_photos_kind_ck', sql`${t.kind} IN ('before', 'after')`)],
+  (t) => [
+    index('project_photos_project_idx').on(t.projectId, t.kind),
+    check('project_photos_kind_ck', sql`${t.kind} IN ('before', 'after')`),
+    // Une seule photo « avant » et une seule « après » actives par projet (audit, D-5).
+    uniqueIndex('project_photos_active_uq').on(t.projectId, t.kind).where(sql`${t.deletedAt} IS NULL`),
+  ],
 );

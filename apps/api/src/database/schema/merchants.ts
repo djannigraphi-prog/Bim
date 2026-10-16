@@ -42,6 +42,8 @@ export const merchantApplications = pgTable(
   },
   (t) => [
     uniqueIndex('merchant_applications_shop_uq').on(t.shopId),
+    // Une seule demande ouverte par personne, garanti par la base (audit, D-2 : double envoi simultané).
+    uniqueIndex('merchant_applications_open_user_uq').on(t.userId).where(sql`${t.status} IN ('draft', 'submitted', 'rejected')`),
     index('merchant_applications_status_idx').on(t.status, t.submittedAt),
     index('merchant_applications_user_idx').on(t.userId),
     check('merchant_applications_status_ck', sql`${t.status} IN ('draft', 'submitted', 'approved', 'rejected')`),

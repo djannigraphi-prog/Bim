@@ -7,6 +7,7 @@ import { DB, Database } from '../../database/database.module';
 import { privacySettings, products, projectCategories, projectCategoryRubriques, projectGoals, projectOfferProducts, projectOffers, projects, shopCategories, shops, users } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { BimShopService } from '../catalog/bimshop.service';
+import { generateTitle } from '../projects/plan';
 import { SettingsService } from '../settings/settings.service';
 
 export const MAX_OFFER_PRODUCTS = 3;
@@ -75,7 +76,7 @@ export class OffersService {
     const rows = await this.db
       .select({
         id: projects.id,
-        title: projects.title,
+        pattern: projectGoals.titlePattern,
         mode: projects.mode,
         durationDays: projects.durationDays,
         targetQuantity: projects.targetQuantity,
@@ -98,7 +99,8 @@ export class OffersService {
       items: rows.map((r) => ({
         id: r.id,
         category: r.category,
-        title: r.title,
+        // Jamais le titre saisi ni la description : ils peuvent contenir des informations personnelles (audit, E-1).
+        title: generateTitle({ pattern: r.pattern, quantity: r.targetQuantity, description: null, categoryLabel: r.category }),
         goal: r.goal,
         mode: r.mode,
         durationDays: r.durationDays,
@@ -157,21 +159,38 @@ export class OffersService {
   /** Offres envoyées par la boutique (titre du projet seulement). */
   async shopOffers(shopId: string) {
     const rows = await this.db
-      .select({ id: projectOffers.id, status: projectOffers.status, message: projectOffers.message, createdAt: projectOffers.createdAt, respondedAt: projectOffers.respondedAt, title: projects.title, category: projectCategories.label })
+      .select({
+        id: projectOffers.id,
+        status: projectOffers.status,
+        message: projectOffers.message,
+        createdAt: projectOffers.createdAt,
+        respondedAt: projectOffers.respondedAt,
+        pattern: projectGoals.titlePattern,
+        quantity: projects.targetQuantity,
+        category: projectCategories.label,
+      })
       .from(projectOffers)
       .innerJoin(projects, eq(projects.id, projectOffers.projectId))
       .innerJoin(projectCategories, eq(projectCategories.code, projects.categoryCode))
+      .leftJoin(projectGoals, eq(projectGoals.code, projects.goalCode))
       .where(eq(projectOffers.shopId, shopId))
       .orderBy(desc(projectOffers.createdAt))
       .limit(200);
-    return { items: rows };
+    return {
+      items: rows.map(({ pattern, quantity, ...r }) => ({ ...r, title: generateTitle({ pattern, quantity, description: null, categoryLabel: r.category }) })),
+    };
   }
 
   async withdraw(shopId: string, offerId: string) {
     const [o] = await this.db.select().from(projectOffers).where(and(eq(projectOffers.id, offerId), eq(projectOffers.shopId, shopId)));
     if (!o) throw Errors.notFound('Offre');
-    if (o.status !== 'sent') throw Errors.conflict('OFFER_CLOSED', 'Cette offre n’est plus active.');
-    await this.db.update(projectOffers).set({ status: 'withdrawn', respondedAt: new Date() }).where(eq(projectOffers.id, offerId));
+    // Mise à jour conditionnelle : un refus simultané n'est jamais écrasé (audit, D-19).
+    const done = await this.db
+      .update(projectOffers)
+      .set({ status: 'withdrawn', respondedAt: new Date() })
+      .where(and(eq(projectOffers.id, offerId), eq(projectOffers.status, 'sent')))
+      .returning({ id: projectOffers.id });
+    if (!done.length) throw Errors.conflict('OFFER_CLOSED', 'Cette offre n’est plus active.');
     return { id: offerId, status: 'withdrawn' as const };
   }
 
@@ -191,7 +210,16 @@ export class OffersService {
       .from(projectOffers)
       .innerJoin(shops, eq(shops.id, projectOffers.shopId))
       .innerJoin(users, eq(users.id, shops.ownerUserId))
-      .where(and(eq(projectOffers.projectId, p.id), eq(projectOffers.status, 'sent'), eq(shops.status, 'active'), eq(users.status, 'active')))
+      .where(
+        and(
+          eq(projectOffers.projectId, p.id),
+          eq(projectOffers.status, 'sent'),
+          eq(shops.status, 'active'),
+          eq(users.status, 'active'),
+          // Ni boutique d'une personne bloquée, dans un sens ou dans l'autre (audit, A-9).
+          sql`NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = ${shops.ownerUserId}) OR (b.blocker_id = ${shops.ownerUserId} AND b.blocked_id = ${userId}))`,
+        ),
+      )
       .orderBy(desc(projectOffers.createdAt));
     const links = rows.length
       ? await this.db
@@ -223,8 +251,14 @@ export class OffersService {
     await this.ownProject(userId, projectId);
     const [o] = await this.db.select().from(projectOffers).where(and(eq(projectOffers.id, offerId), eq(projectOffers.projectId, projectId)));
     if (!o) throw Errors.notFound('Offre');
-    if (o.status === 'sent') await this.db.update(projectOffers).set({ status: 'declined', respondedAt: new Date() }).where(eq(projectOffers.id, offerId));
-    return { id: offerId, status: o.status === 'withdrawn' ? 'withdrawn' : 'declined' };
+    const done = await this.db
+      .update(projectOffers)
+      .set({ status: 'declined', respondedAt: new Date() })
+      .where(and(eq(projectOffers.id, offerId), eq(projectOffers.status, 'sent')))
+      .returning({ id: projectOffers.id });
+    if (done.length) return { id: offerId, status: 'declined' as const };
+    const [now] = await this.db.select({ status: projectOffers.status }).from(projectOffers).where(eq(projectOffers.id, offerId));
+    return { id: offerId, status: now?.status ?? o.status };
   }
 
   async setReceive(userId: string, projectId: string, receive: boolean) {
