@@ -47,7 +47,8 @@ class _FeedViewState extends ConsumerState<FeedView> {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(myProjectsProvider);
-        await ref.refresh(feedProvider(_tab).future);
+        ref.invalidate(feedProvider(_tab));
+        await ref.read(feedProvider(_tab).future);
       },
       child: async.when(
         loading: () => ListView(children: [...header, const Padding(padding: EdgeInsets.all(BimSpacing.xl), child: Center(child: CircularProgressIndicator()))]),

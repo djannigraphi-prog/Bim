@@ -112,7 +112,8 @@ class ProfileScreen extends ConsumerWidget {
         data: (p) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(personPostsProvider(username));
-            await ref.refresh(profileProvider(username).future);
+            ref.invalidate(profileProvider(username));
+            await ref.read(profileProvider(username).future);
           },
           child: ListView(
             children: [

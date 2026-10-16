@@ -111,7 +111,12 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
         ..invalidate(feedProvider('following'));
       if (!mounted) return;
       showBimSnack(context, post.isBim ? 'Ton BIM est publié 🎉' : 'C’est publié !');
-      context.pop(post);
+      // Ouvert depuis le fil, l'écran 30 ou l'écran 31 ; sinon, retour à l'Accueil.
+      if (context.canPop()) {
+        context.pop(post);
+      } else {
+        context.go('/home');
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.code == 'BIM_PHOTOS_MISSING') {

@@ -129,6 +129,7 @@ Future<GoRouter> _pump(WidgetTester tester, Widget screen, _FakeSocial social, {
     GoRoute(path: '/projects', builder: (_, __) => const Scaffold(body: Text('écran 18'))),
     GoRoute(path: '/projects/new', builder: (_, __) => const Scaffold(body: Text('nouveau projet'))),
     GoRoute(path: '/search', builder: (_, __) => const Scaffold(body: Text('recherche'))),
+    GoRoute(path: '/home', builder: (_, __) => const Scaffold(body: Text('accueil'))),
   ],);
   await tester.pumpWidget(ProviderScope(
     overrides: [
@@ -219,6 +220,10 @@ void main() {
   });
 
   testWidgets('écran 11 : comparaison avant / après et résumé du parcours', (tester) async {
+    // Taille d'un téléphone (390 × 844) : le résumé du parcours est sous la grande photo.
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     await _pump(tester, const PostDetailScreen(postId: 'p9'), _FakeSocial());
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Avant · 14 sept.'), findsOneWidget);
