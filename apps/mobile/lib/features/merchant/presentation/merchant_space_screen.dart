@@ -436,9 +436,14 @@ class _OrdersCard extends ConsumerWidget {
     final c = ref.watch(shopOrderCountsProvider).valueOrNull;
     final text = c == null
         ? 'Commandes reçues'
-        : (c.toConfirm + c.toPrepare + c.ready == 0
+        : (c.toConfirm + c.toPrepare + c.ready + c.payments == 0
             ? 'Aucune commande à traiter.'
-            : [if (c.toConfirm > 0) '${c.toConfirm} à confirmer', if (c.toPrepare > 0) '${c.toPrepare} à préparer', if (c.ready > 0) '${c.ready} prête${c.ready > 1 ? 's' : ''}'].join(' · '));
+            : [
+                if (c.toConfirm > 0) '${c.toConfirm} à confirmer',
+                if (c.toPrepare > 0) '${c.toPrepare} à préparer',
+                if (c.ready > 0) '${c.ready} prête${c.ready > 1 ? 's' : ''}',
+                if (c.payments > 0) '${c.payments} paiement${c.payments > 1 ? 's' : ''} à confirmer',
+              ].join(' · '));
     return InkWell(
       key: const ValueKey('shop-orders'),
       borderRadius: BorderRadius.circular(BimRadius.card),

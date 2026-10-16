@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { OrdersService } from './orders.service';
+import { PaymentsService } from './payments.service';
 
 /**
  * Expiration des propositions et des commandes non confirmées, chaque minute, dans le processus du worker
@@ -16,6 +17,7 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly orders: OrdersService,
+    private readonly payments: PaymentsService,
   ) {}
 
   get active(): boolean {
@@ -34,7 +36,9 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.running) return 0;
     this.running = true;
     try {
-      return await this.orders.expireDue(now);
+      const expired = await this.orders.expireDue(now);
+      await this.payments.queueOverdue(now);
+      return expired;
     } catch (e) {
       this.logger.error(`Expiration des commandes : ${(e as Error).message}`);
       return 0;

@@ -133,6 +133,47 @@ class OrderEvent {
   factory OrderEvent.fromJson(Map<String, dynamic> j) => OrderEvent(type: j['type'] as String, actorType: j['actorType'] as String, at: DateTime.parse(j['at'] as String), reason: j['reason'] as String?);
 }
 
+/// 7-C — Paiement de l'article : cinq informations distinctes ; le statut affiché est calculé par le serveur.
+class OrderPayment {
+  const OrderPayment({required this.method, required this.amountFcfa, required this.status, this.declaredReference, this.contestReason, this.payoutPhone, this.payoutOperator});
+  final String method;
+  final int amountFcfa;
+  /// not_paid · declared_by_customer · cash_received_to_confirm · confirmed_by_shop · contested_by_shop · cancelled · failed
+  final String status;
+  final String? declaredReference;
+  final String? contestReason;
+  /// Numéro Mobile Money confirmé de la boutique, montré au client seulement au moment de payer.
+  final String? payoutPhone;
+  final String? payoutOperator;
+
+  factory OrderPayment.fromJson(Map<String, dynamic> j) {
+    final payout = j['shopPayout'] as Map<String, dynamic>?;
+    return OrderPayment(
+      method: j['method'] as String,
+      amountFcfa: j['amountFcfa'] as int,
+      status: j['status'] as String,
+      declaredReference: j['declaredReference'] as String?,
+      contestReason: j['contestReason'] as String?,
+      payoutPhone: payout?['phone'] as String?,
+      payoutOperator: payout?['operator'] as String?,
+    );
+  }
+}
+
+/// Libellés honnêtes (§5) : jamais « payé » sans décision de la boutique, jamais « confirmé par le prestataire ».
+String paymentStatusLabel(String s) => switch (s) {
+      'not_paid' => 'À payer à la remise',
+      'declared_by_customer' => 'Déclaré par le client — à confirmer par la boutique',
+      'cash_received_to_confirm' => 'Espèces reçues par la boutique — à confirmer',
+      'confirmed_by_shop' => 'Confirmé par la boutique',
+      'contested_by_shop' => 'Contesté par la boutique',
+      'cancelled' => 'Annulé',
+      'failed' => 'Échoué',
+      _ => '—',
+    };
+
+String operatorLabel(String? o) => switch (o) { 'wave' => 'Wave', 'orange' => 'Orange Money', 'mtn' => 'MTN MoMo', 'moov' => 'Moov Money', _ => 'Mobile Money' };
+
 class OrderDetail {
   const OrderDetail({
     required this.id,
@@ -160,6 +201,7 @@ class OrderDetail {
     this.expiresAt,
     this.endedBy,
     this.endReason,
+    this.payment,
   });
 
   final String id;
@@ -186,6 +228,7 @@ class OrderDetail {
   final DateTime? expiresAt;
   final String? endedBy;
   final String? endReason;
+  final OrderPayment? payment;
   final List<OrderEvent> events;
   /// Actions possibles maintenant, calculées par le serveur.
   final List<String> actions;
@@ -220,6 +263,7 @@ class OrderDetail {
       expiresAt: j['expiresAt'] == null ? null : DateTime.parse(j['expiresAt'] as String),
       endedBy: ended?['byType'] as String?,
       endReason: ended?['reason'] as String?,
+      payment: j['payment'] == null ? null : OrderPayment.fromJson(j['payment'] as Map<String, dynamic>),
       events: [for (final e in (j['events'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) OrderEvent.fromJson(e)],
       actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
     );
@@ -260,6 +304,7 @@ String orderStatusLabel(String status) => switch (status) {
       'preparing' => 'En préparation',
       'ready' => 'Prête',
       'delivered' => 'Remise',
+      'completed' => 'Terminée',
       'declined' => 'Refusée',
       'expired' => 'Expirée',
       'cancelled' => 'Annulée',
@@ -295,6 +340,13 @@ String orderEventLabel(OrderEvent e) => switch (e.type) {
       'proposal_declined' => 'Proposition refusée',
       'proposal_withdrawn' => 'Proposition retirée',
       'expired' => 'Expirée sans réponse',
+      'payment_declared' => 'Paiement déclaré par le client',
+      'cash_received' => 'Espèces reçues par la boutique',
+      'payment_confirmed' => 'Paiement confirmé par la boutique',
+      'payment_contested' => 'Paiement contesté par la boutique',
+      'payment_review_queued' => 'Paiement à vérifier par le support',
+      'payment_reviewed' => 'Vérifié par le support',
+      'completed' => 'Commande terminée',
       _ => 'Mise à jour',
     };
 
@@ -329,6 +381,9 @@ class OrdersApi {
   Future<OrderDetail> accept(String id, Fulfilment f, {required int expectedTotalFcfa}) async =>
       OrderDetail.fromJson(await _api.post('/v1/orders/$id/accept', body: {...f.toJson(), 'expectedTotalFcfa': expectedTotalFcfa}));
 
+  Future<OrderDetail> declarePayment(String id, {String? reference}) async =>
+      OrderDetail.fromJson(await _api.post('/v1/orders/$id/payment/declare', body: {if (reference != null && reference.isNotEmpty) 'reference': reference}));
+
   Future<OrderDetail> cancel(String id, {String? reason}) async => OrderDetail.fromJson(await _api.post('/v1/orders/$id/cancel', body: {if (reason != null) 'reason': reason}));
 }
 
@@ -342,15 +397,16 @@ class ShopOrdersApi {
     return [for (final o in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) OrderSummary.fromJson(o)];
   }
 
-  Future<({int toConfirm, int toPrepare, int ready})> counts() async {
+  Future<({int toConfirm, int toPrepare, int ready, int payments})> counts() async {
     final r = await _api.get('/v1/shop/orders/counts');
-    return (toConfirm: r['toConfirm'] as int, toPrepare: r['toPrepare'] as int, ready: r['ready'] as int);
+    return (toConfirm: r['toConfirm'] as int, toPrepare: r['toPrepare'] as int, ready: r['ready'] as int, payments: (r['paymentsToConfirm'] ?? 0) as int);
   }
 
   Future<OrderDetail> order(String id) async => OrderDetail.fromJson(await _api.get('/v1/shop/orders/$id'));
 
-  Future<OrderDetail> act(String id, String action, {String? reason, String? code}) async => OrderDetail.fromJson(
-        await _api.post('/v1/shop/orders/$id/$action', body: {if (reason != null) 'reason': reason, if (code != null) 'code': code}),
+  /// `action` : confirm, decline, prepare, ready, handover, cancel, payment/cash, payment/confirm, payment/contest.
+  Future<OrderDetail> act(String id, String action, {String? reason, String? code, int? amountFcfa}) async => OrderDetail.fromJson(
+        await _api.post('/v1/shop/orders/$id/$action', body: {if (reason != null) 'reason': reason, if (code != null) 'code': code, if (amountFcfa != null) 'amountFcfa': amountFcfa}),
       );
 
   Future<OrderDetail> propose(String conversationId, List<OrderLine> lines, {required String idempotencyKey}) async => OrderDetail.fromJson(
@@ -363,4 +419,4 @@ final shopOrdersApiProvider = Provider<ShopOrdersApi>((ref) => ShopOrdersApi(ref
 final communesProvider = FutureProvider.autoDispose<List<Commune>>((ref) => ref.watch(ordersApiProvider).communes());
 final myOrdersProvider = FutureProvider.autoDispose<List<OrderSummary>>((ref) => ref.watch(ordersApiProvider).mine());
 final shopOrdersProvider = FutureProvider.autoDispose.family<List<OrderSummary>, String>((ref, box) => ref.watch(shopOrdersApiProvider).list(box));
-final shopOrderCountsProvider = FutureProvider.autoDispose<({int toConfirm, int toPrepare, int ready})>((ref) => ref.watch(shopOrdersApiProvider).counts());
+final shopOrderCountsProvider = FutureProvider.autoDispose<({int toConfirm, int toPrepare, int ready, int payments})>((ref) => ref.watch(shopOrdersApiProvider).counts());

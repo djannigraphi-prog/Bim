@@ -136,7 +136,8 @@ describe('Commandes (e2e)', () => {
     const wrong = code === '0000' ? '1111' : '0000';
     expect((await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code: wrong }).expect(400)).body.error).toMatchObject({ code: 'HANDOVER_CODE_INVALID', details: { remaining: 4 } });
     so = (await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code }).expect(200)).body;
-    expect(so).toMatchObject({ status: 'delivered', handoverCodeStatus: 'used', actions: [] });
+    // 7-C : remise faite ; reste le paiement en espèces à constater au comptoir.
+    expect(so).toMatchObject({ status: 'delivered', handoverCodeStatus: 'used', actions: ['cash_received'] });
     expect(so.events.map((e: { type: string }) => e.type)).toEqual(['created', 'confirmed', 'preparing', 'ready', 'code_failed', 'code_validated', 'handed_over']);
     // Code déjà utilisé : refusé ; le client ne le voit plus.
     await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code }).expect(409);
@@ -316,7 +317,7 @@ describe('Commandes (e2e)', () => {
     await h.pool.query("insert into shop_member_permissions (shop_id, user_id, permission) values ($1, $2, 'orders.read')", [s.shopId, staff.userId]);
     const list = (await h.http().get('/v1/shop/orders?box=todo').set(st).expect(200)).body.items;
     expect(list).toEqual([expect.objectContaining({ id: o.id, number: o.number, status: 'pending_shop', customerName: 'Awa Koné', actions: ['confirm', 'decline'] })]);
-    expect((await h.http().get('/v1/shop/orders/counts').set(st).expect(200)).body).toEqual({ toConfirm: 1, toPrepare: 0, ready: 0 });
+    expect((await h.http().get('/v1/shop/orders/counts').set(st).expect(200)).body).toEqual({ toConfirm: 1, toPrepare: 0, ready: 0, paymentsToConfirm: 0 });
     await h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(st).expect(403);
     await h.pool.query("insert into shop_member_permissions (shop_id, user_id, permission) values ($1, $2, 'orders.prepare')", [s.shopId, staff.userId]);
     await h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(st).expect(200);

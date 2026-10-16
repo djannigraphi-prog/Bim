@@ -880,7 +880,7 @@ class _FakeOrdersApi extends OrdersApi {
 class _FakeShopOrdersApi extends ShopOrdersApi {
   _FakeShopOrdersApi(super.api);
   @override
-  Future<({int toConfirm, int toPrepare, int ready})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 1);
+  Future<({int toConfirm, int toPrepare, int ready, int payments})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 1, payments: 1);
   @override
   Future<OrderDetail> order(String id) async => _order(shop: true);
 }

@@ -181,6 +181,10 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
   - **Annulation par le client** : jusqu'à « confirmée » ; ensuite, seule la boutique annule (motif obligatoire).
   - **Délais** (A10, provisoires) : proposition 24 h, confirmation par la boutique 24 h, 5 essais pour le code.
   - A14 (fiche obligatoire, éventuellement non publiée) et A15 (prix négocié à la baisse seulement) appliqués.
+- **7-C** : paiement de l'article enregistré (jamais transféré) ; la déclaration du client n'est jamais une confirmation ;
+  une commande n'est « terminée » qu'après confirmation par la boutique ; sans décision au bout de 3 jours : rappel et
+  file « à vérifier » du support, jamais de confirmation implicite. Espèces au comptoir : montant attendu exigé (un écart
+  se conteste). Permission d'administration proposée `payments.review` (rôle principal, support, finance).
 - **Non réalisé, en attente** : livraisons (7-F, arbitrage annonces / sélection L7-04), paiements réels (lot 8).
 
 ### L7-04 — Livreurs, fiches des articles et réputation : corrections (16/10/2026) · Fondateur · **décidé** ; fiches **réalisées**, livreurs **verrouillés** (aucune route livreur encore)

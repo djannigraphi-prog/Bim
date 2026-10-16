@@ -5,7 +5,9 @@ import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { AcceptProposalDto, CreateOrderDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto } from './dto';
+import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
+import { AcceptProposalDto, CashReceivedDto, CreateOrderDto, DeclarePaymentDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto, ReviewNoteDto } from './dto';
+import { PaymentsService } from './payments.service';
 import { OrdersService } from './orders.service';
 
 /** Lot 7-B — Mes commandes (client). Aucun paiement en ligne. */
@@ -14,7 +16,10 @@ import { OrdersService } from './orders.service';
 @RequireSpace('user')
 @Controller('v1/orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly payments: PaymentsService,
+  ) {}
 
   @Post('preview')
   @HttpCode(200)
@@ -53,6 +58,14 @@ export class OrdersController {
     return this.orders.getForCustomer(a.userId, id, apiBase(req));
   }
 
+  @Post(':id/payment/declare')
+  @HttpCode(200)
+  @ApiOperation({ summary: '« J’ai payé » (Mobile Money, après la remise) : déclaration, jamais une confirmation' })
+  async declare(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DeclarePaymentDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.payments.declare(a.userId, id, dto.reference?.trim() || undefined, meta);
+    return this.orders.getForCustomer(a.userId, id, apiBase(req));
+  }
+
   @Post(':id/cancel')
   @HttpCode(200)
   @ApiOperation({ summary: 'Refuser une proposition, ou annuler avant la préparation' })
@@ -68,7 +81,10 @@ export class OrdersController {
 @RequireSpace('merchant')
 @Controller('v1/shop/orders')
 export class ShopOrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly payments: PaymentsService,
+  ) {}
 
   private shop(a: AuthContext) {
     return a.space!.id;
@@ -145,6 +161,33 @@ export class ShopOrdersController {
     return this.orders.getForShop(this.shop(a), id, apiBase(req));
   }
 
+  @Post(':id/payment/cash')
+  @HttpCode(200)
+  @RequireShopPermission('orders.prepare')
+  @ApiOperation({ summary: 'Retrait en boutique : espèces reçues (constat visuel, montant attendu)' })
+  async cash(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CashReceivedDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.payments.cashReceived(a.userId, this.shop(a), id, dto.amountFcfa, meta);
+    return this.orders.getForShop(this.shop(a), id, apiBase(req));
+  }
+
+  @Post(':id/payment/confirm')
+  @HttpCode(200)
+  @RequireShopPermission('payments.decide')
+  @ApiOperation({ summary: 'Confirmer le paiement reçu : la commande est terminée' })
+  async confirmPayment(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.payments.decide(a.userId, this.shop(a), id, 'confirm', undefined, meta);
+    return this.orders.getForShop(this.shop(a), id, apiBase(req));
+  }
+
+  @Post(':id/payment/contest')
+  @HttpCode(200)
+  @RequireShopPermission('payments.decide')
+  @ApiOperation({ summary: 'Contester le paiement (motif) : file « à vérifier » du support' })
+  async contestPayment(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.payments.decide(a.userId, this.shop(a), id, 'contest', dto.reason, meta);
+    return this.orders.getForShop(this.shop(a), id, apiBase(req));
+  }
+
   @Post(':id/cancel')
   @HttpCode(200)
   @RequireShopPermission('orders.prepare')
@@ -152,5 +195,25 @@ export class ShopOrdersController {
   async cancel(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @Req() req: Request) {
     await this.orders.cancelByShop(a.userId, this.shop(a), id, dto.reason.trim());
     return this.orders.getForShop(this.shop(a), id, apiBase(req));
+  }
+}
+
+/** Lot 7-C — File « à vérifier » des paiements (support), consultation journalisée. */
+@ApiTags('Administration')
+@Controller('admin/v1/payments')
+export class PaymentsAdminController {
+  constructor(private readonly payments: PaymentsService) {}
+
+  @Get('review')
+  @AdminRoute('payments.review')
+  queue(@CurrentAdmin() a: AdminContext, @ReqMeta() meta: RequestMeta) {
+    return this.payments.reviewQueue(a, meta);
+  }
+
+  @Post(':id/reviewed')
+  @HttpCode(200)
+  @AdminRoute('payments.review')
+  reviewed(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReviewNoteDto, @ReqMeta() meta: RequestMeta) {
+    return this.payments.markReviewed(a, id, dto.note.trim(), meta);
   }
 }

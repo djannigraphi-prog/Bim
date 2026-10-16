@@ -147,7 +147,7 @@ void main() {
     expect(find.text('Robe soirée à plumes'), findsOneWidget);
     expect(find.text('Stock : 3'), findsOneWidget);
     // 7-B : commandes à traiter, compteurs réels.
-    expect(find.text('2 à confirmer · 1 à préparer'), findsOneWidget);
+    expect(find.text('2 à confirmer · 1 à préparer · 1 paiement à confirmer'), findsOneWidget);
     await tester.tap(find.text('Live'));
     await tester.pumpAndSettle();
     expect(find.text('Bientôt disponible'), findsOneWidget);
@@ -308,7 +308,7 @@ void main() {
 class _FakeShopOrders extends ShopOrdersApi {
   _FakeShopOrders() : super(_client());
   @override
-  Future<({int toConfirm, int toPrepare, int ready})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 0);
+  Future<({int toConfirm, int toPrepare, int ready, int payments})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 0, payments: 1);
 }
 
 class _LockedShop extends _FakeShop {

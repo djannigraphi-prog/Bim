@@ -202,6 +202,12 @@ class _OrderBody extends StatelessWidget {
         _line('Articles', formatFcfa(o.itemsTotalFcfa)),
         if (o.deliveryFeeFcfa != null) _line('Livraison', formatFcfa(o.deliveryFeeFcfa!)),
         _line('Total', formatFcfa(o.totalFcfa), bold: true, key: const ValueKey('order-total')),
+        if (o.payment != null) ...[
+          const SizedBox(height: BimSpacing.sm),
+          Text('Paiement : ${paymentStatusLabel(o.payment!.status)}', key: const ValueKey('payment-status'), style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (o.payment!.declaredReference != null) Text('Référence indiquée par le client : ${o.payment!.declaredReference}', style: theme.textTheme.bodySmall),
+          if (o.payment!.contestReason != null) Text('Motif : ${o.payment!.contestReason}', style: theme.textTheme.bodySmall),
+        ],
         if (o.endReason != null) ...[
           const SizedBox(height: BimSpacing.sm),
           Text('Motif : ${o.endReason}', key: const ValueKey('order-end-reason')),
@@ -296,7 +302,27 @@ class OrderScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderScreenState extends ConsumerState<OrderScreen> {
+  final _reference = TextEditingController();
   bool _busy = false;
+
+  @override
+  void dispose() {
+    _reference.dispose();
+    super.dispose();
+  }
+
+  Future<void> _declare(OrderDetail o) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(ordersApiProvider).declarePayment(o.id, reference: _reference.text.trim());
+      if (mounted) showBimSnack(context, 'Merci : la boutique va confirmer la réception.');
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      ref.invalidate(_orderProvider(o.id));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _cancel(OrderDetail o) async {
     final proposal = o.status == 'proposed';
@@ -364,6 +390,27 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                   Padding(padding: const EdgeInsets.only(top: BimSpacing.sm), child: Text('Proposition valable jusqu’au ${formatDateTimeFr(o.expiresAt!)}.', style: theme.textTheme.bodySmall)),
               ],
               actions: [
+                // 7-C : payer au numéro Mobile Money confirmé de la boutique, puis déclarer. L'app ne transfère rien.
+                if (o.can('declare_payment') && o.payment != null) ...[
+                  Container(
+                    key: const ValueKey('pay-instructions'),
+                    padding: const EdgeInsets.all(BimSpacing.md),
+                    decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outline), borderRadius: BorderRadius.circular(BimRadius.card)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Montant à payer : ${formatFcfa(o.payment!.amountFcfa)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        if (o.payment!.payoutPhone != null)
+                          Text('${operatorLabel(o.payment!.payoutOperator)} de la boutique : ${o.payment!.payoutPhone}', key: const ValueKey('shop-payout')),
+                        Text('Paie depuis ton application Mobile Money, puis indique-le ici. BIM ne fait aucun transfert et ne confirme rien à la place de la boutique.', style: theme.textTheme.bodySmall),
+                        TextField(key: const ValueKey('pay-reference'), controller: _reference, maxLength: 60, decoration: const InputDecoration(labelText: 'Référence de la transaction (facultatif)')),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: BimSpacing.sm),
+                  BimButton(key: const ValueKey('declare-payment'), label: 'J’ai payé', loading: _busy, onPressed: _busy ? null : () => _declare(o)),
+                  const SizedBox(height: BimSpacing.sm),
+                ],
                 if (o.can('accept')) BimButton(key: const ValueKey('order-accept'), label: 'Accepter la proposition', onPressed: _busy ? null : () => _accept(o)),
                 if (o.can('decline') || o.can('cancel')) ...[
                   const SizedBox(height: BimSpacing.sm),
@@ -405,13 +452,13 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
     super.dispose();
   }
 
-  Future<void> _act(String action, {String? reason, String? code, String? done}) async {
+  Future<void> _act(String action, {String? reason, String? code, int? amountFcfa, String? done}) async {
     setState(() {
       _busy = true;
       _codeError = null;
     });
     try {
-      await ref.read(shopOrdersApiProvider).act(widget.orderId, action, reason: reason, code: code);
+      await ref.read(shopOrdersApiProvider).act(widget.orderId, action, reason: reason, code: code, amountFcfa: amountFcfa);
       if (done != null && mounted) showBimSnack(context, done);
       _code.clear();
     } on ApiException catch (e) {
@@ -460,6 +507,24 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
                     decoration: InputDecoration(labelText: 'Code donné par le client', errorText: _codeError),
                   ),
                   BimButton(key: const ValueKey('shop-order-handover'), label: 'Valider le code et remettre', loading: _busy, onPressed: _busy ? null : () => _act('handover', code: _code.text.trim(), done: 'Commande remise')),
+                ],
+                // 7-C : espèces constatées au comptoir, puis décision (permission « confirmer ou contester un paiement »).
+                if (o.can('cash_received') && o.payment != null)
+                  BimButton(
+                    key: const ValueKey('shop-cash-received'),
+                    label: 'Espèces reçues : ${formatFcfa(o.payment!.amountFcfa)}',
+                    loading: _busy,
+                    onPressed: _busy ? null : () => _act('payment/cash', amountFcfa: o.payment!.amountFcfa, done: 'Espèces enregistrées'),
+                  ),
+                if (o.can('confirm_payment')) ...[
+                  BimButton(key: const ValueKey('shop-payment-confirm'), label: 'Confirmer le paiement reçu', loading: _busy, onPressed: _busy ? null : () => _act('payment/confirm', done: 'Paiement confirmé')),
+                  const SizedBox(height: BimSpacing.sm),
+                  BimButton(
+                    key: const ValueKey('shop-payment-contest'),
+                    label: 'Contester le paiement',
+                    variant: BimButtonVariant.outline,
+                    onPressed: _busy ? null : () => _withReason('payment/contest', 'Contester le paiement ?', 'Contester'),
+                  ),
                 ],
                 if (o.can('decline')) ...[
                   const SizedBox(height: BimSpacing.sm),

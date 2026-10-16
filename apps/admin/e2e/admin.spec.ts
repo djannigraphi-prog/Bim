@@ -243,6 +243,14 @@ test('tarifs de livraison (7-D) : commune, grille publiée en vigueur, simulatio
   await page.screenshot({ path: 'test-results/captures/tarifs-livraison.png' });
 });
 
+test('paiements à vérifier (7-C) : page accessible, aucune confirmation implicite annoncée', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Paiements à vérifier' }).click();
+  await expect(page.getByRole('heading', { name: 'Paiements à vérifier' })).toBeVisible();
+  await expect(page.getByText('Aucune confirmation implicite')).toBeVisible();
+  await expect(page.getByText('Aucun paiement à vérifier.')).toBeVisible();
+});
+
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Administrateurs' }).click();

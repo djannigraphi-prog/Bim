@@ -31,6 +31,7 @@ import { MessagingService } from '../messaging/messaging.service';
 import { SettingsService } from '../settings/settings.service';
 import { DeliveryMode } from '../tariffs/pricing';
 import { TariffsService } from '../tariffs/tariffs.service';
+import { PaymentsService } from './payments.service';
 
 type Order = typeof orders.$inferSelect;
 type Item = typeof orderItems.$inferSelect;
@@ -57,7 +58,7 @@ export interface FulfilmentInput {
 
 /** Statuts où la commande est encore ouverte côté client (code visible, annulation possible…). */
 const ACTIVE = ['confirmed', 'preparing', 'ready'] as const;
-const ENDED = ['declined', 'expired', 'cancelled', 'delivered'];
+const ENDED = ['declined', 'expired', 'cancelled'];
 const MAX_LINES = 20;
 
 const stateChanged = (status: string) =>
@@ -81,6 +82,7 @@ export class OrdersService {
     private readonly storage: StorageService,
     private readonly messaging: MessagingService,
     private readonly audit: AuditService,
+    private readonly payments: PaymentsService,
   ) {
     // Clé de chiffrement des codes de remise, dérivée du secret des codes (aucun nouveau secret à fournir).
     this.codeKey = createHmac('sha256', cfg.OTP_SECRET).update('bim-handover-code-key-v1').digest().toString('base64');
@@ -490,9 +492,10 @@ export class OrdersService {
     await this.ownedByShop(shopId, orderId);
     await this.expireIfDue(orderId);
     await this.db.transaction(async (tx) => {
-      await this.move(tx, orderId, ['pending_shop'], 'confirmed', { confirmedAt: new Date(), expiresAt: null }, { type: 'confirmed', actorType: 'shop', actorId: staffId });
+      const { after } = await this.move(tx, orderId, ['pending_shop'], 'confirmed', { confirmedAt: new Date(), expiresAt: null }, { type: 'confirmed', actorType: 'shop', actorId: staffId });
       await this.commitStock(tx, orderId, staffId);
       await this.createCode(tx, orderId);
+      await this.payments.open(tx, after);
     });
   }
 
@@ -506,9 +509,10 @@ export class OrdersService {
       const ful = await this.fulfilment(tx, o.shopId, input);
       const fee = ful.fee?.available ? ful.fee.feeFcfa : null;
       this.checkExpected(input.expectedTotalFcfa, o.itemsTotalFcfa + (fee ?? 0), o.itemsTotalFcfa, fee);
-      await this.move(tx, orderId, ['proposed'], 'confirmed', { ...this.feeColumns(ful), confirmedAt: new Date(), expiresAt: null }, { type: 'accepted', actorType: 'customer', actorId: customerId });
+      const { after } = await this.move(tx, orderId, ['proposed'], 'confirmed', { ...this.feeColumns(ful), confirmedAt: new Date(), expiresAt: null }, { type: 'accepted', actorType: 'customer', actorId: customerId });
       await this.commitStock(tx, orderId, customerId);
       await this.createCode(tx, orderId);
+      await this.payments.open(tx, after);
       await this.audit.log({ actorType: 'user', actorId: customerId, action: 'orders.proposal_accepted', targetType: 'order', targetId: orderId, ip: meta.ip, userAgent: meta.userAgent, metadata: { shopId: o.shopId } }, tx);
     });
   }
@@ -580,6 +584,7 @@ export class OrdersService {
       const { before } = await this.move(tx, orderId, ['proposed', 'pending_shop', 'confirmed'], to, { closedAt: new Date(), endedByType: 'customer', endedById: customerId, endReason: reason ?? null, endedFromStatus: cur.status, expiresAt: null }, { type: to === 'declined' ? 'proposal_declined' : 'cancelled', actorType: 'customer', actorId: customerId, data: reason ? { reason } : {} });
       await this.returnStock(tx, before, customerId);
       await tx.update(orderHandoverCodes).set({ status: 'cancelled' }).where(and(eq(orderHandoverCodes.orderId, orderId), eq(orderHandoverCodes.status, 'active')));
+      await this.payments.cancel(tx, orderId);
     });
   }
 
@@ -592,6 +597,7 @@ export class OrdersService {
       const { before } = await this.move(tx, orderId, ['proposed', 'confirmed', 'preparing', 'ready'], 'cancelled', { closedAt: new Date(), endedByType: 'shop', endedById: staffId, endReason: reason, endedFromStatus: cur.status, expiresAt: null }, { type: cur.status === 'proposed' ? 'proposal_withdrawn' : 'cancelled', actorType: 'shop', actorId: staffId, data: { reason } });
       await this.returnStock(tx, before, staffId);
       await tx.update(orderHandoverCodes).set({ status: 'cancelled' }).where(and(eq(orderHandoverCodes.orderId, orderId), eq(orderHandoverCodes.status, 'active')));
+      await this.payments.cancel(tx, orderId);
     });
   }
 
@@ -706,12 +712,13 @@ export class OrdersService {
       confirmedAt: o.confirmedAt,
       readyAt: o.readyAt,
       deliveredAt: o.deliveredAt,
-      ended: ENDED.includes(o.status) && o.status !== 'delivered' ? { byType: o.endedByType, reason: o.endReason, fromStatus: o.endedFromStatus, at: o.closedAt } : null,
+      ended: ENDED.includes(o.status) ? { byType: o.endedByType, reason: o.endReason, fromStatus: o.endedFromStatus, at: o.closedAt } : null,
       // Code de remise : au client seulement, tant qu'il peut servir. Jamais à la boutique.
       handoverCode: party === 'customer' && code?.status === 'active' && (ACTIVE as readonly string[]).includes(o.status) ? decryptBytes(Buffer.from(code.codeEncrypted, 'base64'), this.codeKey).toString() : null,
       handoverCodeStatus: code ? code.status : null,
       events: events.map((e) => ({ type: e.type, actorType: e.actorType, fromStatus: e.fromStatus, toStatus: e.toStatus, at: e.createdAt, reason: (e.data as { reason?: string }).reason ?? null })),
-      actions: OrdersService.actions(o, party),
+      payment: await this.payments.view(o, party),
+      actions: [...OrdersService.actions(o, party), ...PaymentsService.actions(o, await this.payments.forOrder(o.id), party)],
     };
   }
 
@@ -778,7 +785,7 @@ export class OrdersService {
   /** « Commandes reçues » (boutique) : à traiter, en cours, terminées. */
   async listForShop(shopId: string, box: 'todo' | 'active' | 'done', cursor: string | undefined, apiBase: string) {
     await this.expireOwned(eq(orders.shopId, shopId));
-    const statuses = { todo: ['pending_shop', 'confirmed'], active: ['proposed', 'preparing', 'ready'], done: ['delivered', 'declined', 'expired', 'cancelled'] }[box];
+    const statuses = { todo: ['pending_shop', 'confirmed'], active: ['proposed', 'preparing', 'ready', 'delivered'], done: ['completed', 'declined', 'expired', 'cancelled'] }[box];
     if (!statuses) throw Errors.validation({ fields: { box: ['todo, active ou done.'] } });
     const rows = await this.db
       .select({ o: orders, customerName: users.fullName })
@@ -800,7 +807,7 @@ export class OrdersService {
     await this.expireOwned(eq(orders.shopId, shopId));
     const rows = await this.db.select({ status: orders.status, n: sql<number>`count(*)::int` }).from(orders).where(eq(orders.shopId, shopId)).groupBy(orders.status);
     const by = Object.fromEntries(rows.map((r) => [r.status, r.n]));
-    return { toConfirm: by.pending_shop ?? 0, toPrepare: (by.confirmed ?? 0) + (by.preparing ?? 0), ready: by.ready ?? 0 };
+    return { toConfirm: by.pending_shop ?? 0, toPrepare: (by.confirmed ?? 0) + (by.preparing ?? 0), ready: by.ready ?? 0, paymentsToConfirm: await this.payments.shopPendingCount(shopId) };
   }
 
   private async expireOwned(where: ReturnType<typeof eq>) {

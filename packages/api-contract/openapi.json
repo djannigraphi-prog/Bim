@@ -5928,6 +5928,45 @@
         ]
       }
     },
+    "/v1/orders/{id}/payment/declare": {
+      "post": {
+        "operationId": "OrdersController_declare",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclarePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "« J’ai payé » (Mobile Money, après la remise) : déclaration, jamais une confirmation",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/orders/{id}/cancel": {
       "post": {
         "operationId": "OrdersController_cancel",
@@ -6246,6 +6285,113 @@
         ]
       }
     },
+    "/v1/shop/orders/{id}/payment/cash": {
+      "post": {
+        "operationId": "ShopOrdersController_cash",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashReceivedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retrait en boutique : espèces reçues (constat visuel, montant attendu)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/payment/confirm": {
+      "post": {
+        "operationId": "ShopOrdersController_confirmPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmer le paiement reçu : la commande est terminée",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/payment/contest": {
+      "post": {
+        "operationId": "ShopOrdersController_contestPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Contester le paiement (motif) : file « à vérifier » du support",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
     "/v1/shop/orders/{id}/cancel": {
       "post": {
         "operationId": "ShopOrdersController_cancel",
@@ -6282,6 +6428,63 @@
         "summary": "Annuler (motif obligatoire) ou retirer une proposition",
         "tags": [
           "Espace marchand"
+        ]
+      }
+    },
+    "/admin/v1/payments/review": {
+      "get": {
+        "operationId": "PaymentsAdminController_queue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/payments/{id}/reviewed": {
+      "post": {
+        "operationId": "PaymentsAdminController_reviewed",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
         ]
       }
     },
@@ -8368,6 +8571,15 @@
           "expectedTotalFcfa"
         ]
       },
+      "DeclarePaymentDto": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Référence de la transaction saisie par le client (facultative, jamais vérifiée)"
+          }
+        }
+      },
       "OptionalReasonDto": {
         "type": "object",
         "properties": {
@@ -8442,6 +8654,28 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "CashReceivedDto": {
+        "type": "object",
+        "properties": {
+          "amountFcfa": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "amountFcfa"
+        ]
+      },
+      "ReviewNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
         ]
       },
       "AdminLoginDto": {

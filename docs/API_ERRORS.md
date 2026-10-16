@@ -24,6 +24,8 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `NOT_PICKUP` | 409 | 7-B : commande livrée ; le code se saisit à la livraison (7-F) |
 | `HANDOVER_CODE_INVALID` | 400 | 7-B : code de remise incorrect ; `details.remaining` |
 | `HANDOVER_CODE_BLOCKED` | 409 | 7-B : code bloqué après trop d'essais (`orders.handover_code_max_attempts`) |
+| `PAYMENT_ACTION_NOT_ALLOWED` | 409 | 7-C : action de paiement impossible maintenant (avant la remise, déjà décidé, espèces non constatées, mauvais moyen) |
+| `CASH_AMOUNT_MISMATCH` | 400 | 7-C : espèces enregistrées pour un autre montant que celui attendu (`details.expectedFcfa`) ; en cas d'écart, contester |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |
 | `PRODUCT_CONTENT_LOCKED` | 409 | L7-04 : nom, description et prix normal ne se modifient plus après la création ; rubrique, durée et variantes plus après la première publication ; créer une nouvelle fiche ; `details.fields` (liste des champs refusés) |
 | `REPUTATION_RESET_REQUIRED` | 409 | **Retiré (L7-04)** : n'est plus renvoyé ; `confirmReputationReset` est refusé (400) |

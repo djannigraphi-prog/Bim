@@ -187,6 +187,14 @@ attribution active** (index unique).
 
 ## 5. États du paiement [APPROUVÉ dans le principe, A1 étapes 4 à 7]
 
+> **Réalisé en 7-C pour le paiement de l'article au retrait en boutique** : registre `order_payments` (cinq
+> informations en colonnes distinctes ; « confirmé par le prestataire » impossible par contrainte de la base ; aucune
+> suppression), « J'ai payé » après la remise avec le numéro Mobile Money confirmé de la boutique, espèces constatées au
+> comptoir au montant attendu, décision de la boutique (permission `payments.decide`), commande « terminée » à la
+> confirmation, contestation avec motif, rappel et file « à vérifier » après `payments.shop_decision_reminder_days`
+> (3 j, provisoire), page d'administration « Paiements à vérifier » (`payments.review`, consultation journalisée).
+> Frais de livraison et espèces reçues par un livreur employé : avec 7-F.
+
 Deux paiements par commande livrée : **l'article** et **les frais de livraison**. Chacun porte **cinq informations
 distinctes, jamais fusionnées** (champs et événements séparés, pas un statut unique) :
 

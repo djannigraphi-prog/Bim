@@ -50,3 +50,15 @@ export class OptionalReasonDto {
 export class HandoverDto {
   @ApiProperty({ example: '1234' }) @IsString() @Length(1, 8) code!: string;
 }
+
+export class DeclarePaymentDto {
+  @ApiPropertyOptional({ description: 'Référence de la transaction saisie par le client (facultative, jamais vérifiée)' }) @IsOptional() @IsString() @Length(0, 60) reference?: string;
+}
+
+export class CashReceivedDto {
+  @ApiProperty() @IsInt() @Min(1) amountFcfa!: number;
+}
+
+export class ReviewNoteDto {
+  @ApiProperty() @IsString() @Length(3, 300) note!: string;
+}

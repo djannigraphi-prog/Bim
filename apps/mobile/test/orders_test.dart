@@ -20,7 +20,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -36,6 +36,7 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       handoverCodeStatus: code == null ? null : 'active',
       events: [OrderEvent(type: 'created', actorType: 'customer', at: DateTime.utc(2026, 10, 16, 9))],
       actions: actions,
+      payment: payment,
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
@@ -77,6 +78,12 @@ class _FakeOrders extends OrdersApi {
   Future<OrderDetail> order(String id) async => current;
 
   @override
+  Future<OrderDetail> declarePayment(String id, {String? reference}) async {
+    calls.add('declare $id ${reference ?? '-'}');
+    return current = _detail(status: 'delivered', actions: const [], payment: const OrderPayment(method: 'mobile_money', amountFcfa: 40000, status: 'declared_by_customer', declaredReference: 'WV-1'));
+  }
+
+  @override
   Future<OrderDetail> cancel(String id, {String? reason}) async {
     calls.add('cancel $id ${reason ?? '-'}');
     return current = _detail(status: 'cancelled', actions: const []);
@@ -92,8 +99,14 @@ class _FakeShopOrders extends ShopOrdersApi {
   Future<OrderDetail> order(String id) async => current;
 
   @override
-  Future<OrderDetail> act(String id, String action, {String? reason, String? code}) async {
-    calls.add('$action ${code ?? reason ?? ''}'.trim());
+  Future<OrderDetail> act(String id, String action, {String? reason, String? code, int? amountFcfa}) async {
+    calls.add('$action ${code ?? reason ?? amountFcfa ?? ''}'.trim());
+    if (action == 'payment/cash') {
+      return current = _detail(status: 'delivered', actions: const ['confirm_payment', 'contest_payment'], customer: 'Awa Koné', payment: const OrderPayment(method: 'cash', amountFcfa: 40000, status: 'cash_received_to_confirm'));
+    }
+    if (action == 'payment/confirm') {
+      return current = _detail(status: 'completed', actions: const [], customer: 'Awa Koné', payment: const OrderPayment(method: 'cash', amountFcfa: 40000, status: 'confirmed_by_shop'));
+    }
     if (action == 'handover' && code != '4821') {
       throw const ApiException(code: 'HANDOVER_CODE_INVALID', message: 'Code incorrect.', status: 400, details: {'remaining': 4});
     }
@@ -205,5 +218,39 @@ void main() {
     expect(shop.calls, ['handover 0000', 'handover 4821']);
     expect(find.text('Remise'), findsOneWidget);
     expect(find.byKey(const ValueKey('shop-order-handover')), findsNothing);
+  });
+
+  testWidgets('7-C client : numéro Mobile Money confirmé de la boutique, « J’ai payé » = déclaration à confirmer', (tester) async {
+    final api = _FakeOrders()
+      ..current = _detail(
+        status: 'delivered',
+        actions: const ['declare_payment'],
+        payment: const OrderPayment(method: 'mobile_money', amountFcfa: 40000, status: 'not_paid', payoutPhone: '+2250102030405', payoutOperator: 'wave'),
+      );
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    expect(find.text('Wave de la boutique : +2250102030405'), findsOneWidget);
+    expect(find.text('Paiement : À payer à la remise'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('pay-reference')), 'WV-1');
+    await tester.tap(find.byKey(const ValueKey('declare-payment')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['declare o1 WV-1']);
+    expect(find.text('Paiement : Déclaré par le client — à confirmer par la boutique'), findsOneWidget);
+    expect(find.byKey(const ValueKey('declare-payment')), findsNothing);
+  });
+
+  testWidgets('7-C boutique : espèces reçues au montant attendu, puis confirmation : commande terminée', (tester) async {
+    final shop = _FakeShopOrders()
+      ..current = _detail(status: 'delivered', actions: const ['cash_received'], customer: 'Awa Koné', payment: const OrderPayment(method: 'cash', amountFcfa: 40000, status: 'not_paid'));
+    await _pump(tester, const ShopOrderScreen(orderId: 'o1'), shop: shop);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('shop-cash-received')));
+    await tester.pumpAndSettle();
+    expect(find.text('Paiement : Espèces reçues par la boutique — à confirmer'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('shop-payment-confirm')));
+    await tester.pumpAndSettle();
+    expect(shop.calls, ['payment/cash 40000', 'payment/confirm']);
+    expect(find.text('Terminée'), findsOneWidget);
+    expect(find.text('Paiement : Confirmé par la boutique'), findsOneWidget);
   });
 }
