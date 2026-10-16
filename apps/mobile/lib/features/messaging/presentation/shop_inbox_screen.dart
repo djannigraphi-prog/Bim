@@ -133,12 +133,7 @@ class _ShopInboxScreenState extends ConsumerState<ShopInboxScreen> {
                     BimButton(label: 'Réessayer', variant: BimButtonVariant.outline, onPressed: _refresh),
                   ],
                   data: (page) => page.items.isEmpty
-                      ? _empty(theme, switch (_box) {
-                          'unread' => 'Tout est lu.',
-                          'marked' => 'Aucune conversation marquée.',
-                          'archived' => 'Aucune conversation archivée.',
-                          _ => 'Aucun message pour l’instant. Tes clients peuvent t’écrire depuis tes articles avec « Discuter ».',
-                        })
+                      ? _empty(theme, _emptyText(_box))
                       : [
                           for (final c in page.items)
                             ConversationTile(
@@ -161,6 +156,13 @@ class _ShopInboxScreenState extends ConsumerState<ShopInboxScreen> {
       ),
     );
   }
+
+  static String _emptyText(String box) => switch (box) {
+        'unread' => 'Tout est lu.',
+        'marked' => 'Aucune conversation marquée.',
+        'archived' => 'Aucune conversation archivée.',
+        _ => 'Aucun message pour l’instant. Tes clients peuvent t’écrire depuis tes articles avec « Discuter ».',
+      };
 
   List<Widget> _empty(ThemeData theme, String text) => [
         const SizedBox(height: BimSpacing.xl),

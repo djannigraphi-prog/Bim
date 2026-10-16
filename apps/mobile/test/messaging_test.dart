@@ -257,9 +257,15 @@ void main() {
     expect(find.text('Tous · 1'), findsOneWidget);
     expect(find.text('Non lus · 1'), findsOneWidget);
 
+    // Les onglets défilent horizontalement : on amène chacun à l'écran avant de le toucher.
+    await tester.ensureVisible(find.byKey(const ValueKey('inbox-tab-orders')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inbox-tab-orders')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Les commandes reçues arriveront ici'), findsOneWidget);
+    expect(find.byKey(const ValueKey('conversation-s1')), findsNothing);
+    await tester.ensureVisible(find.byKey(const ValueKey('inbox-tab-all')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inbox-tab-all')));
     await tester.pumpAndSettle();
 
