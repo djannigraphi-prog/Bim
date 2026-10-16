@@ -16,18 +16,22 @@ interface Entry {
 /** Journal d'audit, en lecture seule (la base refuse toute modification). */
 export function Audit() {
   const [items, setItems] = useState<Entry[]>([]);
-  const [next, setNext] = useState<string | null>(null);
+  // Page suivante : date ET identifiant du dernier élément affiché (aucune entrée sautée, audit défaut 4).
+  const [next, setNext] = useState<{ before: string; beforeId: string | null } | null>(null);
   const [action, setAction] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function load(before?: string) {
+  async function load(cursor?: { before: string; beforeId: string | null }) {
     const q = new URLSearchParams({ limit: '50' });
     if (action) q.set('action', action);
-    if (before) q.set('before', before);
+    if (cursor) {
+      q.set('before', cursor.before);
+      if (cursor.beforeId) q.set('beforeId', cursor.beforeId);
+    }
     try {
-      const r = await api<{ items: Entry[]; nextBefore: string | null }>(`/admin/v1/audit-logs?${q}`);
-      setItems((prev) => (before ? [...prev, ...r.items] : r.items));
-      setNext(r.nextBefore);
+      const r = await api<{ items: Entry[]; nextBefore: string | null; nextBeforeId?: string | null }>(`/admin/v1/audit-logs?${q}`);
+      setItems((prev) => (cursor ? [...prev, ...r.items] : r.items));
+      setNext(r.nextBefore ? { before: r.nextBefore, beforeId: r.nextBeforeId ?? null } : null);
       setError(null);
     } catch (e) {
       setError(errorText(e));

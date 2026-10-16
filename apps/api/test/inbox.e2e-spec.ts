@@ -22,7 +22,7 @@ describe('Centre de notifications (e2e)', () => {
   it('coffre ouvert, réponse du support et rappel envoyé apparaissent, du plus récent au plus ancien, avec leur lien', async () => {
     const u = await user();
     const other = await user();
-    expect((await h.http().get('/v1/me/notifications').set(u.auth).expect(200)).body).toEqual({ templatesVersion: 'v2', items: [], nextBefore: null });
+    expect((await h.http().get('/v1/me/notifications').set(u.auth).expect(200)).body).toEqual({ templatesVersion: 'v2', items: [], nextBefore: null, nextBeforeId: null });
     expect((await h.http().get('/v1/me/notifications/unread-count').set(u.auth).expect(200)).body).toEqual({ count: 0 });
 
     const p = (await h.http().post('/v1/projects').set(u.auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', durationDays: 30 }).expect(201)).body;

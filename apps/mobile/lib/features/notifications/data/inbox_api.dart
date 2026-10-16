@@ -45,15 +45,19 @@ class InboxItem {
 }
 
 class InboxPage {
-  const InboxPage({required this.items, required this.nextBefore});
+  const InboxPage({required this.items, required this.nextBefore, this.nextBeforeId});
   final List<InboxItem> items;
 
   /// Curseur de la page suivante (null = fin).
   final String? nextBefore;
 
+  /// Identifiant du dernier élément : avec [nextBefore], aucune notification de même date n'est sautée (audit, défaut 4).
+  final String? nextBeforeId;
+
   factory InboxPage.fromJson(Map<String, dynamic> j) => InboxPage(
         items: [for (final i in (j['items'] as List<dynamic>? ?? const [])) InboxItem.fromJson(i as Map<String, dynamic>)],
         nextBefore: j['nextBefore'] as String?,
+        nextBeforeId: j['nextBeforeId'] as String?,
       );
 }
 
@@ -62,8 +66,12 @@ class InboxApi {
   final ApiClient _api;
 
   /// [category] : null = Tout, « projects » = Projets.
-  Future<InboxPage> page({String? category, String? before}) async => InboxPage.fromJson(
-        await _api.get('/v1/me/notifications', query: {if (category != null) 'category': category, if (before != null) 'before': before}),
+  Future<InboxPage> page({String? category, String? before, String? beforeId}) async => InboxPage.fromJson(
+        await _api.get('/v1/me/notifications', query: {
+          if (category != null) 'category': category,
+          if (before != null) 'before': before,
+          if (before != null && beforeId != null) 'beforeId': beforeId,
+        },),
       );
 
   Future<int> unreadCount() async => ((await _api.get('/v1/me/notifications/unread-count'))['count'] as num?)?.toInt() ?? 0;

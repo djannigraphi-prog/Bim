@@ -91,7 +91,7 @@ export class InboxService {
     return rows[0]?.seenUntil ?? null;
   }
 
-  async list(userId: string, opts: { category?: InboxCategory; before?: Date; limit?: number }, now: Date = new Date()) {
+  async list(userId: string, opts: { category?: InboxCategory; before?: Date; beforeId?: string; limit?: number }, now: Date = new Date()) {
     const since = new Date(now.getTime() - INBOX_DAYS * 86_400_000);
     const limit = Math.min(Math.max(opts.limit ?? 30, 1), INBOX_PAGE_MAX);
     const [seen, offsets, rows] = await Promise.all([
@@ -103,8 +103,13 @@ export class InboxService {
                OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected') THEN 'support'
                         WHEN x.type IN ('post_liked', 'post_commented', 'new_follower') THEN 'social'
                         ELSE 'projects' END) = ${opts.category ?? null}::text)
-          AND (${opts.before ?? null}::timestamptz IS NULL OR x.at < ${opts.before ?? null}::timestamptz)
-        ORDER BY x.at DESC, x.id DESC
+          -- Page suivante : position (date à la milliseconde, identifiant) du dernier élément vu ; aucun élément de même
+          -- date n'est sauté (audit, défaut 4). Sans beforeId (anciennes versions de l'app) : comportement d'origine.
+          AND (${opts.before ?? null}::timestamptz IS NULL
+               OR (${opts.beforeId ?? null}::text IS NULL AND date_trunc('milliseconds', x.at) < ${opts.before ?? null}::timestamptz)
+               OR (${opts.beforeId ?? null}::text IS NOT NULL
+                   AND (date_trunc('milliseconds', x.at), x.id) < (${opts.before ?? null}::timestamptz, ${opts.beforeId ?? null}::text)))
+        ORDER BY date_trunc('milliseconds', x.at) DESC, x.id DESC
         LIMIT ${limit + 1}`),
     ]);
     const attempts = offsets?.value?.length ?? 1;
@@ -134,6 +139,7 @@ export class InboxService {
         };
       }),
       nextBefore: rows.rows.length > limit ? new Date(page[page.length - 1].at).toISOString() : null,
+      nextBeforeId: rows.rows.length > limit ? page[page.length - 1].id : null,
     };
   }
 

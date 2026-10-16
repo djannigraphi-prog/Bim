@@ -34,5 +34,10 @@ export class InboxQueryDto {
   @Type(() => Date)
   @IsDate()
   before?: Date;
+  @ApiPropertyOptional({ description: 'Identifiant de la dernière notification reçue (avec `before`, page suivante sans élément sauté)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  beforeId?: string;
   @ApiPropertyOptional({ minimum: 1, maximum: 50 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limit?: number;
 }

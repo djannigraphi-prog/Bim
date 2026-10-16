@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, ilike, inArray, isNull, lt, or, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
@@ -80,20 +80,24 @@ export class AdminService {
 
   // ------------------------------------------------------------------ Journal d'audit
 
-  async listAudit(q: { action?: string; actorId?: string; targetId?: string; before?: string; limit?: number }) {
+  async listAudit(q: { action?: string; actorId?: string; targetId?: string; before?: string; beforeId?: string; limit?: number }) {
     const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);
     const where: SQL[] = [];
     if (q.action) where.push(ilike(auditLogs.action, `${likeEscape(q.action)}%`));
     if (q.actorId) where.push(eq(auditLogs.actorId, q.actorId));
     if (q.targetId) where.push(eq(auditLogs.targetId, q.targetId));
-    if (q.before) where.push(lt(auditLogs.createdAt, new Date(q.before)));
+    // Page suivante : (date à la milliseconde, identifiant) du dernier élément vu ; rien n'est sauté (audit, défaut 4).
+    const ms = sql`date_trunc('milliseconds', ${auditLogs.createdAt})`;
+    if (q.before && q.beforeId) where.push(sql`(${ms}, ${auditLogs.id}) < (${new Date(q.before)}::timestamptz, ${q.beforeId}::uuid)`);
+    else if (q.before) where.push(sql`${ms} < ${new Date(q.before)}::timestamptz`);
     const rows = await this.db
       .select()
       .from(auditLogs)
       .where(where.length ? and(...where) : undefined)
-      .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+      .orderBy(desc(ms), desc(auditLogs.id))
       .limit(limit);
-    return { items: rows, nextBefore: rows.length === limit ? rows[rows.length - 1].createdAt.toISOString() : null };
+    const last = rows.length === limit ? rows[rows.length - 1] : null;
+    return { items: rows, nextBefore: last ? last.createdAt.toISOString() : null, nextBeforeId: last ? last.id : null };
   }
 
   // ------------------------------------------------------------------ Utilisateurs

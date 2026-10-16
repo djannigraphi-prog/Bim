@@ -26,6 +26,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   String? _category;
   final List<InboxItem> _items = [];
   String? _next;
+  String? _nextId;
   bool _loading = true;
   bool _loadingMore = false;
   Object? _error;
@@ -52,6 +53,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ..clear()
           ..addAll(page.items);
         _next = page.nextBefore;
+        _nextId = page.nextBeforeId;
         _loading = false;
       });
       // Affichées une fois avec leur état « non vu », puis marquées vues : la pastille de la cloche disparaît.
@@ -80,11 +82,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (next == null || _loadingMore) return;
     setState(() => _loadingMore = true);
     try {
-      final page = await _api.page(category: _category, before: next);
+      final page = await _api.page(category: _category, before: next, beforeId: _nextId);
       if (!mounted) return;
       setState(() {
         _items.addAll(page.items);
         _next = page.nextBefore;
+        _nextId = page.nextBeforeId;
       });
     } catch (_) {
       // La liste déjà affichée reste ; « Voir plus » peut être retouché.

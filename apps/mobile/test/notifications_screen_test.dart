@@ -40,11 +40,14 @@ class _FakeInbox extends InboxApi {
     _item('chest:1', 'chest_opened', 'Coffre de la semaine 1 ouvert pour « Abdos ». Continue comme ça !', const Duration(days: 2), unread: false, link: '/projects/p1'),
   ];
   String? next;
+  String? nextId;
+  final beforeIds = <String?>[];
   int failures = 0;
 
   @override
-  Future<InboxPage> page({String? category, String? before}) async {
+  Future<InboxPage> page({String? category, String? before, String? beforeId}) async {
     calls.add('page ${category ?? 'tout'} ${before ?? ''}'.trim());
+    beforeIds.add(beforeId);
     if (failures > 0) {
       failures--;
       throw ApiException.network;
@@ -53,7 +56,7 @@ class _FakeInbox extends InboxApi {
       return InboxPage(items: [_item('chest:0', 'chest_opened', 'Coffre ancien', const Duration(days: 20), unread: false)], nextBefore: null);
     }
     final list = category == null ? items : items.where((i) => i.category == category).toList();
-    return InboxPage(items: list, nextBefore: next);
+    return InboxPage(items: list, nextBefore: next, nextBeforeId: nextId);
   }
 
   @override
@@ -136,6 +139,20 @@ void main() {
     expect(_rich('Coffre ancien'), findsOneWidget);
     expect(find.text('PLUS ANCIEN'), findsOneWidget);
     expect(find.text('Voir plus'), findsNothing);
+  });
+
+  testWidgets('audit défaut 4 : « Voir plus » renvoie aussi l’identifiant du dernier élément (aucune notification sautée)', (tester) async {
+    final api = _FakeInbox()
+      ..next = '2026-10-13T18:00:00.000Z'
+      ..nextId = 'chest:1';
+    await _open(tester, api);
+    await tester.ensureVisible(find.text('Voir plus'));
+    await tester.pump();
+    await tester.tap(find.text('Voir plus'));
+    await tester.pump();
+    await tester.pump();
+    expect(api.calls.last, 'page tout 2026-10-13T18:00:00.000Z');
+    expect(api.beforeIds.last, 'chest:1');
   });
 
   testWidgets('aucune notification : message de Peni ; erreur réseau : message et nouvel essai', (tester) async {

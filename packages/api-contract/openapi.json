@@ -1471,6 +1471,15 @@
             }
           },
           {
+            "name": "beforeId",
+            "required": false,
+            "in": "query",
+            "description": "Identifiant de la dernière notification reçue (avec `before`, page suivante sans élément sauté)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "limit",
             "required": false,
             "in": "query",
@@ -4612,6 +4621,15 @@
             "name": "limit",
             "required": true,
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "beforeId",
+            "required": false,
+            "in": "query",
+            "description": "Identifiant de la dernière entrée affichée (avec `before`, page suivante sans entrée sautée)",
             "schema": {
               "type": "string"
             }

@@ -182,7 +182,7 @@ class _FakeInboxApi extends InboxApi {
   static final now = DateTime(2026, 10, 15, 18);
 
   @override
-  Future<InboxPage> page({String? category, String? before}) async => InboxPage(
+  Future<InboxPage> page({String? category, String? before, String? beforeId}) async => InboxPage(
         items: [
           InboxItem(id: 'r1', type: 'task_reminder', category: 'projects', sender: 'peni', text: 'C’est l’heure : Séance d’abdos. On y va ?', at: now.subtract(const Duration(minutes: 5)), unread: true, link: null),
           InboxItem(id: 's1', type: 'report_answered', category: 'support', sender: 'bim', text: 'L’équipe BIM a répondu à ton signalement.', at: now.subtract(const Duration(hours: 2)), unread: true, link: null),
