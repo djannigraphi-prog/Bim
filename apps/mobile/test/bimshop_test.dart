@@ -185,8 +185,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('order')));
     await tester.pump();
     expect(find.text('Choisis d’abord la taille ou le modèle.'), findsOneWidget);
-    // Le message disparaît (minuterie puis animation) avant de toucher de nouveau le bas de l'écran.
-    await tester.pump(const Duration(seconds: 5));
+    // Les messages temporaires (« Mis de côté », puis celui-ci) couvrent le bas de l'écran : on les retire avant de
+    // toucher de nouveau « Commander ».
+    ScaffoldMessenger.of(tester.element(find.byKey(const ValueKey('order')))).clearSnackBars();
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ChoiceChip, 'S'));
     await tester.pump();
