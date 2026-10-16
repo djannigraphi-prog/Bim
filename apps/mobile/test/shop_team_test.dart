@@ -81,6 +81,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('team-invite')));
     await tester.pumpAndSettle();
     expect(api.calls.last, 'invite koffi.yao');
+    // La nouvelle carte est en bas de la liste (construite à l'approche) : on y fait défiler l'écran.
+    await tester.scrollUntilVisible(find.text('@koffi.yao · invitation en attente'), 300, scrollable: find.byType(Scrollable).first);
     expect(find.text('@koffi.yao · invitation en attente'), findsOneWidget);
   });
 
