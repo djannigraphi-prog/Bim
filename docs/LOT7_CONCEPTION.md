@@ -1,326 +1,540 @@
 # Lot 7 — Commandes, paiements et livraisons : conception
 
-Version du 16/10/2026 (après le « complément final » du fondateur, 12 h 31). **Document de conception : aucun
-développement fonctionnel du lot 7 n'est autorisé à ce stade.** Aucun prestataire activé, aucune dépense, aucune
-transaction réelle.
+**Version 2 du 16/10/2026 (13 h 25)**, après les arbitrages A1 à A12 du fondateur et la nouvelle exigence sur la
+numérotation des articles. Document de conception : **aucun développement fonctionnel du lot 7, aucune migration,
+aucun prestataire activé, aucune dépense, aucune transaction réelle.** L'historique des versions est en fin de
+document (§19).
 
-Légende utilisée dans tout le document :
+Légende utilisée partout :
 
-- **[APPROUVÉ]** : règle décidée par le fondateur (source indiquée).
-- **[PROPOSÉ]** : proposition technique ou métier, en attente de validation.
-- **[ARBITRAGE]** : décision du fondateur nécessaire (numérotée A1, A2… en section 10).
-- **[NON VÉRIFIÉ]** : dépendance technique qui n'existe pas encore dans le dépôt ou n'a pas été éprouvée.
+- **[APPROUVÉ]** décision validée par le fondateur (source entre parenthèses) ;
+- **[PROPOSÉ]** proposition à valider ;
+- **[ARBITRAGE]** décision encore à prendre (liste en §16) ;
+- **[NON VÉRIFIÉ]** élément dont l'état réel n'est pas confirmé ou qui n'existe pas encore ;
+- **[JURIDIQUE]** point à faire vérifier juridiquement en Côte d'Ivoire.
 
-Sources : `DECISIONS.md` (F1-F4, F3 bis, F17, C1, C2), `docs/ANALYSE.md` §5, §6.1 et §8, étude de faisabilité et de
-fiabilité du 16/10/2026, règles proposées le 16/10/2026 (matin), complément final du 16/10/2026 (12 h 31).
-
----
-
-## 0. Principes et architecture
-
-**[APPROUVÉ]** (16/10/2026)
-
-- Un module **Commandes** unique pour le BimShop (« Commander ») et la messagerie (proposition dans une conversation de
-  boutique, lot 6-B). Jamais deux systèmes de commandes.
-- Un module **Livraisons** distinct, relié à la commande.
-- Un module **Paiements** séparé : l'article et les frais de livraison sont deux paiements distincts (Q39, F2).
-- États contrôlés côté serveur ; historique horodaté de chaque transition ; autorisation vérifiée à chaque action.
-- Séparation stricte entre **paiement déclaré**, **paiement confirmé par le bénéficiaire** et **paiement confirmé
-  techniquement par un prestataire**. Ce dernier niveau n'existe pas tant qu'aucun prestataire n'est intégré
-  (lot 8, soumis à accord) ; l'app ne l'affiche jamais avant.
-- **F3 bis** : seuls les livreurs **employés de la boutique concernée** encaissent des espèces, pour les commandes de
-  cette boutique. Les freelances (partenaires ou indépendants) **jamais**, même si le client et le livreur sont
-  d'accord. Vérifié côté serveur, testé spécifiquement.
-- BIM n'encaisse aucun paiement commercial (F4) : il enregistre.
-
-**Ce qui existe dans le dépôt (constaté)** : catalogue, variantes et stock calculé à partir des mouvements, avec un
-déclencheur qui refuse tout stock négatif sous verrou (`migrations/0022_catalog.sql`) ; boutiques et membres
-(`owner`, `staff`) ; tables `courier_accounts` et `courier_shop_partnerships` (lot 0, aucun code) ; espace livreur
-revérifié à chaque requête (`spaces.service.ts`, `auth.guard.ts`) ; messagerie des boutiques (6-B) ; worker
-minute par minute (`reminder-runner.ts`) ; centre de notifications lu dans les sources (T-028).
-**N'existent pas** : commandes, paiements, livraisons, adresses, tarifs de livraison, statut « Premium certifié »,
-abonnements, notifications sur le téléphone actives (Firebase non activé), envoi réel de SMS, prestataire Mobile Money,
-positions et distances.
+Sources : `DECISIONS.md` (F1-F4, F3 bis, F15, F17, C1, C2, T-010, T-028, L7-01, L7-02), `docs/ANALYSE.md` (§5, §6.1,
+§6.6, §8), arbitrages du fondateur du 16/10/2026 (13 h 25), et le code de la branche `main` (commit 711f2d3).
 
 ---
 
-## 1. Fonctionnement côté client
+## 1. Ce que le code contient réellement (vérifié le 16/10/2026)
 
-1. **Choisir** : depuis le BimShop (« Commander ») ou en acceptant une proposition du marchand dans la conversation.
-2. **Choisir le mode de livraison** [APPROUVÉ, complément §1] parmi les modes **réellement disponibles** :
-   - livraison **rapide** (si une disponibilité a été confirmée, §4) ;
-   - livraison **économique**, délai maximal annoncé de **2 jours** (seulement si une promesse tenable existe, §4) ;
-   - **retrait en boutique**, si le marchand le propose.
-3. **Voir avant de confirmer** [APPROUVÉ] : prix des articles, frais de livraison du mode choisi, délai estimé,
-   moyen et moment du paiement (scénario A ou B, §5), statut de la boutique et modalités de contestation (§6 du
-   complément). Les montants article et livraison sont **toujours affichés séparément**.
-4. **Confirmer** explicitement la commande. Le client **ne choisit jamais le livreur** [APPROUVÉ].
-5. Le **code de remise à 4 chiffres** est créé à la confirmation et visible **seulement** par le client
-   [APPROUVÉ] ; il ne le communique qu'après avoir examiné le colis.
-6. **Suivre** la commande dans l'app (l'état reste consultable même si une notification n'arrive pas).
-7. **Accepter ou refuser** toute modification (prix, délai, mode) présentée **avant** son application [APPROUVÉ] ;
-   sans accord, la modification n'a pas lieu.
-8. **À l'arrivée du livreur** : notification, examen du colis, puis communication du code ; paiement selon le
-   scénario (§5).
-9. **« J'ai reçu mon article »** : confirmation indépendante de celle du livreur. **Satisfaction** après réception
-   [PROPOSÉ : note de 1 à 5 et commentaire facultatif pour la boutique ; note du livreur interne, E11].
-10. **Contester** : refus du colis à la remise, ou contestation après remise dans le délai fixé (§7).
+| Élément | Constat | Fichier |
+| --- | --- | --- |
+| Articles et prestations | Identifiant interne `uuid` (v7). **Aucune référence publique**, aucun numéro lisible. Statuts `draft`, `published`, `archived`. **Jamais supprimés** par l'application : « Retirer » archive l'article, mais **efface ses photos du stockage**. | `database/schema/catalog.ts` ; `modules/catalog/merchant-catalog.service.ts` (`setStatus`) |
+| Variantes | Désactivées (`active = false`), jamais supprimées ; libellé unique par article. | `catalog.ts` ; `setVariants` |
+| Stock | Somme des mouvements ; motifs `adjustment`, `sale`, `return` déjà prévus ; déclencheur qui **verrouille la variante** et refuse tout stock négatif. | `migrations/0022_catalog.sql` |
+| Commandes, paiements, livraisons, évaluations, adresses, tarifs | **Absents** (aucune table, aucun service). | — |
+| Étoiles, avis, Gold | **Absents** du code ; seulement dans les maquettes et `ANALYSE.md`. | — |
+| Membres d'une boutique | Rôles `owner` et `staff` seulement, **aucune permission détaillée**. Seul le propriétaire est créé par l'application (ouverture de boutique) ; **aucun écran ni service n'ajoute d'employé** à ce jour. L'appartenance est revérifiée à chaque requête. | `schema/spaces.ts` ; `merchants.service.ts` ; `spaces.service.ts` ; `auth.guard.ts` |
+| Livreurs | Tables `courier_accounts` (types `independent`, `freelance`, `employed`) et `courier_shop_partnerships` (dont `can_collect_article_payment`), créées au lot 0, **jamais lues ni écrites** par le code. Espace livreur prévu, utilisable seulement avec un compte `active`. | `schema/spaces.ts` ; `spaces.service.ts` |
+| Réglages | `app_settings` avec statut de décision ; modification réservée à la permission `settings.write` (`super_admin`), **journalisée avec valeur avant et après**. | `admin.service.ts` ; `admin/permissions.ts` |
+| Journal d'audit | En écriture seule, garanti par un déclencheur de la base (T-010). | `audit` |
+| Âges | `age.min_registration` = 16 (provisoire) ; `age.min_coins_purchase` et `age.min_coins_withdrawal` = 18 (provisoires) ; `age.min_other_payments`, `age.min_merchant`, `age.min_courier` = **non fixés** (ouverture de boutique fermée d'ici là). Messagerie : un moins de 18 ans ne reçoit pas de message d'un compte qu'il ne suit pas (6-A). | migration des réglages ; `messaging.service.ts` |
+| Messagerie des boutiques | Conversations client ↔ boutique (6-B), types de message extensibles, texte neutre pour un type inconnu. | `schema/messaging.ts` |
+| Notifications | Centre de notifications lu dans les sources (T-028). **Notifications sur le téléphone désactivées** (`PUSH_PROVIDER=none`). **SMS réels absents** (`console`, `test`, `none`). | `config.ts` ; `delivery.service.ts` |
+| Paiement | **Aucun prestataire**, aucune interface ; numéro Mobile Money des boutiques confirmé par code (preuve de possession du numéro, pas d'une transaction). | `docs/EXTERNAL_SERVICES.md` |
+| Positions, distances, durées de trajet, zones | **Absentes**. Les boutiques ont une ville et une commune ; les personnes une ville. | `schema/spaces.ts`, `profiles` |
+| Tâches planifiées | Worker chaque minute, sans chevauchement (modèle réutilisable pour délais et expirations). | `reminder-runner.ts` |
 
-## 2. Fonctionnement côté marchand
+---
 
-1. **Confirmer la commande** (scénario A, étape 2) [APPROUVÉ]. Pour une proposition faite dans la messagerie, la
-   proposition du marchand vaut déjà son accord sur le contenu et le prix [PROPOSÉ] ; il lui reste à organiser la
-   livraison.
-2. **Préparer** puis **demander la livraison** dans le mode choisi par le client.
-3. **Sélectionner le livreur** [APPROUVÉ, complément §1] parmi la liste des livreurs **admissibles** calculée par le
-   serveur (§4) : mode, disponibilité, délai, prix applicable, autorisations et conditions de sécurité. Le serveur
-   enregistre **le livreur retenu, l'auteur de l'attribution et l'heure**.
-4. **Proposer une solution alternative** si aucun partenaire n'est disponible ; tout changement de prix plus élevé ou
-   de délai est soumis à l'accord du client [APPROUVÉ].
-5. **Confirmer ou contester la réception du paiement** (notification à la remise) [APPROUVÉ, scénario A étape 11].
-6. **Droits de l'équipe** [PROPOSÉ, règles du 16/10 matin] : le propriétaire fait tout et **seul** : change le numéro
-   Mobile Money, gère l'équipe et les livreurs employés, confirme la remise d'espèces par un livreur employé, annule
-   une commande déjà payée, demande la certification Premium. L'employé (vendeur) répond, propose, prépare, demande
-   la livraison et **sélectionne le livreur** [ARBITRAGE A9]. Chaque action enregistre son auteur.
+## 2. Règles de sécurité permanentes (toujours applicables)
 
-## 3. Fonctionnement côté livreur
+- **[APPROUVÉ, F3 bis, L7-02]** Seuls les livreurs **employés de la boutique concernée** peuvent recevoir le paiement de
+  l'article en espèces, pour le compte de cette boutique et selon les permissions prévues. Les **freelances
+  (partenaires ou indépendants) jamais**, même avec l'accord du client. Contrôle côté serveur. **Le champ
+  `can_collect_article_payment` n'est jamais utilisé comme autorisation d'espèces.**
+- **[APPROUVÉ]** BIM ne détient ni ne collecte les fonds commerciaux (F4) ; il enregistre.
+- **[APPROUVÉ]** Prix de l'article et frais de livraison toujours distincts (Q39, F2).
+- **[APPROUVÉ]** Séparation des modules et des statuts : commandes, livraisons, paiements, évaluations, incidents.
+- **[APPROUVÉ]** Aucune confirmation de paiement sur la seule base d'une notification, d'une déclaration du client ou
+  d'une capture d'écran ; le silence du marchand ne vaut jamais confirmation.
+- **[APPROUVÉ]** Le client ne choisit jamais le livreur ; un livreur n'impose jamais un tarif après confirmation.
+- **[APPROUVÉ]** Les notifications informent ; la source de vérité est l'état enregistré par le serveur.
+- **[APPROUVÉ]** Historique horodaté non réécrit ; actions sensibles attribuées à leur auteur.
+- **[PROPOSÉ]** Toute transition passe par un service unique : mise à jour conditionnelle
+  (`… WHERE statut = attendu RETURNING`), verrou de la commande, clé anti-doublon pour les créations ; une requête
+  tardive ou répétée reste sans effet.
 
-Catégories [APPROUVÉ] : **employé** de la boutique · **freelance partenaire** de la boutique · **freelance
-indépendant**. Elles se déduisent côté serveur d'une **relation avec la boutique de la commande** (emploi actif,
-partenariat actif, aucune), jamais du seul type du compte ni d'une option cochée par le marchand.
-[PROPOSÉ] Une table des relations livreur-boutique (`employment` ou `partnership`, au plus un emploi actif par
-livreur, acceptation par le livreur, journalisation) ; la colonne `can_collect_article_payment` (lot 0, inutilisée)
-n'est **jamais** utilisée pour les espèces.
+---
 
-1. **Disponibilité et capacité** : le livreur se déclare disponible, avec une zone (commune) et une capacité
-   (missions simultanées, [PROPOSÉ] 3 par défaut, réglable).
-2. **Recevoir une mission** sélectionnée par le marchand ; l'**accepter** ou la **refuser** (une attribution n'est
-   effective qu'après acceptation [PROPOSÉ] ; délai d'acceptation réglable).
-3. **Prendre le colis** (« colis pris en charge »).
-4. **« Je suis arrivé »** [APPROUVÉ] : heure d'arrivée, début du temps d'attente, notification au client.
-5. **Code** : le client le communique après examen ; le livreur le saisit, le serveur le valide (une seule fois).
-6. **Paiement** [APPROUVÉ] — libellé et action selon la catégorie et le moyen :
-   - **employé, espèces** : « Espèces reçues : X F » (déclaration du montant, trace, rapprochement) ;
-   - **freelance** : aucune action d'encaissement de l'article ; il voit le **statut** du paiement Mobile Money
-     (déclaré par le client, confirmé par la boutique) — jamais « vérifié » ;
-   - **frais de livraison d'un freelance** : payés au livreur en Mobile Money [PROPOSÉ, A3] ; il déclare la réception.
-7. **« Article remis au client »** [APPROUVÉ] : déclaration du livreur, qui ne remplace pas la confirmation du client.
-8. **Incidents** (§7) : client absent, refus, colis endommagé, impossibilité de terminer, abandon.
+## 3. Parcours complet d'une commande [APPROUVÉ, A1, sauf mention]
 
-## 4. Livraison rapide et livraison économique
+### 3.1 Avant la confirmation
+
+1. **Choix de l'article** : depuis le BimShop (« Commander ») ou dans une proposition du marchand faite dans la
+   conversation de boutique (6-B). Chaque ligne désigne un article ou une prestation **par sa référence BIM** (§10).
+2. **Mode de livraison** choisi par le client : rapide (si réellement disponible), économique (2 jours au plus, si la
+   promesse est tenable), retrait en boutique (si proposé) (L7-01).
+3. **Affichage avant confirmation** : prix de chaque ligne, frais de livraison calculés par la grille (§7), règle
+   d'attente acceptée (§7.3), délai estimé, moyen de paiement prévu, statut de la boutique, modalités de contestation.
+4. **Confirmation par le client.** [PROPOSÉ] Pour une commande du BimShop, la boutique confirme ensuite ; pour une
+   proposition faite dans la conversation, la proposition vaut confirmation de la boutique.
+
+### 3.2 Étape 1 — Commande confirmée
+
+- Le serveur **génère un code de remise à 4 chiffres**, **visible uniquement par le client**, **lié à cette commande
+  seulement**, **non réutilisable**, tentatives incorrectes **limitées** ; le code **n'est pas une preuve de paiement**.
+- [PROPOSÉ, technique] Le code n'apparaît jamais dans les journaux ; il est stocké chiffré (affichage au client) avec
+  une empreinte pour la vérification, comparé en temps constant ; **5 essais faux** bloquent le code (support).
+- Copie figée des lignes, du mode, des frais, de la grille tarifaire appliquée (version) et des conditions.
+
+### 3.3 Préparation et attribution (§8)
+
+Le marchand (ou un employé autorisé, §11) prépare, puis **sélectionne un livreur éligible** ; le serveur enregistre
+le livreur, l'auteur et l'heure. Le livreur accepte la mission (délai §12).
+
+### 3.4 Étape 2 — Arrivée
+
+« **Je suis arrivé** » : heure enregistrée par le serveur, **début du décompte d'attente** (§7.3), notification au
+client. Le client **examine l'article** avant d'accepter la réception.
+
+### 3.5 Étape 3 — Acceptation ou refus
+
+- **Acceptation** : le client communique son code ; le livreur le saisit ; le serveur le vérifie. Code correct →
+  événement « code validé » (une seule fois) et **le bouton de paiement apparaît chez le client**, selon le mode prévu.
+- **Refus** : le client doit **choisir un motif** — article incorrect, article endommagé, article incomplet, autre —
+  avec **précision obligatoire pour « autre »** [PROPOSÉ : facultative pour les autres motifs]. Le motif est enregistré
+  dans l'historique ; le refus ouvre un **incident** (§9) ; la commande **n'est jamais enregistrée comme livrée** ;
+  **aucune pénalité automatique**. Après un refus, la **clôture normale est impossible**.
+- [PROPOSÉ] Si le client n'a pas son téléphone, le livreur peut enregistrer le refus **au nom du client**, avec le
+  motif ; l'événement indique l'auteur réel (le livreur) et le client peut le contester.
+
+### 3.6 Étape 4 — Paiement électronique
+
+- Le bouton de paiement n'apparaît **qu'après validation du code**.
+- [NON VÉRIFIÉ] **Aucun prestataire n'est intégré** : le « paiement » consiste à afficher au client le **montant** et le
+  **numéro Mobile Money confirmé de la boutique**, puis à enregistrer sa **déclaration** « J'ai payé » (avec la
+  référence de transaction qu'il saisit, facultative). L'app **ne déclenche aucun transfert** et n'affiche jamais
+  « confirmé » à ce stade.
+- Quand un prestataire sera intégré (lot 8, sur accord), **seul un retour technique fiable du prestataire** permettra
+  le statut « confirmé par le prestataire ».
+- Le livreur **voit l'état du paiement** dans son application avant de clôturer.
+
+### 3.7 Étape 5 — Paiement en espèces (livreur employé uniquement)
+
+Le client remet l'argent ; le livreur employé **vérifie visuellement** le montant attendu et l'enregistre (« Espèces
+reçues : X F ») ; puis il clôture. Le serveur refuse cette action à tout livreur qui n'a pas, **au moment de l'action
+et dans la même opération en base**, un emploi actif auprès de la boutique de la commande.
+
+### 3.8 Étape 6 — Clôture de la livraison (obligatoire)
+
+Le livreur appuie sur « **Clôturer la livraison** ». Le serveur vérifie :
+
+- livraison attribuée **à ce livreur**, acceptée, non annulée, sans refus ni incident ouvert ;
+- arrivée enregistrée et **code validé** ;
+- paiement de l'article : **constaté visuellement** (espèces, livreur employé) **ou déclaré par le client** (Mobile
+  Money) **ou** confirmé par le prestataire (futur) ; pour un freelance, jamais d'espèces ;
+- frais de livraison : selon §6 (mode de règlement à arbitrer pour les freelances).
+
+Puis il enregistre l'**identité du livreur**, la **date et l'heure**, met la livraison à « clôturée par le livreur » et
+la commande à « livrée », et notifie le marchand. La clôture est la **déclaration du livreur** qu'il a remis l'article
+et fait ses vérifications ; elle **ne prétend pas** qu'un transfert électronique a été vérifié.
+
+### 3.9 Étape 7 — Marchand
+
+Notification « colis livré » (information seulement ; l'état reste consultable dans l'app). Le marchand **confirme ou
+conteste** le paiement ; chaque décision est enregistrée avec son auteur et l'heure. **Sans décision**, le paiement
+reste « à confirmer par la boutique » ; [PROPOSÉ] rappel au marchand puis file « à vérifier » du support après
+**3 jours** (réglable), **jamais de confirmation implicite**.
+
+### 3.10 Fin de commande
+
+[PROPOSÉ] Commande « **terminée** » quand : livraison clôturée par le livreur **et** paiement de l'article confirmé par
+la boutique (ou par le prestataire, plus tard) **et** aucun incident ouvert. Sinon : « livrée — paiement à confirmer »,
+« paiement contesté » ou « incident ».
+
+### 3.11 Retrait en boutique
+
+[PROPOSÉ] Même logique sans livreur : le client présente son code au comptoir, la boutique le saisit, le client paie
+(espèces reçues par la boutique ou Mobile Money déclaré), la boutique clôture la remise.
+
+---
+
+## 4. Cycles de vie distincts
+
+Chaque objet a son statut et son historique propres ; aucune transition de l'un ne modifie silencieusement un autre.
+
+**Commande** [PROPOSÉ] : `proposée` (conversation) · `en attente de la boutique` (BimShop) → `confirmée` → `en
+préparation` → `livraison demandée` → `en livraison` → `livrée` → `terminée`. Sorties : `refusée`, `expirée`,
+`annulée`, `incident`, `litige`. Une commande `annulée` ou `terminée` n'accepte plus aucune action de livraison ou de
+paiement (hors remboursement déclaré, si une règle le prévoit un jour).
+
+**Livraison** [PROPOSÉ] : `à attribuer` → `attribuée` (livreur, auteur, heure) → `acceptée` → `colis pris en charge` →
+`en route` (si disponible) → `livreur arrivé` → `code validé` → `clôturée par le livreur`. Sorties : `refusée par le
+client` (motif), `client absent`, `abandonnée`, `réattribution`, `retour en boutique`, `annulée`. **Une seule
+attribution active** (index unique).
+
+**Code de remise** [APPROUVÉ pour la création, l'unicité et la limite d'essais] : `créé` → `validé` (une fois) ;
+`bloqué` (essais épuisés) ; `annulé` (commande annulée) ; `recréé` par le support seulement (journalisé).
+
+**Paiement** : §5.
+
+---
+
+## 5. États du paiement [APPROUVÉ dans le principe, A1 étapes 4 à 7]
+
+Deux paiements par commande livrée : **l'article** et **les frais de livraison**. Chacun porte **cinq informations
+distinctes, jamais fusionnées** (champs et événements séparés, pas un statut unique) :
+
+| Information | Qui la produit | Valeurs | Remarques |
+| --- | --- | --- | --- |
+| 1. Déclaration du client | Le client (après code validé) | non déclaré · déclaré (heure, référence saisie facultative) | Jamais présentée comme une confirmation |
+| 2. Constat visuel du livreur | Livreur **employé** de la boutique, espèces seulement | non constaté · espèces reçues (montant, heure) | Refusé à tout freelance |
+| 3. Confirmation technique | Prestataire, par retour vérifié | non disponible · confirmé (référence prestataire) | **Toujours « non disponible » tant qu'aucun prestataire n'est intégré** [NON VÉRIFIÉ] |
+| 4. Décision du bénéficiaire | Boutique (article) ; boutique ou livreur selon §6 (frais) | en attente · confirmé · contesté (motif) | Auteur et heure ; le silence n'est jamais une confirmation |
+| 5. Échec ou annulation | Client, boutique, support | aucun · échoué · annulé | Ouvre un incident si la livraison est en cours |
+
+Un paiement appartient à **une seule commande** (contrainte de la base). Le statut affiché est **calculé** à partir de
+ces cinq informations, avec des libellés honnêtes (« déclaré par le client », « espèces reçues par le livreur »,
+« confirmé par la boutique », « contesté par la boutique »).
+
+**Paiement avant livraison** [APPROUVÉ, A7] : **ni développé ni activé** tant que les règles de remboursement,
+d'annulation, de litige et de responsabilité ne sont pas définies **et** qu'un mécanisme de paiement n'est pas
+réellement opérationnel. Une interface de paiement ne suffit pas.
+
+---
+
+## 6. Rémunération des livreurs et frais de livraison [APPROUVÉ, A3, sauf mention]
+
+| | Livreur employé de la boutique | Livreur indépendant ou partenaire (freelance) |
+| --- | --- | --- |
+| Frais de livraison | **Attribués à la boutique** (tranche C2) ; la boutique rémunère son employé selon son organisation | Rémunération selon **les règles de son partenariat** ; mode de règlement **défini et traçable** |
+| Article | Espèces possibles **pour le compte de la boutique**, selon les permissions | **Jamais d'espèces** ; Mobile Money au numéro de la boutique |
+| Automatisation | Aucune | **Aucun paiement Mobile Money automatisé** sans intégration réelle |
+
+**Points ouverts** [ARBITRAGE A3-b] :
+
+- Un **indépendant sans partenariat** n'a pas de « règles de partenariat » : quelle règle de rémunération lui
+  appliquer (la grille BIM du §7 ?) ?
+- **Qui paie le freelance et comment** : le client directement (Mobile Money au livreur, déclaré par le client,
+  confirmé par le livreur) ou la boutique selon l'accord de partenariat ? Dans le second cas, les frais payés par le
+  client reviennent-ils à la boutique ?
+- Le **prix payé par le client** (grille BIM, §7) peut-il différer de la **rémunération du livreur** (accord de
+  partenariat) ? Si oui, qui garde l'écart ? BIM ne détient aucun fonds : l'écart ne peut transiter par BIM.
+
+---
+
+## 7. Tarification des livraisons [APPROUVÉ dans le principe, A2]
+
+**Principe** : une grille configurable **inspirée** de la tarification au temps des services de course (durée du
+trajet, temps d'attente, mode). **BIM ne connaît pas et ne reproduit pas l'algorithme interne de Yango.**
+
+### 7.1 Formule [PROPOSÉ]
+
+```
+frais = arrondi_supérieur( max( minimum_mode ,
+          prise_en_charge_mode + prix_minute_mode × durée_estimée_minutes ) , pas_d_arrondi )
+      + frais d'attente éventuels (§7.3, selon la règle acceptée à la confirmation)
+```
+
+- Paramètres **par mode** (rapide, économique) : prise en charge, prix par minute, minimum, pas d'arrondi
+  (ex. 25 F), plafond d'attente. **Aucune valeur fixée dans le code.**
+- **Grilles versionnées** : chaque version publiée est **immuable**, datée, attribuée à l'administrateur qui l'a
+  publiée (journal d'audit) ; une nouvelle version ne s'applique qu'aux commandes confirmées après sa publication.
+- [PROPOSÉ] Permission d'administration dédiée `delivery_tariffs.write` (réservée au rôle principal, comme
+  `settings.write`), avec valeurs avant et après dans le journal.
+- **À la confirmation** : la version de grille, la durée estimée, le détail du calcul et le montant sont copiés dans la
+  commande ; **aucun supplément arbitraire ensuite** ; toute hausse exige le **consentement explicite** du client.
+
+### 7.2 Durée estimée du trajet [NON VÉRIFIÉ]
+
+BIM **ne calcule aujourd'hui ni distance, ni durée, ni position**, et n'a pas d'adresse de livraison. [PROPOSÉ] Sans
+service externe : une **table des durées estimées entre communes** (commune de la boutique → commune de livraison, par
+mode), saisie et tenue à jour par BIM dans l'administration ; une commune absente de la table rend la livraison
+indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire plus précis serait un **service externe**
+à autoriser. [ARBITRAGE A2-b] : qui saisit la table, avec quelles valeurs de départ.
+
+### 7.3 Temps d'attente [PROPOSÉ]
+
+- **Début** : heure serveur de « Je suis arrivé ».
+- **Attente gratuite** : oui, durée de la grille (ex. 5 min).
+- **Au-delà** : prix par minute d'attente de la grille, **plafonné** (le plafond ne dépasse pas le délai de « client
+  absent », §12).
+- **Fin** : validation du code, refus enregistré, déclaration « client absent », annulation ou ouverture d'un incident.
+- Les frais d'attente ne sont **pas un supplément arbitraire** : leur règle est affichée et acceptée **avant** la
+  confirmation ; leur montant est calculé par le serveur et affiché au client.
+- **Retards du livreur** : aucune incidence sur le client ; l'attente ne court que depuis l'arrivée déclarée.
+- **Incidents** : l'attente s'arrête à l'ouverture de l'incident.
+- [NON VÉRIFIÉ] L'arrivée est **déclarative** (pas de position) : un livreur pourrait déclarer son arrivée trop tôt.
+  [PROPOSÉ] Le client peut signaler « le livreur n'est pas là » ; l'attente facturable est alors suspendue et un
+  incident est ouvert. [ARBITRAGE A2-c] : facturer l'attente dès le lancement, ou l'enregistrer seulement (frais nuls)
+  tant que l'arrivée n'est pas vérifiable.
+
+### 7.4 Rapide et économique
 
 | | Rapide | Économique |
 | --- | --- | --- |
-| Priorité | La rapidité | Le coût ; délai **maximal annoncé de 2 jours** |
-| Livreurs | Employé de la boutique, partenaire disponible ou **freelance indépendant** si nécessaire [APPROUVÉ] | **Partenaires prioritaires** [APPROUVÉ] ; employé de la boutique [ARBITRAGE A4] ; indépendant seulement en solution alternative acceptée par le client |
-| Tarif | Selon la course et les règles de tarification applicables [APPROUVÉ] | Réduit, selon les accords commerciaux et offres de livraison valides ; **jamais un montant fixé en dur dans le code** [APPROUVÉ] |
-| Promesse | **Disponibilité confirmée avant de promettre** [APPROUVÉ] | Proposée **seulement** si un mécanisme tenable existe [APPROUVÉ] |
-| Organisation | Course immédiate | Planification : un partenaire peut regrouper des livraisons compatibles sans dépasser le délai de chacune |
+| Promesse | Proposée seulement si un livreur éligible est disponible pour tenir le délai | Délai maximal 2 jours, proposée seulement si un partenaire éligible a une capacité déclarée dans ce délai |
+| Tarif | Grille du mode rapide | Grille du mode économique ; tarif réduit selon les accords (A3-b) |
+| Organisation | Course immédiate | Un partenaire peut regrouper des livraisons compatibles sans dépasser le délai de chacune |
 
-**Prix connu avant confirmation** [APPROUVÉ] alors que **le livreur est choisi après** : le prix affiché doit donc
-venir d'une **règle de tarification ou d'une offre de livraison valide au moment de la confirmation**, et non d'un devis
-demandé après coup. [PROPOSÉ] :
+---
 
-- **Grilles de tarifs** par boutique, mode et zone (commune de départ → commune d'arrivée), alimentées par les accords
-  de partenariat (économique) et par une grille des courses rapides ; chaque grille a une période de validité.
-- Le prix affiché au client est **figé à la confirmation** (copie dans la commande).
-- Un livreur n'est **admissible** que s'il accepte ce prix (ou moins) pour ce mode et cette zone ; le client ne paie
-  jamais plus que le prix accepté sans nouvel accord. Ce que perçoit le livreur quand son tarif est inférieur :
-  [ARBITRAGE A2].
-- **Économique proposé seulement si** au moins un partenaire admissible a une capacité déclarée dans les 2 jours ; sinon
-  le mode n'apparaît pas (aucune fausse promesse).
-- **Rapide proposé seulement si** au moins un livreur admissible est disponible maintenant dans la zone ; la
-  disponibilité est revérifiée à la sélection. [NON VÉRIFIÉ] Sans notifications sur le téléphone ni position, la
-  « disponibilité confirmée » repose sur la déclaration du livreur et l'actualisation régulière de l'app.
+## 8. Priorité et sélection des livreurs [APPROUVÉ, A4 et A5]
 
-**Priorité des partenaires sans obligation absurde** [APPROUVÉ] : la liste présentée au marchand est ordonnée
-(partenaires admissibles d'abord pour l'économique) ; le serveur refuse un indépendant en économique tant qu'un
-partenaire admissible existe, sauf **motif enregistré** (délai, indisponibilité constatée) [PROPOSÉ, ARBITRAGE A5].
-Un partenaire indisponible ou incapable de tenir le délai n'est **pas admissible**, donc jamais imposé.
+- Le **marchand choisit** le livreur parmi les **livreurs éligibles calculés par le serveur** (mode, disponibilité,
+  capacité, délai, autorisations, sécurité). Le serveur contrôle l'éligibilité et les permissions à la sélection.
+- **Rapide** : partenaires **toujours prioritaires** sur les indépendants, compte tenu de la disponibilité et de
+  l'éligibilité ; aucun délai annoncé qu'aucun livreur disponible ne peut tenir.
+- **Économique** : partenaires prioritaires ; si un partenaire éligible est disponible et que le marchand en choisit un
+  autre, **un motif est obligatoire** et enregistré. L'exception ne lève **aucune** règle de sécurité ni restriction
+  d'espèces.
+- **Livreur employé de la boutique** [ARBITRAGE A4-b] : les arbitrages ne le placent pas. [PROPOSÉ] Sélectionnable dans
+  les deux modes, **avant** les partenaires (il travaille pour la boutique) ; sa sélection ne demande pas de motif.
+- **Priorité Premium des livreurs (F17)** : seulement à l'intérieur d'une même catégorie [PROPOSÉ].
+- **Retirés** : client choisissant un livreur ; devis libre d'un livreur après confirmation ; paliers automatiques.
 
-**Priorité Premium des livreurs (F17)** : uniquement à l'intérieur d'une même catégorie admissible [PROPOSÉ].
+---
 
-## 5. Règles de paiement
+## 9. Incidents [APPROUVÉ : principes A1, A8 ; PROPOSÉ : tableau]
 
-**Statuts d'un paiement** (article et frais de livraison, chacun le sien) [APPROUVÉ dans le principe] :
-`non dû` → `dû` → `déclaré` (par le client, ou par le livreur employé pour des espèces) → `confirmé par le
-bénéficiaire` (boutique pour l'article, livreur pour ses frais) → *(lot 8, si un prestataire est intégré)* `confirmé
-par le prestataire` ; et `contesté`, `échoué`, `annulé`, `remboursement déclaré`, `remboursement confirmé`.
-Un paiement est rattaché à **une seule commande** (contrainte de la base) ; une preuve affichée sur le téléphone du
-client n'est **jamais** une confirmation technique [APPROUVÉ].
+Aucun frais d'annulation, remboursement ou pénalité automatique sans règle commerciale explicite (A8). Chaque incident
+enregistre : auteur, heure, motif, **état de la livraison au moment de l'incident**, pièces éventuelles. Le support agit
+avec une permission dédiée, chaque consultation est journalisée.
 
-### Scénario A — boutique ordinaire : paiement à la réception [APPROUVÉ]
-
-Commande confirmée par le client → confirmée par la boutique → livreur sélectionné → course → arrivée → notification
-au client → examen du colis → **code** (accepte la remise) → **paiement** → événements de remise → notification à la
-boutique, qui **confirme ou conteste** le paiement.
-
-| Livreur | Article | Frais de livraison |
-| --- | --- | --- |
-| Employé de la boutique | Espèces (déclarées par l'employé, montant comparé à celui déclaré par le client, puis remise d'argent confirmée par le propriétaire) **ou** Mobile Money au numéro confirmé de la boutique | Selon A3 (tarif de la boutique, revenant à la boutique si C2 est tranché ainsi) |
-| Freelance partenaire ou indépendant | **Mobile Money uniquement**, au numéro confirmé de la boutique ; **jamais d'espèces** | Mobile Money au livreur [PROPOSÉ, A3] |
-| Retrait en boutique | Sur place, déclaré par la boutique | Sans objet |
-
-**Point de vigilance majeur** [ARBITRAGE A1] : dans l'ordre approuvé, le code (acceptation) précède le paiement. Avec un
-freelance, si le colis est laissé au client avant que le paiement Mobile Money soit **au moins déclaré**, la boutique
-supporte seule le risque de non-paiement. [PROPOSÉ] : le livreur ne déclare « Article remis » qu'après validation du
-code **et** déclaration du paiement par le client ; il attend la confirmation de la boutique pendant un délai court
-réglable (ex. 10 min) ; sans réponse de la boutique, il remet le colis et la commande passe « paiement à confirmer »
-(jamais « réussie ») — ou bien la boutique peut exiger d'attendre sa confirmation.
-
-### Scénario B — boutique Premium certifiée : paiement avant livraison [APPROUVÉ]
-
-Proposé **uniquement** si le serveur reconnaît la boutique comme Premium certifiée (§6) et si l'option est activée.
-Le client accepte conditions et montant total → paie par le parcours externe autorisé (Mobile Money au numéro confirmé
-de la boutique ; BIM ne reçoit rien, F4) → le paiement est enregistré au niveau réellement disponible (`déclaré`, puis
-`confirmé par la boutique`) → livraison → examen → code. **Aucun second paiement** n'est demandé à la livraison.
-[NON VÉRIFIÉ] « Confirmé par le prestataire » exige une intégration (lot 8) ; avant cela, l'app affiche « confirmé par
-la boutique » au mieux. **Livraison échouée après paiement anticipé** : modalités à définir avant la mise en
-production [ARBITRAGE A7] ; aucun remboursement automatique.
-
-## 6. Cycles de vie distincts
-
-Chaque objet a son propre statut et son propre historique ; aucune transition de l'un ne modifie silencieusement un
-autre. Les transitions sont listées dans le code et vérifiées par des mises à jour conditionnelles
-(`… WHERE statut = attendu RETURNING`), ce qui rend toute requête tardive ou répétée sans effet.
-
-**Commande** [PROPOSÉ] : `proposée` (messagerie) ou `en attente de la boutique` (BimShop) → `confirmée` (les deux
-accords ; code créé) → `en préparation` → `livraison demandée` → `en livraison` → `remise` → `terminée`.
-Sorties : `refusée`, `expirée`, `annulée` (avant remise seulement), `incident`, `litige`. Une commande `annulée` ou
-`terminée` n'accepte plus aucune action de livraison ou de paiement (hors remboursement déclaré).
-`terminée` exige : remise déclarée ou confirmée par le client **et** paiement de l'article au moins `confirmé par le
-bénéficiaire` (ou litige clos) — sinon `incident` ou `à vérifier`, jamais `terminée`.
-
-**Paiement** : voir §5.
-
-**Livraison** [PROPOSÉ] : `demandée` → `attribuée` (livreur, auteur, heure) → `acceptée` → `colis pris` → `en route`
-(si disponible) → `arrivée` → `remise déclarée` → `close`. Sorties : `réattribution`, `client absent`, `refusée par le
-client`, `abandonnée`, `retour en boutique`, `annulée`. Une seule attribution active (index unique de la base).
-
-**Code de remise** [APPROUVÉ pour la création à la confirmation] : `créé` → `validé` (une seule fois) ; `bloqué` après
-5 essais faux [PROPOSÉ] ; `annulé` si la commande l'est ; `recréé` par le support seulement (journalisé). Le code
-n'est **jamais** une preuve de paiement. [PROPOSÉ, technique] Le serveur ne garde pas le code en clair dans les
-journaux ; il est affiché au client seul (copie chiffrée ou valeur dérivée d'un secret serveur), comparé en temps
-constant, tentatives limitées.
-
-## 7. Incidents
-
-Aucun remboursement automatique ni pénalité financière sans règle commerciale explicite [APPROUVÉ]. Chaque incident
-crée un événement horodaté (auteur, motif, pièces éventuelles) ; les anciens événements ne sont jamais remplacés.
-Le support agit avec une permission dédiée, chaque consultation est journalisée. [PROPOSÉ] pour chaque cas :
-
-| Incident | Déclaré par | Statut appliqué | Notifiés | Reste possible | Bloqué |
+| Incident | Déclaré par | Statuts appliqués | Notifiés | Reste possible | Bloqué |
 | --- | --- | --- | --- | --- | --- |
-| Client absent | Livreur, après « Je suis arrivé » + délai d'attente (15 min proposé) | Livraison `client absent` ; commande `incident` | Client, boutique | Nouvelle tentative convenue, retour en boutique | Validation du code, déclaration de remise |
-| Colis non conforme, refusé | Client (ou livreur pour lui) avant le code | Livraison `refusée par le client` ; commande `incident` | Boutique, livreur | Retour en boutique, nouvelle proposition (accord du client) | Code, paiement à la réception |
-| Colis endommagé | Client ou livreur | Commande `incident` | Boutique, livreur, client | Refus ou acceptation avec réserve enregistrée | Clôture automatique |
-| Client a payé, boutique ne retrouve pas la transaction | Boutique (contestation) | Paiement `contesté` ; commande `à vérifier` | Client, livreur, support | Pièces des deux parties, nouvelle confirmation de la boutique | Passage à `terminée` |
-| Preuve que le livreur ne peut pas vérifier | Livreur | Paiement `déclaré` seulement | Boutique | Confirmation de la boutique, attente bornée (A1) | Statut « confirmé » par le livreur freelance |
-| Paiement échoué | Client ou boutique | Paiement `échoué` | Les trois | Nouveau paiement, annulation avant remise | Remise déclarée « payée » |
-| Livreur ne peut pas terminer | Livreur | Livraison `abandonnée` → `réattribution` ou `retour` | Boutique, client | Réattribution par le marchand | Clôture |
-| Boutique ne répond pas à une confirmation | Système (délai réglable) | Paiement reste `déclaré` ; commande `à vérifier` | Boutique (rappel), support | Confirmation tardive de la boutique, support | Aucune confirmation implicite |
-| Livreur abandonne une course | Livreur ou système (délai dépassé) | Attribution close ; livraison `réattribution` | Marchand, client | Nouvelle sélection (le mode et le prix acceptés restent) | Toute hausse sans accord du client |
-| Annulation avec livreur en route | Client ou boutique selon les règles | Commande `annulée` ; livraison `retour en boutique` | Livreur, autre partie | Retour du colis ; frais engagés [ARBITRAGE A8] | Code, remise, paiement de l'article |
-| Code incorrect ou refusé par le client | Système (essais) ou livreur | Code `bloqué` après 5 essais ; commande `incident` | Client, support | Recréation par le support, nouvelle tentative | Remise déclarée sans code |
-| Contestation après remise | Client ou boutique, dans le délai (7 jours proposé) | Commande `litige` | L'autre partie, support | Pièces, échanges, décision du support enregistrée | Effacement de l'historique |
+| Refus de l'article (motif obligatoire) | Client (ou livreur pour lui, §3.5) | Livraison `refusée par le client` ; commande `incident` | Boutique, livreur | Retour en boutique ; nouvelle proposition avec accord du client | Code, paiement, clôture normale |
+| Colis endommagé | Client ou livreur | Commande `incident` | Les trois | Refus motivé ou acceptation avec réserve enregistrée | Clôture automatique |
+| Client absent | Livreur, après le délai d'attente (§12) | Livraison `client absent` ; commande `incident` | Client, boutique | Nouvelle tentative convenue ; retour | Code, clôture |
+| Livreur pas arrivé malgré « Je suis arrivé » | Client | Attente suspendue ; commande `incident` | Livreur, boutique, support | Reprise après vérification | Frais d'attente |
+| Paiement déclaré non retrouvé | Boutique (contestation) | Paiement `contesté` ; commande `paiement contesté` | Client, livreur, support | Pièces des deux parties ; nouvelle décision de la boutique | Passage à `terminée` |
+| Preuve non vérifiable par le livreur | Livreur | Paiement reste `déclaré` | Boutique | Clôture si les conditions §3.8 sont remplies ; décision de la boutique | Toute mention « confirmé » |
+| Paiement échoué | Client ou boutique | Paiement `échoué` | Les trois | Nouveau paiement ; retour | Clôture « payée » |
+| Livreur ne peut pas terminer / abandonne | Livreur ou système (délai) | Livraison `abandonnée` → `réattribution` ou `retour` | Marchand, client | Nouvelle sélection, même mode et même prix | Hausse sans accord du client |
+| Boutique sans réponse | Système (délai §12) | Paiement « à confirmer » ; file `à vérifier` | Boutique, support | Décision tardive de la boutique ; support | Confirmation implicite |
+| Annulation, livreur en route | Client ou boutique selon les règles | Commande `annulée` (auteur, heure, état de la livraison figé) ; livraison `retour en boutique` | Livreur, autre partie | Retour du colis | Code, clôture, paiement ; frais d'annulation (politique financière **à finaliser**, A8) |
+| Code incorrect ou refusé | Système (essais) ou livreur | Code `bloqué` après 5 essais ; commande `incident` | Client, support | Recréation par le support | Clôture sans code |
+| Contestation après livraison | Client ou boutique, dans le délai (§12) | Commande `litige` | L'autre partie, support | Échanges, pièces, décision du support enregistrée | Modification de l'historique |
 
-## 8. Notifications
+---
 
-[APPROUVÉ] Confirmation de commande, attribution du livreur, départ et progression (si disponibles), arrivée, rappel
-du paiement, déclaration du paiement, confirmation ou contestation par la boutique, remise, incidents et annulations.
+## 10. Références des articles et prestations [APPROUVÉ : règles 1 à 7 ; PROPOSÉ : réalisation]
 
-- Chaque notification est **liée à une commande identifiable** et n'est qu'une **information** : aucune action
-  financière ou de livraison n'est déclenchée par sa réception ; toute action passe par une requête authentifiée,
-  idempotente (clé anti-doublon, mise à jour conditionnelle) [PROPOSÉ].
-- L'état reste consultable dans l'app ; le centre de notifications lit les commandes à la source (T-028).
-- [NON VÉRIFIÉ] **Notifications sur le téléphone : Firebase n'est pas activé** (`PUSH_PROVIDER=none`). Sans elles,
-  l'arrivée du livreur et les attributions ne sont vues qu'en ouvrant l'app : **condition du lancement**, activation
-  soumise à l'accord du fondateur.
+**Constat** : un identifiant interne stable existe (`products.id`, uuid), mais **aucune référence publique**. Les
+articles ne sont jamais supprimés (archivage) et les variantes jamais effacées : une référence ne risque donc pas d'être
+réattribuée par suppression. **Aucune commande ni évaluation n'existe encore** : la référence peut être introduite sans
+reprise de données commerciales.
 
-## 9. Historique et données
+**Format proposé** : `BIM-000001`, `BIM-000002`… (6 chiffres minimum, 7 et plus au-delà de 999 999, jamais de remise à
+zéro). Un seul compteur pour les articles et les prestations (le type reste un champ distinct).
 
-- Événements horodatés et **non modifiables** pour la commande, chaque paiement, la livraison et le code : auteur
-  (personne, rôle, espace), action, valeurs, motif. Les corrections sont de nouveaux événements [APPROUVÉ].
-- Copie figée de ce qui a été accepté : articles, prix, mode, délai, frais, conditions de paiement.
-- Coordonnées de livraison visibles de la boutique et du livreur **attribué**, pendant la mission seulement [PROPOSÉ].
-- Comptes : un compte ayant des commandes, paiements ou livraisons ne peut pas être purgé ; suspension = plus
-  d'action, historique conservé.
-- Durées de conservation (commandes, adresses, déclarations d'espèces, pièces de litige) : **à définir** [ARBITRAGE
-  A11], minimisation des données.
+**Réalisation proposée (migration à créer, non appliquée)** :
 
-## 10. Tests prévus avant toute mise en production
+- séquence PostgreSQL dédiée ; colonne `products.reference` **unique, non nulle**, remplie par la base à la création
+  (`'BIM-' || lpad(nextval(...)::text, 6, '0')`) — jamais fournie par l'app ni par le marchand ;
+- **reprise des articles existants** dans l'ordre de création (`created_at`, `id`) ;
+- **déclencheur interdisant toute modification** de la référence ;
+- les numéros consommés par une transaction annulée ne sont pas réutilisés (trous possibles, acceptés).
+- [ARBITRAGE A13] Référence attribuée **à la création** (brouillons compris, plus simple et stable) [PROPOSÉ] ou à la
+  première publication (numérotation plus serrée).
 
-Tous les tests existants sont conservés ; aucun n'est affaibli. Tous les tests ci-dessous sont réalisables **sans
-paiement réel ni prestataire** (BIM enregistre, les livreurs sont un module interne).
+**Usages** : affichée au marchand (liste, fiche), sur la fiche publique, dans le bandeau de conversation, dans les
+lignes de commande, l'historique, les évaluations et l'administration ; **recherche exacte** par référence pour le
+marchand qui prépare une commande. Ajout dans les contrats API (champ supplémentaire, rétrocompatible).
 
-**Demandés par le fondateur** : client qui tente de choisir un livreur (refusé) ; marchand qui sélectionne un livreur
-admissible ; priorité des partenaires ; économique jamais plus cher sans accord ; boutique ordinaire qui tente le
-paiement anticipé (refusé) ; boutique Premium qui tente de contourner les conditions ; **freelance (partenaire et
-indépendant) qui tente de déclarer des espèces (refusé)** ; employé d'une autre boutique (refusé) ; code utilisable une
-seule fois ; paiement rattaché à une autre commande (refusé) ; confirmation de paiement inventée (refusée : seul le
-bénéficiaire confirme, jamais le client ni un freelance pour l'article) ; commande annulée puis requête tardive de
-remise (sans effet) ; notifications répétées sans double opération ; historique des incidents conservé.
+**Lignes de commande** : une ligne par article ; chaque ligne garde l'identifiant interne, la **référence**, le titre,
+le type, la variante (identifiant et libellé), la quantité, le **prix du catalogue au moment** et le **prix appliqué**,
+et une **copie de la photo principale** (l'archivage efface les photos du stockage). Une modification ultérieure de la
+fiche ne change pas la ligne.
 
-**Ajoutés** : doubles commandes (même clé anti-doublon, envois simultanés) ; doubles attributions (deux acceptations
-simultanées) ; survente (confirmations simultanées sur la dernière unité) ; confirmation d'une version de commande
-dépassée ; prix du catalogue modifié après la commande (sans effet) ; employé révoqué entre attribution et
-encaissement ; écart entre montants déclarés (espèces) ; code faux ou épuisé ; remise déclarée sans paiement déclaré
-(freelance) ; aucun statut « confirmé par le prestataire » sans prestataire ; accès croisés (client, boutique,
-employé, livreur non attribué, support journalisé) ; suspension pendant une livraison ; reprise après arrêt du worker ;
-non-régression complète (API, administration, Flutter, Android réel).
+**Contradiction** [ARBITRAGE A14] : l'étude du 16/10 (matin) prévoyait des **articles hors catalogue** dans les
+propositions de la messagerie (photo envoyée par le client, article vu dans un live). Ils n'ont **pas de référence**.
+[PROPOSÉ] Toute ligne doit avoir une référence : le marchand crée d'abord une fiche (éventuellement non publiée dans le
+BimShop) ; cela garde le rattachement des évaluations et la traçabilité.
 
-## 11. Contradictions restantes
+**Prix négocié** [ARBITRAGE A15] : écart autorisé entre prix du catalogue et prix appliqué (libre, plafonné, interdit
+au-dessus du prix catalogue ?).
 
-1. **Prix connu avant confirmation, livreur choisi après** (complément §1) **contre** devis du livreur choisi par le
-   client (règle du 16/10 matin, §7 de la demande initiale). → Proposition : grilles de tarifs valides (§4) ;
-   le devis libre du livreur est abandonné. A2.
-2. **Code avant paiement** (scénario A) **contre** protection de la boutique avec un freelance. → A1.
-3. **Livreur employé** : absent de la description des deux modes alors qu'il était premier dans l'ordre de priorité
-   initial. → A4.
-4. **« Premium certifié »** : le dépôt n'a ni abonnement Premium (lot 8) ni certification ; F17 et Q50 parlent d'un
-   Premium payant. Certification administrative seule, ou abonnement + certification ? → A6.
-5. **Frais de livraison d'un freelance** : F2 « payés au livreur à la livraison » sans moyen précisé ; F3 bis interdit
-   les espèces aux freelances « pour une commande BIM ». → A3 (Mobile Money au livreur proposé).
-6. **Frais d'un livreur employé** : C2 toujours ouvert.
-7. **Moment de la confirmation par la boutique** : pour une proposition faite dans la messagerie, la boutique a déjà
-   donné son accord ; double confirmation inutile. → proposé : la proposition vaut confirmation de la boutique.
-8. **Règles proposées le 16/10 matin** remplacées par ce complément : priorité des livreurs par paliers horaires
-   automatiques (remplacée par la sélection par le marchand), options « maintenant / plus tard » proposées par le
-   livreur (remplacées par les modes rapide / économique), « paiement avant expédition » au choix de toute boutique
-   (réservé aux boutiques Premium certifiées), code créé à l'attribution (créé à la confirmation).
+---
 
-## 12. Arbitrages nécessaires
+## 11. Permissions de l'équipe d'une boutique [APPROUVÉ, A9]
+
+- Un employé ne reçoit **aucun droit du propriétaire par défaut** ; le propriétaire accorde chaque permission ; contrôle
+  côté serveur ; actions sensibles attribuées et horodatées.
+- **Permissions distinctes** : consulter les commandes · préparer une commande · sélectionner un livreur · modifier les
+  paramètres de livraison · confirmer ou contester un paiement.
+- [PROPOSÉ] Permissions réservées au propriétaire : gérer l'équipe et ses permissions ; numéro Mobile Money ; relations
+  d'emploi et de partenariat avec les livreurs ; confirmer la remise d'espèces par un livreur employé.
+- [PROPOSÉ, technique] Table des permissions par membre (une ligne par permission accordée, auteur et date), journal
+  d'audit à chaque changement ; écran et service d'ajout d'employés (**inexistants aujourd'hui**).
+- **Cohérence avec l'existant** [ARBITRAGE A16] : aujourd'hui un membre `staff` (créé seulement en test, aucun écran
+  ne permet d'en ajouter) a accès au catalogue, aux offres et à la boîte de messages (6-B) sans permission détaillée.
+  [PROPOSÉ] Étendre le même modèle (gérer le catalogue, répondre aux messages, envoyer des offres) au moment où l'ajout
+  d'employés sera ouvert ; aucun lot validé n'est rouvert d'ici là.
+
+---
+
+## 12. Délais [PROPOSÉ, A10 : valeurs initiales à vérifier]
+
+Tous réglables dans `app_settings` (modification réservée à `settings.write`, journalisée avant / après, statut
+« provisoire ») ; lus par le worker minute par minute (précision d'une minute).
+
+| Réglage proposé | Valeur initiale | Rôle | Cohérence |
+| --- | --- | --- | --- |
+| `deliveries.mission_accept_minutes` | 5 min | Délai pour qu'un livreur accepte la mission choisie par le marchand ; sinon le marchand en choisit un autre | [NON VÉRIFIÉ] Sans notifications sur le téléphone, 5 min n'est réaliste que si le livreur a l'app ouverte |
+| `deliveries.client_absent_after_minutes` | 15 min | Après « Je suis arrivé », le livreur peut déclarer « client absent » | Doit être ≥ attente gratuite + plafond d'attente facturable |
+| `orders.dispute_window_days` | 7 jours | Contestation après livraison | — |
+| `orders.proposal_ttl_hours` | 24 h | Expiration d'une **proposition de commande** du marchand (messagerie) | **Pas de système d'offres de livraison** : il n'est pas retenu |
+| `payments.shop_decision_reminder_days` | 3 jours (nouveau) | Rappel, puis file « à vérifier » si la boutique ne décide pas | Jamais de confirmation implicite |
+
+---
+
+## 13. Statut Gold, étoiles, évaluations [APPROUVÉ : distinctions A6 ; ARBITRAGE : règles]
+
+- **Abonnement Premium d'un utilisateur** : **aucune certification administrative** (A6).
+- **Statut Gold d'un marchand** et **étoiles / évaluations** : notions distinctes ; Gold **jamais attribué
+  automatiquement par un abonnement** sauf règle validée plus tard.
+- **Contradiction** [ARBITRAGE A17] : `ANALYSE.md` (§5 et §6.6, Q50) indique « l'étoile Gold remplace les 5 étoiles pour
+  les marchands Premium » ; cette règle liait Gold à l'abonnement. À confirmer comme **remplacée**.
+- **Retiré** : la notion de « boutique Premium certifiée » de la version 1 (scénario B).
+- **Évaluations** [PROPOSÉ] : trois objets distincts — **article ou prestation** (rattaché à une ligne de commande, donc
+  à sa référence) ; **boutique** (rattachée à la commande) ; **livraison** (rattachée à la livraison, si retenue ; note
+  interne du livreur, E11). Éligibilité : commande `terminée` (ou livrée sans contestation en cours) du client lui-même,
+  une évaluation par ligne, délai limité ; jamais par un membre de la boutique ni un livreur de la commande ; signalement
+  et modération ; une mauvaise livraison ne baisse pas la note de l'article.
+- **À définir** [ARBITRAGE A17] : critères d'obtention de Gold ; maintien et retrait ; calcul des étoiles (moyenne
+  pondérée par le nombre d'avis proposée) ; prévention des avis frauduleux ; prise en compte des commandes contestées.
+
+---
+
+## 14. Données : conservation [PROPOSÉ, A11 ; JURIDIQUE pour toutes les durées]
+
+Principes : accès limité au besoin, traçabilité des consultations sensibles, minimisation, suppression ou anonymisation
+quand la durée est atteinte. Cadre à vérifier : loi ivoirienne n° 2013-450 sur la protection des données personnelles
+et autorité de régulation (ARTCI) ; obligations de conservation commerciales et comptables (OHADA) applicables aux
+marchands et éventuellement à BIM ; règles de preuve en cas de litige.
+
+| Catégorie | Contenu | Proposition (à vérifier) |
+| --- | --- | --- |
+| Comptes | Identité, coordonnées, préférences | Durée de vie du compte ; à la suppression, anonymisation, sauf éléments rattachés à des commandes ou litiges conservés pour la durée de ces derniers |
+| Historique des commandes | Lignes, prix, statuts, événements | Durée longue, liée aux obligations commerciales ; l'hypothèse de 10 ans (documents comptables OHADA) concerne les marchands et **doit être vérifiée** pour BIM |
+| Livraison | Adresse et téléphone du client, heures, livreur | Coordonnées visibles du livreur attribué pendant la mission seulement ; **effacées ou anonymisées après le délai de contestation et la clôture des litiges** ; heures et statuts gardés avec la commande |
+| Déclarations et preuves de paiement | Déclarations, constats, décisions, références saisies | Avec l'historique de la commande |
+| Incidents et contestations | Motifs, pièces, décisions | Jusqu'à la fin du litige, puis délai de prescription à déterminer |
+| Journaux de sécurité et d'administration | Audit (T-010), connexions | Durée à fixer ; écriture seule déjà garantie |
+
+Aucune position GPS n'est collectée (fonction inexistante).
+
+---
+
+## 15. Âges [PROPOSÉ, A12 ; JURIDIQUE]
+
+| Fonction | Règle actuelle (code) | Proposition | Contradiction ou conséquence |
+| --- | --- | --- | --- |
+| Accès à l'application | 16 ans (`age.min_registration`, provisoire) | Inchangé | — |
+| Messagerie | Moins de 18 ans : pas de message d'un compte non suivi (6-A) ; 16-17 ans peuvent écrire à une boutique (6-B, à valider) | Inchangé | Une boutique ne doit **jamais envoyer une proposition de commande** à un moins de 18 ans (contrôle serveur) |
+| Commande | Non fixé (`age.min_other_payments`) | 18 ans | Les 16-17 ans consultent le BimShop mais ne commandent pas ; bouton « Commander » expliqué |
+| Livreur | Non fixé (`age.min_courier`) | 18 ans | — |
+| Ouverture de boutique | Non fixé (`age.min_merchant`, ouverture fermée) | 18 ans | Rouvre l'ouverture des boutiques une fois validé |
+
+Les valeurs ne seront modifiées qu'après validation, par l'administration (journalisé), sans migration.
+
+---
+
+## 16. Points ouverts
+
+### 16.1 Arbitrages du fondateur
 
 | N° | Question | Proposition |
 | --- | --- | --- |
-| A1 | Avec un freelance, le livreur laisse-t-il le colis avant la confirmation du paiement par la boutique ? | Remise seulement après code + paiement déclaré ; attente bornée (10 min) de la confirmation, puis « paiement à confirmer » ; option boutique « attendre ma confirmation » |
-| A2 | Qui fixe les grilles de tarifs (boutique, livreurs partenaires dans leur accord, BIM) et que touche le livreur si son tarif est inférieur au prix affiché ? | Grille par accord de partenariat (économique) et grille de la boutique ou du réseau (rapide) ; le livreur reçoit le prix affiché accepté |
-| A3 | Frais de livraison d'un freelance : Mobile Money au livreur ? Et pour un employé (C2) : à la boutique ? | Oui / oui |
-| A4 | Place du livreur employé : prioritaire dans les deux modes ? | Sélectionnable dans les deux modes, avant les partenaires |
-| A5 | Économique : le serveur bloque-t-il un indépendant tant qu'un partenaire admissible existe, ou un motif suffit-il ? | Motif enregistré obligatoire |
-| A6 | Définition de « Premium certifié » : certification administrative (critères, durée, retrait) et lien avec l'abonnement Premium | Certification administrative distincte, attribuée et retirée par l'administration avec journal, critères publiés |
-| A7 | Livraison échouée après paiement anticipé : remboursement, nouvelle tentative, délais, preuve | À définir avant la production ; aucun automatisme |
-| A8 | Frais engagés quand une commande est annulée avec un livreur en route | Aucun frais facturé dans un premier temps ; incident enregistré |
-| A9 | L'employé (vendeur) peut-il sélectionner le livreur ? | Oui ; confirmation de remise d'espèces réservée au propriétaire |
-| A10 | Délais : acceptation d'une mission, attente du client, contestation après remise, expiration d'une proposition | 5 min, 15 min, 7 jours, 24 h (réglables) |
-| A11 | Durées de conservation | À fixer avec un avis juridique |
-| A12 | Âges : commander, être livreur, ouvrir une boutique (`age.min_merchant`, ouverture fermée d'ici là) | 18 ans pour les trois, après avis juridique |
+| A2-b | Table des durées entre communes : qui la saisit, valeurs de départ | Saisie par BIM dans l'administration ; commune absente = livraison indisponible |
+| A2-c | Frais d'attente facturés dès le lancement malgré une arrivée déclarative ? | Enregistrer l'attente, frais à 0 F au lancement |
+| A3-b | Rémunération et règlement des freelances (indépendants sans partenariat, payeur, écart prix client / rémunération) | Client paie directement le livreur en Mobile Money le montant de la grille ; déclaré par le client, confirmé par le livreur |
+| A4-b | Place du livreur employé | Avant les partenaires, sans motif |
+| A8 | Politique financière des annulations | À finaliser ; aucun frais au lancement |
+| A13 | Référence à la création ou à la publication | À la création |
+| A14 | Articles hors catalogue dans les propositions | Fiche obligatoire (éventuellement non publiée) |
+| A15 | Prix négocié par rapport au catalogue | Autorisé à la baisse seulement |
+| A16 | Permissions des employés pour catalogue, offres et messages | Même modèle, à l'ouverture de l'ajout d'employés |
+| A17 | Gold et étoiles : critères, maintien, retrait, calcul, fraude ; Q50 remplacée ? | À rédiger ; Q50 remplacée |
+| A18 | « J'ai reçu mon article » : bouton du client encore utile si la validation du code vaut acceptation ? | La validation du code vaut acceptation ; pas de second bouton |
+| A19 | Valeurs initiales des délais (§12) | Celles du tableau, provisoires |
+| — | 16-17 ans et boutiques (6-B) | Autorisé à écrire, pas à commander |
 
-## 13. Dépendances non vérifiées ou absentes
+### 16.2 Vérifications juridiques [JURIDIQUE]
 
-| Dépendance | État | Conséquence |
+Âges (commande, livreur, boutique) ; durées de conservation ; statut d'intermédiaire de BIM et paiement à la livraison
+(BCEAO, déjà prévu) ; encaissement d'espèces par des employés ; valeur probante des déclarations et du code ; règles de
+consommation (contestation, remboursement) ; données de livraison (ARTCI).
+
+### 16.3 Dépendances techniques
+
+| Dépendance | État | Effet |
 | --- | --- | --- |
-| Notifications sur le téléphone (Firebase) | Code présent, **désactivé** | Arrivée, attributions et rappels invisibles hors de l'app ; condition du lancement ; accord requis |
-| SMS réels | Fournisseurs `console`, `test`, `none` seulement | Numéros Mobile Money des boutiques et des livreurs non confirmables en production ; accord requis |
-| Prestataire Mobile Money | Absent (lot 8) | Aucun statut « confirmé par le prestataire » ; interface prévue pour l'ajouter sans refonte |
-| Position, distance, zones | Absentes | Disponibilité « rapide » déclarative ; zones par commune |
-| Abonnement Premium et certification | Absents | Scénario B impossible avant A6 et sa réalisation |
-| Espace livreur, vérification des livreurs | Espace prévu, aucun écran ni service | Étape 7-C ; réutilise le chiffrement des pièces du lot 5-A |
-| Version minimale de l'app | Non imposée | À ajouter avant 7-A (les anciennes versions affichent déjà un texte neutre pour les messages inconnus, 6-B) |
+| Notifications sur le téléphone | Désactivées, accord requis | Délais d'acceptation et arrivée invisibles hors de l'app ; **condition du lancement** |
+| SMS réels | Absents, accord requis | Numéros Mobile Money des boutiques et des livreurs non confirmables en production |
+| Prestataire Mobile Money | Absent (lot 8, accord requis) | Pas de « confirmé par le prestataire » ; pas de paiement avant livraison |
+| Durée de trajet, position | Absentes | Table des durées par commune ; arrivée déclarative |
+| Adresses de livraison | Absentes | À créer (7-B) avec commune obligatoire |
+| Ajout d'employés et permissions | Absents | À créer (7-A) |
+| Espace livreur, vérification | Espace prévu seulement | À créer (7-E), réutilise le chiffrement des pièces de 5-A |
+| Version minimale de l'app | Non imposée | À ajouter avant l'ouverture des commandes |
 
-## 14. Découpage proposé (inchangé dans son principe)
+---
 
-7-A Commandes (BimShop et messagerie, modes et prix figés, confirmation, code, stock) · 7-B Paiements déclaratifs ·
-7-C Espace livreur et relations emploi / partenariat · 7-D Livraisons (sélection par le marchand, admissibilité,
-grilles, incidents) · 7-E Espèces des employés et rapprochement · 7-F Satisfaction. Scénario B après A6.
-Lot 8 : prestataire Mobile Money et abonnements, sur accord.
+## 17. Découpage du développement (à autoriser)
+
+| Sous-lot | Contenu | Dépend de | Critères d'acceptation |
+| --- | --- | --- | --- |
+| **7-A Références et équipe** | Référence `BIM-…` (migration additive, reprise, immuabilité) ; ajout d'employés par le propriétaire ; permissions séparées ; version minimale de l'app | A13, A16 | Références uniques sous créations simultanées ; jamais modifiables (déclencheur testé) ; aucun écart après archivage ; affichées partout ; un employé sans permission est refusé sur chaque action (tests par permission) ; journal à chaque changement ; suite existante intacte |
+| **7-B Commandes** | Module Commandes unique (BimShop et proposition dans la conversation) ; lignes figées avec référence et photo copiée ; adresses avec commune ; modes et frais affichés avant confirmation ; confirmation, expiration 24 h, annulation (auteur, heure, état) ; code de remise ; stock `sale` / `return` ; carte de commande dans la conversation ; « Mes commandes » / « Commandes reçues » ; retrait en boutique ; notifications dans l'app ; âge 18 si validé | 7-A, 7-D (frais), A14, A15, A12 | Doubles commandes impossibles (clé anti-doublon, envois simultanés) ; survente impossible ; version dépassée refusée ; prix catalogue modifié sans effet ; proposition refusée à un moins de 18 ans ; code visible du seul client, lié à une commande ; requête tardive sur commande annulée sans effet |
+| **7-C Paiements** | Registre : article et frais ; cinq informations distinctes ; déclaration du client ; constat visuel par l'employé ; décision de la boutique ; rappels et file « à vérifier » ; interface prestataire « aucun » | 7-B | Freelance refusé pour les espèces (partenaire, indépendant, employé d'une autre boutique, employé révoqué) ; paiement rattaché à une autre commande refusé ; « confirmé par le prestataire » impossible sans prestataire ; silence de la boutique jamais compté comme confirmation ; notification répétée sans double opération |
+| **7-D Tarification** | Grilles versionnées par mode ; table des durées par commune ; calcul côté serveur ; attente ; écran d'administration avec permission dédiée | A2-b, A2-c | Aucun montant en dur ; grille publiée immuable ; calcul reproductible et figé dans la commande ; hausse impossible sans consentement ; commune absente = mode indisponible |
+| **7-E Livreurs** | Comptes livreurs, vérification (pièces chiffrées), relations emploi / partenariat (acceptées, au plus un emploi actif), disponibilité, capacité, commune ; âge 18 | A12, A3-b, F17 | Catégorie déduite de la relation avec la boutique de la commande, jamais du type du compte ni de `can_collect_article_payment` ; relation révoquée prise en compte immédiatement |
+| **7-F Livraisons** | Éligibilité calculée par le serveur ; sélection par le marchand ou employé autorisé ; priorité des partenaires et motif ; acceptation dans le délai ; arrivée ; attente ; code (essais limités, usage unique) ; refus motivé ; paiement ; clôture ; notifications dans l'app | 7-B, 7-C, 7-D, 7-E, A4-b | Client ne peut pas choisir de livreur ; livreur non éligible refusé ; motif exigé en économique ; une seule attribution active sous acceptations simultanées ; clôture refusée sans code, après refus, par un autre livreur ou sans condition de paiement ; code réutilisé refusé |
+| **7-G Incidents et support** | Incidents du §9 ; litiges ; file « à vérifier » ; consultation journalisée par le support | 7-F | Chaque incident conserve son historique ; aucune pénalité ni remboursement automatique ; état de la livraison figé à l'annulation |
+| **7-H Évaluations** | Avis article (par ligne et référence), boutique, livraison ; éligibilité ; modération | 7-F, A17 | Avis impossible sans expérience réelle ; un avis par ligne ; membres de la boutique exclus ; produit et livraison séparés |
+
+**Avant toute mise en production** (hors développement) : notifications sur le téléphone, SMS, vérifications
+juridiques (§16.2), validation des délais et des grilles, essais sur vrais téléphones. Le paiement avant livraison et
+tout prestataire Mobile Money relèvent du lot 8, sur accord.
+
+**Tests transverses** (tous réalisables sans paiement réel ni service externe) : ceux du complément du 16/10 (12 h 31),
+repris dans les critères ci-dessus ; plus accès croisés (client, boutique, employé selon permissions, livreur non
+attribué, support journalisé), suspension pendant une livraison, reprise après arrêt du worker, non-régression complète
+(API, administration, Flutter, Android réel). Aucun test existant n'est supprimé ni affaibli.
+
+---
+
+## 18. Vérification de cohérence avec les règles existantes
+
+| Règle existante | Décision du lot 7 | Cohérence |
+| --- | --- | --- |
+| F3 bis, `can_collect_article_payment` jamais utilisé | Espèces : employé de la boutique seulement | Cohérent, renforcé |
+| F4, BIM ne reçoit aucun paiement commercial | Paiement Mobile Money direct à la boutique ; aucun fonds via BIM | Cohérent ; à surveiller pour A3-b (écart prix / rémunération) |
+| F2, frais au livreur ; C2 ouvert | Employé : frais à la boutique ; freelance : selon partenariat | C2 **tranché** pour l'employé ; F2 précisé |
+| C1, paiement au marchand à la remise | Scénario standard : paiement après code, à la remise | Cohérent |
+| E11, note du livreur interne | Évaluation de la livraison distincte | Cohérent |
+| F17, priorité des livreurs Premium | Seulement dans une même catégorie | À confirmer |
+| Q50, Gold lié au Premium | Gold non lié automatiquement à l'abonnement | **Contradiction**, A17 |
+| T-010, journal en écriture seule | Historique non réécrit | Cohérent |
+| T-028, centre de notifications lu dans les sources | Notifications non source de vérité | Cohérent |
+| 6-A, protection des mineurs | Aucune proposition de commande à un mineur | Cohérent, ajout d'un contrôle |
+| Documents d'identité privés et chiffrés (5-A) | Pièces des livreurs | Même mécanisme proposé |
+
+---
+
+## 19. Historique des versions
+
+- **Version 1 (16/10/2026, 12 h 31)** : conception après le complément final (L7-01) ; scénario B « boutique Premium
+  certifiée » ; arbitrages A1 à A12 ouverts.
+- **Version 2 (16/10/2026, 13 h 25)** : arbitrages A1 à A12 intégrés (L7-02). Changements :
+  - **A1** : parcours détaillé ; refus motivé ; clôture obligatoire par le livreur ; cinq informations de paiement
+    distinctes. Remplace la proposition « attente bornée de la confirmation de la boutique avant remise ».
+  - **A2** : grille au temps (trajet, attente) ; remplace les « grilles par zone » de la version 1.
+  - **A3** : frais de l'employé à la boutique (C2 tranché) ; freelances selon leur partenariat ; points restants A3-b.
+  - **A4 / A5** : partenaires prioritaires dans les deux modes ; motif obligatoire en économique. La place de l'employé
+    reste à confirmer (A4-b).
+  - **A6 / A7** : « Premium certifié » **retiré** ; paiement avant livraison **suspendu** (ni développé ni activé) ;
+    Gold et étoiles distincts de l'abonnement (A17).
+  - **A8** : aucun frais d'annulation au lancement ; politique financière à finaliser.
+  - **A9** : permissions séparées accordées par le propriétaire.
+  - **A10** : délais conservés comme valeurs initiales ; l'« expiration d'une offre » s'applique aux propositions de
+    commande ; pas de système d'offres de livraison.
+  - **A11** : politique de conservation par catégorie, durées à vérifier.
+  - **A12** : 18 ans proposé pour commander, livrer, ouvrir une boutique.
+  - **Nouveau** : références `BIM-…` des articles et prestations, lignes de commande, rattachement des évaluations.

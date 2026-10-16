@@ -166,6 +166,42 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-02 — Lot 7 : arbitrages A1 à A12 et références des articles (16/10/2026, 13 h 25) · Fondateur · **décidé** (développement non autorisé)
+
+Détail, propositions restantes et arbitrages encore ouverts (A2-b à A19) : `docs/LOT7_CONCEPTION.md`, version 2.
+
+- **A1** : code de remise à 4 chiffres créé à la confirmation, visible du seul client, propre à la commande, essais
+  limités, jamais preuve de paiement ; « Je suis arrivé » ; examen de l'article ; acceptation par le code (le bouton de
+  paiement n'apparaît qu'ensuite) ou **refus avec motif obligatoire** (incident, jamais « livrée », aucune pénalité
+  automatique, clôture normale impossible) ; espèces seulement avec un livreur **employé** de la boutique (constat
+  visuel enregistré) ; **clôture obligatoire par le livreur** (identité et heure), notification au marchand qui
+  confirme ou conteste. Distincts dans les données : clôture du livreur, paiement déclaré par le client, constat visuel
+  du livreur, confirmation technique d'un prestataire, décision du marchand. Le silence du marchand ne vaut jamais
+  confirmation.
+- **A2** : frais de livraison calculés par une grille configurable **inspirée** de la tarification au temps (durée du
+  trajet, attente, mode), sans prétendre reproduire l'algorithme de Yango ; prix visible avant confirmation, figé à la
+  confirmation, hausse seulement avec consentement explicite.
+- **A3** : livreur employé : frais attribués à la boutique (**C2 tranché**), la boutique rémunère son employé ;
+  freelances : rémunération selon leur partenariat, règlement défini et traçable, jamais d'espèces pour l'article,
+  aucun Mobile Money présenté comme automatisé sans intégration.
+- **A4 / A5** : partenaires prioritaires sur les indépendants (rapide et économique), selon disponibilité et
+  éligibilité ; en économique, choisir un autre livreur qu'un partenaire éligible disponible exige un **motif
+  enregistré** ; le marchand choisit parmi les livreurs éligibles contrôlés par le serveur.
+- **A6 / A7** : pas de certification administrative des comptes utilisateurs Premium ; Gold et étoiles des marchands
+  distincts de l'abonnement, Gold jamais automatique par abonnement ; **paiement avant livraison ni développé ni
+  activé** tant que remboursement, annulation, litige, responsabilité et mécanisme réel ne sont pas en place.
+- **A8** : aucun frais d'annulation automatique ; auteur, heure et état de la livraison enregistrés ; politique
+  financière à finaliser.
+- **A9** : permissions séparées accordées par le propriétaire (consulter, préparer, sélectionner un livreur, paramètres
+  de livraison, confirmer ou contester un paiement) ; rien par défaut.
+- **A10** : 5 min, 15 min, 7 jours, 24 h conservés comme **valeurs initiales à vérifier**.
+- **A11** : conservation par catégorie de données, durées à vérifier juridiquement.
+- **A12** : 18 ans proposé pour commander, livrer et ouvrir une boutique, **sous réserve de vérification juridique**
+  (reste une proposition).
+- **Références** : chaque article ou prestation reçoit une référence publique unique, générée par le serveur, stable,
+  jamais réattribuée ni modifiée, distincte de l'identifiant interne, utilisée dans les commandes, l'historique et les
+  évaluations.
+
 ### L7-01 — Lot 7 : complément final (16/10/2026, 12 h 31) · Fondateur · **décidé** (développement non autorisé)
 
 Conception détaillée, contradictions et arbitrages : `docs/LOT7_CONCEPTION.md`. Règles décidées :
@@ -180,7 +216,7 @@ Conception détaillée, contradictions et arbitrages : `docs/LOT7_CONCEPTION.md`
   **Rapide** : indépendant possible ; disponibilité confirmée avant la promesse.
 - **Paiement** : scénario A (boutique ordinaire) à la réception ; scénario B (boutique **Premium certifiée**, statut
   attribué par un processus administratif, jamais par une donnée envoyée par l'app) avant livraison, sans second
-  paiement. Trois niveaux distincts : déclaré, confirmé par la boutique, confirmé techniquement par un prestataire.
+  paiement. *(Scénario B et « Premium certifié » : remplacés par L7-02 — paiement avant livraison suspendu, notion retirée.)* Trois niveaux distincts : déclaré, confirmé par la boutique, confirmé techniquement par un prestataire.
 - **Code à 4 chiffres** créé à la confirmation, confidentiel, communiqué après examen du colis ; il n'est **jamais**
   une preuve de paiement. Arrivée, code, paiement, remise déclarée, confirmation du client et confirmation ou
   contestation de la boutique sont des événements distincts.
