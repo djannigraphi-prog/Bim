@@ -3564,7 +3564,7 @@
             "bearer": []
           }
         ],
-        "summary": "Modifier le contenu ; un article déjà publié perd sa réputation (REPUTATION_RESET_REQUIRED tant que confirmReputationReset n’est pas envoyé)",
+        "summary": "Promotion (activer, modifier, supprimer) ; rubrique et durée avant la première publication. Nom, description et prix normal : PRODUCT_CONTENT_LOCKED (nouvelle fiche)",
         "tags": [
           "Espace marchand"
         ]
@@ -3831,7 +3831,7 @@
             "bearer": []
           }
         ],
-        "summary": "Variantes (tailles, couleurs…) ; vide : « Unique ». Les changer sur un article déjà publié remet sa réputation à zéro (confirmation)",
+        "summary": "Variantes (tailles, couleurs…) ; vide : « Unique ». Après la première publication, seul l’ordre change (PRODUCT_CONTENT_LOCKED)",
         "tags": [
           "Espace marchand"
         ]
@@ -7079,13 +7079,13 @@
           },
           "priceFcfa": {
             "type": "number",
-            "example": 45000,
-            "description": "Prix en FCFA"
-          },
-          "compareAtFcfa": {
-            "type": "object",
             "example": 60000,
-            "description": "Prix barré (promotion), supérieur au prix"
+            "description": "Prix normal en FCFA, fixé à la création (L7-04)"
+          },
+          "promoPriceFcfa": {
+            "type": "object",
+            "example": 45000,
+            "description": "Prix promotionnel, inférieur au prix normal"
           },
           "durationMinutes": {
             "type": "object",
@@ -7114,17 +7114,14 @@
           "priceFcfa": {
             "type": "number"
           },
-          "compareAtFcfa": {
+          "promoPriceFcfa": {
             "type": "object",
-            "nullable": true
+            "nullable": true,
+            "description": "Promotion : activer ou modifier (montant), supprimer (null). Réputation conservée."
           },
           "durationMinutes": {
             "type": "object",
             "nullable": true
-          },
-          "confirmReputationReset": {
-            "type": "boolean",
-            "description": "7-A : confirmation, après avertissement, de la remise à zéro de la réputation d’un article déjà publié"
           }
         }
       },
@@ -7144,10 +7141,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "confirmReputationReset": {
-            "type": "boolean",
-            "description": "7-A : confirmation de la remise à zéro de la réputation (variantes ajoutées, retirées ou renommées)"
           }
         },
         "required": [
