@@ -230,16 +230,22 @@ void main() {
     final api = _FakeShop()..current = _detail(status: 'published', everPublished: true, hearts: 3, photos: const [ProductPhoto(id: 'm1', url: null)]);
     await _pump(tester, api, '/shop/products/x1');
     expect(tester.widget<Text>(find.byKey(const ValueKey('product-reference'))).data, 'Réf. BIM-000123');
-    TextField field(String key) => tester.widget<TextField>(find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField)));
-    for (final k in ['product-title', 'product-price', 'product-description']) {
-      expect(field(k).readOnly, isTrue, reason: k);
-    }
-    expect(field('product-promo').readOnly, isFalse);
     // Une nouvelle fiche est proposée pour changer le nom, la description ou le prix normal.
     expect(find.byKey(const ValueKey('identity-locked')), findsOneWidget);
     expect(find.byKey(const ValueKey('new-sheet')), findsOneWidget);
+    // Les champs sont construits à l'approche : on fait défiler jusqu'à chacun avant de le lire.
+    Future<TextField> field(String key) async {
+      final f = find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField));
+      await tester.scrollUntilVisible(f, 150, scrollable: find.byType(Scrollable).first);
+      return tester.widget<TextField>(f);
+    }
+    expect((await field('product-title')).readOnly, isTrue);
     // Rubrique et variantes figées depuis la publication ; le stock reste modifiable.
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-category')), 150, scrollable: find.byType(Scrollable).first);
     expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const ValueKey('product-category'))).onChanged, isNull);
+    expect((await field('product-price')).readOnly, isTrue);
+    expect((await field('product-promo')).readOnly, isFalse);
+    expect((await field('product-description')).readOnly, isTrue);
     await tester.scrollUntilVisible(find.byKey(const ValueKey('variants-frozen')), 300, scrollable: find.byType(Scrollable).first);
     expect(find.text('Mettre à jour les variantes'), findsNothing);
 
