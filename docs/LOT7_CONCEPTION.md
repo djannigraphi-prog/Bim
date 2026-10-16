@@ -322,15 +322,14 @@ reprise de données commerciales.
 **Format proposé** : `BIM-000001`, `BIM-000002`… (6 chiffres minimum, 7 et plus au-delà de 999 999, jamais de remise à
 zéro). Un seul compteur pour les articles et les prestations (le type reste un champ distinct).
 
-**Réalisation proposée (migration à créer, non appliquée)** :
+**Réalisation (7-A, migration 0027 appliquée)** :
 
 - séquence PostgreSQL dédiée ; colonne `products.reference` **unique, non nulle**, remplie par la base à la création
   (`'BIM-' || lpad(nextval(...)::text, 6, '0')`) — jamais fournie par l'app ni par le marchand ;
 - **reprise des articles existants** dans l'ordre de création (`created_at`, `id`) ;
 - **déclencheur interdisant toute modification** de la référence ;
 - les numéros consommés par une transaction annulée ne sont pas réutilisés (trous possibles, acceptés).
-- [ARBITRAGE A13] Référence attribuée **à la création** (brouillons compris, plus simple et stable) [PROPOSÉ] ou à la
-  première publication (numérotation plus serrée).
+- **A13 tranché** : référence attribuée **à la création**, brouillons compris (L7-03).
 
 **Usages** : affichée au marchand (liste, fiche), sur la fiche publique, dans le bandeau de conversation, dans les
 lignes de commande, l'historique, les évaluations et l'administration ; **recherche exacte** par référence pour le
@@ -351,7 +350,29 @@ au-dessus du prix catalogue ?).
 
 ---
 
+### 10 bis. Réputation des articles et masquage [APPROUVÉ, L7-03 ; **réalisé en 7-A**]
+
+- **Version du contenu** (`products.content_version`) : une modification confirmée du contenu d'une fiche déjà publiée
+  l'incrémente ; la réputation active ne compte que ce qui a été donné à la version courante (cœurs aujourd'hui ;
+  j'aime, commentaires, recommandations et avis plus tard). Avertissement obligatoire : sans confirmation, le serveur
+  refuse (`REPUTATION_RESET_REQUIRED`) et n'enregistre rien. Historique : `product_revisions` (champs, contenu
+  précédent, auteur, date) et journal d'audit.
+- **Ne changent pas la version** : photo seule, masquage, republication, stock, ordre des variantes. Modifier une photo
+  et un autre élément dans la même opération suit la règle générale.
+- **Brouillon jamais publié** : modifications libres (aucune réputation possible).
+- **Masquer / republier** : statut `hidden` (« Visible par moi uniquement ») ; invisible du BimShop, référence et
+  réputation conservées.
+- **Fiches créées pour une commande** [PROPOSÉ] : fiches ordinaires (§10, L7-03).
+- **Conséquences pour 7-B et 7-H** : chaque ligne de commande enregistre la référence **et** la version du contenu ;
+  chaque avis aussi, pour ne jamais présenter l'avis d'une ancienne version comme concernant la nouvelle.
+
 ## 11. Permissions de l'équipe d'une boutique [APPROUVÉ, A9]
+
+**Réalisé en 7-A** : permissions séparées (table `shop_member_permissions`), invitation acceptée par la personne,
+garde serveur `RequireShopPermission` revérifiée à chaque requête, journal avant / après. Catalogue : créer et
+modifier (`products.edit`), publier et retirer (`products.publish`), masquer ou republier (`products.visibility`) ;
+boîte de la boutique : `messages.reply` ; présentation, logo, équipe, demandes et offres de projet : propriétaire.
+Les permissions de commandes, livraisons et paiements existent et seront contrôlées par leurs sous-lots.
 
 - Un employé ne reçoit **aucun droit du propriétaire par défaut** ; le propriétaire accorde chaque permission ; contrôle
   côté serveur ; actions sensibles attribuées et horodatées.

@@ -14,8 +14,15 @@ import '../data/shop_api.dart';
 
 const _maxPhotos = 6;
 
+/// Le marchand a annulé une modification après l'avertissement de remise à zéro (7-A).
+class _ResetCancelled implements Exception {
+  const _ResetCancelled();
+}
+
 /// Lot 5-B — Ajouter ou modifier un article ou une prestation (« + » de l'écran 55).
 /// Brouillon d'abord ; la publication sur le BimShop demande au moins une photo et une rubrique.
+/// Lot 7-A — Référence BIM-… affichée ; modifier le contenu d'un article déjà publié affiche d'abord un avertissement
+/// (sa réputation repart de zéro) ; la photo seule, masquer et republier ne touchent pas à la réputation.
 class ProductEditorScreen extends ConsumerStatefulWidget {
   const ProductEditorScreen({super.key, this.productId});
 
@@ -99,6 +106,10 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         ..invalidate(shopDashboardProvider)
         ..invalidate(shopProductsProvider);
       if (done != null && mounted) showBimSnack(context, done);
+    } on _ResetCancelled {
+      // Annulé : rien n'a été enregistré ; le formulaire revient à la fiche telle qu'elle est.
+      if (_product != null) _apply(_product!);
+      if (mounted) showBimSnack(context, 'Modification annulée : la fiche et sa réputation sont inchangées.');
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
@@ -116,9 +127,38 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         description: _description.text.trim(),
       );
 
+  /// Le serveur exige une confirmation avant de remettre à zéro la réputation d'un article déjà publié : on affiche
+  /// l'avertissement, puis on renvoie la même demande confirmée, ou on annule.
+  Future<ProductDetail> _withResetWarning(Future<ProductDetail> Function(bool confirm) call) async {
+    try {
+      return await call(false);
+    } on ApiException catch (e) {
+      if (e.code != 'REPUTATION_RESET_REQUIRED' || !mounted) rethrow;
+      final hearts = (e.details['activeFavorites'] as num?)?.toInt() ?? 0;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Remettre la réputation à zéro ?'),
+          content: Text(
+            'Cet article a déjà été publié. En modifiant son contenu (nom, prix, description, rubrique, variantes…), '
+            'ses j’aime, commentaires et recommandations repartent de zéro : la réputation doit correspondre au produit '
+            'réellement évalué.${hearts > 0 ? '\n\n$hearts personne${hearts > 1 ? 's l’ont' : ' l’a'} mis de côté actuellement.' : ''}\n\n'
+            'Changer seulement la photo, masquer ou republier l’article ne remet rien à zéro. Sa référence ne change pas.',
+          ),
+          actions: [
+            TextButton(key: const ValueKey('reset-cancel'), onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler la modification')),
+            TextButton(key: const ValueKey('reset-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Modifier et remettre à zéro')),
+          ],
+        ),
+      );
+      if (ok != true) throw const _ResetCancelled();
+      return call(true);
+    }
+  }
+
   Future<void> _save() => _run((api) async {
         final p = _product;
-        if (p != null) return api.update(p.id, _input);
+        if (p != null) return _withResetWarning((confirm) => api.update(p.id, _input, confirmReset: confirm));
         var created = await api.create(_input);
         // L'article existe désormais : un échec des photos ne doit pas conduire à le recréer (audit, M-7).
         _apply(created);
@@ -148,7 +188,8 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     return _run((api) async {
       if (_dirty) {
         if (!_valid) throw const ApiException(code: 'VALIDATION_FAILED', message: 'Complète le nom, le prix et la rubrique avant de continuer.');
-        await api.update(p.id, _input);
+        // Photo et contenu modifiés ensemble : la règle générale s'applique (avertissement, remise à zéro).
+        await _withResetWarning((confirm) => api.update(p.id, _input, confirmReset: confirm));
       }
       return action(api, p);
     }, done: done,);
@@ -241,6 +282,11 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                 if (p != null) _StatusChip(status: p.status),
               ],
             ),
+            if (p != null && p.reference.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: BimSpacing.xs, left: 56),
+                child: Text('Réf. ${p.reference}', key: const ValueKey('product-reference'), style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+              ),
             const SizedBox(height: BimSpacing.lg),
             if (p == null) ...[
               SegmentedButton<String>(
@@ -347,7 +393,10 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                 variant: BimButtonVariant.outline,
                 onPressed: _busy
                     ? null
-                    : () => _act((api, p) => api.setVariants(p.id, _variants.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList())),
+                    : () => _act((api, p) {
+                          final labels = _variants.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
+                          return _withResetWarning((confirm) => api.setVariants(p.id, labels, confirmReset: confirm));
+                        },),
               ),
               const SizedBox(height: BimSpacing.md),
               for (final v in p.variants)
@@ -378,8 +427,16 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
             ],
             if (p != null) ...[
               const SizedBox(height: BimSpacing.xl),
-              if (p.status == 'published')
-                BimButton(label: 'Retirer du BimShop (brouillon)', variant: BimButtonVariant.outline, onPressed: _busy ? null : () => _act((api, p) => api.unpublish(p.id)))
+              if (p.status == 'published' || p.status == 'hidden')
+                // 7-A : masquer en cas de rupture, republier ensuite ; référence et réputation conservées.
+                SwitchListTile(
+                  key: const ValueKey('product-visibility'),
+                  contentPadding: EdgeInsets.zero,
+                  value: p.status == 'published',
+                  title: Text(p.status == 'published' ? 'Visible publiquement' : 'Visible par moi uniquement'),
+                  subtitle: const Text('Masquer garde la référence, les j’aime, commentaires et recommandations.'),
+                  onChanged: _busy ? null : (visible) => _act((api, p) => visible ? api.show(p.id) : api.hide(p.id), done: visible ? 'Article visible publiquement' : 'Article masqué'),
+                )
               else
                 BimButton(
                   key: const ValueKey('publish-product'),
@@ -413,7 +470,10 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: BimSpacing.sm, vertical: BimSpacing.xs),
       decoration: BoxDecoration(color: online ? BimColors.success.withValues(alpha: 0.15) : BimColors.warningBg, borderRadius: BorderRadius.circular(BimRadius.chip)),
-      child: Text(online ? 'En ligne' : 'Brouillon', style: TextStyle(fontWeight: FontWeight.w700, color: online ? BimColors.success : BimColors.grey800)),
+      child: Text(
+        switch (status) { 'published' => 'En ligne', 'hidden' => 'Masqué', _ => 'Brouillon' },
+        style: TextStyle(fontWeight: FontWeight.w700, color: online ? BimColors.success : BimColors.grey800),
+      ),
     );
   }
 }

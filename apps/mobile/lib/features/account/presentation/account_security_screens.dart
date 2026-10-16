@@ -9,6 +9,7 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../auth/application/session_controller.dart';
+import '../../merchant/presentation/shop_team_screen.dart' show ShopInvitationsList;
 import '../data/account_api.dart';
 import 'code_sheets.dart';
 
@@ -313,6 +314,8 @@ class _SpacesSheet extends ConsumerWidget {
               error: (e, _) => [Text(e is ApiException ? e.message : ApiException.unknown.message)],
               data: (items) => [for (final s in items) _SpaceTile(space: s)],
             ),
+            // 7-A : invitation à rejoindre l'équipe d'une boutique (aucun accès avant l'accord).
+            ShopInvitationsList(onJoined: () => ref.invalidate(_spacesProvider)),
             const SizedBox(height: BimSpacing.sm),
             Row(
               children: [

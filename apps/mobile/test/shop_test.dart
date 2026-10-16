@@ -19,8 +19,12 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-ProductDetail _detail({String status = 'draft', List<ProductPhoto> photos = const []}) => ProductDetail(
+ProductDetail _detail({String status = 'draft', List<ProductPhoto> photos = const [], bool everPublished = false, int version = 1, int hearts = 0}) => ProductDetail(
       id: 'x1',
+      reference: 'BIM-000123',
+      everPublished: everPublished,
+      contentVersion: version,
+      activeFavorites: hearts,
       kind: 'product',
       title: 'Robe soirée à plumes',
       categoryCode: 'vetements_soiree',
@@ -32,15 +36,16 @@ ProductDetail _detail({String status = 'draft', List<ProductPhoto> photos = cons
 
 /// API simulée de l'espace marchand (les règles sont testées côté API).
 class _FakeShop extends ShopApi {
-  _FakeShop({this.publishError}) : super(_client());
+  _FakeShop({this.publishError, this.dash}) : super(_client());
 
   final ApiException? publishError;
+  final ShopDashboard? dash;
   final calls = <String>[];
   ProductDetail? current;
 
   @override
   Future<ShopDashboard> dashboard() async =>
-      const ShopDashboard(id: 's1', name: 'Boutique Élégance', status: 'active', verified: true, city: 'Abidjan', commune: 'Cocody', published: 1, drafts: 0, followers: 0);
+      dash ?? const ShopDashboard(id: 's1', name: 'Boutique Élégance', status: 'active', verified: true, city: 'Abidjan', commune: 'Cocody', published: 1, drafts: 0, followers: 0);
 
   @override
   Future<List<ProductSummary>> products({required String status}) async => status == 'published'
@@ -62,19 +67,42 @@ class _FakeShop extends ShopApi {
     return current = _detail();
   }
 
+  /// Comme le serveur (7-A) : un article déjà publié dont le contenu change exige une confirmation.
   @override
-  Future<ProductDetail> update(String id, ProductInput input) async {
-    calls.add('update $id ${input.title} ${input.priceFcfa}');
+  Future<ProductDetail> update(String id, ProductInput input, {bool confirmReset = false}) async {
+    final c = current;
+    final changed = c != null && (input.title != c.title || input.priceFcfa != c.priceFcfa);
+    if ((c?.everPublished ?? false) && changed && !confirmReset) {
+      calls.add('refused $id');
+      throw const ApiException(code: 'REPUTATION_RESET_REQUIRED', message: 'Confirme', status: 409, details: {'fields': ['title'], 'activeFavorites': 3});
+    }
+    calls.add('update $id ${input.title} ${input.priceFcfa}${confirmReset ? ' (remise à zéro)' : ''}');
     return current = ProductDetail(
       id: id,
+      reference: c?.reference ?? 'BIM-000123',
+      everPublished: c?.everPublished ?? false,
+      contentVersion: (c?.contentVersion ?? 1) + (confirmReset ? 1 : 0),
+      activeFavorites: confirmReset ? 0 : (c?.activeFavorites ?? 0),
       kind: 'product',
       title: input.title,
       categoryCode: input.categoryCode,
       priceFcfa: input.priceFcfa,
-      status: current?.status ?? 'draft',
-      photos: current?.photos ?? const [],
-      variants: current?.variants ?? const [],
+      status: c?.status ?? 'draft',
+      photos: c?.photos ?? const [],
+      variants: c?.variants ?? const [],
     );
+  }
+
+  @override
+  Future<ProductDetail> hide(String id) async {
+    calls.add('hide $id');
+    return current = _detail(status: 'hidden', everPublished: true, hearts: current?.activeFavorites ?? 0, photos: const [ProductPhoto(id: 'm1', url: null)]);
+  }
+
+  @override
+  Future<ProductDetail> show(String id) async {
+    calls.add('show $id');
+    return current = _detail(status: 'published', everPublished: true, hearts: current?.activeFavorites ?? 0, photos: const [ProductPhoto(id: 'm1', url: null)]);
   }
 
   @override
@@ -172,7 +200,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('publish-product')));
     await tester.pumpAndSettle();
     expect(ok.calls, ['publish x1']);
-    expect(find.text('Retirer du BimShop (brouillon)'), findsOneWidget);
+    // 7-A : un article publié se masque (« Visible par moi uniquement ») au lieu de repasser en brouillon.
+    expect(find.text('Visible publiquement'), findsOneWidget);
     await tester.drag(find.byType(Scrollable).first, const Offset(0, 2000));
     await tester.pumpAndSettle();
     expect(find.text('En ligne'), findsOneWidget);
@@ -194,6 +223,66 @@ void main() {
     expect(find.byKey(const ValueKey('product-load-error')), findsOneWidget);
     expect(find.text('Nouvel article'), findsNothing);
     expect(api.calls, isEmpty);
+  });
+
+  testWidgets('7-A : article publié — avertissement avant de modifier ; annuler garde la fiche ; confirmer remet à zéro', (tester) async {
+    final api = _FakeShop()..current = _detail(status: 'published', everPublished: true, hearts: 3, photos: const [ProductPhoto(id: 'm1', url: null)]);
+    await _pump(tester, api, '/shop/products/x1');
+    expect(tester.widget<Text>(find.byKey(const ValueKey('product-reference'))).data, 'Réf. BIM-000123');
+    final title = find.descendant(of: find.byKey(const ValueKey('product-title')), matching: find.byType(TextField));
+    await tester.enterText(title, 'Chaussures cuir');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const ValueKey('save-product')));
+    await tester.pumpAndSettle();
+    expect(find.text('Remettre la réputation à zéro ?'), findsOneWidget);
+    expect(find.textContaining('3 personnes l’ont mis de côté'), findsOneWidget);
+
+    // Annuler : rien n'est enregistré, le formulaire revient à la fiche.
+    await tester.tap(find.byKey(const ValueKey('reset-cancel')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['refused x1']);
+    expect(api.current!.title, 'Robe soirée à plumes');
+    expect(tester.widget<TextField>(title).controller!.text, 'Robe soirée à plumes');
+
+    // Confirmer : enregistrement avec remise à zéro.
+    await tester.enterText(title, 'Chaussures cuir');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const ValueKey('save-product')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reset-confirm')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['refused x1', 'refused x1', 'update x1 Chaussures cuir 45000 (remise à zéro)']);
+    expect(api.current!.activeFavorites, 0);
+  });
+
+  testWidgets('7-A : masquer puis republier sans avertissement ni remise à zéro', (tester) async {
+    final api = _FakeShop()..current = _detail(status: 'published', everPublished: true, hearts: 2, photos: const [ProductPhoto(id: 'm1', url: null)]);
+    await _pump(tester, api, '/shop/products/x1');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-visibility')), 300, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const ValueKey('product-visibility')));
+    await tester.pumpAndSettle();
+    expect(find.text('Visible par moi uniquement'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('product-visibility')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['hide x1', 'show x1']);
+    expect(find.text('Remettre la réputation à zéro ?'), findsNothing);
+    expect(api.current!.activeFavorites, 2);
+  });
+
+  testWidgets('7-A : employé sans permission — ni « + », ni Messages, ni Demandes, ni Équipe', (tester) async {
+    final api = _FakeShop(
+      dash: const ShopDashboard(id: 's1', name: 'Boutique Élégance', status: 'active', verified: true, published: 1, drafts: 0, followers: 0, role: 'staff'),
+    );
+    await _pump(tester, api, '/shop');
+    expect(find.byKey(const ValueKey('add-product')), findsNothing);
+    expect(find.byKey(const ValueKey('shop-messages')), findsNothing);
+    expect(find.byKey(const ValueKey('action-article')), findsNothing);
+    expect(find.byKey(const ValueKey('action-requests')), findsNothing);
+    expect(find.byKey(const ValueKey('action-team')), findsNothing);
+    // Le propriétaire voit tout.
+    await _pump(tester, _FakeShop(), '/shop');
+    expect(find.byKey(const ValueKey('add-product')), findsOneWidget);
+    expect(find.byKey(const ValueKey('action-team')), findsOneWidget);
   });
 }
 

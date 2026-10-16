@@ -35,6 +35,7 @@ import '../../features/messaging/presentation/shop_inbox_screen.dart';
 import '../../features/offers/presentation/project_offers_screen.dart';
 import '../../features/offers/presentation/shop_requests_screen.dart';
 import '../../features/merchant/presentation/product_editor_screen.dart';
+import '../../features/merchant/presentation/shop_team_screen.dart';
 import '../../features/social/presentation/composer_screen.dart';
 import '../../features/social/presentation/post_detail_screen.dart';
 import '../../features/social/presentation/profile_screen.dart';
@@ -121,6 +122,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!)),
       GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
       GoRoute(path: '/shop/messages', builder: (_, __) => const ShopInboxScreen()),
+      GoRoute(path: '/shop/team', builder: (_, __) => const ShopTeamScreen()),
       GoRoute(path: '/shop/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, asShop: true)),
       GoRoute(path: '/projects/:id/offers', builder: (_, s) => ProjectOffersScreen(projectId: s.pathParameters['id']!)),
       // Lot 5-C : BimShop (public, sauf « Mis de côté »).

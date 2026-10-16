@@ -34,7 +34,9 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
   void initState() {
     super.initState();
     // 6-B : pas de notification sur le téléphone ; la pastille Messages de la boutique est mise à jour régulièrement.
-    _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) => ref.invalidate(shopInboxUnreadProvider));
+    _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (ref.read(shopDashboardProvider).valueOrNull?.can('messages.reply') ?? false) ref.invalidate(shopInboxUnreadProvider);
+    });
   }
 
   @override
@@ -70,7 +72,11 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dash = ref.watch(shopDashboardProvider);
-    final inboxUnread = ref.watch(shopInboxUnreadProvider).valueOrNull?.unread ?? 0;
+    // 7-A : « Messages » et « + » seulement avec la permission correspondante (propriétaire : tout).
+    final me = dash.valueOrNull;
+    final canReply = me?.can('messages.reply') ?? false;
+    final canEdit = me?.can('products.edit') ?? false;
+    final inboxUnread = canReply ? (ref.watch(shopInboxUnreadProvider).valueOrNull?.unread ?? 0) : 0;
     return Scaffold(
       body: SafeArea(
         child: dash.when(
@@ -127,18 +133,24 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   ),
                 ),
                 const SizedBox(height: BimSpacing.lg),
+                // 7-A : les actions suivent mes permissions (le serveur les contrôle de toute façon).
                 Row(
                   children: [
-                    _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
+                    if (d.can('products.edit'))
+                      _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
                     _Action(icon: Icons.videocam_outlined, label: 'Live', onTap: () => showComingSoon(context, feature: 'Le live')),
                     _Action(icon: Icons.local_offer_outlined, label: 'Promo', onTap: () => showComingSoon(context, feature: 'Les promotions')),
-                    _Action(key: const ValueKey('action-requests'), icon: Icons.assignment_outlined, label: 'Demandes', onTap: () => context.push('/shop/requests')),
+                    if (d.isOwner) ...[
+                      _Action(key: const ValueKey('action-requests'), icon: Icons.assignment_outlined, label: 'Demandes', onTap: () => context.push('/shop/requests')),
+                      _Action(key: const ValueKey('action-team'), icon: Icons.group_outlined, label: 'Équipe', onTap: () => context.push('/shop/team')),
+                    ],
                   ],
                 ),
                 const SizedBox(height: BimSpacing.xl),
                 SegmentedButton<String>(
                   segments: [
                     ButtonSegment(value: 'published', label: Text('En ligne (${d.published})')),
+                    ButtonSegment(value: 'hidden', label: Text('Masqués (${d.hidden})')),
                     ButtonSegment(value: 'draft', label: Text('Brouillons (${d.drafts})')),
                   ],
                   selected: {_tab},
@@ -168,6 +180,9 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   ],
                 ),
               ),
+              if (!canReply)
+                const Expanded(child: SizedBox())
+              else
               Expanded(
                 child: InkWell(
                   key: const ValueKey('shop-messages'),
@@ -190,6 +205,9 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   ),
                 ),
               ),
+              if (!canEdit)
+                const Expanded(child: SizedBox())
+              else
               Expanded(
                 child: Center(
                   child: Semantics(
@@ -338,7 +356,11 @@ class _ProductList extends ConsumerWidget {
                   const Peni(pose: PeniPose.wave, size: 90),
                   const SizedBox(height: BimSpacing.md),
                   Text(
-                    status == 'published' ? 'Aucun article en ligne pour l’instant. Ajoute ton premier article avec « + ».' : 'Aucun brouillon.',
+                    switch (status) {
+                      'published' => 'Aucun article en ligne pour l’instant. Ajoute ton premier article avec « + ».',
+                      'hidden' => 'Aucun article masqué. Masque un article en rupture : il garde sa référence et sa réputation.',
+                      _ => 'Aucun brouillon.',
+                    },
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -387,6 +409,7 @@ class _ProductTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    if (p.reference.isNotEmpty) Text('Réf. ${p.reference}', style: theme.textTheme.bodySmall),
                     const SizedBox(height: 2),
                     Wrap(
                       spacing: BimSpacing.sm,

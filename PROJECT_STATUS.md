@@ -126,6 +126,14 @@ Aucune notification sur le téléphone (Firebase non activé) : la pastille de l
 
 Décisions en attente (lot 6) : durée de conservation des messages (`messages.retention_days`, non fixée : rien n'est effacé automatiquement) ; `messages.daily_limit` = 500 et `messages.new_conversations_daily_limit` = 20 (**provisoires**) ; règle E10 et protection des mineurs ci-dessus (**proposées**). Décision à valider (6-B) : une personne de 16-17 ans peut écrire à une boutique (c'est elle qui ouvre la conversation ; la boutique ne démarche personne). Lot 7 : conception version 2 (`docs/LOT7_CONCEPTION.md`, décisions L7-01 et L7-02, arbitrages restants A2-b à A19, découpage 7-A à 7-H) ; **développement non autorisé** ; F3 bis décidée (espèces réservées aux livreurs employés de la boutique, `DECISIONS.md`). À venir : 6-C (réactions ; messages vocaux et groupes soumis à accord).
 
+## Lot 7 — Commandes, paiements, livraisons (conception : `docs/LOT7_CONCEPTION.md`)
+
+Aucun paiement réel, aucun prestataire, aucune dépense. Sous-lots 7-B à 7-H **non commencés**.
+
+| Étape | Contenu | Tests | CI |
+| --- | --- | --- | --- |
+| 7-A | **Références** `BIM-000001…` attribuées par la base dès la création (articles existants numérotés dans l'ordre de création), uniques, immuables (déclencheur), jamais réattribuées, affichées dans l'espace boutique et le BimShop. **Réputation liée au contenu** : modifier le contenu d'un article déjà publié affiche un avertissement, exige une confirmation côté serveur puis crée une nouvelle version (les cœurs de l'ancienne ne comptent plus, conservés en base ; historique des modifications) ; photo seule, masquage, republication et stock n'y touchent pas. **Masquer / republier** (« Visible par moi uniquement »). **Équipe** : invitation acceptée par la personne, permissions séparées accordées par le propriétaire seul, contrôlées à chaque requête, journalisées ; boîte de la boutique soumise à « répondre aux messages », demandes et offres réservées au propriétaire. Migration 0027 (additive, vérifiée sur des données existantes) | API : 6 e2e (suite : 371 réussis) ; Flutter : 5 + capture x22 | en cours (branche lot7a-wip) |
+
 ## Lot 2 — avancement (15/10/2026, partie sans dépense)
 
 Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'aucune décision en attente. **Rien n'est activé** : `WORKER_MODE=off`, `PUSH_PROVIDER=none` par défaut, réglage `notifications.reminders_enabled` = false (« en attente »), aucun projet Firebase, aucune ressource AWS.

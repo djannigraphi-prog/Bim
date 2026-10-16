@@ -166,6 +166,30 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-03 — Lot 7-A : références, réputation des articles, permissions (16/10/2026, 16 h 14) · Fondateur · **décidé**, **réalisé** (7-A)
+
+- **A13** : référence attribuée **dès la création** de la fiche (brouillon compris), par le serveur, unique, stable,
+  jamais réattribuée ; les articles existants sont numérotés par la migration. Réalisé : séquence de la base, format
+  `BIM-000001` (7 chiffres et plus au-delà de 999 999), déclencheur d'immuabilité, référence refusée si l'app en envoie une.
+- **Fiches créées pour une commande** (point 6, règle proposée par Claude, à valider) : ce sont des fiches ordinaires —
+  référence à la création, « visible par moi uniquement » tant qu'elles ne sont pas publiées, mêmes règles de
+  réputation dès qu'elles le sont ; les lignes de commande (7-B) gardent la référence et la **version du contenu**
+  commandée ; les avis (7-H) se rattachent à cette référence et à cette version.
+- **Réputation liée au contenu réellement évalué** : toute modification confirmée du contenu d'une fiche **déjà
+  publiée** (nom, prix, prix barré, description, rubrique, durée, variantes ajoutées / retirées / renommées) exige un
+  avertissement préalable et une confirmation, puis crée une nouvelle **version du contenu** : la réputation active
+  repart de zéro, l'ancienne reste en base (traçabilité) sans être affichée ; trace de la modification (champs, contenu
+  précédent, auteur, date). **Exceptions** : photo seule, masquage, republication, stock, ordre des variantes.
+  Aujourd'hui, le seul signe de réputation existant est le cœur « mettre de côté » ; les j'aime, commentaires et
+  recommandations d'articles n'existent pas encore et utiliseront la même version.
+- **Masquer / republier** : « Visible publiquement » ↔ « Visible par moi uniquement » (statut `hidden`), référence et
+  réputation conservées.
+- **A16** : permissions séparées accordées et retirées par le propriétaire seul (consulter / préparer les commandes,
+  créer et modifier, publier, masquer ou republier, répondre aux messages, sélectionner un livreur, paramètres de
+  livraison, confirmer ou contester un paiement) ; aucune par défaut ; contrôlées par le serveur à chaque requête ;
+  journalisées ; aucune ne donne le droit d'encaisser des espèces. Un employé est invité et **accepte** l'invitation.
+  Demandes et offres de projet : propriétaire seul (non listées parmi les permissions).
+
 ### L7-02 — Lot 7 : arbitrages A1 à A12 et références des articles (16/10/2026, 13 h 25) · Fondateur · **décidé** (développement non autorisé)
 
 Détail, propositions restantes et arbitrages encore ouverts (A2-b à A19) : `docs/LOT7_CONCEPTION.md`, version 2.

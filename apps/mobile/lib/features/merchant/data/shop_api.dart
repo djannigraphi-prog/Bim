@@ -13,6 +13,9 @@ class ShopDashboard {
     required this.published,
     required this.drafts,
     required this.followers,
+    this.hidden = 0,
+    this.role = 'owner',
+    this.permissions = const [],
     this.city,
     this.commune,
     this.description,
@@ -30,9 +33,18 @@ class ShopDashboard {
   final int published;
   final int drafts;
   final int followers;
+  /// 7-A : articles « visibles par moi uniquement ».
+  final int hidden;
+  /// 7-A : mon rôle (owner · staff) et mes permissions ; le serveur contrôle chaque action.
+  final String role;
+  final List<String> permissions;
+
+  bool get isOwner => role == 'owner';
+  bool can(String permission) => isOwner || permissions.contains(permission);
 
   factory ShopDashboard.fromJson(Map<String, dynamic> j) {
     final c = (j['counts'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
+    final viewer = (j['viewer'] ?? const <String, dynamic>{'role': 'owner'}) as Map<String, dynamic>;
     return ShopDashboard(
       id: j['id'] as String,
       name: j['name'] as String,
@@ -45,14 +57,19 @@ class ShopDashboard {
       published: (c['published'] ?? 0) as int,
       drafts: (c['drafts'] ?? 0) as int,
       followers: (c['followers'] ?? 0) as int,
+      hidden: (c['hidden'] ?? 0) as int,
+      role: (viewer['role'] ?? 'staff') as String,
+      permissions: [for (final p in (viewer['permissions'] as List<dynamic>? ?? const [])) p as String],
     );
   }
 }
 
 class ProductSummary {
-  const ProductSummary({required this.id, required this.kind, required this.title, required this.priceFcfa, required this.status, this.compareAtFcfa, this.imageUrl, this.stock});
+  const ProductSummary({required this.id, required this.kind, required this.title, required this.priceFcfa, required this.status, this.reference = '', this.compareAtFcfa, this.imageUrl, this.stock});
 
   final String id;
+  /// 7-A : référence BIM-… attribuée par le serveur.
+  final String reference;
   final String kind;
   final String title;
   final int priceFcfa;
@@ -64,6 +81,7 @@ class ProductSummary {
 
   factory ProductSummary.fromJson(Map<String, dynamic> j) => ProductSummary(
         id: j['id'] as String,
+        reference: (j['reference'] ?? '') as String,
         kind: j['kind'] as String,
         title: j['title'] as String,
         priceFcfa: j['priceFcfa'] as int,
@@ -96,6 +114,10 @@ class ProductDetail {
     required this.status,
     required this.photos,
     required this.variants,
+    this.reference = '',
+    this.contentVersion = 1,
+    this.activeFavorites = 0,
+    this.everPublished = false,
     this.description,
     this.categoryCode,
     this.compareAtFcfa,
@@ -113,6 +135,12 @@ class ProductDetail {
   final String status;
   final List<ProductPhoto> photos;
   final List<ProductVariant> variants;
+  /// 7-A : référence BIM-…, version du contenu, cœurs de la version courante.
+  final String reference;
+  final int contentVersion;
+  final int activeFavorites;
+  /// Déjà publié au moins une fois : modifier son contenu remet sa réputation à zéro.
+  final bool everPublished;
 
   bool get isService => kind == 'service';
 
@@ -126,6 +154,10 @@ class ProductDetail {
         compareAtFcfa: j['compareAtFcfa'] as int?,
         durationMinutes: j['durationMinutes'] as int?,
         status: j['status'] as String,
+        reference: (j['reference'] ?? '') as String,
+        contentVersion: (j['contentVersion'] ?? 1) as int,
+        activeFavorites: (j['activeFavorites'] ?? 0) as int,
+        everPublished: j['publishedAt'] != null,
         photos: [
           for (final p in (j['photos'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) ProductPhoto(id: p['id'] as String, url: p['url'] as String?),
         ],
@@ -191,17 +223,91 @@ class ShopApi {
 
   Future<ProductDetail> product(String id) async => ProductDetail.fromJson(await _api.get('/v1/shop/products/$id'));
   Future<ProductDetail> create(ProductInput input) async => ProductDetail.fromJson(await _api.post('/v1/shop/products', body: input.toJson()));
-  Future<ProductDetail> update(String id, ProductInput input) async => ProductDetail.fromJson(await _api.patch('/v1/shop/products/$id', body: input.toJson(create: false)));
+  /// 7-A : `confirmReset` après avertissement, si l'article a déjà été publié (sinon REPUTATION_RESET_REQUIRED).
+  Future<ProductDetail> update(String id, ProductInput input, {bool confirmReset = false}) async => ProductDetail.fromJson(
+        await _api.patch('/v1/shop/products/$id', body: {...input.toJson(create: false), if (confirmReset) 'confirmReputationReset': true}),
+      );
   Future<ProductDetail> publish(String id) async => ProductDetail.fromJson(await _api.post('/v1/shop/products/$id/publish'));
-  Future<ProductDetail> unpublish(String id) async => ProductDetail.fromJson(await _api.post('/v1/shop/products/$id/unpublish'));
+  /// 7-A : « Visible par moi uniquement » / « Visible publiquement » ; la réputation est conservée.
+  Future<ProductDetail> hide(String id) async => ProductDetail.fromJson(await _api.post('/v1/shop/products/$id/hide'));
+  Future<ProductDetail> show(String id) async => ProductDetail.fromJson(await _api.post('/v1/shop/products/$id/show'));
   Future<void> archive(String id) => _api.delete('/v1/shop/products/$id');
   Future<ProductDetail> addPhotos(String id, List<List<int>> files) async =>
       ProductDetail.fromJson(await _api.postFiles('/v1/shop/products/$id/photos', fields: const {}, fileField: 'photos', files: files));
   Future<ProductDetail> removePhoto(String id, String photoId) async => ProductDetail.fromJson(await _api.delete('/v1/shop/products/$id/photos/$photoId'));
-  Future<ProductDetail> setVariants(String id, List<String> labels) async => ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants', body: {'labels': labels}));
+  Future<ProductDetail> setVariants(String id, List<String> labels, {bool confirmReset = false}) async =>
+      ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants', body: {'labels': labels, if (confirmReset) 'confirmReputationReset': true}));
   Future<ProductDetail> setStock(String id, String variantId, int quantity) async =>
       ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants/$variantId/stock', body: {'quantity': quantity}));
 }
+
+/// 7-A — Membre de l'équipe d'une boutique.
+class TeamMember {
+  const TeamMember({required this.userId, required this.username, required this.fullName, required this.role, required this.status, required this.permissions, this.avatarUrl});
+
+  final String userId;
+  final String username;
+  final String fullName;
+  final String? avatarUrl;
+  /// owner · staff
+  final String role;
+  /// active · invited
+  final String status;
+  final List<String> permissions;
+
+  bool get isOwner => role == 'owner';
+
+  factory TeamMember.fromJson(Map<String, dynamic> j) => TeamMember(
+        userId: j['userId'] as String,
+        username: (j['username'] ?? '') as String,
+        fullName: (j['fullName'] ?? '') as String,
+        avatarUrl: j['avatarUrl'] as String?,
+        role: j['role'] as String,
+        status: j['status'] as String,
+        permissions: [for (final p in (j['permissions'] as List<dynamic>? ?? const [])) p as String],
+      );
+}
+
+/// Libellés des permissions (A16), dans l'ordre d'affichage.
+const shopPermissionLabels = <String, String>{
+  'orders.read': 'Consulter les commandes',
+  'orders.prepare': 'Préparer les commandes',
+  'products.edit': 'Créer et modifier des articles',
+  'products.publish': 'Publier et retirer des articles',
+  'products.visibility': 'Masquer ou republier des articles',
+  'messages.reply': 'Répondre aux messages des clients',
+  'deliveries.select_courier': 'Sélectionner un livreur',
+  'deliveries.settings': 'Modifier les paramètres de livraison',
+  'payments.decide': 'Confirmer ou contester un paiement',
+};
+
+/// 7-A — Équipe (propriétaire) et invitations reçues (personne invitée).
+class ShopTeamApi {
+  ShopTeamApi(this._api);
+  final ApiClient _api;
+
+  static List<TeamMember> _members(Map<String, dynamic> r) => [for (final m in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) TeamMember.fromJson(m)];
+
+  Future<List<TeamMember>> team() async => _members(await _api.get('/v1/shop/team'));
+  Future<List<TeamMember>> invite(String username) async => _members(await _api.post('/v1/shop/team', body: {'username': username}));
+  Future<List<TeamMember>> setPermissions(String userId, List<String> permissions) async =>
+      _members(await _api.put('/v1/shop/team/$userId/permissions', body: {'permissions': permissions}));
+  Future<List<TeamMember>> remove(String userId) async => _members(await _api.delete('/v1/shop/team/$userId'));
+
+  Future<List<({String shopId, String name, String? logoUrl})>> invitations() async {
+    final r = await _api.get('/v1/shop-invitations');
+    return [
+      for (final i in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>())
+        (shopId: (i['shop'] as Map<String, dynamic>)['id'] as String, name: (i['shop'] as Map<String, dynamic>)['name'] as String, logoUrl: (i['shop'] as Map<String, dynamic>)['logoUrl'] as String?),
+    ];
+  }
+
+  Future<void> answer(String shopId, {required bool accept}) => _api.post('/v1/shop-invitations/$shopId/${accept ? 'accept' : 'decline'}');
+}
+
+final shopTeamApiProvider = Provider<ShopTeamApi>((ref) => ShopTeamApi(ref.watch(apiClientProvider)));
+final shopTeamProvider = FutureProvider.autoDispose<List<TeamMember>>((ref) => ref.watch(shopTeamApiProvider).team());
+final shopInvitationsProvider = FutureProvider.autoDispose<List<({String shopId, String name, String? logoUrl})>>((ref) => ref.watch(shopTeamApiProvider).invitations());
 
 final shopApiProvider = Provider<ShopApi>((ref) => ShopApi(ref.watch(apiClientProvider)));
 final shopDashboardProvider = FutureProvider.autoDispose<ShopDashboard>((ref) => ref.watch(shopApiProvider).dashboard());

@@ -163,6 +163,7 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                   children: [
                     if (p.categoryLabel != null) Text(p.categoryLabel!, style: theme.textTheme.bodySmall),
                     Text(p.title, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+                    if (p.reference.isNotEmpty) Text('Réf. ${p.reference}', key: const ValueKey('product-reference'), style: theme.textTheme.bodySmall),
                     const SizedBox(height: BimSpacing.xs),
                     Wrap(
                       spacing: BimSpacing.sm,

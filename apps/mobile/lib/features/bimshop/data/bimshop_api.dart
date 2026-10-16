@@ -63,6 +63,7 @@ class ShopProduct {
     required this.variants,
     required this.shop,
     required this.moreFromShop,
+    this.reference = '',
     this.description,
     this.compareAtFcfa,
     this.durationMinutes,
@@ -70,6 +71,8 @@ class ShopProduct {
   });
 
   final String id;
+  /// 7-A : référence BIM-… (stable, attribuée par BIM).
+  final String reference;
   final String kind;
   final String title;
   final String? description;
@@ -85,6 +88,7 @@ class ShopProduct {
 
   factory ShopProduct.fromJson(Map<String, dynamic> j) => ShopProduct(
         id: j['id'] as String,
+        reference: (j['reference'] ?? '') as String,
         kind: j['kind'] as String,
         title: j['title'] as String,
         description: j['description'] as String?,

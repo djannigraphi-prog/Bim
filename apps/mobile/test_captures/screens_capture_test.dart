@@ -48,6 +48,7 @@ import 'package:bim/features/messaging/data/messaging_api.dart';
 import 'package:bim/features/messaging/presentation/conversation_screen.dart';
 import 'package:bim/features/messaging/presentation/messages_view.dart';
 import 'package:bim/features/messaging/presentation/shop_inbox_screen.dart';
+import 'package:bim/features/merchant/presentation/shop_team_screen.dart';
 import 'package:bim/features/offers/data/offers_api.dart';
 import 'package:bim/features/offers/presentation/project_offers_screen.dart';
 import 'package:bim/features/offers/presentation/shop_requests_screen.dart';
@@ -266,9 +267,9 @@ class _FakeShopApi extends ShopApi {
   _FakeShopApi(super.api);
 
   static const _items = [
-    ProductSummary(id: 'x1', kind: 'product', title: 'Robe soirée à plumes', priceFcfa: 45000, compareAtFcfa: 60000, status: 'published', stock: 7),
-    ProductSummary(id: 'x2', kind: 'product', title: 'Ensemble wax corporate', priceFcfa: 32000, status: 'published', stock: 0),
-    ProductSummary(id: 'x3', kind: 'service', title: 'Retouche et ajustement', priceFcfa: 5000, status: 'published'),
+    ProductSummary(id: 'x1', reference: 'BIM-000123', kind: 'product', title: 'Robe soirée à plumes', priceFcfa: 45000, compareAtFcfa: 60000, status: 'published', stock: 7),
+    ProductSummary(id: 'x2', reference: 'BIM-000124', kind: 'product', title: 'Ensemble wax corporate', priceFcfa: 32000, status: 'published', stock: 0),
+    ProductSummary(id: 'x3', reference: 'BIM-000131', kind: 'service', title: 'Retouche et ajustement', priceFcfa: 5000, status: 'published'),
   ];
 
   @override
@@ -288,6 +289,9 @@ class _FakeShopApi extends ShopApi {
   @override
   Future<ProductDetail> product(String id) async => const ProductDetail(
         id: 'x1',
+        reference: 'BIM-000123',
+        everPublished: true,
+        activeFavorites: 3,
         kind: 'product',
         title: 'Robe soirée à plumes',
         description: 'Plumes cousues main, doublure satin.',
@@ -298,6 +302,18 @@ class _FakeShopApi extends ShopApi {
         photos: [ProductPhoto(id: 'm1', url: null)],
         variants: [ProductVariant(id: 'v1', label: 'S', stock: 2), ProductVariant(id: 'v2', label: 'M', stock: 3), ProductVariant(id: 'v3', label: 'L', stock: 2)],
       );
+}
+
+/// Équipe de démonstration POUR LES CAPTURES UNIQUEMENT (7-A ; personnes inventées).
+class _FakeShopTeamApi extends ShopTeamApi {
+  _FakeShopTeamApi(super.api);
+
+  @override
+  Future<List<TeamMember>> team() async => const [
+        TeamMember(userId: 'o1', username: 'doho.yannick', fullName: 'Doho Yannick', role: 'owner', status: 'active', permissions: []),
+        TeamMember(userId: 'u2', username: 'awa.kone', fullName: 'Awa Koné', role: 'staff', status: 'active', permissions: ['messages.reply', 'products.edit', 'orders.read']),
+        TeamMember(userId: 'u3', username: 'koffi.yao', fullName: 'Koffi Yao', role: 'staff', status: 'invited', permissions: []),
+      ];
 }
 
 /// BimShop de démonstration POUR LES CAPTURES UNIQUEMENT (écrans 32, 33, 34, 54 ; boutiques et articles inventés,
@@ -738,6 +754,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     offersApiProvider.overrideWithValue(_FakeOffersApi(client)),
     messagingApiProvider.overrideWithValue(_FakeMessagingApi(client)),
     shopInboxApiProvider.overrideWithValue(_FakeShopInboxApi(client)),
+    shopTeamApiProvider.overrideWithValue(_FakeShopTeamApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -775,6 +792,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/messages/c1', builder: (_, __) => const ConversationScreen(conversationId: 'c1', refreshEvery: null)),
     GoRoute(path: '/messages/c2', builder: (_, __) => const ConversationScreen(conversationId: 'c2', refreshEvery: null)),
     GoRoute(path: '/shop/messages', builder: (_, __) => const ShopInboxScreen()),
+    GoRoute(path: '/shop/team', builder: (_, __) => const ShopTeamScreen()),
     GoRoute(path: '/shop/messages/s2', builder: (_, __) => const ConversationScreen(conversationId: 's2', refreshEvery: null, asShop: true)),
     GoRoute(path: '/projects/p1/offers', builder: (_, __) => const ProjectOffersScreen(projectId: 'p1')),
     GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
@@ -1119,6 +1137,10 @@ void main() {
   testWidgets('55 article (modification)', (t) async {
     await _show(t, '/shop/products/x1');
     await _capture(t, 'x17_article');
+  });
+  testWidgets('7-A équipe de la boutique', (t) async {
+    await _show(t, '/shop/team');
+    await _capture(t, 'x22_equipe_boutique');
   });
   testWidgets('55 espace marchand (sombre)', (t) async {
     await _show(t, '/shop', mode: ThemeMode.dark);
