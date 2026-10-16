@@ -76,7 +76,12 @@ export class InboxService {
       SELECT 'merchant:' || m.id || ':' || m.status, CASE WHEN m.status = 'approved' THEN 'merchant_approved' ELSE 'merchant_rejected' END, m.reviewed_at,
              NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, s.name
       FROM merchant_applications m JOIN shops s ON s.id = m.shop_id
-      WHERE m.user_id = ${userId} AND m.status IN ('approved', 'rejected') AND m.reviewed_at > ${since}`;
+      WHERE m.user_id = ${userId} AND m.status IN ('approved', 'rejected') AND m.reviewed_at > ${since}
+      -- Lot 5-D : offre d'une boutique (ouverte) pour un de mes projets.
+      UNION ALL
+      SELECT 'offer:' || o.id, 'project_offer', o.created_at, p.id, p.title, NULL, NULL, NULL, NULL, NULL, NULL, NULL, s.name
+      FROM project_offers o JOIN projects p ON p.id = o.project_id JOIN shops s ON s.id = o.shop_id
+      WHERE p.user_id = ${userId} AND o.status = 'sent' AND s.status = 'active' AND o.created_at > ${since}`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {
@@ -166,5 +171,7 @@ function link(r: Row): string | null {
     case 'merchant_approved':
     case 'merchant_rejected':
       return '/merchant/apply';
+    case 'project_offer':
+      return r.project_id ? `/projects/${r.project_id}/offers` : null;
   }
 }

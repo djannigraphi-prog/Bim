@@ -714,7 +714,7 @@ class _GoalStepState extends State<_GoalStep> {
             activeTrackColor: BimColors.red,
             onChanged: (v) => widget.onChanged((x) => x.copyWith(receiveMerchantOffers: v)),
             title: Text('Recevoir les offres des marchands', style: theme.textTheme.titleMedium),
-            subtitle: const Text('Ton choix est enregistré. Les offres arriveront avec le BimShop.'),
+            subtitle: const Text('Les boutiques de ta catégorie voient ton projet sans ton nom ; tu peux refuser chaque offre.'),
           ),
         ),
         // Écran 21 : ouvre le formulaire de signalement (C8, décidé le 15/10) ; la réponse arrive dans « Mes signalements ».

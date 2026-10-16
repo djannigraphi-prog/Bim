@@ -162,6 +162,13 @@
       "when": 1792117437565,
       "tag": "0022_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792118849039,
+      "tag": "0023_project_offers",
+      "breakpoints": true
     }
   ]
 }

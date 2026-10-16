@@ -11,7 +11,7 @@ import { reminderMessage } from './reminders';
  */
 export const INBOX_TEMPLATES_VERSION = 'v2';
 
-export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected';
+export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected' | 'project_offer';
 export type InboxCategory = 'projects' | 'support' | 'social';
 
 export interface InboxSource {
@@ -53,6 +53,8 @@ export function inboxText(s: InboxSource): string {
     }
     case 'new_follower':
       return `${s.actorName ?? 'Quelqu’un'} s’est abonné·e à toi.`;
+    case 'project_offer':
+      return `« ${s.snippet ?? ''} » te propose une offre pour ${quoted(s.projectTitle)}. Tu restes libre de la refuser.`;
     case 'merchant_approved':
       return `Ta boutique « ${s.snippet ?? ''} » est validée par l’équipe BIM. Bienvenue parmi les marchands !`;
     case 'merchant_rejected':
