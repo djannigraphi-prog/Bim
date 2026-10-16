@@ -34,7 +34,7 @@ describe('BimShop (e2e)', () => {
 
   it('visiteur : seuls les articles en ligne des boutiques ouvertes ; disponibilité sans stock exact ; fiche et profil', async () => {
     const m = await merchant('Maison Plumes');
-    const robe = await product(m, { title: 'Robe Plumes Zéphyr', priceFcfa: 45000, compareAtFcfa: 60000 }, { stock: 2 });
+    const robe = await product(m, { title: 'Robe Plumes Zéphyr', priceFcfa: 60000, promoPriceFcfa: 45000 }, { stock: 2 });
     const draft = await product(m, { title: 'Robe Zéphyr brouillon' }, { publish: false });
     const sac = await product(m, { title: 'Sac Zéphyr', categoryCode: 'accessoires_sacs', priceFcfa: 15000 });
 

@@ -25,7 +25,7 @@ describe('Catalogue des boutiques (e2e)', () => {
       .withMetadata({ exif: { IFD0: { Copyright: 'boutique' } } })
       .jpeg()
       .toBuffer();
-  const robe = { title: 'Robe soirée à plumes', categoryCode: 'vetements_soiree', priceFcfa: 45000, compareAtFcfa: 60000, description: 'Taille ajustable' };
+  const robe = { title: 'Robe soirée à plumes', categoryCode: 'vetements_soiree', priceFcfa: 60000, promoPriceFcfa: 45000, description: 'Taille ajustable' };
 
   it('rubriques publiques (écran 33) en arbre', async () => {
     const cats = (await h.http().get('/v1/shop-categories').expect(200)).body.items;
@@ -52,11 +52,15 @@ describe('Catalogue des boutiques (e2e)', () => {
     const m = await merchant();
     // Règles de saisie.
     await h.http().post('/v1/shop/products').set(m.auth!).send({ ...robe, categoryCode: 'inconnue' }).expect(400);
-    await h.http().post('/v1/shop/products').set(m.auth!).send({ ...robe, compareAtFcfa: 40000 }).expect(400);
+    await h.http().post('/v1/shop/products').set(m.auth!).send({ ...robe, promoPriceFcfa: 70000 }).expect(400);
     await h.http().post('/v1/shop/products').set(m.auth!).send({ ...robe, priceFcfa: 0 }).expect(400);
 
     const p = (await h.http().post('/v1/shop/products').set(m.auth!).send(robe).expect(201)).body;
     expect(p).toMatchObject({ status: 'draft', priceFcfa: 45000, photos: [], variants: [{ label: 'Unique', stock: 0 }] });
+
+    // Variantes (tailles) réglées avant la première publication (L7-04 : figées ensuite).
+    const withSizes = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L'] }).expect(200)).body;
+    expect(withSizes.variants.map((v: { label: string }) => v.label)).toEqual(['S', 'M', 'L']);
 
     // Publication impossible sans photo.
     const noPhoto = (await h.http().post(`/v1/shop/products/${p.id}/publish`).set(m.auth!).expect(400)).body.error.details.fields;
@@ -82,12 +86,11 @@ describe('Catalogue des boutiques (e2e)', () => {
     const last = await h.http().delete(`/v1/shop/products/${p.id}/photos/${d.photos[1].id}`).set(m.auth!).expect(409);
     expect(last.body.error.code).toBe('LAST_PHOTO');
 
-    // Variantes (tailles) puis stock par variante. Article déjà publié : changer les variantes remet sa réputation à
-    // zéro (7-A) — refusé tant que ce n'est pas confirmé, rien n'est enregistré.
-    const unconfirmed = await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L'] }).expect(409);
-    expect(unconfirmed.body.error).toMatchObject({ code: 'REPUTATION_RESET_REQUIRED', details: { fields: ['variants'] } });
-    expect((await h.http().get(`/v1/shop/products/${p.id}`).set(m.auth!).expect(200)).body.variants.map((v: { label: string }) => v.label)).toEqual(['Unique']);
-    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L'], confirmReputationReset: true }).expect(200)).body;
+    // Article publié : ajouter ou retirer une taille est refusé (L7-04, nouvelle fiche), rien n'est enregistré ;
+    // le stock par variante reste libre.
+    const locked = await h.http().put(`/v1/shop/products/${p.id}/variants`).set(m.auth!).send({ labels: ['S', 'M', 'L', 'XL'] }).expect(409);
+    expect(locked.body.error).toMatchObject({ code: 'PRODUCT_CONTENT_LOCKED', details: { fields: ['variants'] } });
+    d = (await h.http().get(`/v1/shop/products/${p.id}`).set(m.auth!).expect(200)).body;
     expect(d.variants.map((v: { label: string }) => v.label)).toEqual(['S', 'M', 'L']);
     const vM = d.variants[1].id;
     d = (await h.http().put(`/v1/shop/products/${p.id}/variants/${vM}/stock`).set(m.auth!).send({ quantity: 7 }).expect(200)).body;

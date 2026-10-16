@@ -14,15 +14,12 @@ import '../data/shop_api.dart';
 
 const _maxPhotos = 6;
 
-/// Le marchand a annulé une modification après l'avertissement de remise à zéro (7-A).
-class _ResetCancelled implements Exception {
-  const _ResetCancelled();
-}
-
 /// Lot 5-B — Ajouter ou modifier un article ou une prestation (« + » de l'écran 55).
 /// Brouillon d'abord ; la publication sur le BimShop demande au moins une photo et une rubrique.
-/// Lot 7-A — Référence BIM-… affichée ; modifier le contenu d'un article déjà publié affiche d'abord un avertissement
-/// (sa réputation repart de zéro) ; la photo seule, masquer et republier ne touchent pas à la réputation.
+/// Lot 7-A — Référence BIM-… affichée ; masquer et republier gardent la réputation.
+/// L7-04 — Nom, description et prix normal sont fixés à la création (champs en lecture seule ensuite) : les changer
+/// demande une nouvelle fiche (nouvelle référence, réputation vierge). Photo et promotion se modifient librement, la
+/// réputation est conservée. Rubrique, durée et variantes se règlent jusqu'à la première publication.
 class ProductEditorScreen extends ConsumerStatefulWidget {
   const ProductEditorScreen({super.key, this.productId});
 
@@ -35,7 +32,7 @@ class ProductEditorScreen extends ConsumerStatefulWidget {
 class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
   final _title = TextEditingController();
   final _price = TextEditingController();
-  final _compare = TextEditingController();
+  final _promo = TextEditingController();
   final _duration = TextEditingController();
   final _description = TextEditingController();
   final _variants = TextEditingController();
@@ -58,7 +55,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
 
   @override
   void dispose() {
-    for (final c in [_title, _price, _compare, _duration, _description, _variants, ..._stock.values]) {
+    for (final c in [_title, _price, _promo, _duration, _description, _variants, ..._stock.values]) {
       c.dispose();
     }
     super.dispose();
@@ -80,8 +77,8 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     _kind = p.kind;
     _category = p.categoryCode;
     _title.text = p.title;
-    _price.text = '${p.priceFcfa}';
-    _compare.text = p.compareAtFcfa?.toString() ?? '';
+    _price.text = '${p.normalPrice}';
+    _promo.text = _promoOf(p)?.toString() ?? '';
     _duration.text = p.durationMinutes?.toString() ?? '';
     _description.text = p.description ?? '';
     final labels = p.variants.map((v) => v.label).toList();
@@ -91,6 +88,14 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     }
     if (mounted) setState(() {});
   }
+
+  static int? _promoOf(ProductDetail p) => p.promoPriceFcfa ?? (p.compareAtFcfa != null ? p.priceFcfa : null);
+
+  /// Fiche créée : nom, description et prix normal ne se modifient plus.
+  bool get _identityLocked => _product != null;
+
+  /// Déjà publiée une fois : rubrique, durée et variantes sont figées aussi.
+  bool get _frozen => _product?.everPublished ?? false;
 
   bool get _valid => _title.text.trim().length >= 2 && (int.tryParse(_price.text) ?? 0) > 0 && _category != null;
 
@@ -106,10 +111,6 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         ..invalidate(shopDashboardProvider)
         ..invalidate(shopProductsProvider);
       if (done != null && mounted) showBimSnack(context, done);
-    } on _ResetCancelled {
-      // Annulé : rien n'a été enregistré ; le formulaire revient à la fiche telle qu'elle est.
-      if (_product != null) _apply(_product!);
-      if (mounted) showBimSnack(context, 'Modification annulée : la fiche et sa réputation sont inchangées.');
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
@@ -122,46 +123,23 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         title: _title.text.trim(),
         categoryCode: _category!,
         priceFcfa: int.parse(_price.text),
-        compareAtFcfa: int.tryParse(_compare.text),
+        promoPriceFcfa: int.tryParse(_promo.text),
         durationMinutes: _kind == 'service' ? int.tryParse(_duration.text) : null,
         description: _description.text.trim(),
       );
 
-  /// Le serveur exige une confirmation avant de remettre à zéro la réputation d'un article déjà publié : on affiche
-  /// l'avertissement, puis on renvoie la même demande confirmée, ou on annule.
-  Future<ProductDetail> _withResetWarning(Future<ProductDetail> Function(bool confirm) call) async {
-    try {
-      return await call(false);
-    } on ApiException catch (e) {
-      if (e.code != 'REPUTATION_RESET_REQUIRED' || !mounted) rethrow;
-      final hearts = (e.details['activeFavorites'] as num?)?.toInt() ?? 0;
-      // Pas d'indicateur de chargement derrière la question : rien n'est en cours tant que le marchand n'a pas choisi.
-      setState(() => _busy = false);
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Remettre la réputation à zéro ?'),
-          content: Text(
-            'Cet article a déjà été publié. En modifiant son contenu (nom, prix, description, rubrique, variantes…), '
-            'ses j’aime, commentaires et recommandations repartent de zéro : la réputation doit correspondre au produit '
-            'réellement évalué.${hearts > 0 ? '\n\n$hearts personne${hearts > 1 ? 's l’ont' : ' l’a'} mis de côté actuellement.' : ''}\n\n'
-            'Changer seulement la photo, masquer ou republier l’article ne remet rien à zéro. Sa référence ne change pas.',
-          ),
-          actions: [
-            TextButton(key: const ValueKey('reset-cancel'), onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler la modification')),
-            TextButton(key: const ValueKey('reset-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Modifier et remettre à zéro')),
-          ],
-        ),
+  /// Ce qu'une fiche existante peut encore changer (L7-04).
+  ProductChanges get _changes => ProductChanges(
+        promoPriceFcfa: int.tryParse(_promo.text),
+        categoryCode: _category,
+        durationMinutes: int.tryParse(_duration.text),
+        sendCategory: !_frozen,
+        sendDuration: !_frozen && _kind == 'service',
       );
-      if (ok != true) throw const _ResetCancelled();
-      if (mounted) setState(() => _busy = true);
-      return call(true);
-    }
-  }
 
   Future<void> _save() => _run((api) async {
         final p = _product;
-        if (p != null) return _withResetWarning((confirm) => api.update(p.id, _input, confirmReset: confirm));
+        if (p != null) return api.update(p.id, _changes);
         var created = await api.create(_input);
         // L'article existe désormais : un échec des photos ne doit pas conduire à le recréer (audit, M-7).
         _apply(created);
@@ -172,16 +150,13 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         return created;
       }, done: 'Enregistré',);
 
-  /// Le formulaire diffère de l'article enregistré (titre, prix, rubrique…).
+  /// Le formulaire diffère de la fiche enregistrée (promotion ; rubrique et durée avant la première publication).
   bool get _dirty {
     final p = _product;
     if (p == null) return false;
-    return _title.text.trim() != p.title ||
-        _price.text != '${p.priceFcfa}' ||
-        _compare.text != (p.compareAtFcfa?.toString() ?? '') ||
-        (p.isService && _duration.text != (p.durationMinutes?.toString() ?? '')) ||
-        _description.text.trim() != (p.description ?? '') ||
-        _category != p.categoryCode;
+    return _promo.text != (_promoOf(p)?.toString() ?? '') ||
+        (!_frozen && p.isService && _duration.text != (p.durationMinutes?.toString() ?? '')) ||
+        (!_frozen && _category != p.categoryCode);
   }
 
   /// Les autres actions (publier, variantes, stock, photos) enregistrent d'abord les changements du formulaire :
@@ -191,8 +166,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     return _run((api) async {
       if (_dirty) {
         if (!_valid) throw const ApiException(code: 'VALIDATION_FAILED', message: 'Complète le nom, le prix et la rubrique avant de continuer.');
-        // Photo et contenu modifiés ensemble : la règle générale s'applique (avertissement, remise à zéro).
-        await _withResetWarning((confirm) => api.update(p.id, _input, confirmReset: confirm));
+        await api.update(p.id, _changes);
       }
       return action(api, p);
     }, done: done,);
@@ -334,9 +308,42 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
             ),
             if (e?.fieldError('photos') != null) Text(e!.fieldError('photos')!, style: const TextStyle(color: BimColors.red)),
             const SizedBox(height: BimSpacing.lg),
-            BimTextField(key: const ValueKey('product-title'), label: 'Nom', controller: _title, required: true, maxLength: 120, errorText: e?.fieldError('title'), onChanged: (_) => setState(() {})),
+            if (_identityLocked) ...[
+              Container(
+                key: const ValueKey('identity-locked'),
+                padding: const EdgeInsets.all(BimSpacing.md),
+                decoration: BoxDecoration(color: BimColors.warningBg, borderRadius: BorderRadius.circular(BimRadius.chip)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Le nom, la description et le prix normal sont fixés à la création. Pour les changer, crée une nouvelle '
+                      'fiche : elle aura une nouvelle référence et une réputation vierge. Photo et promotion se modifient ici '
+                      'sans toucher à la réputation.',
+                    ),
+                    TextButton.icon(
+                      key: const ValueKey('new-sheet'),
+                      onPressed: () => context.push('/shop/products/new'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Créer une nouvelle fiche'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: BimSpacing.md),
+            ],
+            BimTextField(
+              key: const ValueKey('product-title'),
+              label: 'Nom',
+              controller: _title,
+              required: !_identityLocked,
+              readOnly: _identityLocked,
+              maxLength: 120,
+              errorText: e?.fieldError('title'),
+              onChanged: (_) => setState(() {}),
+            ),
             const SizedBox(height: BimSpacing.md),
-            _CategoryField(value: _category, error: e?.fieldError('categoryCode'), onChanged: (c) => setState(() => _category = c)),
+            _CategoryField(value: _category, error: e?.fieldError('categoryCode'), onChanged: _frozen ? null : (c) => setState(() => _category = c)),
             const SizedBox(height: BimSpacing.md),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,9 +351,10 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                 Expanded(
                   child: BimTextField(
                     key: const ValueKey('product-price'),
-                    label: 'Prix (FCFA)',
+                    label: 'Prix normal (FCFA)',
                     controller: _price,
-                    required: true,
+                    required: !_identityLocked,
+                    readOnly: _identityLocked,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     errorText: e?.fieldError('priceFcfa'),
@@ -356,12 +364,14 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                 const SizedBox(width: BimSpacing.sm),
                 Expanded(
                   child: BimTextField(
-                    label: 'Prix barré',
-                    controller: _compare,
+                    key: const ValueKey('product-promo'),
+                    label: 'Prix promo',
+                    controller: _promo,
                     optional: true,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    errorText: e?.fieldError('compareAtFcfa'),
+                    errorText: e?.fieldError('promoPriceFcfa'),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
               ],
@@ -372,14 +382,15 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                 label: 'Durée (minutes)',
                 controller: _duration,
                 optional: true,
+                readOnly: _frozen,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 errorText: e?.fieldError('durationMinutes'),
               ),
             ],
             const SizedBox(height: BimSpacing.md),
-            BimTextField(label: 'Description', controller: _description, optional: true, maxLength: 2000),
-            if (e != null && e.details['fields'] == null) ...[
+            BimTextField(key: const ValueKey('product-description'), label: 'Description', controller: _description, optional: !_identityLocked, readOnly: _identityLocked, maxLength: 2000),
+            if (e != null && e.details['fields'] is! Map) ...[
               const SizedBox(height: BimSpacing.md),
               Text(e.message, style: const TextStyle(color: BimColors.red)),
             ],
@@ -389,18 +400,22 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
               const SizedBox(height: BimSpacing.xl),
               Text('Tailles, couleurs et stock', style: theme.textTheme.titleMedium),
               const SizedBox(height: BimSpacing.sm),
-              BimTextField(label: 'Variantes', hint: 'S, M, L ou Rouge, Noir', controller: _variants, optional: true),
-              const SizedBox(height: BimSpacing.sm),
-              BimButton(
-                label: 'Mettre à jour les variantes',
-                variant: BimButtonVariant.outline,
-                onPressed: _busy
-                    ? null
-                    : () => _act((api, p) {
-                          final labels = _variants.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
-                          return _withResetWarning((confirm) => api.setVariants(p.id, labels, confirmReset: confirm));
-                        },),
-              ),
+              if (_frozen)
+                Text('Variantes fixées depuis la publication ; le stock reste modifiable.', key: const ValueKey('variants-frozen'), style: theme.textTheme.bodySmall)
+              else ...[
+                BimTextField(label: 'Variantes', hint: 'S, M, L ou Rouge, Noir', controller: _variants, optional: true),
+                const SizedBox(height: BimSpacing.sm),
+                BimButton(
+                  label: 'Mettre à jour les variantes',
+                  variant: BimButtonVariant.outline,
+                  onPressed: _busy
+                      ? null
+                      : () => _act((api, p) {
+                            final labels = _variants.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet().toList();
+                            return api.setVariants(p.id, labels);
+                          },),
+                ),
+              ],
               const SizedBox(height: BimSpacing.md),
               for (final v in p.variants)
                 Padding(
@@ -517,7 +532,8 @@ class _CategoryField extends ConsumerWidget {
 
   final String? value;
   final String? error;
-  final ValueChanged<String?> onChanged;
+  /// null : rubrique figée (fiche déjà publiée).
+  final ValueChanged<String?>? onChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

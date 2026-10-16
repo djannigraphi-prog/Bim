@@ -166,6 +166,33 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-04 — Livreurs, fiches des articles et réputation : corrections (16/10/2026) · Fondateur · **décidé** ; fiches **réalisées**, livreurs **verrouillés** (aucune route livreur encore)
+
+- **Livreurs** : un livreur n'accède **jamais** aux commandes internes d'une boutique. Il peut seulement (1) voir les
+  **annonces de livraison publiées** (le marchand valide une commande puis publie une annonce pour trouver un livreur),
+  (2) **accepter** une course et voir les informations nécessaires pour l'exécuter, (3) consulter **son propre
+  historique** (les livraisons qu'il a lui-même effectuées). Ni commandes générales, ni commandes non publiées, ni
+  historique des autres livreurs. L'historique des livraisons est distinct des commandes du marchand ; contrôle par le
+  serveur. Aujourd'hui : aucune route n'est ouverte à l'espace livreur ; un test e2e (`courier-access`) énumère toutes
+  les routes et le vérifie, ainsi que le refus de toutes les routes de boutique à un livreur actif, même partenaire.
+- **Point à arbitrer (contradiction avec A4 / A5)** : le modèle « annonce publiée, acceptée par un livreur » diffère du
+  modèle approuvé « le marchand choisit le livreur parmi les éligibles, partenaires prioritaires, motif obligatoire ».
+  Proposition (non réalisée) : l'annonce est d'abord proposée aux employés puis aux partenaires, ensuite aux
+  indépendants ; l'acceptation attribue la course. Voir `docs/LOT7_CONCEPTION.md` §8 bis.
+- **Fiches des articles** : le **prix normal** est fixé à la création. Après la création, **nom, description et prix
+  normal** ne se modifient plus (brouillon compris) : il faut une **nouvelle fiche**, avec une nouvelle référence et une
+  réputation vierge. Restent modifiables : **photos** (ajout, remplacement, suppression) et **promotion** (activer,
+  modifier, supprimer), sans effet sur la réputation ; stock, masquage, republication aussi. Rubrique, durée et
+  variantes se règlent jusqu'à la **première publication** (interprétation de Claude, à confirmer). Refus :
+  `PRODUCT_CONTENT_LOCKED` (409) ; la base refuse elle-même toute modification du nom, de la description ou du prix
+  normal (déclencheur). Le « prix barré » devient le prix normal ; la promotion est un champ distinct
+  (`promo_price_fcfa`, migrations 0028 et 0029, données reprises sans perte).
+- **Réputation** : conservée pour la photo et la promotion ; une nouvelle fiche a une nouvelle référence et une
+  réputation vierge ; la référence existante reste stable ; commandes et historiques (7-B, 7-H) garderont référence et
+  version. **Remplace** la règle de L7-03 « modifier le contenu avec avertissement remet la réputation à zéro » :
+  l'avertissement, `confirmReputationReset` et `REPUTATION_RESET_REQUIRED` sont retirés ; `content_version`,
+  `product_revisions` et `reputation_reset_at` restent en base (aucune suppression, plus alimentés).
+
 ### L7-03 — Lot 7-A : références, réputation des articles, permissions (16/10/2026, 16 h 14) · Fondateur · **décidé**, **réalisé** (7-A)
 
 - **A13** : référence attribuée **dès la création** de la fiche (brouillon compris), par le serveur, unique, stable,
@@ -175,7 +202,7 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
   référence à la création, « visible par moi uniquement » tant qu'elles ne sont pas publiées, mêmes règles de
   réputation dès qu'elles le sont ; les lignes de commande (7-B) gardent la référence et la **version du contenu**
   commandée ; les avis (7-H) se rattachent à cette référence et à cette version.
-- **Réputation liée au contenu réellement évalué** : toute modification confirmée du contenu d'une fiche **déjà
+- **[Remplacé par L7-04]** **Réputation liée au contenu réellement évalué** : toute modification confirmée du contenu d'une fiche **déjà
   publiée** (nom, prix, prix barré, description, rubrique, durée, variantes ajoutées / retirées / renommées) exige un
   avertissement préalable et une confirmation, puis crée une nouvelle **version du contenu** : la réputation active
   repart de zéro, l'ancienne reste en base (traçabilité) sans être affichée ; trace de la modification (champs, contenu

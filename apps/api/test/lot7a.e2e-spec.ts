@@ -85,84 +85,80 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     expect((await h.http().get('/v1/shop/products').set(s.auth).expect(200)).body.items.find((x: { id: string }) => x.id === p.id).reference).toBe(p.reference);
   });
 
-  it('photo seule : réputation conservée ; contenu modifié : avertissement, annulation possible, puis remise à zéro', async () => {
+  it('L7-04 — photo et promotion : réputation conservée ; nom, description, prix normal : refusés (nouvelle fiche)', async () => {
     const s = await shop();
-    const p = await published(s);
+    const p = await published(s, 'Robe soirée à plumes', 60000);
     const a = await client();
     const b = await client();
     await heart(a, p.id);
     await heart(b, p.id);
     expect((await detail(s, p.id)).activeFavorites).toBe(2);
 
-    // 1. Photo seule (ajout puis retrait) : rien ne change.
+    // Photo seule (ajout puis retrait) : réputation conservée.
     const withPhoto = (await h.http().post(`/v1/shop/products/${p.id}/photos`).set(s.auth).attach('photos', await jpeg(30), 'b.jpg').expect(201)).body;
     await h.http().delete(`/v1/shop/products/${p.id}/photos/${withPhoto.photos[0].id}`).set(s.auth).expect(200);
     let d = await detail(s, p.id);
-    expect(d).toMatchObject({ contentVersion: 1, activeFavorites: 2, reputationResetAt: null, reference: p.reference });
+    expect(d).toMatchObject({ contentVersion: 1, activeFavorites: 2, reference: p.reference });
     expect(await hearted(a, p.id)).toBe(true);
 
-    // 5. Modification non confirmée (annulation) : 409, rien n'est enregistré, réputation intacte.
-    const warn = await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Chaussures cuir', priceFcfa: 30000 }).expect(409);
-    expect(warn.body.error).toMatchObject({ code: 'REPUTATION_RESET_REQUIRED', details: { fields: ['title', 'priceFcfa'], activeFavorites: 2 } });
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Chaussures cuir', confirmReputationReset: false }).expect(409);
-    d = await detail(s, p.id);
-    expect(d).toMatchObject({ title: 'Robe soirée à plumes', priceFcfa: 45000, contentVersion: 1, activeFavorites: 2 });
-
-    // Renvoyer les mêmes valeurs n'est pas une modification.
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Robe soirée à plumes', priceFcfa: 45000 }).expect(200);
-    expect((await detail(s, p.id)).contentVersion).toBe(1);
-
-    // 2. Nom (et prix) confirmés : remise à zéro, trace conservée, référence stable (7).
-    d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Chaussures cuir', priceFcfa: 30000, confirmReputationReset: true }).expect(200)).body;
-    expect(d).toMatchObject({ title: 'Chaussures cuir', priceFcfa: 30000, contentVersion: 2, activeFavorites: 0, reference: p.reference });
-    expect(d.reputationResetAt).toBeTruthy();
-    expect(await hearted(a, p.id)).toBe(false);
-    expect(await favoritesList(a)).not.toContain(p.id);
-    // 8. Historique non corrompu : les anciens cœurs restent en base (inactifs), la version précédente est conservée.
-    expect((await h.pool.query('select count(*)::int n from product_favorites where product_id = $1 and product_version = 1', [p.id])).rows[0].n).toBe(2);
-    const rev = (await h.pool.query('select version, changed_fields, previous, changed_by from product_revisions where product_id = $1', [p.id])).rows;
-    expect(rev).toEqual([
-      { version: 2, changed_fields: 'title,priceFcfa', previous: expect.objectContaining({ title: 'Robe soirée à plumes', priceFcfa: 45000, reputation: { favorites: 2 } }), changed_by: s.ownerId },
+    // Promotion activée, modifiée puis supprimée : réputation conservée, prix normal intact, journal avant / après.
+    d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ promoPriceFcfa: 45000 }).expect(200)).body;
+    expect(d).toMatchObject({ normalPriceFcfa: 60000, promoPriceFcfa: 45000, priceFcfa: 45000, compareAtFcfa: 60000, activeFavorites: 2, contentVersion: 1 });
+    expect((await h.http().get(`/v1/bimshop/products/${p.id}`).expect(200)).body).toMatchObject({ priceFcfa: 45000, compareAtFcfa: 60000 });
+    d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ promoPriceFcfa: 40000 }).expect(200)).body;
+    expect(d).toMatchObject({ promoPriceFcfa: 40000, activeFavorites: 2 });
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ promoPriceFcfa: 60000 }).expect(400); // pas au-dessus du prix normal
+    d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ promoPriceFcfa: null }).expect(200)).body;
+    expect(d).toMatchObject({ normalPriceFcfa: 60000, promoPriceFcfa: null, priceFcfa: 60000, compareAtFcfa: null, activeFavorites: 2, contentVersion: 1 });
+    expect(await hearted(b, p.id)).toBe(true);
+    const promos = (await h.pool.query("select metadata from audit_logs where action = 'shop.product_promotion_changed' and target_id = $1 order by created_at", [p.id])).rows.map((r: { metadata: unknown }) => r.metadata);
+    expect(promos).toEqual([
+      expect.objectContaining({ reference: p.reference, before: null, after: 45000 }),
+      expect.objectContaining({ before: 45000, after: 40000 }),
+      expect.objectContaining({ before: 40000, after: null }),
     ]);
-    const audit = await h.pool.query("select metadata from audit_logs where action = 'shop.product_content_changed' and target_id = $1", [p.id]);
-    expect(audit.rows[0].metadata).toMatchObject({ reference: p.reference, fields: ['title', 'priceFcfa'], version: 2, reputationReset: true });
 
-    // Un nouveau cœur compte pour la nouvelle version.
-    await heart(a, p.id);
-    expect(await hearted(a, p.id)).toBe(true);
-    expect((await detail(s, p.id)).activeFavorites).toBe(1);
+    // Nom, description, prix normal : refusés, rien n'est enregistré (même combinés avec une promotion).
+    for (const body of [{ title: 'Chaussures cuir' }, { description: 'Autre produit' }, { priceFcfa: 30000 }, { title: 'Chaussures cuir', promoPriceFcfa: 20000 }]) {
+      const r = await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send(body).expect(409);
+      expect(r.body.error.code).toBe('PRODUCT_CONTENT_LOCKED');
+    }
+    // L'ancienne demande de « remise à zéro » n'existe plus : champ refusé.
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Chaussures cuir', confirmReputationReset: true }).expect(400);
+    d = await detail(s, p.id);
+    expect(d).toMatchObject({ title: 'Robe soirée à plumes', normalPriceFcfa: 60000, promoPriceFcfa: null, activeFavorites: 2, contentVersion: 1, reference: p.reference });
+    // Renvoyer les mêmes valeurs n'est pas une modification.
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Robe soirée à plumes', priceFcfa: 60000 }).expect(200);
+    // Même en contournant l'API, la base refuse.
+    await expect(h.pool.query("update products set title = 'Autre' where id = $1", [p.id])).rejects.toThrow(/ne se modifient pas/);
+    await expect(h.pool.query('update products set price_fcfa = 1 where id = $1', [p.id])).rejects.toThrow(/ne se modifient pas/);
 
-    // 3. Prix seul : remise à zéro aussi.
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ priceFcfa: 28000 }).expect(409);
-    d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ priceFcfa: 28000, confirmReputationReset: true }).expect(200)).body;
-    expect(d).toMatchObject({ contentVersion: 3, activeFavorites: 0 });
-
-    // 4. Photo et contenu dans la même opération (l'app envoie la photo puis le contenu) : la remise à zéro s'applique.
-    await heart(b, p.id);
-    await h.http().post(`/v1/shop/products/${p.id}/photos`).set(s.auth).attach('photos', await jpeg(200), 'c.jpg').expect(201);
-    expect((await detail(s, p.id)).activeFavorites).toBe(1);
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ description: 'Cuir véritable' }).expect(409);
-    d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ description: 'Cuir véritable', confirmReputationReset: true }).expect(200)).body;
-    expect(d).toMatchObject({ contentVersion: 4, activeFavorites: 0, reference: p.reference });
-
-    // Variantes : changer seulement l'ordre ne change rien ; ajouter une taille remet à zéro.
-    await h.http().put(`/v1/shop/products/${p.id}/variants`).set(s.auth).send({ labels: ['S', 'M'] }).expect(409);
-    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(s.auth).send({ labels: ['S', 'M'], confirmReputationReset: true }).expect(200)).body;
-    expect(d.contentVersion).toBe(5);
-    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(s.auth).send({ labels: ['M', 'S'] }).expect(200)).body;
-    expect(d.contentVersion).toBe(5);
-    // Le stock n'est pas le contenu : aucune remise à zéro.
+    // Article publié : rubrique et variantes figées aussi ; l'ordre des variantes et le stock restent libres.
+    expect((await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ categoryCode: 'accessoires_sacs' }).expect(409)).body.error.details.fields).toEqual(['categoryCode']);
+    expect((await h.http().put(`/v1/shop/products/${p.id}/variants`).set(s.auth).send({ labels: ['S', 'M'] }).expect(409)).body.error.details.fields).toEqual(['variants']);
+    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(s.auth).send({ labels: ['Unique'] }).expect(200)).body;
     d = (await h.http().put(`/v1/shop/products/${p.id}/variants/${d.variants[0].id}/stock`).set(s.auth).send({ quantity: 4 }).expect(200)).body;
-    expect(d.contentVersion).toBe(5);
-    expect((await h.pool.query('select count(*)::int n from product_revisions where product_id = $1', [p.id])).rows[0].n).toBe(4);
+    expect(d).toMatchObject({ contentVersion: 1, activeFavorites: 2 });
+
+    // Nouvelle fiche pour un autre produit : nouvelle référence, réputation vierge ; l'ancienne fiche est intacte.
+    const other = await published(s, 'Chaussures cuir', 30000);
+    expect(other.reference).not.toBe(p.reference);
+    expect(await detail(s, other.id)).toMatchObject({ reference: other.reference, contentVersion: 1, activeFavorites: 0 });
+    expect(await hearted(a, other.id)).toBe(false);
+    expect(await detail(s, p.id)).toMatchObject({ title: 'Robe soirée à plumes', activeFavorites: 2 });
   });
 
-  it('brouillon jamais publié : modifications libres, sans avertissement ni remise à zéro', async () => {
+  it('fiche jamais publiée : nom, description, prix normal figés dès la création ; rubrique, durée et variantes encore réglables', async () => {
     const s = await shop();
     const p = (await h.http().post('/v1/shop/products').set(s.auth).send({ title: 'Brouillon', categoryCode: 'vetements_soiree', priceFcfa: 1000 }).expect(201)).body;
-    const d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Brouillon renommé', priceFcfa: 2000 }).expect(200)).body;
-    expect(d).toMatchObject({ title: 'Brouillon renommé', contentVersion: 1, reference: p.reference });
-    expect((await h.pool.query('select count(*)::int n from product_revisions where product_id = $1', [p.id])).rows[0].n).toBe(0);
+    expect((await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Brouillon renommé' }).expect(409)).body.error).toMatchObject({ code: 'PRODUCT_CONTENT_LOCKED', details: { fields: ['title'] } });
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ priceFcfa: 2000 }).expect(409);
+    let d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ categoryCode: 'accessoires_sacs', promoPriceFcfa: 800 }).expect(200)).body;
+    expect(d).toMatchObject({ title: 'Brouillon', categoryCode: 'accessoires_sacs', normalPriceFcfa: 1000, promoPriceFcfa: 800, reference: p.reference });
+    d = (await h.http().put(`/v1/shop/products/${p.id}/variants`).set(s.auth).send({ labels: ['S', 'M'] }).expect(200)).body;
+    expect(d.variants.map((v: { label: string }) => v.label)).toEqual(['S', 'M']);
+    const svc = (await h.http().post('/v1/shop/products').set(s.auth).send({ kind: 'service', title: 'Tresses', categoryCode: 'services', priceFcfa: 15000, durationMinutes: 120 }).expect(201)).body;
+    expect((await h.http().patch(`/v1/shop/products/${svc.id}`).set(s.auth).send({ durationMinutes: 180 }).expect(200)).body.durationMinutes).toBe(180);
   });
 
   it('masquer et republier : invisible publiquement, réputation et référence conservées', async () => {
@@ -192,12 +188,13 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     // L'ancien « unpublish » masque désormais (réputation conservée).
     d = (await h.http().post(`/v1/shop/products/${p.id}/unpublish`).set(s.auth).expect(200)).body;
     expect(d).toMatchObject({ status: 'hidden', activeFavorites: 1 });
-    // Un article masqué modifié : avertissement aussi (il a déjà été publié).
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Autre chose' }).expect(409);
+    // Masqué : le nom reste figé ; la promotion se règle, sans toucher à la réputation.
+    expect((await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ title: 'Autre chose' }).expect(409)).body.error.code).toBe('PRODUCT_CONTENT_LOCKED');
+    expect((await h.http().patch(`/v1/shop/products/${p.id}`).set(s.auth).send({ promoPriceFcfa: 30000 }).expect(200)).body).toMatchObject({ status: 'hidden', activeFavorites: 1 });
     expect((await h.pool.query('select count(*)::int n from audit_logs where target_id = $1 and action in ($2, $3)', [p.id, 'shop.product_hidden', 'shop.product_published'])).rows[0].n).toBeGreaterThanOrEqual(3);
   });
 
-  it('permissions séparées : rien par défaut, chaque action contrôlée par le serveur, mêmes règles de réputation', async () => {
+  it('permissions séparées : rien par défaut, chaque action contrôlée par le serveur, mêmes règles de fiche', async () => {
     const s = await shop();
     const p = await published(s);
     const nobody = await staff(s, []);
@@ -227,29 +224,30 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     await h.http().post(`/v1/shop/products/${p.id}/photos`).set(nobody.auth).attach('photos', await jpeg(), 'a.jpg').expect(403);
 
     // Éditeur : modifie, soumis au même avertissement ; ne publie, ne masque ni ne retire.
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(editor.auth).send({ title: 'Robe modifiée' }).expect(409);
-    const d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(editor.auth).send({ title: 'Robe modifiée', confirmReputationReset: true }).expect(200)).body;
-    expect(d.contentVersion).toBe(2);
-    expect((await h.pool.query('select changed_by from product_revisions where product_id = $1', [p.id])).rows[0].changed_by).toBe(editor.userId);
+    // Éditeur : mêmes règles que le propriétaire (nom figé) ; il règle la promotion, journalisée à son nom.
+    expect((await h.http().patch(`/v1/shop/products/${p.id}`).set(editor.auth).send({ title: 'Robe modifiée' }).expect(409)).body.error.code).toBe('PRODUCT_CONTENT_LOCKED');
+    const d = (await h.http().patch(`/v1/shop/products/${p.id}`).set(editor.auth).send({ promoPriceFcfa: 40000 }).expect(200)).body;
+    expect(d).toMatchObject({ promoPriceFcfa: 40000, contentVersion: 1 });
+    expect((await h.pool.query("select actor_id from audit_logs where action = 'shop.product_promotion_changed' and target_id = $1", [p.id])).rows[0].actor_id).toBe(editor.userId);
     await h.http().post(`/v1/shop/products/${p.id}/hide`).set(editor.auth).expect(403);
     await h.http().delete(`/v1/shop/products/${p.id}`).set(editor.auth).expect(403);
     // Masquer / republier : sa permission propre, sans pouvoir modifier.
     await h.http().post(`/v1/shop/products/${p.id}/hide`).set(visibility.auth).expect(200);
     await h.http().post(`/v1/shop/products/${p.id}/show`).set(visibility.auth).expect(200);
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(visibility.auth).send({ title: 'Non' }).expect(403);
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(visibility.auth).send({ promoPriceFcfa: 1000 }).expect(403);
     // Publier n'autorise pas à modifier, ni à republier un article masqué (« masquer ou republier »), même par /publish.
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(publisher.auth).send({ title: 'Non' }).expect(403);
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(publisher.auth).send({ promoPriceFcfa: 1000 }).expect(403);
     await h.http().post(`/v1/shop/products/${p.id}/hide`).set(visibility.auth).expect(200);
     expect((await h.http().post(`/v1/shop/products/${p.id}/publish`).set(publisher.auth).expect(403)).body.error).toMatchObject({ code: 'SHOP_PERMISSION_REQUIRED', details: { permission: 'products.visibility' } });
     expect((await h.http().post(`/v1/shop/products/${p.id}/publish`).set(s.auth).expect(200)).body.status).toBe('published');
     // Une autre boutique : introuvable.
     const other = await shop('Autre');
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(other.auth).send({ title: 'Vol', confirmReputationReset: true }).expect(404);
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(other.auth).send({ promoPriceFcfa: 1000 }).expect(404);
     // Espace utilisateur : refusé.
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.user).send({ title: 'Non' }).expect(403);
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(s.user).send({ promoPriceFcfa: 1000 }).expect(403);
     // Permission retirée : effet immédiat (revérifiée à chaque requête).
     await h.pool.query('delete from shop_member_permissions where user_id = $1', [editor.userId]);
-    await h.http().patch(`/v1/shop/products/${p.id}`).set(editor.auth).send({ title: 'Plus le droit', confirmReputationReset: true }).expect(403);
+    await h.http().patch(`/v1/shop/products/${p.id}`).set(editor.auth).send({ promoPriceFcfa: 1000 }).expect(403);
   });
 
   it('équipe : invitation acceptée par la personne, permissions accordées et retirées par le propriétaire seul, journalisées', async () => {

@@ -118,6 +118,8 @@ class ProductDetail {
     this.contentVersion = 1,
     this.activeFavorites = 0,
     this.everPublished = false,
+    this.normalPriceFcfa,
+    this.promoPriceFcfa,
     this.description,
     this.categoryCode,
     this.compareAtFcfa,
@@ -139,8 +141,13 @@ class ProductDetail {
   final String reference;
   final int contentVersion;
   final int activeFavorites;
-  /// Déjà publié au moins une fois : modifier son contenu remet sa réputation à zéro.
+  /// Déjà publié au moins une fois : rubrique, durée et variantes sont alors figées aussi (L7-04).
   final bool everPublished;
+  /// L7-04 : prix normal (fixé à la création) et promotion (modifiable). `priceFcfa` = prix payé.
+  final int? normalPriceFcfa;
+  final int? promoPriceFcfa;
+
+  int get normalPrice => normalPriceFcfa ?? compareAtFcfa ?? priceFcfa;
 
   bool get isService => kind == 'service';
 
@@ -158,6 +165,8 @@ class ProductDetail {
         contentVersion: (j['contentVersion'] ?? 1) as int,
         activeFavorites: (j['activeFavorites'] ?? 0) as int,
         everPublished: j['publishedAt'] != null,
+        normalPriceFcfa: j['normalPriceFcfa'] as int?,
+        promoPriceFcfa: j['promoPriceFcfa'] as int?,
         photos: [
           for (final p in (j['photos'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) ProductPhoto(id: p['id'] as String, url: p['url'] as String?),
         ],
@@ -181,27 +190,45 @@ class ShopCategory {
       );
 }
 
-/// Champs d'un article ou d'une prestation.
+/// Champs d'un article ou d'une prestation à la création. L7-04 : nom, description et prix normal ne changent plus
+/// ensuite ; seuls la promotion (toujours) et la rubrique, la durée (avant la première publication) se modifient.
 class ProductInput {
-  const ProductInput({required this.kind, required this.title, required this.categoryCode, required this.priceFcfa, this.description, this.compareAtFcfa, this.durationMinutes});
+  const ProductInput({required this.kind, required this.title, required this.categoryCode, required this.priceFcfa, this.description, this.promoPriceFcfa, this.durationMinutes});
   final String kind;
   final String title;
   final String categoryCode;
+  /// Prix normal.
   final int priceFcfa;
   final String? description;
-  final int? compareAtFcfa;
+  final int? promoPriceFcfa;
   final int? durationMinutes;
 
-  Map<String, dynamic> toJson({bool create = true}) => {
-        if (create) 'kind': kind,
+  Map<String, dynamic> toJson() => {
+        'kind': kind,
         'title': title,
         'categoryCode': categoryCode,
         'priceFcfa': priceFcfa,
         'description': description ?? '',
-        if (create && compareAtFcfa != null) 'compareAtFcfa': compareAtFcfa,
-        if (!create) 'compareAtFcfa': compareAtFcfa,
-        if (create && durationMinutes != null) 'durationMinutes': durationMinutes,
-        if (!create) 'durationMinutes': durationMinutes,
+        if (promoPriceFcfa != null) 'promoPriceFcfa': promoPriceFcfa,
+        if (durationMinutes != null) 'durationMinutes': durationMinutes,
+      };
+}
+
+/// Modifications autorisées d'une fiche existante (L7-04).
+class ProductChanges {
+  const ProductChanges({this.promoPriceFcfa, this.categoryCode, this.durationMinutes, this.sendCategory = false, this.sendDuration = false});
+  /// null = supprimer la promotion.
+  final int? promoPriceFcfa;
+  final String? categoryCode;
+  final int? durationMinutes;
+  /// Rubrique et durée : envoyées seulement pour une fiche jamais publiée.
+  final bool sendCategory;
+  final bool sendDuration;
+
+  Map<String, dynamic> toJson() => {
+        'promoPriceFcfa': promoPriceFcfa,
+        if (sendCategory && categoryCode != null) 'categoryCode': categoryCode,
+        if (sendDuration) 'durationMinutes': durationMinutes,
       };
 }
 
@@ -223,10 +250,8 @@ class ShopApi {
 
   Future<ProductDetail> product(String id) async => ProductDetail.fromJson(await _api.get('/v1/shop/products/$id'));
   Future<ProductDetail> create(ProductInput input) async => ProductDetail.fromJson(await _api.post('/v1/shop/products', body: input.toJson()));
-  /// 7-A : `confirmReset` après avertissement, si l'article a déjà été publié (sinon REPUTATION_RESET_REQUIRED).
-  Future<ProductDetail> update(String id, ProductInput input, {bool confirmReset = false}) async => ProductDetail.fromJson(
-        await _api.patch('/v1/shop/products/$id', body: {...input.toJson(create: false), if (confirmReset) 'confirmReputationReset': true}),
-      );
+  /// L7-04 : promotion, et rubrique / durée avant la première publication. La réputation est conservée.
+  Future<ProductDetail> update(String id, ProductChanges changes) async => ProductDetail.fromJson(await _api.patch('/v1/shop/products/$id', body: changes.toJson()));
   Future<ProductDetail> publish(String id) async => ProductDetail.fromJson(await _api.post('/v1/shop/products/$id/publish'));
   /// 7-A : « Visible par moi uniquement » / « Visible publiquement » ; la réputation est conservée.
   Future<ProductDetail> hide(String id) async => ProductDetail.fromJson(await _api.post('/v1/shop/products/$id/hide'));
@@ -235,8 +260,8 @@ class ShopApi {
   Future<ProductDetail> addPhotos(String id, List<List<int>> files) async =>
       ProductDetail.fromJson(await _api.postFiles('/v1/shop/products/$id/photos', fields: const {}, fileField: 'photos', files: files));
   Future<ProductDetail> removePhoto(String id, String photoId) async => ProductDetail.fromJson(await _api.delete('/v1/shop/products/$id/photos/$photoId'));
-  Future<ProductDetail> setVariants(String id, List<String> labels, {bool confirmReset = false}) async =>
-      ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants', body: {'labels': labels, if (confirmReset) 'confirmReputationReset': true}));
+  /// Variantes : avant la première publication seulement (ensuite, seul l'ordre change).
+  Future<ProductDetail> setVariants(String id, List<String> labels) async => ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants', body: {'labels': labels}));
   Future<ProductDetail> setStock(String id, String variantId, int quantity) async =>
       ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants/$variantId/stock', body: {'quantity': quantity}));
 }

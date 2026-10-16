@@ -70,7 +70,7 @@ export class MerchantCatalogController {
   @Patch('products/:id')
   @RequireShopPermission('products.edit')
   @ApiOperation({
-    summary: 'Modifier le contenu ; un article déjà publié perd sa réputation (REPUTATION_RESET_REQUIRED tant que confirmReputationReset n’est pas envoyé)',
+    summary: 'Promotion (activer, modifier, supprimer) ; rubrique et durée avant la première publication. Nom, description et prix normal : PRODUCT_CONTENT_LOCKED (nouvelle fiche)',
   })
   updateProduct(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProductDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
     return this.catalog.update(this.shop(a), a.userId, id, dto, meta, apiBase(req));
@@ -137,9 +137,9 @@ export class MerchantCatalogController {
 
   @Put('products/:id/variants')
   @RequireShopPermission('products.edit')
-  @ApiOperation({ summary: 'Variantes (tailles, couleurs…) ; vide : « Unique ». Les changer sur un article déjà publié remet sa réputation à zéro (confirmation)' })
-  variants(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VariantsDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
-    return this.catalog.setVariants(this.shop(a), a.userId, id, dto.labels, dto.confirmReputationReset, meta, apiBase(req));
+  @ApiOperation({ summary: 'Variantes (tailles, couleurs…) ; vide : « Unique ». Après la première publication, seul l’ordre change (PRODUCT_CONTENT_LOCKED)' })
+  variants(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VariantsDto, @Req() req: Request) {
+    return this.catalog.setVariants(this.shop(a), id, dto.labels, apiBase(req));
   }
 
   @Put('products/:id/variants/:variantId/stock')

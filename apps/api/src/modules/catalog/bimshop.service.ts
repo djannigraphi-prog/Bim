@@ -19,6 +19,15 @@ const like = (v: string) => `%${v.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
  * Seuls les articles publiés des boutiques ouvertes dont le propriétaire a un compte actif sont visibles.
  * Le stock exact n'est jamais montré au public : seulement « disponible » ou « épuisé ».
  */
+
+/** Prix payé (promotion ou prix normal), pour le tri et la pagination. */
+const PAID = sql<number>`coalesce(${products.promoPriceFcfa}, ${products.priceFcfa})`;
+
+/** L7-04 : prix affiché = promotion (prix normal barré) ou prix normal. Contrat de lecture inchangé. */
+function publicPrices(p: { priceFcfa: number; promoPriceFcfa: number | null }) {
+  return { priceFcfa: p.promoPriceFcfa ?? p.priceFcfa, compareAtFcfa: p.promoPriceFcfa != null ? p.priceFcfa : null };
+}
+
 @Injectable()
 export class BimShopService {
   constructor(
@@ -56,8 +65,7 @@ export class BimShopService {
         reference: p.reference,
         kind: p.kind,
         title: p.title,
-        priceFcfa: p.priceFcfa,
-        compareAtFcfa: p.compareAtFcfa,
+        ...publicPrices(p),
         categoryCode: p.categoryCode,
         imageUrl: first ? await this.url(first.storageKey, apiBase) : null,
         available: p.kind === 'service' || (stock.get(p.id) ?? 0) > 0,
@@ -113,10 +121,11 @@ export class BimShopService {
         const v = Number(c.v);
         // Curseur forgé (prix non entier) : 400 et non une erreur de la base (audit, A-11).
         if (!Number.isSafeInteger(v)) throw Errors.validation({ fields: { cursor: ['Curseur invalide.'] } });
-        conds.push(sort === 'price_asc' ? or(gt(products.priceFcfa, v), and(eq(products.priceFcfa, v), gt(products.id, c.id)))! : or(lt(products.priceFcfa, v), and(eq(products.priceFcfa, v), lt(products.id, c.id)))!);
+        conds.push(sort === 'price_asc' ? or(gt(PAID, v), and(eq(PAID, v), gt(products.id, c.id)))! : or(lt(PAID, v), and(eq(PAID, v), lt(products.id, c.id)))!);
       }
     }
-    const order = sort === 'recent' ? [desc(products.publishedAt), desc(products.id)] : sort === 'price_asc' ? [asc(products.priceFcfa), asc(products.id)] : [desc(products.priceFcfa), desc(products.id)];
+    // Tri sur le prix payé : la promotion si elle existe, sinon le prix normal.
+    const order = sort === 'recent' ? [desc(products.publishedAt), desc(products.id)] : sort === 'price_asc' ? [asc(PAID), asc(products.id)] : [desc(PAID), desc(products.id)];
     const rows = await this.db
       .select({ p: products, s: shops })
       .from(products)
@@ -128,7 +137,7 @@ export class BimShopService {
     const page = rows.slice(0, PAGE);
     const last = page[page.length - 1];
     const nextCursor =
-      rows.length > PAGE && last ? Buffer.from(JSON.stringify({ v: sort === 'recent' ? last.p.publishedAt!.toISOString() : last.p.priceFcfa, id: last.p.id })).toString('base64url') : null;
+      rows.length > PAGE && last ? Buffer.from(JSON.stringify({ v: sort === 'recent' ? last.p.publishedAt!.toISOString() : (last.p.promoPriceFcfa ?? last.p.priceFcfa), id: last.p.id })).toString('base64url') : null;
     return { items: await this.cards(page, apiBase), nextCursor };
   }
 
@@ -208,8 +217,7 @@ export class BimShopService {
       kind: p.kind,
       title: p.title,
       description: p.description,
-      priceFcfa: p.priceFcfa,
-      compareAtFcfa: p.compareAtFcfa,
+      ...publicPrices(p),
       durationMinutes: p.durationMinutes,
       category: category ? { code: category.code, label: category.label } : null,
       photos,

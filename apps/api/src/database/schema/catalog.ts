@@ -27,10 +27,10 @@ export const shopCategories = pgTable(
  * uniquement », réputation conservée) · archived (retiré).
  * 7-A — `reference` : référence publique BIM-000001…, attribuée par la base à la création (séquence), unique,
  * jamais modifiée (déclencheur) ni réattribuée ; elle ne remplace pas l'identifiant interne.
- * 7-A — `contentVersion` : version du contenu. Une modification confirmée du contenu d'un article déjà publié
- * (nom, prix, description, rubrique, durée, variantes…) l'incrémente : la réputation active (cœurs, plus tard avis et
- * recommandations) ne compte que ce qui a été donné à la version courante. Photo seule, masquage, republication et
- * stock ne changent pas la version.
+ * 7-A — `contentVersion` : version du contenu, gardée par les commandes et les avis pour leur traçabilité.
+ * L7-04 : le nom, la description et le prix normal ne se modifient plus après la création (déclencheur) ; rubrique,
+ * durée et variantes seulement tant que la fiche n'a jamais été publiée. Photo, promotion, masquage, republication et
+ * stock conservent la réputation. Un autre produit = une nouvelle fiche (nouvelle référence, réputation vierge).
  */
 export const products = pgTable(
   'products',
@@ -49,10 +49,13 @@ export const products = pgTable(
     categoryCode: varchar('category_code', { length: 40 }).references(() => shopCategories.code),
     title: varchar('title', { length: 120 }).notNull(),
     description: varchar('description', { length: 2000 }),
-    /** Prix en FCFA (entier). */
+    /**
+     * Prix normal en FCFA (entier). L7-04 : fixé à la création, jamais modifié ensuite (déclencheur de la base) ;
+     * pour un autre prix, le marchand crée une nouvelle fiche (nouvelle référence, réputation vierge).
+     */
     priceFcfa: integer('price_fcfa').notNull(),
-    /** Prix barré (promotion), supérieur au prix. */
-    compareAtFcfa: integer('compare_at_fcfa'),
+    /** L7-04 : prix promotionnel (activable, modifiable, supprimable), inférieur au prix normal ; réputation conservée. */
+    promoPriceFcfa: integer('promo_price_fcfa'),
     /** Prestation : durée indicative en minutes. */
     durationMinutes: integer('duration_minutes'),
     status: varchar('status', { length: 10 }).notNull().default('draft'),
@@ -67,7 +70,7 @@ export const products = pgTable(
     check('products_kind_ck', sql`${t.kind} IN ('product', 'service')`),
     check('products_status_ck', sql`${t.status} IN ('draft', 'published', 'hidden', 'archived')`),
     check('products_price_ck', sql`${t.priceFcfa} > 0 AND ${t.priceFcfa} <= 100000000`),
-    check('products_compare_ck', sql`${t.compareAtFcfa} IS NULL OR ${t.compareAtFcfa} > ${t.priceFcfa}`),
+    check('products_promo_ck', sql`${t.promoPriceFcfa} IS NULL OR (${t.promoPriceFcfa} > 0 AND ${t.promoPriceFcfa} < ${t.priceFcfa})`),
     check('products_duration_ck', sql`${t.durationMinutes} IS NULL OR (${t.durationMinutes} BETWEEN 5 AND 1440)`),
   ],
 );

@@ -6,7 +6,7 @@ import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { inventoryMovements, productFavorites, productMedia, productRevisions, products, productVariants, ShopPermission, shopCategories, shopFollows, shops } from '../../database/schema';
+import { inventoryMovements, productFavorites, productMedia, products, productVariants, ShopPermission, shopCategories, shopFollows, shops } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
@@ -17,9 +17,8 @@ export const MAX_PRODUCT_IMAGES = 6;
 type ProductRow = typeof products.$inferSelect;
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 
-/** 7-A — Champs dont la modification change le contenu (et donc l'identité) d'un article déjà publié. */
-const CONTENT_FIELDS = ['title', 'description', 'categoryCode', 'priceFcfa', 'compareAtFcfa', 'durationMinutes'] as const;
-type ContentField = (typeof CONTENT_FIELDS)[number] | 'variants';
+/** L7-04 — Éléments de l'identité d'une fiche, figés (nom, description, prix normal ; rubrique, durée et variantes une fois publiée). */
+type ContentField = 'title' | 'description' | 'priceFcfa' | 'categoryCode' | 'durationMinutes' | 'variants';
 
 /**
  * Lot 5-B — Espace marchand (écran 55) : la boutique et son catalogue. Toutes les routes exigent l'espace marchand
@@ -97,8 +96,18 @@ export class MerchantCatalogService {
     if (!c) throw Errors.validation({ fields: { categoryCode: ['Rubrique inconnue.'] } });
   }
 
-  private checkPrices(price: number, compareAt: number | null | undefined) {
-    if (compareAt != null && compareAt <= price) throw Errors.validation({ fields: { compareAtFcfa: ['Le prix barré doit être supérieur au prix.'] } });
+  private checkPromo(price: number, promo: number | null | undefined) {
+    if (promo != null && promo >= price) throw Errors.validation({ fields: { promoPriceFcfa: ['La promotion doit être inférieure au prix normal.'] } });
+  }
+
+  /** Prix à afficher : promotion (prix payé) et prix normal barré, ou prix normal seul. */
+  static prices(p: { priceFcfa: number; promoPriceFcfa: number | null }) {
+    return {
+      priceFcfa: p.promoPriceFcfa ?? p.priceFcfa,
+      compareAtFcfa: p.promoPriceFcfa != null ? p.priceFcfa : null,
+      normalPriceFcfa: p.priceFcfa,
+      promoPriceFcfa: p.promoPriceFcfa,
+    };
   }
 
   private async own(shopId: string, productId: string): Promise<ProductRow> {
@@ -109,7 +118,7 @@ export class MerchantCatalogService {
 
   async create(shopId: string, userId: string, dto: ProductDto, meta: RequestMeta, apiBase: string) {
     await this.checkCategory(dto.categoryCode);
-    this.checkPrices(dto.priceFcfa, dto.compareAtFcfa);
+    this.checkPromo(dto.priceFcfa, dto.promoPriceFcfa);
     const id = uuidv7();
     await this.db.transaction(async (tx) => {
       await tx.insert(products).values({
@@ -120,7 +129,7 @@ export class MerchantCatalogService {
         description: dto.description?.trim() || null,
         categoryCode: dto.categoryCode,
         priceFcfa: dto.priceFcfa,
-        compareAtFcfa: dto.compareAtFcfa ?? null,
+        promoPriceFcfa: dto.promoPriceFcfa ?? null,
         durationMinutes: dto.kind === 'service' ? (dto.durationMinutes ?? null) : null,
       });
       // Une variante « Unique » par défaut, sans stock.
@@ -139,63 +148,55 @@ export class MerchantCatalogService {
     return n;
   }
 
-  /**
-   * 7-A — Une modification du contenu d'un article déjà publié (même masqué) remet sa réputation à zéro. Le serveur
-   * l'exige confirmée (avertissement affiché par l'app) : sans `confirmReputationReset`, rien n'est enregistré.
-   */
-  private async requireResetConfirmation(p: ProductRow, fields: ContentField[], confirmed: boolean | undefined, tx: Tx) {
-    if (!p.publishedAt || !fields.length || confirmed === true) return;
-    throw new AppError(
-      'REPUTATION_RESET_REQUIRED',
-      'Modifier le contenu de cet article remet à zéro ses j’aime, commentaires et recommandations. Confirme pour continuer, ou annule pour le garder tel quel.',
+  /** L7-04 : l'identité d'une fiche est figée ; un autre produit se crée comme une nouvelle fiche. */
+  private locked(fields: ContentField[]) {
+    return new AppError(
+      'PRODUCT_CONTENT_LOCKED',
+      'Le nom, la description et le prix normal ne se modifient pas (ni la rubrique, la durée et les variantes d’un article déjà publié). Crée une nouvelle fiche : elle aura sa propre référence. Tu peux changer la photo et la promotion.',
       HttpStatus.CONFLICT,
-      { fields, activeFavorites: await this.activeFavorites(p, tx) },
+      { fields },
     );
   }
 
-  /** Nouvelle version du contenu : la réputation de l'ancienne reste en base mais n'est plus comptée ni affichée. */
-  private async resetReputation(tx: Tx, p: ProductRow, fields: ContentField[], previous: Record<string, unknown>, userId: string, meta: RequestMeta) {
-    const version = p.contentVersion + 1;
-    const now = new Date();
-    // Réputation de la version qui se termine, gardée dans l'historique (les lignes individuelles peuvent ensuite changer
-    // si la personne remet ou retire son cœur).
-    previous = { ...previous, reputation: { favorites: await this.activeFavorites(p, tx) } };
-    await tx.update(products).set({ contentVersion: version, reputationResetAt: now }).where(eq(products.id, p.id));
-    await tx.insert(productRevisions).values({ id: uuidv7(), productId: p.id, version, changedFields: fields.join(','), previous, changedBy: userId, createdAt: now });
-    await this.audit.log(
-      { actorType: 'user', actorId: userId, action: 'shop.product_content_changed', targetType: 'product', targetId: p.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { reference: p.reference, fields, version, reputationReset: true } },
-      tx,
-    );
-  }
-
-  private snapshot(p: ProductRow) {
-    return { title: p.title, description: p.description, categoryCode: p.categoryCode, priceFcfa: p.priceFcfa, compareAtFcfa: p.compareAtFcfa, durationMinutes: p.durationMinutes };
-  }
-
+  /**
+   * L7-04 — Modifications autorisées : promotion (activer, modifier, supprimer) à tout moment ; rubrique et durée tant
+   * que la fiche n'a jamais été publiée. Nom, description et prix normal : jamais après la création (aussi garanti par
+   * la base). Renvoyer la même valeur n'est pas une modification. La réputation n'est jamais remise à zéro ici.
+   */
   async update(shopId: string, userId: string, productId: string, dto: UpdateProductDto, meta: RequestMeta, apiBase: string) {
     await this.own(shopId, productId);
     if (dto.categoryCode !== undefined) await this.checkCategory(dto.categoryCode);
     await this.db.transaction(async (tx) => {
-      // Ligne verrouillée : deux modifications simultanées ne peuvent pas se partager une seule remise à zéro.
       const [p] = await tx.select().from(products).where(and(eq(products.id, productId), eq(products.shopId, shopId), ne(products.status, 'archived'))).for('update');
       if (!p) throw Errors.notFound('Article');
-      const price = dto.priceFcfa ?? p.priceFcfa;
-      const compareAt = dto.compareAtFcfa === undefined ? p.compareAtFcfa : dto.compareAtFcfa;
-      this.checkPrices(price, compareAt);
-      const next = {
-        title: dto.title?.trim() ?? p.title,
-        description: dto.description === undefined ? p.description : dto.description.trim() || null,
-        categoryCode: dto.categoryCode ?? p.categoryCode,
-        priceFcfa: price,
-        compareAtFcfa: compareAt,
-        durationMinutes: p.kind === 'service' ? (dto.durationMinutes === undefined ? p.durationMinutes : dto.durationMinutes) : null,
-      };
-      // Seuls les champs réellement changés comptent : renvoyer les mêmes valeurs ne remet rien à zéro.
-      const fields: ContentField[] = CONTENT_FIELDS.filter((f) => (next[f] ?? null) !== (p[f] ?? null));
-      if (!fields.length) return;
-      await this.requireResetConfirmation(p, fields, dto.confirmReputationReset, tx);
-      await tx.update(products).set({ ...next, updatedAt: new Date() }).where(eq(products.id, p.id));
-      if (p.publishedAt) await this.resetReputation(tx, p, fields, this.snapshot(p), userId, meta);
+      const fields: ContentField[] = [];
+      if (dto.title !== undefined && dto.title.trim() !== p.title) fields.push('title');
+      if (dto.description !== undefined && (dto.description.trim() || null) !== p.description) fields.push('description');
+      if (dto.priceFcfa !== undefined && dto.priceFcfa !== p.priceFcfa) fields.push('priceFcfa');
+      const category = dto.categoryCode ?? p.categoryCode;
+      const duration = p.kind === 'service' ? (dto.durationMinutes === undefined ? p.durationMinutes : dto.durationMinutes) : null;
+      if (p.publishedAt && category !== p.categoryCode) fields.push('categoryCode');
+      if (p.publishedAt && duration !== p.durationMinutes) fields.push('durationMinutes');
+      if (fields.length) throw this.locked(fields);
+      const promo = dto.promoPriceFcfa === undefined ? p.promoPriceFcfa : dto.promoPriceFcfa;
+      this.checkPromo(p.priceFcfa, promo);
+      if (promo === p.promoPriceFcfa && category === p.categoryCode && duration === p.durationMinutes) return;
+      await tx.update(products).set({ promoPriceFcfa: promo, categoryCode: category, durationMinutes: duration, updatedAt: new Date() }).where(eq(products.id, p.id));
+      if (promo !== p.promoPriceFcfa) {
+        await this.audit.log(
+          {
+            actorType: 'user',
+            actorId: userId,
+            action: 'shop.product_promotion_changed',
+            targetType: 'product',
+            targetId: p.id,
+            ip: meta.ip,
+            userAgent: meta.userAgent,
+            metadata: { reference: p.reference, before: p.promoPriceFcfa, after: promo },
+          },
+          tx,
+        );
+      }
     });
     return this.detail(shopId, productId, apiBase);
   }
@@ -315,7 +316,8 @@ export class MerchantCatalogService {
   }
 
   /** Variantes : la liste donnée remplace les actives (une variante retirée est désactivée, son historique gardé). */
-  async setVariants(shopId: string, userId: string, productId: string, labels: string[], confirm: boolean | undefined, meta: RequestMeta, apiBase: string) {
+  /** Variantes : librement tant que la fiche n'a jamais été publiée ; ensuite seul l'ordre change (L7-04). */
+  async setVariants(shopId: string, productId: string, labels: string[], apiBase: string) {
     await this.own(shopId, productId);
     const wanted = [...new Set(labels.map((l) => l.trim()).filter(Boolean))];
     const list = wanted.length ? wanted : ['Unique'];
@@ -326,7 +328,7 @@ export class MerchantCatalogService {
       const before = existing.filter((v) => v.active).sort((a, b) => a.position - b.position).map((v) => v.label);
       // Ajouter, retirer ou renommer une variante change l'article ; changer seulement l'ordre, non.
       const changed = before.length !== list.length || before.some((l) => !list.includes(l));
-      if (changed) await this.requireResetConfirmation(p, ['variants'], confirm, tx);
+      if (changed && p.publishedAt) throw this.locked(['variants']);
       for (const v of existing) {
         const pos = list.indexOf(v.label);
         await tx.update(productVariants).set({ active: pos >= 0, position: pos >= 0 ? pos : v.position }).where(eq(productVariants.id, v.id));
@@ -334,7 +336,6 @@ export class MerchantCatalogService {
       for (const [i, label] of list.entries()) {
         if (!existing.some((v) => v.label === label)) await tx.insert(productVariants).values({ id: uuidv7(), productId: p.id, label, position: i });
       }
-      if (changed && p.publishedAt) await this.resetReputation(tx, p, ['variants'], { ...this.snapshot(p), variants: before }, userId, meta);
     });
     return this.detail(shopId, productId, apiBase);
   }
@@ -380,8 +381,7 @@ export class MerchantCatalogService {
         reference: r.reference,
         kind: r.kind,
         title: r.title,
-        priceFcfa: r.priceFcfa,
-        compareAtFcfa: r.compareAtFcfa,
+        ...MerchantCatalogService.prices(r),
         status: r.status,
         categoryCode: r.categoryCode,
         imageUrl: first ? await this.url(first.storageKey, apiBase) : null,
@@ -412,14 +412,12 @@ export class MerchantCatalogService {
       title: p.title,
       description: p.description,
       categoryCode: p.categoryCode,
-      priceFcfa: p.priceFcfa,
-      compareAtFcfa: p.compareAtFcfa,
+      ...MerchantCatalogService.prices(p),
       durationMinutes: p.durationMinutes,
       status: p.status,
       publishedAt: p.publishedAt,
-      /** 7-A : réputation active de la version courante du contenu. */
+      /** 7-A : version du contenu (traçabilité des commandes et avis) et réputation active. */
       contentVersion: p.contentVersion,
-      reputationResetAt: p.reputationResetAt,
       activeFavorites: await this.activeFavorites(p),
       photos,
       variants: variants.map((v) => ({ id: v.id, label: v.label, stock: p.kind === 'service' ? null : v.stock })),

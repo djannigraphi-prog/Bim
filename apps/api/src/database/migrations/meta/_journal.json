@@ -197,6 +197,20 @@
       "when": 1792167485944,
       "tag": "0027_product_references_team",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792174210794,
+      "tag": "0028_product_promotion",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792174224277,
+      "tag": "0029_drop_compare_at",
+      "breakpoints": true
     }
   ]
 }

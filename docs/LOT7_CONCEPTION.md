@@ -273,7 +273,7 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 
 ---
 
-## 8. Priorité et sélection des livreurs [APPROUVÉ, A4 et A5]
+## 8. Priorité et sélection des livreurs [APPROUVÉ, A4 et A5 ; **à réconcilier avec L7-04, voir §8 bis**]
 
 - Le **marchand choisit** le livreur parmi les **livreurs éligibles calculés par le serveur** (mode, disponibilité,
   capacité, délai, autorisations, sécurité). Le serveur contrôle l'éligibilité et les permissions à la sélection.
@@ -286,6 +286,29 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
   les deux modes, **avant** les partenaires (il travaille pour la boutique) ; sa sélection ne demande pas de motif.
 - **Priorité Premium des livreurs (F17)** : seulement à l'intérieur d'une même catégorie [PROPOSÉ].
 - **Retirés** : client choisissant un livreur ; devis libre d'un livreur après confirmation ; paliers automatiques.
+
+### 8 bis. Accès des livreurs [APPROUVÉ, L7-04 ; **verrouillé** côté serveur, rien développé]
+
+- Le livreur ne voit **jamais** les commandes internes d'une boutique (commandes générales, non publiées, détails
+  internes, équipe, messages, catalogue).
+- Il voit seulement : (1) les **annonces de livraison publiées** — le marchand valide une commande puis publie une
+  annonce ; (2) après **acceptation**, les informations nécessaires à la course (adresses de retrait et de remise,
+  contact utile, articles à remettre, code de remise côté client seulement) ; (3) **son historique personnel** — les
+  seules livraisons qu'il a effectuées.
+- **Séparation des données** [PROPOSÉ pour 7-E / 7-F] : table des annonces (`delivery_announcements`) et table des
+  courses (`deliveries`, liée à la commande par identifiant, jamais exposée par les routes des commandes) ; routes
+  livreur dédiées (`/v1/courier/announcements`, `/v1/courier/deliveries/:id`, `/v1/courier/history`) sous l'espace
+  `courier`, filtrées par le serveur sur `courier_id = livreur courant` ; minimisation (pas de prix des articles, pas
+  d'historique client, adresse exacte seulement après acceptation).
+- **État actuel** : aucune route n'est ouverte à l'espace livreur ; toutes les routes `/v1/shop…` exigent l'espace
+  boutique ; un livreur actif, même partenaire, reçoit 403 (test `courier-access`). Constat : les routes sans espace
+  imposé (fil social, profils, notifications) restent accessibles depuis l'espace livreur, contrairement à l'analyse
+  (§5 : pas de fil ni de profil pour un livreur) ; à fermer avec 7-E.
+- **[ARBITRAGE] Contradiction avec §8 (A4 / A5)** : « le marchand choisit le livreur » contre « le livreur accepte une
+  annonce publiée ». Proposition : l'annonce est proposée d'abord aux livreurs employés, puis aux partenaires (en
+  économique, passer aux indépendants demande un motif), enfin aux indépendants ; le premier livreur éligible qui
+  accepte est attribué ; le marchand peut aussi réserver l'annonce à un livreur précis. Rien ne sera développé avant
+  l'arbitrage.
 
 ---
 
@@ -350,7 +373,19 @@ au-dessus du prix catalogue ?).
 
 ---
 
-### 10 bis. Réputation des articles et masquage [APPROUVÉ, L7-03 ; **réalisé en 7-A**]
+### 10 bis. Fiches figées, promotion, réputation et masquage [APPROUVÉ, L7-04 (remplace la remise à zéro de L7-03) ; **réalisé**]
+
+- **Après la création** : nom, description et **prix normal** ne se modifient plus (brouillon compris ; refus
+  `PRODUCT_CONTENT_LOCKED` et déclencheur de la base). Les changer = **nouvelle fiche** : nouvelle référence, réputation
+  vierge. Rubrique, durée et variantes (ajout, retrait, renommage) : jusqu'à la première publication [interprétation à
+  confirmer] ; l'ordre des variantes et le stock restent libres.
+- **Modifiables sans effet sur la réputation** : photos, **promotion** (`promo_price_fcfa`, inférieure au prix normal ;
+  activer, modifier, supprimer ; journalisée), stock, masquage, republication.
+- **Prix affichés** : `priceFcfa` = prix payé (promotion sinon prix normal), `compareAtFcfa` = prix normal barré si une
+  promotion est active ; l'espace boutique reçoit aussi `normalPriceFcfa` et `promoPriceFcfa`.
+- Conséquence pour 7-B : la ligne de commande enregistre référence, version et **prix payé** au moment de la commande.
+
+Historique 7-A (remplacé) :
 
 - **Version du contenu** (`products.content_version`) : une modification confirmée du contenu d'une fiche déjà publiée
   l'incrémente ; la réputation active ne compte que ce qui a été donné à la version courante (cœurs aujourd'hui ;
@@ -566,3 +601,5 @@ attribué, support journalisé), suspension pendant une livraison, reprise aprè
   - **A11** : politique de conservation par catégorie, durées à vérifier.
   - **A12** : 18 ans proposé pour commander, livrer, ouvrir une boutique.
   - **Nouveau** : références `BIM-…` des articles et prestations, lignes de commande, rattachement des évaluations.
+- **Version 3 (16/10/2026)** : corrections L7-04 — §8 bis (accès des livreurs ; arbitrage avec A4 / A5) ; §10 bis
+  (fiches figées après création, promotion, réputation conservée ; remplace la remise à zéro avec avertissement).

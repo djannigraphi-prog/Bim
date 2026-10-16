@@ -67,29 +67,30 @@ class _FakeShop extends ShopApi {
     return current = _detail();
   }
 
-  /// Comme le serveur (7-A) : un article déjà publié dont le contenu change exige une confirmation.
+  /// Comme le serveur (L7-04) : seules la promotion (et la rubrique, la durée avant publication) changent ;
+  /// référence, version du contenu et réputation sont conservées.
   @override
-  Future<ProductDetail> update(String id, ProductInput input, {bool confirmReset = false}) async {
-    final c = current;
-    final changed = c != null && (input.title != c.title || input.priceFcfa != c.priceFcfa);
-    if ((c?.everPublished ?? false) && changed && !confirmReset) {
-      calls.add('refused $id');
-      throw const ApiException(code: 'REPUTATION_RESET_REQUIRED', message: 'Confirme', status: 409, details: {'fields': ['title'], 'activeFavorites': 3});
-    }
-    calls.add('update $id ${input.title} ${input.priceFcfa}${confirmReset ? ' (remise à zéro)' : ''}');
+  Future<ProductDetail> update(String id, ProductChanges changes) async {
+    final c = current!;
+    final body = changes.toJson();
+    calls.add('update $id ${body.entries.map((e) => '${e.key}=${e.value}').join(' ')}');
+    final promo = changes.promoPriceFcfa;
     return current = ProductDetail(
       id: id,
-      reference: c?.reference ?? 'BIM-000123',
-      everPublished: c?.everPublished ?? false,
-      contentVersion: (c?.contentVersion ?? 1) + (confirmReset ? 1 : 0),
-      activeFavorites: confirmReset ? 0 : (c?.activeFavorites ?? 0),
-      kind: 'product',
-      title: input.title,
-      categoryCode: input.categoryCode,
-      priceFcfa: input.priceFcfa,
-      status: c?.status ?? 'draft',
-      photos: c?.photos ?? const [],
-      variants: c?.variants ?? const [],
+      reference: c.reference,
+      everPublished: c.everPublished,
+      contentVersion: c.contentVersion,
+      activeFavorites: c.activeFavorites,
+      kind: c.kind,
+      title: c.title,
+      categoryCode: (body['categoryCode'] as String?) ?? c.categoryCode,
+      priceFcfa: promo ?? c.normalPrice,
+      normalPriceFcfa: c.normalPrice,
+      promoPriceFcfa: promo,
+      compareAtFcfa: promo != null ? c.normalPrice : null,
+      status: c.status,
+      photos: c.photos,
+      variants: c.variants,
     );
   }
 
@@ -207,14 +208,14 @@ void main() {
     expect(find.text('En ligne'), findsOneWidget);
   });
 
-  testWidgets('audit M-8 : publier enregistre d’abord les changements du formulaire', (tester) async {
+  testWidgets('audit M-8 : publier enregistre d’abord les changements du formulaire (promotion)', (tester) async {
     final api = _FakeShop()..current = _detail();
     await _pump(tester, api, '/shop/products/x1');
-    await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-price')), matching: find.byType(TextField)), '39000');
+    await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '39000');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('publish-product')), 300, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('publish-product')));
     await tester.pumpAndSettle();
-    expect(api.calls, ['update x1 Robe soirée à plumes 39000', 'publish x1']);
+    expect(api.calls, ['update x1 promoPriceFcfa=39000 categoryCode=vetements_soiree', 'publish x1']);
   });
 
   testWidgets('audit M-9 : article introuvable : message et « Réessayer », jamais un formulaire de création', (tester) async {
@@ -225,34 +226,46 @@ void main() {
     expect(api.calls, isEmpty);
   });
 
-  testWidgets('7-A : article publié — avertissement avant de modifier ; annuler garde la fiche ; confirmer remet à zéro', (tester) async {
+  testWidgets('L7-04 : nom, description et prix normal en lecture seule ; promotion modifiée, réputation conservée', (tester) async {
     final api = _FakeShop()..current = _detail(status: 'published', everPublished: true, hearts: 3, photos: const [ProductPhoto(id: 'm1', url: null)]);
     await _pump(tester, api, '/shop/products/x1');
     expect(tester.widget<Text>(find.byKey(const ValueKey('product-reference'))).data, 'Réf. BIM-000123');
-    final title = find.descendant(of: find.byKey(const ValueKey('product-title')), matching: find.byType(TextField));
-    await tester.enterText(title, 'Chaussures cuir');
+    TextField field(String key) => tester.widget<TextField>(find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField)));
+    for (final k in ['product-title', 'product-price', 'product-description']) {
+      expect(field(k).readOnly, isTrue, reason: k);
+    }
+    expect(field('product-promo').readOnly, isFalse);
+    // Une nouvelle fiche est proposée pour changer le nom, la description ou le prix normal.
+    expect(find.byKey(const ValueKey('identity-locked')), findsOneWidget);
+    expect(find.byKey(const ValueKey('new-sheet')), findsOneWidget);
+    // Rubrique et variantes figées depuis la publication ; le stock reste modifiable.
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const ValueKey('product-category'))).onChanged, isNull);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('variants-frozen')), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Mettre à jour les variantes'), findsNothing);
+
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-promo')), -300, scrollable: find.byType(Scrollable).first);
+    await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '39000');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('save-product')));
     await tester.pumpAndSettle();
-    expect(find.text('Remettre la réputation à zéro ?'), findsOneWidget);
-    expect(find.textContaining('3 personnes l’ont mis de côté'), findsOneWidget);
+    // Seule la promotion part ; ni le nom ni le prix normal, ni la rubrique d'une fiche publiée.
+    expect(api.calls, ['update x1 promoPriceFcfa=39000']);
+    expect(api.current!.activeFavorites, 3);
+    expect(api.current!.contentVersion, 1);
+    expect(api.current!.normalPrice, 45000);
+    expect(api.current!.priceFcfa, 39000);
+    expect(find.text('Remettre la réputation à zéro ?'), findsNothing);
+  });
 
-    // Annuler : rien n'est enregistré, le formulaire revient à la fiche.
-    await tester.tap(find.byKey(const ValueKey('reset-cancel')));
+  testWidgets('L7-04 : refus du serveur (PRODUCT_CONTENT_LOCKED) affiché, rien n’est modifié', (tester) async {
+    final api = _LockedShop()..current = _detail();
+    await _pump(tester, api, '/shop/products/x1');
+    await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '40000');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const ValueKey('save-product')));
     await tester.pumpAndSettle();
-    expect(api.calls, ['refused x1']);
+    expect(find.text('Ce champ ne se modifie plus : crée une nouvelle fiche.'), findsOneWidget);
     expect(api.current!.title, 'Robe soirée à plumes');
-    expect(tester.widget<TextField>(title).controller!.text, 'Robe soirée à plumes');
-
-    // Confirmer : enregistrement avec remise à zéro.
-    await tester.enterText(title, 'Chaussures cuir');
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
-    await tester.tap(find.byKey(const ValueKey('save-product')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('reset-confirm')));
-    await tester.pumpAndSettle();
-    expect(api.calls, ['refused x1', 'refused x1', 'update x1 Chaussures cuir 45000 (remise à zéro)']);
-    expect(api.current!.activeFavorites, 0);
   });
 
   testWidgets('7-A : masquer puis republier sans avertissement ni remise à zéro', (tester) async {
@@ -284,6 +297,16 @@ void main() {
     expect(find.byKey(const ValueKey('add-product')), findsOneWidget);
     expect(find.byKey(const ValueKey('action-team')), findsOneWidget);
   });
+}
+
+class _LockedShop extends _FakeShop {
+  @override
+  Future<ProductDetail> update(String id, ProductChanges changes) async => throw const ApiException(
+        code: 'PRODUCT_CONTENT_LOCKED',
+        message: 'Ce champ ne se modifie plus : crée une nouvelle fiche.',
+        status: 409,
+        details: {'fields': ['title']},
+      );
 }
 
 class _MissingShop extends _FakeShop {
