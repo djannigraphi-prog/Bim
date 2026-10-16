@@ -113,6 +113,8 @@ describe('Audit technique : non-régression (e2e)', () => {
 
       // La personne retire sa demande : la validation qui arrive ensuite échoue, la boutique reste fermée.
       await h.http().delete(`/v1/merchant/applications/${app.id}`).set(auth).expect(204);
+      // Point 8 de la relecture : un second retrait (déjà fait) répond « introuvable », pas « boutique ouverte ».
+      expect((await h.http().delete(`/v1/merchant/applications/${app.id}`).set(auth).expect(404)).body.error.code).toBe('NOT_FOUND');
       await h.http().post(`/admin/v1/merchant-applications/${app.id}/approve`).set(admin).expect(409);
       expect((await h.pool.query('select status from shops where id = $1', [app.shop.id])).rows[0].status).toBe('closed');
     } finally {
