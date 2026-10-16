@@ -280,6 +280,8 @@ class _StoryViewerState extends ConsumerState<StoryViewer> with SingleTickerProv
       backgroundColor: BimColors.black,
       body: SafeArea(
         child: GestureDetector(
+          // Tout l'écran réagit, y compris autour de la photo.
+          behavior: HitTestBehavior.opaque,
           onTapUp: (d) => d.localPosition.dx > MediaQuery.sizeOf(context).width / 3 ? _next() : _previous(),
           onLongPressStart: (_) => _progress.stop(),
           onLongPressEnd: (_) => _progress.forward(),

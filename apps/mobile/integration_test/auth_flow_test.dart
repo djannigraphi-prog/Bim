@@ -349,7 +349,13 @@ void main() {
     // Lot 0, partie 2 : ajouter un e-mail (opération protégée : mot de passe + code SMS, puis code reçu par e-mail).
     await _tap(tester, find.byTooltip('Retour'));
     // Lot 4 (écran 10) : le BIM publié plus haut apparaît dans le fil de l'Accueil, lu dans les vraies données.
-    await _waitFor(tester, find.textContaining('a partagé un Bim'));
+    // Le fil défile vers le bas (jamais au-delà du haut) jusqu'à la publication, sous les stories et mes projets.
+    await _waitFor(tester, find.byKey(const PageStorageKey('feed-for_you')));
+    await tester.scrollUntilVisible(
+      find.textContaining('a partagé un Bim'),
+      200,
+      scrollable: find.descendant(of: find.byKey(const PageStorageKey('feed-for_you')), matching: find.byType(Scrollable)).first,
+    );
     await _shot(tester, 'a10_fil');
     await _tap(tester, find.byTooltip('Mon compte'));
 
