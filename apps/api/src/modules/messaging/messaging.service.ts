@@ -1,21 +1,52 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, gt, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { conversationMembers, conversations, follows, messages, userBlocks, users } from '../../database/schema';
+import { conversationMembers, conversations, follows, messages, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
 import { ageOn } from '../age-policy/age';
 import { AuditService } from '../audit/audit.service';
+import { BimShopService } from '../catalog/bimshop.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { SettingsService } from '../settings/settings.service';
 
 const PAGE = 30;
 type MessageRow = typeof messages.$inferSelect;
+type ConversationRow = typeof conversations.$inferSelect;
+type MemberRow = typeof conversationMembers.$inferSelect;
+type ShopRow = typeof shops.$inferSelect;
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/** Accès d'une personne à une conversation (6-A : avec une personne ; 6-B : avec une boutique, côté cliente). */
+interface Access {
+  conv: ConversationRow;
+  me: MemberRow;
+  /** Dernier message lu par l'autre partie (personne ou boutique) : statut « Vu » de mes messages. */
+  otherReadId: string | null;
+  other: MemberRow | null;
+  otherUser: typeof users.$inferSelect | null;
+  shop: ShopRow | null;
+}
+
+/**
+ * Condition SQL : l'autre partie d'une conversation est joignable par `userId` (compte actif, boutique ouverte,
+ * aucun blocage entre la personne et l'autre membre, ou le propriétaire de la boutique).
+ */
+export function counterpartReachable(userId: string, conversation: { id: unknown; kind: unknown; shopId: unknown }) {
+  return sql`(
+    (${conversation.kind} = 'direct' AND EXISTS (SELECT 1 FROM conversation_members o JOIN users ou ON ou.id = o.user_id
+       WHERE o.conversation_id = ${conversation.id} AND o.user_id <> ${userId} AND ou.status = 'active'
+         AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = ${userId}))))
+    OR (${conversation.kind} = 'shop' AND EXISTS (SELECT 1 FROM shops s JOIN users ow ON ow.id = s.owner_user_id
+       WHERE s.id = ${conversation.shopId} AND s.status = 'active' AND ow.status = 'active'
+         AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = ow.id) OR (b.blocker_id = ow.id AND b.blocked_id = ${userId}))))
+  )`;
+}
 
 /**
  * Lot 6-A — Messagerie entre personnes (écran 47) : conversations à deux, demandes, texte et photos, lu / non lu.
@@ -35,6 +66,7 @@ export class MessagingService {
     private readonly storage: StorageService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly bimshop: BimShopService,
   ) {}
 
   private async limit(key: string, fallback: number): Promise<number> {
@@ -42,12 +74,12 @@ export class MessagingService {
     return typeof s?.value === 'number' && s.value > 0 ? s.value : fallback;
   }
 
-  private async url(key: string | null, apiBase: string) {
+  async url(key: string | null, apiBase: string) {
     if (!key || !this.storage.available) return null;
     return (await this.storage.temporaryUrl(key, apiBase)).url;
   }
 
-  private blocked(a: string, b: string) {
+  blocked(a: string, b: string) {
     return this.db
       .select({ x: userBlocks.blockerId })
       .from(userBlocks)
@@ -60,18 +92,37 @@ export class MessagingService {
     return !!r;
   }
 
-  /** Mon adhésion et l'autre membre ; refuse une conversation inaccessible (404, jamais d'indice). */
-  private async access(userId: string, conversationId: string, allowDeclined = false) {
-    const members = await this.db.select().from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId));
-    const me = members.find((m) => m.userId === userId);
-    const other = members.find((m) => m.userId !== userId);
-    if (!me || !other || (me.status === 'declined' && !allowDeclined)) throw Errors.notFound('Conversation');
-    const [u] = await this.db.select().from(users).where(eq(users.id, other.userId));
-    if (!u || u.status !== 'active' || (await this.blocked(userId, other.userId)).length) throw Errors.notFound('Conversation');
-    return { me, other, otherUser: u };
+  /** Boutique ouverte, propriétaire actif, aucun blocage avec la personne ; sinon `null`. */
+  async reachableShop(where: { id?: string; slug?: string }, userId: string): Promise<ShopRow | null> {
+    const [row] = await this.db
+      .select({ s: shops })
+      .from(shops)
+      .innerJoin(users, eq(users.id, shops.ownerUserId))
+      .where(and(where.id ? eq(shops.id, where.id) : eq(shops.slug, where.slug ?? ''), eq(shops.status, 'active'), eq(users.status, 'active')));
+    if (!row || (await this.blocked(userId, row.s.ownerUserId)).length) return null;
+    return row.s;
   }
 
-  private person(u: typeof users.$inferSelect, avatarUrl: string | null) {
+  /** Mon adhésion et l'autre partie ; refuse une conversation inaccessible (404, jamais d'indice). */
+  private async access(userId: string, conversationId: string, allowDeclined = false): Promise<Access> {
+    const [conv] = await this.db.select().from(conversations).where(eq(conversations.id, conversationId));
+    if (!conv) throw Errors.notFound('Conversation');
+    const members = await this.db.select().from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId));
+    const me = members.find((m) => m.userId === userId);
+    if (!me || (me.status === 'declined' && !allowDeclined)) throw Errors.notFound('Conversation');
+    if (conv.kind === 'shop') {
+      const shop = await this.reachableShop({ id: conv.shopId! }, userId);
+      if (!shop) throw Errors.notFound('Conversation');
+      return { conv, me, otherReadId: conv.shopLastReadMessageId, other: null, otherUser: null, shop };
+    }
+    const other = members.find((m) => m.userId !== userId);
+    if (!other) throw Errors.notFound('Conversation');
+    const [u] = await this.db.select().from(users).where(eq(users.id, other.userId));
+    if (!u || u.status !== 'active' || (await this.blocked(userId, other.userId)).length) throw Errors.notFound('Conversation');
+    return { conv, me, otherReadId: other.lastReadMessageId, other, otherUser: u, shop: null };
+  }
+
+  person(u: typeof users.$inferSelect, avatarUrl: string | null) {
     return { id: u.id, username: u.username, fullName: u.fullName, avatarUrl };
   }
 
@@ -113,6 +164,83 @@ export class MessagingService {
     return this.summary(userId, conv.id, apiBase);
   }
 
+  /**
+   * 6-B — Écrire à une boutique (« Discuter » depuis un article, une offre ou le profil de la boutique). Les boutiques
+   * reçoivent les messages de tous (ANALYSE.md §5) : jamais de demande. Seule la cliente ouvre la conversation.
+   */
+  async startWithShop(userId: string, input: { shopSlug: string; productId?: string; offerId?: string }, apiBase: string) {
+    const shop = await this.reachableShop({ slug: input.shopSlug.trim().toLowerCase() }, userId);
+    if (!shop) throw Errors.notFound('Boutique');
+    const [member] = await this.db
+      .select({ x: shopMembers.userId })
+      .from(shopMembers)
+      .where(and(eq(shopMembers.shopId, shop.id), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt)));
+    if (member) throw Errors.conflict('OWN_SHOP', 'Tu fais partie de cette boutique : réponds à ses clients depuis l’espace boutique.');
+    let contextProductId: string | null = null;
+    let contextOfferId: string | null = null;
+    if (input.productId) {
+      const [card] = await this.bimshop.visibleCards([input.productId], apiBase);
+      if (!card || card.shop.id !== shop.id) throw Errors.notFound('Article');
+      contextProductId = card.id;
+    }
+    if (input.offerId) {
+      // Une offre reçue pour un de mes projets, envoyée par cette boutique.
+      const [o] = await this.db
+        .select({ id: projectOffers.id })
+        .from(projectOffers)
+        .innerJoin(projects, eq(projects.id, projectOffers.projectId))
+        .where(and(eq(projectOffers.id, input.offerId), eq(projectOffers.shopId, shop.id), eq(projects.userId, userId)));
+      if (!o) throw Errors.notFound('Offre');
+      contextOfferId = o.id;
+    }
+    const key = `shop:${shop.id}:${userId}`;
+    const [existing] = await this.db.select().from(conversations).where(eq(conversations.directKey, key));
+    if (existing) {
+      if (contextProductId || contextOfferId) {
+        await this.db
+          .update(conversations)
+          .set(contextProductId ? { contextProductId } : { contextOfferId })
+          .where(eq(conversations.id, existing.id));
+      }
+      return this.summary(userId, existing.id, apiBase);
+    }
+    const max = await this.limit('messages.new_conversations_daily_limit', 20);
+    await this.db.transaction(async (tx) => {
+      await lockUserQuota(tx, 'conversations', userId);
+      const [{ n }] = await tx.select({ n: count() }).from(conversations).where(and(eq(conversations.createdBy, userId), gt(conversations.createdAt, new Date(Date.now() - 24 * 3600_000))));
+      if (n >= max) throw Errors.tooMany('Tu as commencé beaucoup de conversations aujourd’hui. Réessaie demain.', { reason: 'MESSAGES_NEW_CONVERSATIONS_LIMIT', limit: max });
+      const id = uuidv7();
+      const created = await tx
+        .insert(conversations)
+        .values({ id, kind: 'shop', directKey: key, shopId: shop.id, createdBy: userId, contextProductId, contextOfferId })
+        .onConflictDoNothing()
+        .returning({ id: conversations.id });
+      if (created.length) await tx.insert(conversationMembers).values({ conversationId: id, userId, status: 'active' });
+    });
+    const [conv] = await this.db.select({ id: conversations.id }).from(conversations).where(eq(conversations.directKey, key));
+    return this.summary(userId, conv.id, apiBase);
+  }
+
+  /** Bandeau d'une conversation avec une boutique : l'article (disponible ou non, jamais le stock) ou l'offre. */
+  async context(conv: ConversationRow, apiBase: string) {
+    if (conv.kind !== 'shop') return null;
+    const [product] = conv.contextProductId ? await this.bimshop.visibleCards([conv.contextProductId], apiBase) : [];
+    let offer: { id: string; projectTitle: string } | null = null;
+    if (conv.contextOfferId) {
+      const [o] = await this.db
+        .select({ id: projectOffers.id, projectTitle: projects.title })
+        .from(projectOffers)
+        .innerJoin(projects, eq(projects.id, projectOffers.projectId))
+        .where(eq(projectOffers.id, conv.contextOfferId));
+      offer = o ?? null;
+    }
+    return product || offer ? { product: product ?? null, offer } : null;
+  }
+
+  shopRef(s: ShopRow, logoUrl: string | null) {
+    return { id: s.id, name: s.name, slug: s.slug, logoUrl, verified: !!s.verifiedAt };
+  }
+
   /** Liste « Tous » (inbox) ou « Demandes » (requests), conversation la plus récente d'abord. */
   async list(userId: string, box: 'inbox' | 'requests', cursor: string | undefined, apiBase: string) {
     const status = box === 'requests' ? 'request' : 'active';
@@ -121,10 +249,8 @@ export class MessagingService {
       eq(conversationMembers.status, status),
       // Une conversation sans message n'apparaît que chez la personne qui l'a ouverte.
       sql`(EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = ${conversations.id}) OR ${conversations.createdBy} = ${userId})`,
-      // L'autre membre : compte actif, aucun blocage.
-      sql`EXISTS (SELECT 1 FROM conversation_members o JOIN users ou ON ou.id = o.user_id
-                  WHERE o.conversation_id = ${conversations.id} AND o.user_id <> ${userId} AND ou.status = 'active'
-                    AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = ${userId})))`,
+      // L'autre partie : compte actif (ou boutique ouverte), aucun blocage.
+      counterpartReachable(userId, conversations),
     ];
     if (cursor) {
       const [at, id] = cursor.split('|');
@@ -146,10 +272,10 @@ export class MessagingService {
     return { items, nextCursor: rows.length > PAGE && last ? `${last.lastMessageAt.toISOString()}|${last.id}` : null };
   }
 
-  /** Résumé d'une conversation pour la liste : l'autre personne, le dernier message, les non-lus. */
+  /** Résumé d'une conversation pour la liste : l'autre personne (ou la boutique), le dernier message, les non-lus. */
   async summary(userId: string, conversationId: string, apiBase: string) {
-    const { me, other, otherUser } = await this.access(userId, conversationId);
-    const [[last], [{ unread }], [conv]] = await Promise.all([
+    const { conv, me, other, otherUser, shop } = await this.access(userId, conversationId);
+    const [[last], [{ unread }]] = await Promise.all([
       this.db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(desc(messages.id)).limit(1),
       this.db
         .select({ unread: count() })
@@ -162,35 +288,46 @@ export class MessagingService {
             me.lastReadMessageId ? gt(messages.id, me.lastReadMessageId) : undefined,
           ),
         ),
-      this.db.select().from(conversations).where(eq(conversations.id, conversationId)),
     ]);
     return {
       id: conversationId,
+      /** direct : avec une personne · shop : avec une boutique (6-B). */
+      kind: conv.kind,
       status: me.status,
       /** Ma demande n'a pas encore été acceptée (l'autre personne ne me suit pas) : je peux écrire, elle choisira. */
-      pendingForOther: other.status === 'request',
-      person: this.person(otherUser, await this.url(otherUser.avatarKey, apiBase)),
-      lastMessage: last ? { senderIsMe: last.senderId === userId, preview: this.preview(last), createdAt: last.createdAt } : null,
+      pendingForOther: other?.status === 'request',
+      person: otherUser ? this.person(otherUser, await this.url(otherUser.avatarKey, apiBase)) : null,
+      shop: shop ? this.shopRef(shop, await this.url(shop.logoKey, apiBase)) : null,
+      context: await this.context(conv, apiBase),
+      lastMessage: last ? { senderIsMe: this.mine(last, userId), preview: this.preview(last), createdAt: last.createdAt } : null,
       unread,
       lastMessageAt: conv.lastMessageAt,
     };
   }
 
-  private preview(m: MessageRow): string {
+  /** Message écrit par cette personne en son nom (pas au nom d'une boutique). */
+  private mine(m: MessageRow, userId: string) {
+    return m.senderId === userId && m.senderShopId === null;
+  }
+
+  preview(m: MessageRow): string {
     if (m.status === 'deleted') return 'Message supprimé';
     if (m.status === 'hidden') return 'Message masqué par la modération';
-    return m.kind === 'photo' ? 'Photo' : (m.text ?? '').slice(0, 120);
+    if (m.kind === 'photo') return 'Photo';
+    if (m.kind === 'text') return (m.text ?? '').slice(0, 120);
+    // Types à venir (cartes de commande, lot 7) : texte neutre, jamais de contenu interne.
+    return 'Nouveau message';
   }
 
   /** Pastille de l'onglet Messages : conversations avec des non-lus, demandes en attente. */
   async unreadCount(userId: string) {
+    const c = { id: sql.raw('c.id'), kind: sql.raw('c.kind'), shopId: sql.raw('c.shop_id') };
     const rows = await this.db.execute<{ status: string; n: number }>(sql`
       SELECT cm.status, count(*)::int AS n
       FROM conversation_members cm
-      JOIN conversation_members o ON o.conversation_id = cm.conversation_id AND o.user_id <> cm.user_id
-      JOIN users ou ON ou.id = o.user_id AND ou.status = 'active'
+      JOIN conversations c ON c.id = cm.conversation_id
       WHERE cm.user_id = ${userId} AND cm.status IN ('active', 'request')
-        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = ${userId}))
+        AND ${counterpartReachable(userId, c)}
         AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = cm.conversation_id AND m.sender_id <> ${userId} AND m.status = 'published'
                       AND (cm.last_read_message_id IS NULL OR m.id > cm.last_read_message_id))
       GROUP BY cm.status`);
@@ -216,25 +353,25 @@ export class MessagingService {
 
   // ------------------------------------------------------------------------------------------------ Messages
 
-  private async messageView(m: MessageRow, userId: string, otherReadId: string | null, apiBase: string) {
+  /** Vue d'un message ; `mine` = écrit par moi (ou par ma boutique, côté boutique). */
+  async view(m: MessageRow, mine: boolean, otherReadId: string | null, apiBase: string) {
     const visible = m.status === 'published';
     return {
       id: m.id,
-      senderIsMe: m.senderId === userId,
+      senderIsMe: mine,
       kind: m.kind,
       text: visible ? m.text : null,
       photoUrl: visible && m.kind === 'photo' ? await this.url(m.mediaKey, apiBase) : null,
       photo: visible && m.kind === 'photo' ? { width: m.mediaWidth, height: m.mediaHeight } : null,
       status: m.status,
       createdAt: m.createdAt,
-      /** Mes messages : lus par l'autre personne. */
-      read: m.senderId === userId ? !!otherReadId && otherReadId >= m.id : null,
+      /** Mes messages : lus par l'autre partie. */
+      read: mine ? !!otherReadId && otherReadId >= m.id : null,
     };
   }
 
-  /** Messages, du plus récent au plus ancien, 30 par page (`before` = identifiant du plus ancien déjà affiché). */
-  async messages(userId: string, conversationId: string, before: string | undefined, apiBase: string) {
-    const { other } = await this.access(userId, conversationId);
+  /** Page de messages, du plus récent au plus ancien (`before` = identifiant du plus ancien déjà affiché). */
+  async page(conversationId: string, before: string | undefined) {
     if (before && !/^[0-9a-f-]{36}$/.test(before)) throw Errors.validation({ fields: { before: ['Curseur invalide.'] } });
     const rows = await this.db
       .select()
@@ -242,38 +379,42 @@ export class MessagingService {
       .where(and(eq(messages.conversationId, conversationId), before ? lt(messages.id, before) : undefined))
       .orderBy(desc(messages.id))
       .limit(PAGE + 1);
-    const page = rows.slice(0, PAGE);
-    const items = [];
-    for (const m of page) items.push(await this.messageView(m, userId, other.lastReadMessageId, apiBase));
-    return { items, nextBefore: rows.length > PAGE ? page[page.length - 1].id : null };
+    return { rows: rows.slice(0, PAGE), nextBefore: rows.length > PAGE ? rows[PAGE - 1].id : null };
   }
 
-  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File }, meta: RequestMeta, apiBase: string) {
-    const { me, other } = await this.access(userId, conversationId);
-    const text = input.text?.trim();
-    if (!text && !input.photo) throw Errors.validation({ fields: { text: ['Écris un message ou ajoute une photo.'] } });
-    if (text && input.photo) throw Errors.validation({ fields: { text: ['Un message contient un texte ou une photo.'] } });
+  /**
+   * Enregistre un message (texte ou photo ré-encodée) sous la limite quotidienne de son auteur, puis `after` dans la
+   * même transaction (état de lecture, archivage). La photo est effacée du stockage si l'enregistrement échoue.
+   */
+  async persist(
+    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; meta: RequestMeta },
+    after: (tx: Tx, id: string, now: Date) => Promise<void>,
+  ): Promise<MessageRow> {
+    const text = p.text?.trim();
+    if (!text && !p.photo) throw Errors.validation({ fields: { text: ['Écris un message ou ajoute une photo.'] } });
+    if (text && p.photo) throw Errors.validation({ fields: { text: ['Un message contient un texte ou une photo.'] } });
     if (text && text.length > 2000) throw Errors.validation({ fields: { text: ['2000 caractères au plus.'] } });
-    if (input.photo && !this.storage.available) throw Errors.notConfigured('Le stockage des photos');
+    if (p.photo && !this.storage.available) throw Errors.notConfigured('Le stockage des photos');
     const max = await this.limit('messages.daily_limit', 500);
     const id = uuidv7();
     let key: string | null = null;
     let img: Awaited<ReturnType<typeof encodePrivateImage>> | null = null;
-    if (input.photo) {
-      img = await encodePrivateImage(input.photo, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photo');
-      key = `messages/${conversationId}/${id}.jpg`;
+    if (p.photo) {
+      img = await encodePrivateImage(p.photo, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photo');
+      key = `messages/${p.conversationId}/${id}.jpg`;
       await this.storage.put(key, img.data, 'image/jpeg');
     }
     try {
       await this.db.transaction(async (tx) => {
-        await lockUserQuota(tx, 'messages', userId);
-        const [{ n }] = await tx.select({ n: count() }).from(messages).where(and(eq(messages.senderId, userId), gt(messages.createdAt, new Date(Date.now() - 24 * 3600_000))));
+        await lockUserQuota(tx, 'messages', p.senderId);
+        const [{ n }] = await tx.select({ n: count() }).from(messages).where(and(eq(messages.senderId, p.senderId), gt(messages.createdAt, new Date(Date.now() - 24 * 3600_000))));
         if (n >= max) throw Errors.tooMany('Tu as envoyé beaucoup de messages aujourd’hui. Réessaie plus tard.', { reason: 'MESSAGES_DAILY_LIMIT', limit: max });
         const now = new Date();
         await tx.insert(messages).values({
           id,
-          conversationId,
-          senderId: userId,
+          conversationId: p.conversationId,
+          senderId: p.senderId,
+          senderShopId: p.senderShopId,
           kind: img ? 'photo' : 'text',
           text: img ? null : text,
           mediaKey: key,
@@ -281,21 +422,52 @@ export class MessagingService {
           mediaHeight: img?.height ?? null,
           createdAt: now,
         });
-        await tx.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, conversationId));
-        // Répondre à une demande vaut acceptation ; mon propre message est lu.
-        await tx
-          .update(conversationMembers)
-          .set({ status: me.status === 'request' ? 'active' : me.status, lastReadMessageId: id, lastReadAt: now })
-          .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, userId)));
-        // L'autre personne avait refusé ma demande : le message reste invisible pour elle (elle n'est pas relancée).
-        await this.audit.log({ actorType: 'user', actorId: userId, action: 'messages.message_sent', targetType: 'conversation', targetId: conversationId, ip: meta.ip, userAgent: meta.userAgent, metadata: { kind: img ? 'photo' : 'text' } }, tx);
+        await tx.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, p.conversationId));
+        await after(tx, id, now);
+        await this.audit.log(
+          {
+            actorType: 'user',
+            actorId: p.senderId,
+            action: 'messages.message_sent',
+            targetType: 'conversation',
+            targetId: p.conversationId,
+            ip: p.meta.ip,
+            userAgent: p.meta.userAgent,
+            metadata: { kind: img ? 'photo' : 'text', ...(p.senderShopId ? { shopId: p.senderShopId } : {}) },
+          },
+          tx,
+        );
       });
     } catch (e) {
       if (key) await this.storage.remove(key).catch(() => undefined);
       throw e;
     }
     const [m] = await this.db.select().from(messages).where(eq(messages.id, id));
-    return this.messageView(m, userId, other.lastReadMessageId, apiBase);
+    return m;
+  }
+
+  /** Messages, du plus récent au plus ancien, 30 par page (`before` = identifiant du plus ancien déjà affiché). */
+  async messages(userId: string, conversationId: string, before: string | undefined, apiBase: string) {
+    const { otherReadId } = await this.access(userId, conversationId);
+    const { rows, nextBefore } = await this.page(conversationId, before);
+    const items = [];
+    for (const m of rows) items.push(await this.view(m, this.mine(m, userId), otherReadId, apiBase));
+    return { items, nextBefore };
+  }
+
+  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File }, meta: RequestMeta, apiBase: string) {
+    const { conv, me, otherReadId } = await this.access(userId, conversationId);
+    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, meta }, async (tx, id, now) => {
+      // Répondre à une demande vaut acceptation ; mon propre message est lu.
+      await tx
+        .update(conversationMembers)
+        .set({ status: me.status === 'request' ? 'active' : me.status, lastReadMessageId: id, lastReadAt: now })
+        .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, userId)));
+      // 6-B : une conversation archivée par la boutique revient dans « Tous » quand la cliente écrit.
+      if (conv.kind === 'shop') await tx.update(conversations).set({ shopArchivedAt: null }).where(eq(conversations.id, conversationId));
+      // L'autre personne avait refusé ma demande : le message reste invisible pour elle (elle n'est pas relancée).
+    });
+    return this.view(m, true, otherReadId, apiBase);
   }
 
   /** Conversation lue jusqu'au dernier message (statut « Vu » chez l'autre personne). */
@@ -319,7 +491,10 @@ export class MessagingService {
 
   /** Supprimer mon message : « Message supprimé » chez les deux, photo effacée du stockage. */
   async deleteMessage(userId: string, messageId: string) {
-    const [m] = await this.db.select().from(messages).where(and(eq(messages.id, messageId), eq(messages.senderId, userId), eq(messages.status, 'published')));
+    const [m] = await this.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.senderId, userId), isNull(messages.senderShopId), eq(messages.status, 'published')));
     if (!m) throw Errors.notFound('Message');
     await this.access(userId, m.conversationId);
     await this.db.update(messages).set({ status: 'deleted', text: null, mediaKey: null }).where(eq(messages.id, m.id));

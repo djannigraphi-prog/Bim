@@ -4483,6 +4483,36 @@
         ]
       }
     },
+    "/v1/conversations/shop": {
+      "post": {
+        "operationId": "MessagingController_startWithShop",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartShopConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Écrire à une boutique (« Discuter ») : ouvre ou retrouve la conversation, avec l’article ou l’offre dont on parle",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
     "/v1/conversations/{id}/messages": {
       "get": {
         "operationId": "MessagingController_messages",
@@ -4725,6 +4755,445 @@
         "summary": "Supprimer mon message (« Message supprimé » chez les deux)",
         "tags": [
           "Messages"
+        ]
+      }
+    },
+    "/v1/shop/inbox": {
+      "get": {
+        "operationId": "ShopInboxController_list",
+        "parameters": [
+          {
+            "name": "box",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "all",
+                "unread",
+                "archived",
+                "marked"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conversations de la boutique : Tous, Non lus, Archivés, Marqués",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/unread-count": {
+      "get": {
+        "operationId": "ShopInboxController_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conversations non lues par la boutique",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/quick-replies": {
+      "get": {
+        "operationId": "ShopInboxController_quickReplies",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Réponses rapides de la boutique",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      },
+      "post": {
+        "operationId": "ShopInboxController_addQuickReply",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter une réponse rapide (10 au plus)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/quick-replies/{id}": {
+      "delete": {
+        "operationId": "ShopInboxController_removeQuickReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer une réponse rapide",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/messages/{id}": {
+      "delete": {
+        "operationId": "ShopInboxController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprimer un message de la boutique (son auteur ou le propriétaire)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/{id}": {
+      "get": {
+        "operationId": "ShopInboxController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une conversation : la cliente, l’article ou l’offre dont on parle, les non-lus",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/{id}/messages": {
+      "get": {
+        "operationId": "ShopInboxController_messages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "Identifiant du plus ancien message déjà affiché",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Messages, du plus récent au plus ancien",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      },
+      "post": {
+        "operationId": "ShopInboxController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Répondre au nom de la boutique (texte ou photo ré-encodée sans métadonnées)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/{id}/read": {
+      "post": {
+        "operationId": "ShopInboxController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conversation lue par la boutique (« Vu » chez la cliente)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/{id}/archive": {
+      "put": {
+        "operationId": "ShopInboxController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archiver (revient dans « Tous » au prochain message de la cliente)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      },
+      "delete": {
+        "operationId": "ShopInboxController_unarchive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sortir des archives",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
+    "/v1/shop/inbox/{id}/mark": {
+      "put": {
+        "operationId": "ShopInboxController_mark",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marquer la conversation (à suivre)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      },
+      "delete": {
+        "operationId": "ShopInboxController_unmark",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer la marque",
+        "tags": [
+          "Messages de la boutique"
         ]
       }
     },
@@ -6479,6 +6948,40 @@
         },
         "required": [
           "username"
+        ]
+      },
+      "StartShopConversationDto": {
+        "type": "object",
+        "properties": {
+          "shopSlug": {
+            "type": "string",
+            "example": "boutique-elegance",
+            "description": "Adresse (slug) de la boutique"
+          },
+          "productId": {
+            "type": "string",
+            "description": "Article dont on parle (bandeau de la conversation)"
+          },
+          "offerId": {
+            "type": "string",
+            "description": "Offre reçue pour un de mes projets (écran 49)"
+          }
+        },
+        "required": [
+          "shopSlug"
+        ]
+      },
+      "QuickReplyDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 200,
+            "example": "Disponible ✅"
+          }
+        },
+        "required": [
+          "text"
         ]
       },
       "AdminLoginDto": {

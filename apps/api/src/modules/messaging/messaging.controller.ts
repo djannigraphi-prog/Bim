@@ -7,10 +7,10 @@ import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { SendMessageDto, StartConversationDto } from './dto';
+import { SendMessageDto, StartConversationDto, StartShopConversationDto } from './dto';
 import { MessagingService } from './messaging.service';
 
-/** Lot 6-A — Messagerie entre personnes (écran 47). Espace utilisateur ; aucune notification sur le téléphone. */
+/** Lot 6-A — Messagerie entre personnes (écran 47) ; 6-B : conversations avec une boutique, côté cliente. Espace utilisateur ; aucune notification sur le téléphone. */
 @ApiTags('Messages')
 @ApiBearerAuth()
 @RequireSpace('user')
@@ -37,6 +37,13 @@ export class MessagingController {
   @ApiOperation({ summary: 'Ouvrir ou retrouver la conversation avec une personne' })
   start(@CurrentAuth() a: AuthContext, @Body() dto: StartConversationDto, @Req() req: Request) {
     return this.messaging.start(a.userId, dto.username, apiBase(req));
+  }
+
+  @Post('conversations/shop')
+  @Throttle({ default: { limit: 30, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Écrire à une boutique (« Discuter ») : ouvre ou retrouve la conversation, avec l’article ou l’offre dont on parle' })
+  startWithShop(@CurrentAuth() a: AuthContext, @Body() dto: StartShopConversationDto, @Req() req: Request) {
+    return this.messaging.startWithShop(a.userId, dto, apiBase(req));
   }
 
   @Get('conversations/:id/messages')

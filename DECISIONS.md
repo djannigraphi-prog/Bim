@@ -158,6 +158,14 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 
 ---
 
+### F3 bis — Espèces réservées aux livreurs employés de la boutique (16/10/2026) · Fondateur · **décidé** (remplace F3 pour les livreurs partenaires)
+
+- Seuls les livreurs **employés directement par la boutique concernée** peuvent encaisser des espèces, et seulement pour les commandes de cette boutique.
+- Les livreurs **freelances partenaires** et les livreurs **freelances indépendants** n'encaissent **jamais** d'espèces pour une commande BIM ; leurs livraisons suivent le parcours Mobile Money.
+- La règle est appliquée et vérifiée **côté serveur** (jamais seulement dans l'interface) et fait l'objet de tests dédiés. Le droit d'encaisser se déduit d'une relation d'emploi active avec la boutique de la commande ; il n'est jamais une option cochée par le marchand. Conséquence technique (lot 7) : la colonne `courier_shop_partnerships.can_collect_article_payment` (lot 0, jamais utilisée) ne doit pas servir aux espèces.
+- Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
+- Règles détaillées du lot 7 (moment du paiement, frais de livraison, délais d'attribution, commandes sans livreur, droits des employés, annulations et litiges, code de remise, âges) : **proposées le 16/10/2026, en attente de validation**. Aucun développement des commandes sans accord explicite.
+
 ### C6 — Mode d'un projet et abonnement Premium : deux notions indépendantes · Fondateur · décidé (14/10/2026)
 - **Projet économique** : atteindre l'objectif avec des solutions gratuites ou économiques (exercices à la maison, astuces, conseils, méthodes pratiques, solutions à fabriquer soi-même). Exemple, prise de muscle : 10 pompes chaque matin et exercices à domicile.
 - **Projet Premium** : la personne accepte d'envisager des achats ; BIM peut lui recommander des accessoires, produits ou services adaptés, vendus par des marchands. Exemple, prise de muscle : haltères, bandes élastiques, tapis de sport.

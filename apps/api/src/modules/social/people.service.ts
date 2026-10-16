@@ -1,12 +1,12 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, ilike, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers } from '../../database/schema';
+import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers, conversations, shopMembers } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
@@ -182,8 +182,18 @@ export class PeopleService {
         .from(messages)
         .innerJoin(conversationMembers, and(eq(conversationMembers.conversationId, messages.conversationId), eq(conversationMembers.userId, viewerId)))
         .where(and(eq(messages.id, dto.targetId), eq(messages.status, 'published'), ne(messages.senderId, viewerId)));
-      if (!m) throw Errors.notFound('Message');
-      targetUserId = m.senderId;
+      // Lot 6-B : une personne de l'équipe d'une boutique signale un message de la cliente (pas un message de la boutique).
+      const [fromClient] = m
+        ? []
+        : await this.db
+            .select({ senderId: messages.senderId })
+            .from(messages)
+            .innerJoin(conversations, and(eq(conversations.id, messages.conversationId), eq(conversations.kind, 'shop')))
+            .innerJoin(shopMembers, and(eq(shopMembers.shopId, conversations.shopId), eq(shopMembers.userId, viewerId), isNull(shopMembers.revokedAt)))
+            .where(and(eq(messages.id, dto.targetId), eq(messages.status, 'published'), isNull(messages.senderShopId), ne(messages.senderId, viewerId)));
+      const found = m ?? fromClient;
+      if (!found) throw Errors.notFound('Message');
+      targetUserId = found.senderId;
     } else if (dto.targetType === 'story') {
       targetUserId = (await this.stories.visibleStory(viewerId, dto.targetId)).userId;
     } else {

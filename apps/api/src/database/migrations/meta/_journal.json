@@ -183,6 +183,13 @@
       "when": 1792142160713,
       "tag": "0025_messaging",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792148382737,
+      "tag": "0026_shop_messaging",
+      "breakpoints": true
     }
   ]
 }
