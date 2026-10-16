@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
+import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
@@ -49,9 +50,10 @@ export class PostsService {
     return new Date(this.clock.now().getTime() - 24 * 3600_000);
   }
 
-  private async checkPostLimit(userId: string) {
+  /** Limite sur 24 heures. Appelée une fois avant le travail coûteux (photos), puis sous verrou dans la transaction. */
+  private async checkPostLimit(userId: string, db: Pick<Database, 'select'> = this.db) {
     const max = await this.limit('social.posts_daily_limit', 20);
-    const [{ n }] = await this.db.select({ n: count() }).from(posts).where(and(eq(posts.userId, userId), gt(posts.createdAt, this.since24h())));
+    const [{ n }] = await db.select({ n: count() }).from(posts).where(and(eq(posts.userId, userId), gt(posts.createdAt, this.since24h())));
     if (n >= max) throw Errors.tooMany('Tu as déjà beaucoup publié aujourd’hui 😊 Réessaie demain.', { reason: 'SOCIAL_POSTS_DAILY_LIMIT', limit: max });
   }
 
@@ -78,6 +80,8 @@ export class PostsService {
         media.push({ id: mid, postId: id, position: i, kind: 'image', storageKey: key, width: img.width, height: img.height, bytes: img.bytes });
       }
       await this.db.transaction(async (tx) => {
+        await lockUserQuota(tx, 'posts', userId);
+        await this.checkPostLimit(userId, tx);
         await tx.insert(posts).values({ id, userId, kind: 'post', text, visibility: dto.visibility ?? 'public', createdAt: this.clock.now(), updatedAt: this.clock.now() });
         if (media.length) await tx.insert(postMedia).values(media);
         await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.post_created', targetType: 'post', targetId: id, ip: meta.ip, userAgent: meta.userAgent, metadata: { images: media.length } }, tx);
@@ -118,6 +122,8 @@ export class PostsService {
         media.push({ id: mid, postId: id, position: i, kind: ph.kind, storageKey: key, width: ph.width, height: ph.height, bytes: ph.bytes, takenDay: ph.takenDay });
       }
       await this.db.transaction(async (tx) => {
+        await lockUserQuota(tx, 'posts', userId);
+        await this.checkPostLimit(userId, tx);
         await tx.insert(posts).values({
           id,
           userId,
@@ -348,8 +354,11 @@ export class PostsService {
     const text = dto.text.trim();
     if (!text) throw Errors.validation({ fields: { text: ['Écris ton commentaire.'] } });
     const max = await this.limit('social.comments_daily_limit', 200);
-    const [{ n }] = await this.db.select({ n: count() }).from(postComments).where(and(eq(postComments.userId, viewerId), gt(postComments.createdAt, this.since24h())));
-    if (n >= max) throw Errors.tooMany('Tu as déjà beaucoup commenté aujourd’hui 😊 Réessaie demain.', { reason: 'SOCIAL_COMMENTS_DAILY_LIMIT', limit: max });
+    const checkCommentLimit = async (db: Pick<Database, 'select'>) => {
+      const [{ n }] = await db.select({ n: count() }).from(postComments).where(and(eq(postComments.userId, viewerId), gt(postComments.createdAt, this.since24h())));
+      if (n >= max) throw Errors.tooMany('Tu as déjà beaucoup commenté aujourd’hui 😊 Réessaie demain.', { reason: 'SOCIAL_COMMENTS_DAILY_LIMIT', limit: max });
+    };
+    await checkCommentLimit(this.db);
     if (dto.parentId) {
       // Réponse impossible à un commentaire masqué, d'un compte inactif ou d'une personne bloquée (audit, A-9).
       const [row] = await this.db
@@ -365,6 +374,9 @@ export class PostsService {
     const now = this.clock.now();
     const id = uuidv7(now.getTime());
     await this.db.transaction(async (tx) => {
+      // Sous verrou : des envois simultanés ne dépassent pas la limite (audit, défaut 1).
+      await lockUserQuota(tx, 'comments', viewerId);
+      await checkCommentLimit(tx);
       await tx.insert(postComments).values({ id, postId, userId: viewerId, parentId: dto.parentId ?? null, text, createdAt: now });
       await tx.update(posts).set({ commentCount: sql`${posts.commentCount} + 1` }).where(eq(posts.id, post.id));
       await this.audit.log({ actorType: 'user', actorId: viewerId, action: 'social.comment_created', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent, metadata: { commentId: id } }, tx);

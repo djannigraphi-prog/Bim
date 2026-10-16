@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
+import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
@@ -51,8 +52,11 @@ export class StoriesService {
     const s = await this.settings.get<number>('social.stories_daily_limit');
     const max = typeof s?.value === 'number' && s.value > 0 ? s.value : 20;
     const since = new Date(this.clock.now().getTime() - 24 * 3600_000);
-    const [{ n }] = await this.db.select({ n: count() }).from(stories).where(and(eq(stories.userId, userId), gt(stories.createdAt, since)));
-    if (n >= max) throw Errors.tooMany('Tu as déjà publié beaucoup de stories aujourd’hui 😊 Réessaie demain.', { reason: 'SOCIAL_STORIES_DAILY_LIMIT', limit: max });
+    const checkLimit = async (db: Pick<Database, 'select'>) => {
+      const [{ n }] = await db.select({ n: count() }).from(stories).where(and(eq(stories.userId, userId), gt(stories.createdAt, since)));
+      if (n >= max) throw Errors.tooMany('Tu as déjà publié beaucoup de stories aujourd’hui 😊 Réessaie demain.', { reason: 'SOCIAL_STORIES_DAILY_LIMIT', limit: max });
+    };
+    await checkLimit(this.db);
     const img = await encodePrivateImage(file, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photo');
     const now = this.clock.now();
     const id = uuidv7(now.getTime());
@@ -60,6 +64,9 @@ export class StoriesService {
     await this.storage.put(key, img.data, 'image/jpeg');
     try {
       await this.db.transaction(async (tx) => {
+        // Recompte sous verrou (audit, défaut 1) ; en cas de refus, le fichier déjà stocké est effacé plus bas.
+        await lockUserQuota(tx, 'stories', userId);
+        await checkLimit(tx);
         await tx.insert(stories).values({ id, userId, storageKey: key, width: img.width, height: img.height, bytes: img.bytes, createdAt: now, expiresAt: new Date(now.getTime() + STORY_HOURS * 3600_000) });
         await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.story_created', targetType: 'story', targetId: id, ip: meta.ip, userAgent: meta.userAgent }, tx);
       });

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, asc, count, eq, gt, sql } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
+import { lockUserQuota } from '../../common/quota-lock';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
 import { notificationPreferences, peniConversations, peniMessages, users } from '../../database/schema';
@@ -70,10 +71,10 @@ export class PeniService {
   }
 
   /** Limite sur 24 heures glissantes, comptée sur les messages de la personne (pas ceux de Peni). */
-  private async checkDailyLimit(userId: string) {
+  private async checkDailyLimit(userId: string, db: Pick<Database, 'select'> = this.db) {
     const max = await this.limit('peni.daily_message_limit', 100);
     const since = new Date(this.clock.now().getTime() - 24 * 3600_000);
-    const [{ n }] = await this.db
+    const [{ n }] = await db
       .select({ n: count() })
       .from(peniMessages)
       .where(and(eq(peniMessages.userId, userId), eq(peniMessages.role, 'user'), gt(peniMessages.createdAt, since)));
@@ -208,7 +209,10 @@ export class PeniService {
   }
 
   /** Écriture courte, sous le verrou de la discussion : message de la personne, réponses de Peni, nouvel état. */
-  private async persist(tx: Pick<Database, 'select' | 'insert' | 'update'>, userId: string, id: string, last: number, dto: PeniMessageDto, result: EngineResult) {
+  private async persist(tx: Pick<Database, 'select' | 'insert' | 'update' | 'execute'>, userId: string, id: string, last: number, dto: PeniMessageDto, result: EngineResult) {
+    // Recompte sous verrou : des messages simultanés (plusieurs discussions) ne dépassent pas la limite (audit, défaut 1).
+    await lockUserQuota(tx, 'peni', userId);
+    await this.checkDailyLimit(userId, tx);
     const now = this.clock.now();
     const label = dto.choice ? await this.choiceLabel(tx, id, dto.choice) : dto.text!.trim();
     const rows = [

@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, desc, eq, gte } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
+import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
@@ -64,8 +65,11 @@ export class ReportsService {
     }
 
     const since = new Date(this.clock.now().getTime() - 24 * 3600 * 1000);
-    const [{ n }] = await this.db.select({ n: count() }).from(projectReports).where(and(eq(projectReports.userId, userId), gte(projectReports.createdAt, since)));
-    if (n >= MAX_REPORTS_PER_DAY) throw Errors.tooMany('Tu as envoyé beaucoup de signalements aujourd’hui. Réessaie demain, l’équipe traite ceux déjà reçus.');
+    const checkLimit = async (db: Pick<Database, 'select'>) => {
+      const [{ n }] = await db.select({ n: count() }).from(projectReports).where(and(eq(projectReports.userId, userId), gte(projectReports.createdAt, since)));
+      if (n >= MAX_REPORTS_PER_DAY) throw Errors.tooMany('Tu as envoyé beaucoup de signalements aujourd’hui. Réessaie demain, l’équipe traite ceux déjà reçus.');
+    };
+    await checkLimit(this.db);
 
     // Image facultative : contrôlée et ré-encodée AVANT tout enregistrement ; en cas d'erreur, rien n'est créé.
     let image: PrivateImage | null = null;
@@ -85,6 +89,9 @@ export class ReportsService {
     }
     try {
       await this.db.transaction(async (tx) => {
+        // Recompte sous verrou (audit, défaut 1).
+        await lockUserQuota(tx, 'reports', userId);
+        await checkLimit(tx);
         await tx.insert(projectReports).values({
           id,
           context,
