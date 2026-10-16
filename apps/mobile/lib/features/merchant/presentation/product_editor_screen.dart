@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -127,7 +125,7 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
           _pending.clear();
         }
         return created;
-      }, done: 'Enregistré');
+      }, done: 'Enregistré',);
 
   Future<void> _addPhoto() async {
     final camera = await showModalBottomSheet<bool>(
@@ -216,12 +214,12 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
                   if (p != null)
                     for (final ph in p.photos)
                       _Thumb(
-                        child: ph.url == null ? const Icon(Icons.image_outlined) : Image.network(ph.url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                         onRemove: _busy ? null : () => _run((api) => api.removePhoto(p.id, ph.id)),
+                        child: ph.url == null ? const Icon(Icons.image_outlined) : Image.network(ph.url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                       )
                   else
                     for (final (i, b) in _pending.indexed)
-                      _Thumb(child: Image.memory(Uint8List.fromList(b), fit: BoxFit.cover), onRemove: () => setState(() => _pending.removeAt(i))),
+                      _Thumb(onRemove: () => setState(() => _pending.removeAt(i)), child: Image.memory(Uint8List.fromList(b), fit: BoxFit.cover)),
                   if (photoCount < _maxPhotos)
                     InkWell(
                       key: const ValueKey('add-photo'),
