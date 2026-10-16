@@ -36,25 +36,7 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
   bool _requests = false;
 
   Future<void> _newMessage() async {
-    final controller = TextEditingController();
-    final username = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nouveau message'),
-        content: TextField(
-          key: const ValueKey('new-message-username'),
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(prefixText: '@', hintText: 'nom d’utilisateur'),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          TextButton(key: const ValueKey('new-message-go'), onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Écrire')),
-        ],
-      ),
-    );
-    controller.dispose();
+    final username = await showDialog<String>(context: context, builder: (_) => const _NewMessageDialog());
     if (username == null || username.isEmpty || !mounted) return;
     await openConversationWith(context, ref, username.replaceFirst('@', ''));
   }
@@ -117,6 +99,41 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
       ),
     );
   }
+}
+
+/// Saisie du destinataire. Le dialogue possède son contrôleur : il n'est libéré qu'à la fermeture complète
+/// (animation de sortie comprise), jamais pendant que le champ est encore affiché.
+class _NewMessageDialog extends StatefulWidget {
+  const _NewMessageDialog();
+
+  @override
+  State<_NewMessageDialog> createState() => _NewMessageDialogState();
+}
+
+class _NewMessageDialogState extends State<_NewMessageDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Nouveau message'),
+        content: TextField(
+          key: const ValueKey('new-message-username'),
+          controller: _controller,
+          autofocus: true,
+          decoration: const InputDecoration(prefixText: '@', hintText: 'nom d’utilisateur'),
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(key: const ValueKey('new-message-go'), onPressed: () => Navigator.pop(context, _controller.text.trim()), child: const Text('Écrire')),
+        ],
+      );
 }
 
 class _ConversationTile extends ConsumerWidget {
