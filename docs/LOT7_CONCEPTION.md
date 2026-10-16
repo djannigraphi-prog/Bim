@@ -217,7 +217,13 @@ réellement opérationnel. Une interface de paiement ne suffit pas.
 
 ---
 
-## 7. Tarification des livraisons [APPROUVÉ dans le principe, A2]
+## 7. Tarification des livraisons [APPROUVÉ dans le principe, A2 ; **réalisé en 7-D** selon les propositions A2-b et A2-c]
+
+> Réalisé (7-D) : référentiel des communes (code `ville-commune`), table des durées par mode, grilles versionnées
+> (brouillon → publiée, immuable par déclencheur), permission `delivery_tariffs.write` (rôle principal), lecture
+> `delivery_tariffs.read`, journal avant / après, devis public `GET /v1/shops/:id/delivery-quote?commune=`, écran
+> d'administration « Tarifs de livraison ». La commune de la boutique est déduite de sa ville et de sa commune.
+> Attente : réglage `delivery.wait_fees_enabled` = false (A2-c, provisoire).
 
 **Principe** : une grille configurable **inspirée** de la tarification au temps des services de course (durée du
 trajet, temps d'attente, mode). **BIM ne connaît pas et ne reproduit pas l'algorithme interne de Yango.**

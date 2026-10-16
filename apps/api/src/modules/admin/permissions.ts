@@ -19,6 +19,9 @@ export const ADMIN_PERMISSIONS = {
   'content.moderate': ['super_admin', 'moderator'],
   /** Lot 5 : vérification des demandes de boutique (pièces d'identité) — proposition, à valider. */
   'merchants.review': ['super_admin', 'support'],
+  /** 7-D : communes, durées et grilles de livraison (proposé : rôle principal seul pour modifier). */
+  'delivery_tariffs.read': ['super_admin', 'commercial', 'finance', 'support', 'tech'],
+  'delivery_tariffs.write': ['super_admin'],
   'admins.manage': ['super_admin'],
   /** Surveillance technique (état du worker des rappels…) : exploitation, pas d'accès aux données des personnes. */
   'system.health': ['super_admin', 'tech', 'support'],

@@ -5451,6 +5451,328 @@
         ]
       }
     },
+    "/v1/communes": {
+      "get": {
+        "operationId": "TariffsController_communes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Communes desservables (adresse de livraison)",
+        "tags": [
+          "Livraisons — tarifs"
+        ]
+      }
+    },
+    "/v1/shops/{shopId}/delivery-quote": {
+      "get": {
+        "operationId": "TariffsController_quote",
+        "parameters": [
+          {
+            "name": "shopId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Frais de livraison par mode vers une commune, calculés par le serveur ; indisponible si commune, durée ou grille absente",
+        "tags": [
+          "Livraisons — tarifs"
+        ]
+      }
+    },
+    "/admin/v1/delivery/communes": {
+      "get": {
+        "operationId": "TariffsAdminController_communes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      },
+      "post": {
+        "operationId": "TariffsAdminController_createCommune",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommuneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/communes/{code}": {
+      "patch": {
+        "operationId": "TariffsAdminController_communeStatus",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommuneStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/durations": {
+      "get": {
+        "operationId": "TariffsAdminController_durations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      },
+      "put": {
+        "operationId": "TariffsAdminController_setDuration",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DurationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Durée estimée d’un trajet entre deux communes pour un mode (null : retirer)",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/tariffs": {
+      "get": {
+        "operationId": "TariffsAdminController_tariffsList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/tariffs/draft": {
+      "put": {
+        "operationId": "TariffsAdminController_draft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TariffDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créer ou modifier le brouillon de grille d’un mode",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/tariffs/{id}/publish": {
+      "post": {
+        "operationId": "TariffsAdminController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publier un brouillon : grille en vigueur, immuable",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/tariffs/{id}": {
+      "delete": {
+        "operationId": "TariffsAdminController_deleteDraft",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/delivery/tariffs/{id}/simulate": {
+      "post": {
+        "operationId": "TariffsAdminController_simulate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -7276,6 +7598,117 @@
         },
         "required": [
           "permissions"
+        ]
+      },
+      "CommuneDto": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "example": "Abidjan"
+          },
+          "name": {
+            "type": "string",
+            "example": "Cocody"
+          }
+        },
+        "required": [
+          "city",
+          "name"
+        ]
+      },
+      "CommuneStatusDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
+        ]
+      },
+      "DurationDto": {
+        "type": "object",
+        "properties": {
+          "fromCode": {
+            "type": "string"
+          },
+          "toCode": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "express",
+              "economy"
+            ]
+          },
+          "minutes": {
+            "type": "object",
+            "nullable": true,
+            "description": "Minutes ; null retire le trajet (livraison indisponible)"
+          }
+        },
+        "required": [
+          "fromCode",
+          "toCode",
+          "mode",
+          "minutes"
+        ]
+      },
+      "TariffDraftDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "express",
+              "economy"
+            ]
+          },
+          "baseFcfa": {
+            "type": "number"
+          },
+          "perMinuteFcfa": {
+            "type": "number"
+          },
+          "minimumFcfa": {
+            "type": "number"
+          },
+          "roundingFcfa": {
+            "type": "number"
+          },
+          "freeWaitMinutes": {
+            "type": "number"
+          },
+          "waitPerMinuteFcfa": {
+            "type": "number"
+          },
+          "waitCapMinutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "mode",
+          "baseFcfa",
+          "perMinuteFcfa",
+          "minimumFcfa",
+          "roundingFcfa",
+          "freeWaitMinutes",
+          "waitPerMinuteFcfa",
+          "waitCapMinutes"
+        ]
+      },
+      "SimulateDto": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "minutes"
         ]
       },
       "AdminLoginDto": {

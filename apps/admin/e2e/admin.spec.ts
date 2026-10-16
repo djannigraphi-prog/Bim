@@ -219,6 +219,30 @@ test('boutiques (lot 5) : demande examinée, pièces déchiffrées affichées, v
   await expect(page.getByLabel('Demande de boutique « Boutique Test E2E »')).toBeVisible();
 });
 
+test('tarifs de livraison (7-D) : commune, grille publiée en vigueur, simulation du calcul', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Tarifs de livraison' }).click();
+  const commune = `Commune E2E ${Date.now()}`;
+  await page.getByLabel('Commune', { exact: true }).fill(commune);
+  await page.getByRole('button', { name: 'Ajouter la commune' }).click();
+  await expect(page.getByRole('cell', { name: commune, exact: true })).toBeVisible();
+
+  const values = ['500', '40', '1000', '25', '5', '50', '15'];
+  const labels = ['Prise en charge (F)', 'Prix par minute (F)', 'Minimum (F)', "Pas d'arrondi (F)", 'Attente gratuite (min)', "Prix par minute d'attente (F)", "Plafond d'attente (min)"];
+  for (const [i, l] of labels.entries()) await page.getByLabel(`${l} (Rapide)`, { exact: true }).fill(values[i]);
+  await page.getByRole('button', { name: 'Enregistrer le brouillon Rapide' }).click();
+  const card = page.getByLabel('Grille Rapide');
+  const publish = card.getByRole('button', { name: /^Publier la version \d+$/ });
+  await expect(publish).toBeVisible();
+  const version = (await publish.textContent())!.replace(/\D/g, '');
+  await publish.click();
+  await expect(card.getByRole('heading', { name: `Rapide — version ${version} en vigueur` })).toBeVisible();
+  await card.getByLabel(`Minutes à simuler, version ${version} Rapide`).fill('30');
+  await card.getByRole('row', { name: new RegExp(`^${version} En vigueur`) }).getByRole('button', { name: 'Simuler' }).click();
+  await expect(card.getByText('1700 F')).toBeVisible();
+  await page.screenshot({ path: 'test-results/captures/tarifs-livraison.png' });
+});
+
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Administrateurs' }).click();

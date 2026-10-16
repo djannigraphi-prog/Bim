@@ -94,7 +94,9 @@ export type Permission =
   | 'reports.resolve'
   | 'content.read'
   | 'content.moderate'
-  | 'merchants.review';
+  | 'merchants.review'
+  | 'delivery_tariffs.read'
+  | 'delivery_tariffs.write';
 
 export interface AdminProfile {
   id: string;

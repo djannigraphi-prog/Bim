@@ -69,6 +69,7 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^messages\.new_conversations_daily_limit$/, intIn(1, 500)],
   // Conservation des messages privés : null tant qu'elle n'est pas validée (aucune suppression).
   [/^messages\.retention_days$/, intIn(30, 3650, true)],
+  [/^delivery\.wait_fees_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

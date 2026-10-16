@@ -10,3 +10,4 @@ export * from './merchants';
 export * from './catalog';
 export * from './offers';
 export * from './messaging';
+export * from './logistics';
