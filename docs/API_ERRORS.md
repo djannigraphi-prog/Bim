@@ -14,6 +14,16 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `SESSION_INVALID` | 401 | rafraîchissement impossible ; `details.reason` = invalid · revoked · reuse · expired |
 | `FORBIDDEN` | 403 | action ou espace non autorisé |
 | `SHOP_PERMISSION_REQUIRED` | 403 | 7-A : permission de boutique manquante (propriétaire seul, ou permission non accordée à l'employé) ; `details.permission` |
+| `PRODUCT_UNAVAILABLE` | 409 | 7-B : article retiré, variante inactive, ou non publié (commande du BimShop) ; `details.index`, `details.productId` |
+| `OUT_OF_STOCK` | 409 | 7-B : stock insuffisant à la commande ou à la confirmation (la base refuse tout stock négatif) ; rien n'est confirmé |
+| `DELIVERY_UNAVAILABLE` | 409 | 7-B : mode indisponible pour cette adresse ; `details.reason` = NO_TARIFF · NO_DURATION · COMMUNE_UNKNOWN |
+| `SHOP_UNAVAILABLE` | 409 | 7-B : boutique fermée ou propriétaire inactif |
+| `PRICE_CHANGED` | 409 | 7-B : le montant affiché diffère du calcul du serveur ; `details.itemsTotalFcfa`, `deliveryFeeFcfa`, `totalFcfa` ; rien n'est créé |
+| `ORDER_STATE_CHANGED` | 409 | 7-B : la commande n'est plus dans un état qui permet l'action (requête tardive ou répétée, expiration) ; `details.status` |
+| `CUSTOMER_CANNOT_ORDER` | 403 | 7-B : proposition impossible pour cette personne (motif non communiqué à la boutique) |
+| `NOT_PICKUP` | 409 | 7-B : commande livrée ; le code se saisit à la livraison (7-F) |
+| `HANDOVER_CODE_INVALID` | 400 | 7-B : code de remise incorrect ; `details.remaining` |
+| `HANDOVER_CODE_BLOCKED` | 409 | 7-B : code bloqué après trop d'essais (`orders.handover_code_max_attempts`) |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |
 | `PRODUCT_CONTENT_LOCKED` | 409 | L7-04 : nom, description et prix normal ne se modifient plus après la création ; rubrique, durée et variantes plus après la première publication ; créer une nouvelle fiche ; `details.fields` (liste des champs refusés) |
 | `REPUTATION_RESET_REQUIRED` | 409 | **Retiré (L7-04)** : n'est plus renvoyé ; `confirmReputationReset` est refusé (400) |

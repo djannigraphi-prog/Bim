@@ -62,6 +62,17 @@ Sources : `DECISIONS.md` (F1-F4, F3 bis, F15, F17, C1, C2, T-010, T-028, L7-01, 
 
 ## 3. Parcours complet d'une commande [APPROUVÉ, A1, sauf mention]
 
+> **Réalisé en 7-B** (§3.1, §3.2, §3.11, §4 pour la commande) : module unique (`orders`, `order_items` figées,
+> `order_events` en écriture seule, `order_handover_codes`), BimShop (la boutique confirme) et proposition dans la
+> conversation (carte, vaut confirmation de la boutique, prix négocié à la baisse seulement, fiche non publiée
+> possible), récapitulatif calculé par le serveur et montant attendu vérifié (`PRICE_CHANGED`), clé anti-doublon,
+> stock retiré à la confirmation (`sale`) et remis à l'annulation (`return`), code de remise à 4 chiffres chiffré,
+> empreinte comparée à temps constant, 5 essais, usage unique, retrait en boutique, expiration (worker et à la
+> lecture), annulation avec auteur et statut, notifications dans l'app, « Mes commandes », « Commandes reçues ».
+> Choix de réalisation (L7-05) : âge = réglage `age.min_other_payments` (non décidé : commandes fermées) ; espèces au
+> retrait seulement ; client annule jusqu'à « confirmée » ; retrait en boutique toujours proposé. Livraison (7-F) et
+> paiement (7-C) non couverts.
+
 ### 3.1 Avant la confirmation
 
 1. **Choix de l'article** : depuis le BimShop (« Commander ») ou dans une proposition du marchand faite dans la

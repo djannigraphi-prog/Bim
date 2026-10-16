@@ -11,3 +11,4 @@ export * from './catalog';
 export * from './offers';
 export * from './messaging';
 export * from './logistics';
+export * from './orders';

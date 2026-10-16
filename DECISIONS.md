@@ -166,6 +166,23 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-05 — Lot 7 : développement de 7-D et 7-B (16/10/2026) · Fondateur (« code sans attendre ») · **réalisé** ; choix de réalisation à confirmer
+
+- **7-D** : propositions A2-b et A2-c appliquées (grilles, communes et durées saisies par BIM dans l'administration ;
+  commune ou trajet absent = mode indisponible ; attente enregistrée, non facturée : `delivery.wait_fees_enabled` = false).
+- **7-B, choix pris sans arbitrage explicite (à confirmer)** :
+  - **Âge pour commander (A12)** : réglage existant `age.min_other_payments` (« autres paiements : BimShop, projets »).
+    Il est **non décidé** : selon la règle F15, les commandes restent **fermées** (`RULE_NOT_DECIDED`) tant que le
+    fondateur ne l'a pas fixé dans l'administration. Une proposition à une personne qui ne peut pas commander est
+    refusée sans en dire le motif à la boutique.
+  - **Espèces** : possibles seulement au retrait en boutique (la boutique encaisse) tant que les livreurs employés
+    n'existent pas (7-E / 7-F) ; jamais pour une livraison à ce stade.
+  - **Retrait en boutique** : toujours proposé (aucun réglage par boutique n'existe encore).
+  - **Annulation par le client** : jusqu'à « confirmée » ; ensuite, seule la boutique annule (motif obligatoire).
+  - **Délais** (A10, provisoires) : proposition 24 h, confirmation par la boutique 24 h, 5 essais pour le code.
+  - A14 (fiche obligatoire, éventuellement non publiée) et A15 (prix négocié à la baisse seulement) appliqués.
+- **Non réalisé, en attente** : livraisons (7-F, arbitrage annonces / sélection L7-04), paiements réels (lot 8).
+
 ### L7-04 — Livreurs, fiches des articles et réputation : corrections (16/10/2026) · Fondateur · **décidé** ; fiches **réalisées**, livreurs **verrouillés** (aucune route livreur encore)
 
 - **Livreurs** : un livreur n'accède **jamais** aux commandes internes d'une boutique. Il peut seulement (1) voir les

@@ -83,7 +83,13 @@ export class InboxService {
       SELECT 'offer:' || o.id, 'project_offer', o.created_at, p.id, p.title, NULL, NULL, NULL, NULL, NULL, NULL, NULL, s.name
       FROM project_offers o JOIN projects p ON p.id = o.project_id JOIN shops s ON s.id = o.shop_id JOIN users so ON so.id = s.owner_user_id
       WHERE p.user_id = ${userId} AND o.status = 'sent' AND s.status = 'active' AND so.status = 'active' AND o.created_at > ${since}
-        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = so.id) OR (b.blocker_id = so.id AND b.blocked_id = ${userId}))`;
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = so.id) OR (b.blocker_id = so.id AND b.blocked_id = ${userId}))
+      -- Lot 7-B : ce qui arrive à mes commandes du fait de la boutique ou du délai (jamais mes propres actions).
+      UNION ALL
+      SELECT 'order:' || e.id, 'order_update', e.created_at, NULL, NULL, o.number, NULL, NULL, NULL, s.name, NULL, o.id::text, e.type
+      FROM order_events e JOIN orders o ON o.id = e.order_id JOIN shops s ON s.id = o.shop_id
+      WHERE o.customer_id = ${userId} AND e.actor_type IN ('shop', 'system') AND e.created_at > ${since}
+        AND e.type IN ('proposed', 'confirmed', 'declined', 'ready', 'handed_over', 'cancelled', 'proposal_withdrawn', 'expired')`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {
@@ -100,7 +106,7 @@ export class InboxService {
       this.db.execute<Row>(sql`
         SELECT * FROM (${this.sources(userId, since)}) x
         WHERE (${opts.category ?? null}::text IS NULL
-               OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected') THEN 'support'
+               OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected', 'order_update') THEN 'support'
                         WHEN x.type IN ('post_liked', 'post_commented', 'new_follower') THEN 'social'
                         ELSE 'projects' END) = ${opts.category ?? null}::text)
           -- Page suivante : position (date à la milliseconde, identifiant) du dernier élément vu ; aucun élément de même
@@ -181,5 +187,7 @@ function link(r: Row): string | null {
       return '/merchant/apply';
     case 'project_offer':
       return r.project_id ? `/projects/${r.project_id}/offers` : null;
+    case 'order_update':
+      return r.post_id ? `/orders/${r.post_id}` : null;
   }
 }

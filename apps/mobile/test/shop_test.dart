@@ -5,6 +5,7 @@ import 'package:bim/core/theme/app_theme.dart';
 import 'package:bim/features/merchant/data/shop_api.dart';
 import 'package:bim/features/merchant/presentation/merchant_space_screen.dart';
 import 'package:bim/features/merchant/presentation/product_editor_screen.dart';
+import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -124,7 +125,7 @@ Future<void> _pump(WidgetTester tester, _FakeShop api, String location, {double 
     GoRoute(path: '/shop/products/:id', builder: (_, s) => ProductEditorScreen(productId: s.pathParameters['id'])),
   ],);
   await tester.pumpWidget(ProviderScope(
-    overrides: [apiClientProvider.overrideWithValue(_client()), shopApiProvider.overrideWithValue(api)],
+    overrides: [apiClientProvider.overrideWithValue(_client()), shopApiProvider.overrideWithValue(api), shopOrdersApiProvider.overrideWithValue(_FakeShopOrders())],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);
   await tester.pump();
@@ -138,14 +139,15 @@ void main() {
     expect(formatFcfa(500), '500 FCFA');
   });
 
-  testWidgets('écran 55 : boutique, compteurs réels, articles en ligne ; ventes et commandes annoncées sans chiffre inventé', (tester) async {
+  testWidgets('écran 55 : boutique, compteurs réels, articles en ligne, commandes à traiter', (tester) async {
     await _pump(tester, _FakeShop(), '/shop');
     expect(find.text('Boutique Élégance'), findsOneWidget);
     expect(find.text('Espace marchand · Cocody, Abidjan'), findsOneWidget);
     expect(find.text('En ligne'), findsOneWidget); // compteur
     expect(find.text('Robe soirée à plumes'), findsOneWidget);
     expect(find.text('Stock : 3'), findsOneWidget);
-    expect(find.text('Ventes du jour et commandes à traiter : bientôt, avec les commandes.'), findsOneWidget);
+    // 7-B : commandes à traiter, compteurs réels.
+    expect(find.text('2 à confirmer · 1 à préparer'), findsOneWidget);
     await tester.tap(find.text('Live'));
     await tester.pumpAndSettle();
     expect(find.text('Bientôt disponible'), findsOneWidget);
@@ -294,11 +296,19 @@ void main() {
     expect(find.byKey(const ValueKey('action-article')), findsNothing);
     expect(find.byKey(const ValueKey('action-requests')), findsNothing);
     expect(find.byKey(const ValueKey('action-team')), findsNothing);
+    expect(find.byKey(const ValueKey('shop-orders')), findsNothing);
     // Le propriétaire voit tout.
     await _pump(tester, _FakeShop(), '/shop');
     expect(find.byKey(const ValueKey('add-product')), findsOneWidget);
     expect(find.byKey(const ValueKey('action-team')), findsOneWidget);
   });
+}
+
+/// Compteurs de commandes simulés (7-B).
+class _FakeShopOrders extends ShopOrdersApi {
+  _FakeShopOrders() : super(_client());
+  @override
+  Future<({int toConfirm, int toPrepare, int ready})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 0);
 }
 
 class _LockedShop extends _FakeShop {

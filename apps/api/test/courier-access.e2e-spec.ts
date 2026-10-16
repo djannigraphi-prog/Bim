@@ -49,8 +49,12 @@ describe('Accès des livreurs (e2e)', () => {
     const shopRoutes = all.filter((r) => r.path.startsWith('/v1/shop/') || r.path === '/v1/shop');
     expect(shopRoutes.length).toBeGreaterThan(20);
     expect(shopRoutes.filter((r) => r.space !== 'merchant')).toEqual([]);
-    // Aucune route de commandes, de livraisons ni d'historique n'existe avant les sous-lots 7-B à 7-F.
-    expect(all.filter((r) => /\/(orders|deliveries|courses)\b/.test(r.path))).toEqual([]);
+    // 7-B : les commandes sont réservées au client (espace personnel) et à la boutique (espace boutique) ; aucune
+    // route de livraison ni d'historique de courses n'existe avant 7-E / 7-F.
+    const orderRoutes = all.filter((r) => /\/orders\b/.test(r.path));
+    expect(orderRoutes.length).toBeGreaterThan(5);
+    expect(orderRoutes.filter((r) => !(r.path.startsWith('/v1/orders') ? r.space === 'user' : r.path.startsWith('/v1/shop/orders') && r.space === 'merchant'))).toEqual([]);
+    expect(all.filter((r) => /\/(deliveries|courses)\b/.test(r.path))).toEqual([]);
   });
 
   it('un compte livreur actif n’accède à aucune donnée d’une boutique ni à la messagerie des clients', async () => {
@@ -79,8 +83,9 @@ describe('Accès des livreurs (e2e)', () => {
     await h.http().get('/v1/projects').set(auth).expect(403);
     // Un partenariat ne donne pas l'espace boutique.
     await h.http().post('/v1/auth/switch-space').set(userAuth).send({ type: 'merchant', id: shopId }).expect(403);
-    // Aucune route de commandes ou de livraisons n'existe encore.
-    await h.http().get('/v1/orders').set(auth).expect(404);
+    // Commandes : ni celles des clients ni celles de la boutique depuis l'espace livreur ; pas encore de livraisons.
+    await h.http().get('/v1/orders').set(auth).expect(403);
+    await h.http().get('/v1/shop/orders').set(auth).expect(403);
     await h.http().get('/v1/deliveries').set(auth).expect(404);
   });
 });

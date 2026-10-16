@@ -9,7 +9,8 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
-import '../../merchant/data/shop_api.dart' show formatFcfa;
+import '../../merchant/data/shop_api.dart';
+import '../../orders/data/orders_api.dart';
 import '../../projects/application/photo_source.dart';
 import '../../social/presentation/moderation_sheets.dart';
 import '../../social/presentation/social_widgets.dart';
@@ -153,6 +154,18 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     }
   }
 
+  Future<void> _propose() async {
+    final sent = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ProposalSheet(conversationId: widget.conversationId),
+    );
+    if (sent == true) {
+      await _refresh();
+      if (mounted) showBimSnack(context, 'Proposition envoyée');
+    }
+  }
+
   Future<void> _pickPhoto() async {
     final bytes = await ref.read(photoSourceProvider).pick(camera: false);
     if (bytes != null) await _send(photo: bytes);
@@ -280,7 +293,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                               return Center(child: TextButton(key: const ValueKey('messages-older'), onPressed: _more, child: const Text('Messages précédents')));
                             }
                             final m = _messages[i];
-                            return _Bubble(message: m, showRead: identical(m, lastMineRead) && (m.read ?? false), onLongPress: () => _messageMenu(m));
+                            return _Bubble(message: m, asShop: widget.asShop, showRead: identical(m, lastMineRead) && (m.read ?? false), onLongPress: () => _messageMenu(m));
                           },
                         ),
             ),
@@ -308,6 +321,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 child: Row(
                   children: [
                     IconButton(key: const ValueKey('message-photo'), tooltip: 'Envoyer une photo', icon: const Icon(Icons.photo_outlined), onPressed: _sending ? null : _pickPhoto),
+                    // 7-B : la boutique propose une commande dans la conversation (vaut sa confirmation).
+                    if (widget.asShop)
+                      IconButton(key: const ValueKey('propose-order'), tooltip: 'Proposer une commande', icon: const Icon(Icons.receipt_long_outlined), onPressed: _sending ? null : _propose),
                     Expanded(
                       child: TextField(
                         key: const ValueKey('message-input'),
@@ -337,9 +353,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, required this.showRead, required this.onLongPress});
+  const _Bubble({required this.message, required this.showRead, required this.onLongPress, this.asShop = false});
 
   final ChatMessage message;
+  final bool asShop;
   final bool showRead;
   final VoidCallback onLongPress;
 
@@ -355,6 +372,7 @@ class _Bubble extends StatelessWidget {
       'hidden' => Text('Message masqué par la modération', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       // Type à venir (cartes de commande, lot 7) : jamais de bulle vide.
       _ when !m.supported => Text('Ce message s’affiche dans une version plus récente de BIM.', key: const ValueKey('message-unsupported'), style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
+      _ when m.kind == 'order' => _OrderCardView(card: m.order!, fg: fg, onTap: () => context.push(asShop ? '/shop/orders/${m.order!.id}' : '/orders/${m.order!.id}')),
       _ => m.kind == 'photo'
           ? ClipRRect(
               borderRadius: BorderRadius.circular(BimRadius.chip),
@@ -461,7 +479,8 @@ class _ContextBanner extends StatelessWidget {
                     FilledButton(
                       key: const ValueKey('chat-order'),
                       style: FilledButton.styleFrom(backgroundColor: BimColors.red, foregroundColor: Colors.white),
-                      onPressed: p.available ? () => showComingSoon(context, feature: p.kind == 'service' ? 'La réservation' : 'La commande') : null,
+                      // 7-B : la commande se passe depuis la fiche (taille, quantité, mode) ; aucun paiement ici.
+                      onPressed: p.available ? () => context.push('/bimshop/products/${p.id}') : null,
                       child: Text(p.kind == 'service' ? 'Réserver' : 'Commander'),
                     ),
                 ],
@@ -494,6 +513,183 @@ class _QuickReplies extends ConsumerWidget {
               child: ActionChip(key: ValueKey('quick-reply-${q.id}'), label: Text(q.text), onPressed: () => onPick(q.text)),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Carte d'une proposition de commande : numéro, article(s), montant, état ; un appui ouvre la commande.
+class _OrderCardView extends StatelessWidget {
+  const _OrderCardView({required this.card, required this.fg, required this.onTap});
+  final OrderCard card;
+  final Color fg;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        key: ValueKey('order-card-${card.id}'),
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [Icon(Icons.receipt_long_outlined, color: fg, size: 18), const SizedBox(width: 6), Text('Proposition ${card.number}', style: TextStyle(color: fg, fontWeight: FontWeight.w700))],
+            ),
+            if (card.title != null) Text(card.title!, style: TextStyle(color: fg)),
+            Text('${formatFcfa(card.itemsTotalFcfa)} · ${orderStatusLabel(card.status)}', style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+            Text('Voir la commande', style: TextStyle(color: fg, decoration: TextDecoration.underline)),
+          ],
+        ),
+      );
+}
+
+/// 7-B — La boutique choisit un article de son catalogue (publié ou non, A14), la variante, la quantité et, si elle le
+/// souhaite, un prix plus bas (A15 : jamais au-dessus du catalogue). Le serveur revérifie tout.
+class _ProposalSheet extends ConsumerStatefulWidget {
+  const _ProposalSheet({required this.conversationId});
+  final String conversationId;
+
+  @override
+  ConsumerState<_ProposalSheet> createState() => _ProposalSheetState();
+}
+
+class _ProposalSheetState extends ConsumerState<_ProposalSheet> {
+  final _key = newIdempotencyKey();
+  final _price = TextEditingController();
+  List<ProductSummary> _products = const [];
+  ProductDetail? _product;
+  String? _variant;
+  int _qty = 1;
+  bool _busy = false;
+  ApiException? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  @override
+  void dispose() {
+    _price.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProducts() async {
+    final api = ref.read(shopApiProvider);
+    try {
+      final all = [for (final st in ['published', 'hidden', 'draft']) ...await api.products(status: st)];
+      if (mounted) setState(() => _products = all);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  Future<void> _pick(String id) async {
+    setState(() {
+      _product = null;
+      _variant = null;
+    });
+    try {
+      final p = await ref.read(shopApiProvider).product(id);
+      if (mounted) {
+        setState(() {
+          _product = p;
+          _variant = p.variants.length == 1 ? p.variants.first.id : null;
+          _price.text = '${p.priceFcfa}';
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  Future<void> _send() async {
+    final p = _product!;
+    final price = int.tryParse(_price.text);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(shopOrdersApiProvider).propose(
+        widget.conversationId,
+        [OrderLine(productId: p.id, variantId: _variant!, quantity: _qty, appliedPriceFcfa: price != null && price < p.priceFcfa ? price : null)],
+        idempotencyKey: _key,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final p = _product;
+    final price = int.tryParse(_price.text);
+    final priceOk = p != null && price != null && price >= 1 && price <= p.priceFcfa;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.lg, BimSpacing.screen, BimSpacing.lg + MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Proposer une commande', style: theme.textTheme.titleLarge),
+            const SizedBox(height: BimSpacing.xs),
+            Text('La personne choisit ensuite le retrait ou la livraison, puis accepte. Sans réponse, la proposition expire.', style: theme.textTheme.bodySmall),
+            const SizedBox(height: BimSpacing.md),
+            DropdownButtonFormField<String>(
+              key: const ValueKey('proposal-product'),
+              // ignore: deprecated_member_use
+              value: p?.id,
+              isExpanded: true,
+              items: [for (final x in _products) DropdownMenuItem(value: x.id, child: Text('${x.title} · ${x.reference}', overflow: TextOverflow.ellipsis))],
+              onChanged: (id) => id == null ? null : _pick(id),
+              decoration: const InputDecoration(labelText: 'Article ou prestation'),
+            ),
+            if (p != null && p.variants.length > 1) ...[
+              const SizedBox(height: BimSpacing.sm),
+              Wrap(
+                spacing: BimSpacing.sm,
+                children: [for (final v in p.variants) ChoiceChip(key: ValueKey('proposal-variant-${v.label}'), label: Text(v.label), selected: _variant == v.id, onSelected: (_) => setState(() => _variant = v.id))],
+              ),
+            ],
+            if (p != null) ...[
+              const SizedBox(height: BimSpacing.sm),
+              Row(
+                children: [
+                  const Text('Quantité'),
+                  IconButton(tooltip: 'Un de moins', icon: const Icon(Icons.remove_circle_outline), onPressed: _qty > 1 ? () => setState(() => _qty--) : null),
+                  Text('$_qty', key: const ValueKey('proposal-qty')),
+                  IconButton(tooltip: 'Un de plus', icon: const Icon(Icons.add_circle_outline), onPressed: _qty < 99 ? () => setState(() => _qty++) : null),
+                ],
+              ),
+              TextField(
+                key: const ValueKey('proposal-price'),
+                controller: _price,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: 'Prix unitaire (au plus ${formatFcfa(p.priceFcfa)})', errorText: priceOk ? null : 'Entre 1 F et le prix du catalogue.'),
+                onChanged: (_) => setState(() {}),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: BimSpacing.sm),
+              Text(_error!.message, key: const ValueKey('proposal-error'), style: const TextStyle(color: BimColors.red)),
+            ],
+            const SizedBox(height: BimSpacing.md),
+            BimButton(
+              key: const ValueKey('proposal-send'),
+              label: 'Envoyer la proposition',
+              loading: _busy,
+              onPressed: p != null && _variant != null && priceOk && !_busy ? _send : null,
+            ),
+          ],
+        ),
       ),
     );
   }

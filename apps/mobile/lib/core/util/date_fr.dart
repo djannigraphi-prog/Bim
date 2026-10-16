@@ -30,3 +30,10 @@ String hourFr(String hhmm) {
   final m = parts.length > 1 ? parts[1] : '00';
   return m == '00' ? '$h h' : '$h h $m';
 }
+
+/// « 16 oct. à 14 h 05 » (heure d'Abidjan = UTC).
+String formatDateTimeFr(DateTime t) {
+  final d = t.toUtc();
+  final m = d.minute.toString().padLeft(2, '0');
+  return '${d.day} ${_monthsShort[d.month - 1]} à ${d.hour} h $m';
+}

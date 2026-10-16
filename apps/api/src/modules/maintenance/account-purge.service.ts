@@ -54,6 +54,9 @@ export const PURGE_BLOCKING_TABLES = [
   'conversations',
   'conversation_members',
   'messages',
+  // Lot 7-B : commander, proposer ou remettre une commande est une activité.
+  'orders',
+  'order_handover_codes',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -68,6 +71,8 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   shop_member_permissions: ['user_id', 'granted_by'],
   product_revisions: ['changed_by'],
   shop_members: ['user_id', 'invited_by'],
+  orders: ['customer_id', 'created_by'],
+  order_handover_codes: ['used_by'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [

@@ -1,13 +1,13 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { conversationMembers, conversations, follows, messages, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
+import { conversationMembers, conversations, follows, messages, orderItems, orders, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
 import { ageOn } from '../age-policy/age';
 import { AuditService } from '../audit/audit.service';
 import { BimShopService } from '../catalog/bimshop.service';
@@ -315,6 +315,7 @@ export class MessagingService {
     if (m.status === 'hidden') return 'Message masqué par la modération';
     if (m.kind === 'photo') return 'Photo';
     if (m.kind === 'text') return (m.text ?? '').slice(0, 120);
+    if (m.kind === 'order') return 'Proposition de commande';
     // Types à venir (cartes de commande, lot 7) : texte neutre, jamais de contenu interne.
     return 'Nouveau message';
   }
@@ -367,7 +368,18 @@ export class MessagingService {
       createdAt: m.createdAt,
       /** Mes messages : lus par l'autre partie. */
       read: mine ? !!otherReadId && otherReadId >= m.id : null,
+      /** 7-B : carte d'une proposition de commande (l'état réel se lit dans la commande). */
+      order: visible && m.kind === 'order' && m.orderId ? await this.orderCard(m.orderId) : null,
     };
+  }
+
+  private async orderCard(orderId: string) {
+    const [o] = await this.db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!o) return null;
+    const items = await this.db.select({ title: orderItems.title }).from(orderItems).where(eq(orderItems.orderId, orderId)).orderBy(asc(orderItems.position));
+    // Proposition échue mais pas encore traitée par le worker : affichée expirée (le serveur l'expire à la prochaine action).
+    const status = ['proposed', 'pending_shop'].includes(o.status) && o.expiresAt && o.expiresAt <= new Date() ? 'expired' : o.status;
+    return { id: o.id, number: o.number, status, itemsTotalFcfa: o.itemsTotalFcfa, title: items.length ? (items.length > 1 ? `${items[0].title} + ${items.length - 1}` : items[0].title) : null, expiresAt: o.expiresAt };
   }
 
   /** Page de messages, du plus récent au plus ancien (`before` = identifiant du plus ancien déjà affiché). */

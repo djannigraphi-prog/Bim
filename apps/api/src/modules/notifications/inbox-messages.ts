@@ -11,7 +11,7 @@ import { reminderMessage } from './reminders';
  */
 export const INBOX_TEMPLATES_VERSION = 'v2';
 
-export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected' | 'project_offer';
+export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected' | 'project_offer' | 'order_update';
 export type InboxCategory = 'projects' | 'support' | 'social';
 
 export interface InboxSource {
@@ -29,7 +29,7 @@ export interface InboxSource {
 
 const SOCIAL: InboxType[] = ['post_liked', 'post_commented', 'new_follower'];
 export const inboxCategory = (type: InboxType): InboxCategory =>
-  type === 'report_answered' || type === 'content_hidden' || type === 'merchant_approved' || type === 'merchant_rejected' ? 'support' : SOCIAL.includes(type) ? 'social' : 'projects';
+  type === 'report_answered' || type === 'content_hidden' || type === 'merchant_approved' || type === 'merchant_rejected' || type === 'order_update' ? 'support' : SOCIAL.includes(type) ? 'social' : 'projects';
 export const inboxSender = (type: InboxType): 'peni' | 'bim' => (type === 'chest_opened' || type === 'task_reminder' ? 'peni' : 'bim');
 
 const quoted = (title: string | null) => (title ? `« ${title} »` : 'ton projet');
@@ -53,6 +53,21 @@ export function inboxText(s: InboxSource): string {
     }
     case 'new_follower':
       return `${s.actorName ?? 'Quelqu’un'} s’est abonné·e à toi.`;
+    case 'order_update': {
+      const shop = `« ${s.actorName ?? 'La boutique'} »`;
+      const n = s.chest ?? '';
+      const texts: Record<string, string> = {
+        proposed: `${shop} te propose une commande (${n}). Tu restes libre de l’accepter ou de la refuser.`,
+        confirmed: `${shop} a confirmé ta commande ${n}.`,
+        declined: `${shop} n’a pas pu accepter ta commande ${n}.`,
+        ready: `Ta commande ${n} est prête.`,
+        handed_over: `Ta commande ${n} t’a été remise. Merci !`,
+        cancelled: `${shop} a annulé ta commande ${n}.`,
+        proposal_withdrawn: `${shop} a retiré sa proposition ${n}.`,
+        expired: `La commande ${n} a expiré sans confirmation.`,
+      };
+      return texts[s.snippet ?? ''] ?? `Ta commande ${n} a été mise à jour.`;
+    }
     case 'project_offer':
       return `« ${s.snippet ?? ''} » te propose une offre pour ${quoted(s.projectTitle)}. Tu restes libre de la refuser.`;
     case 'merchant_approved':

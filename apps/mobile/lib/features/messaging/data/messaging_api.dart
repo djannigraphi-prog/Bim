@@ -107,8 +107,20 @@ class ConversationSummary {
   }
 }
 
+/// 7-B : carte d'une proposition de commande dans la conversation (l'état réel se lit dans la commande).
+class OrderCard {
+  const OrderCard({required this.id, required this.number, required this.status, required this.itemsTotalFcfa, this.title});
+  final String id;
+  final String number;
+  final String status;
+  final int itemsTotalFcfa;
+  final String? title;
+  factory OrderCard.fromJson(Map<String, dynamic> j) =>
+      OrderCard(id: j['id'] as String, number: j['number'] as String, status: j['status'] as String, itemsTotalFcfa: j['itemsTotalFcfa'] as int, title: j['title'] as String?);
+}
+
 class ChatMessage {
-  const ChatMessage({required this.id, required this.mine, required this.kind, required this.status, required this.createdAt, this.text, this.photoUrl, this.read});
+  const ChatMessage({required this.id, required this.mine, required this.kind, required this.status, required this.createdAt, this.text, this.photoUrl, this.read, this.order});
 
   final String id;
   final bool mine;
@@ -120,11 +132,12 @@ class ChatMessage {
   final String? photoUrl;
   /// Mes messages : lus par l'autre personne.
   final bool? read;
+  final OrderCard? order;
 
   bool get visible => status == 'published';
   /// Types connus de cette version (texte, photo). Les types à venir (cartes de commande, lot 7) s'affichent
   /// avec un texte neutre au lieu d'une bulle vide.
-  bool get supported => kind == 'text' || kind == 'photo';
+  bool get supported => kind == 'text' || kind == 'photo' || (kind == 'order' && order != null);
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
         id: j['id'] as String,
@@ -135,6 +148,7 @@ class ChatMessage {
         text: j['text'] as String?,
         photoUrl: j['photoUrl'] as String?,
         read: j['read'] as bool?,
+        order: j['order'] == null ? null : OrderCard.fromJson(j['order'] as Map<String, dynamic>),
       );
 }
 

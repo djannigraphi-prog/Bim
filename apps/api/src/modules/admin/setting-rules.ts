@@ -69,6 +69,8 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^messages\.new_conversations_daily_limit$/, intIn(1, 500)],
   // Conservation des messages privés : null tant qu'elle n'est pas validée (aucune suppression).
   [/^messages\.retention_days$/, intIn(30, 3650, true)],
+  [/^orders\.(proposal_ttl_hours|shop_confirm_ttl_hours)$/, intIn(1, 168)],
+  [/^orders\.handover_code_max_attempts$/, intIn(3, 10)],
   [/^delivery\.wait_fees_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
 ];
 

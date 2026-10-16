@@ -100,7 +100,15 @@ class _FakeShopChat extends _FakeMessaging {
   @override
   Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async => (
         items: [
-          ChatMessage(id: 'k2', mine: false, kind: 'order', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 21)),
+          ChatMessage(id: 'k3', mine: false, kind: 'voice', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 22)),
+          ChatMessage(
+            id: 'k2',
+            mine: false,
+            kind: 'order',
+            status: 'published',
+            createdAt: DateTime(2026, 10, 16, 14, 21),
+            order: const OrderCard(id: 'o9', number: 'CMD-000009', status: 'proposed', itemsTotalFcfa: 18000, title: 'Robe noire (prix convenu)'),
+          ),
           ChatMessage(id: 'k1', mine: false, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 20), text: 'Il en reste 2 en noir.'),
         ],
         nextBefore: null,
@@ -172,6 +180,8 @@ Future<void> _pump(WidgetTester tester, _FakeMessaging api, Widget home, {_FakeS
     GoRoute(path: '/', builder: (_, __) => home),
     GoRoute(path: '/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, refreshEvery: null)),
     GoRoute(path: '/shop/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, refreshEvery: null, asShop: true)),
+    GoRoute(path: '/orders/:id', builder: (_, s) => Scaffold(body: Text('commande ${s.pathParameters['id']}'))),
+    GoRoute(path: '/bimshop/products/:id', builder: (_, s) => Scaffold(body: Text('fiche ${s.pathParameters['id']}'))),
   ],);
   await tester.pumpWidget(ProviderScope(
     overrides: [
@@ -235,7 +245,7 @@ void main() {
     expect(find.byKey(const ValueKey('message-input')), findsOneWidget);
   });
 
-  testWidgets('6-B, écran 48 côté cliente : la boutique, l’article (« en stock »), « Commander » annoncé ; type de message à venir lisible', (tester) async {
+  testWidgets('6-B / 7-B, écran 48 côté cliente : l’article, carte de proposition de commande, type à venir lisible, « Commander » ouvre la fiche', (tester) async {
     final api = _FakeShopChat();
     await _pump(tester, api, const ConversationScreen(conversationId: 'c2', refreshEvery: null));
     await tester.pump(const Duration(milliseconds: 100));
@@ -244,9 +254,20 @@ void main() {
     expect(find.textContaining('en stock'), findsOneWidget);
     expect(find.byKey(const ValueKey('message-unsupported')), findsOneWidget);
     expect(find.text('Il en reste 2 en noir.'), findsOneWidget);
+    // 7-B : carte de la proposition ; un appui ouvre la commande.
+    expect(find.text('Proposition CMD-000009'), findsOneWidget);
+    expect(find.text('18 000 FCFA · Proposition à accepter'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('order-card-o9')));
+    await tester.pumpAndSettle();
+    expect(find.text('commande o9'), findsOneWidget);
+  });
+
+  testWidgets('7-B, bandeau de l’article : « Commander » ouvre la fiche (taille, quantité, mode)', (tester) async {
+    await _pump(tester, _FakeShopChat(), const ConversationScreen(conversationId: 'c2', refreshEvery: null));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('chat-order')));
     await tester.pumpAndSettle();
-    expect(find.text('Bientôt disponible'), findsOneWidget);
+    expect(find.textContaining('fiche '), findsOneWidget);
   });
 
   testWidgets('6-B, écran 51 : boîte de la boutique, onglet Commandes annoncé, archiver par appui long', (tester) async {

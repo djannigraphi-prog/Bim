@@ -12,13 +12,15 @@ import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../merchant/data/shop_api.dart' show formatFcfa;
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
+import '../../orders/data/orders_api.dart';
+import '../../orders/presentation/checkout_screen.dart';
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
 final _productStateProvider = FutureProvider.autoDispose.family<({bool favorite, bool followingShop}), String>((ref, id) => ref.watch(bimShopApiProvider).productState(id));
 
 /// Lot 5-C — Écran 34, fiche article : photos, prix (prix barré), tailles disponibles, boutique, autres articles.
-/// La commande arrive au lot 7 : le bouton l'annonce, aucun paiement ici.
+/// Lot 7-B : « Commander » ouvre le récapitulatif (mode, frais calculés par le serveur) ; aucun paiement dans l'app.
 class ShopProductScreen extends ConsumerStatefulWidget {
   const ShopProductScreen({super.key, required this.productId});
 
@@ -269,13 +271,38 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                 child: BimButton(
                   key: const ValueKey('order'),
                   label: p.kind == 'service' ? 'Réserver' : 'Commander',
-                  onPressed: p.available ? () => showComingSoon(context, feature: p.kind == 'service' ? 'La réservation' : 'La commande') : null,
+                  onPressed: p.available ? () => _order(p) : null,
                 ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _order(ShopProduct p) async {
+    if (!_signedIn) {
+      await showVisitorGate(context, ref);
+      return;
+    }
+    if (_merchantSpace) {
+      showBimSnack(context, 'Passe dans ton espace personnel pour commander.');
+      return;
+    }
+    final available = p.variants.where((v) => v.available).toList();
+    final variant = p.variants.length == 1 ? p.variants.first : p.variants.where((v) => v.id == _variant).firstOrNull;
+    if (variant == null || !variant.available || available.isEmpty) {
+      showBimSnack(context, 'Choisis d’abord la taille ou le modèle.');
+      return;
+    }
+    await context.push(
+      '/orders/checkout',
+      extra: CheckoutArgs(
+        shopId: p.shop.id,
+        shopName: p.shop.name,
+        lines: [CheckoutLine(line: OrderLine(productId: p.id, variantId: variant.id, quantity: 1), title: p.title, variantLabel: variant.label, unitPriceFcfa: p.priceFcfa)],
+      ),
     );
   }
 

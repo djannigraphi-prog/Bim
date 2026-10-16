@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { check, index, integer, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { products } from './catalog';
+import { orders } from './orders';
 import { users } from './identity';
 import { projectOffers } from './offers';
 import { shops } from './spaces';
@@ -77,7 +78,7 @@ export const conversationMembers = pgTable(
   ],
 );
 
-/** Message. kind : text · photo. status : published · deleted (par son auteur) · hidden (modération). */
+/** Message. kind : text · photo · order (7-B : carte d'une proposition de commande). status : published · deleted (par son auteur) · hidden (modération). */
 export const messages = pgTable(
   'messages',
   {
@@ -93,6 +94,8 @@ export const messages = pgTable(
     kind: varchar('kind', { length: 8 }).notNull().default('text'),
     text: varchar('text', { length: 2000 }),
     mediaKey: varchar('media_key', { length: 200 }),
+    /** 7-B : commande présentée par une carte (kind order). */
+    orderId: uuid('order_id').references(() => orders.id),
     mediaWidth: integer('media_width'),
     mediaHeight: integer('media_height'),
     status: varchar('status', { length: 10 }).notNull().default('published'),
@@ -101,9 +104,9 @@ export const messages = pgTable(
   (t) => [
     index('messages_conversation_idx').on(t.conversationId, t.id),
     index('messages_sender_idx').on(t.senderId, t.createdAt),
-    check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo')`),
+    check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo', 'order')`),
     check('messages_status_ck', sql`${t.status} IN ('published', 'deleted', 'hidden')`),
-    check('messages_content_ck', sql`(${t.kind} = 'text' AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR ${t.status} <> 'published'`),
+    check('messages_content_ck', sql`(${t.kind} = 'text' AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR (${t.kind} = 'order' AND ${t.orderId} IS NOT NULL) OR ${t.status} <> 'published'`),
   ],
 );
 

@@ -63,6 +63,9 @@ import 'package:bim/features/social/presentation/composer_screen.dart';
 import 'package:bim/features/social/presentation/post_detail_screen.dart';
 import 'package:bim/features/social/presentation/profile_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:bim/features/orders/data/orders_api.dart';
+import 'package:bim/features/orders/presentation/checkout_screen.dart';
+import 'package:bim/features/orders/presentation/order_screens.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -458,7 +461,7 @@ class _FakeMessagingApi extends MessagingApi {
 /// Conversation de démonstration avec une boutique POUR LES CAPTURES UNIQUEMENT (écran 48).
 List<ChatMessage> _shopChat({required bool clientSide}) => [
       ChatMessage(id: 'k4', mine: clientSide, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 22), text: 'Parfait, je la prends 🙏', read: clientSide ? false : null),
-      ChatMessage(id: 'k3', mine: !clientSide, kind: 'order', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 21)),
+      ChatMessage(id: 'k3', mine: !clientSide, kind: 'order', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 21), order: const OrderCard(id: 'o1', number: 'CMD-000042', status: 'proposed', itemsTotalFcfa: 45000, title: 'Robe soirée à plumes')),
       ChatMessage(id: 'k2', mine: !clientSide, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 20), text: 'Oui ! Il en reste 2 en noir.', read: clientSide ? null : true),
       ChatMessage(id: 'k1', mine: clientSide, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 18), text: 'Bonjour, la robe à plumes est disponible en M ?', read: clientSide ? true : null),
     ];
@@ -755,6 +758,8 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     messagingApiProvider.overrideWithValue(_FakeMessagingApi(client)),
     shopInboxApiProvider.overrideWithValue(_FakeShopInboxApi(client)),
     shopTeamApiProvider.overrideWithValue(_FakeShopTeamApi(client)),
+    ordersApiProvider.overrideWithValue(_FakeOrdersApi(client)),
+    shopOrdersApiProvider.overrideWithValue(_FakeShopOrdersApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -787,6 +792,18 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/social/new', builder: (_, __) => const ComposerScreen()),
     GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
     GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+    GoRoute(path: '/orders/o1', builder: (_, __) => const OrderScreen(orderId: 'o1')),
+    GoRoute(path: '/shop/orders/o1', builder: (_, __) => const ShopOrderScreen(orderId: 'o1')),
+    GoRoute(
+      path: '/orders/checkout',
+      builder: (_, __) => const CheckoutScreen(
+        args: CheckoutArgs(
+          shopId: 's1',
+          shopName: 'Boutique Élégance',
+          lines: [CheckoutLine(line: OrderLine(productId: 'x1', variantId: 'v1', quantity: 1), title: 'Robe soirée à plumes', variantLabel: 'M', unitPriceFcfa: 45000)],
+        ),
+      ),
+    ),
     GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
     GoRoute(path: '/messages-tab', builder: (_, __) => const Scaffold(body: SafeArea(child: MessagesView()))),
     GoRoute(path: '/messages/c1', builder: (_, __) => const ConversationScreen(conversationId: 'c1', refreshEvery: null)),
@@ -824,6 +841,48 @@ Future<void> _settle(WidgetTester tester) async {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 150)));
     await tester.pump(const Duration(milliseconds: 400));
   }
+}
+
+/// 7-B — Commandes simulées (les règles sont testées côté API).
+OrderDetail _order({required bool shop}) => OrderDetail(
+      id: 'o1',
+      number: 'CMD-000042',
+      status: 'ready',
+      source: 'bimshop',
+      shopName: 'Boutique Élégance',
+      customerName: shop ? 'Awa Koné' : null,
+      items: const [OrderItem(reference: 'BIM-000123', title: 'Robe soirée à plumes', variantLabel: 'M', quantity: 1, unitPriceFcfa: 45000, catalogPriceFcfa: 45000, lineTotalFcfa: 45000)],
+      deliveryMode: 'pickup',
+      paymentMethod: 'mobile_money',
+      itemsTotalFcfa: 45000,
+      totalFcfa: 45000,
+      handoverCode: shop ? null : '4821',
+      handoverCodeStatus: 'active',
+      events: [
+        OrderEvent(type: 'created', actorType: 'customer', at: DateTime.utc(2026, 10, 16, 9, 12)),
+        OrderEvent(type: 'confirmed', actorType: 'shop', at: DateTime.utc(2026, 10, 16, 9, 30)),
+        OrderEvent(type: 'preparing', actorType: 'shop', at: DateTime.utc(2026, 10, 16, 10, 5)),
+        OrderEvent(type: 'ready', actorType: 'shop', at: DateTime.utc(2026, 10, 16, 11, 40)),
+      ],
+      actions: shop ? const ['handover', 'cancel'] : const [],
+    );
+
+class _FakeOrdersApi extends OrdersApi {
+  _FakeOrdersApi(super.api);
+  @override
+  Future<OrderDetail> order(String id) async => _order(shop: false);
+  @override
+  Future<List<Commune>> communes() async => const [Commune(code: 'abidjan-yopougon', city: 'Abidjan', name: 'Yopougon')];
+  @override
+  Future<OrderPreview> preview(String shopId, List<OrderLine> lines, Fulfilment f) async => const OrderPreview(itemsTotalFcfa: 45000, totalFcfa: 45000);
+}
+
+class _FakeShopOrdersApi extends ShopOrdersApi {
+  _FakeShopOrdersApi(super.api);
+  @override
+  Future<({int toConfirm, int toPrepare, int ready})> counts() async => (toConfirm: 2, toPrepare: 1, ready: 1);
+  @override
+  Future<OrderDetail> order(String id) async => _order(shop: true);
 }
 
 Future<void> _capture(WidgetTester tester, String name) =>
@@ -1137,6 +1196,18 @@ void main() {
   testWidgets('55 article (modification)', (t) async {
     await _show(t, '/shop/products/x1');
     await _capture(t, 'x17_article');
+  });
+  testWidgets('7-B commande (client) : code de remise', (t) async {
+    await _show(t, '/orders/o1');
+    await _capture(t, 'x23_commande_client');
+  });
+  testWidgets('7-B commande reçue (boutique)', (t) async {
+    await _show(t, '/shop/orders/o1');
+    await _capture(t, 'x24_commande_boutique');
+  });
+  testWidgets('7-B récapitulatif avant confirmation', (t) async {
+    await _show(t, '/orders/checkout');
+    await _capture(t, 'x25_recapitulatif_commande');
   });
   testWidgets('7-A équipe de la boutique', (t) async {
     await _show(t, '/shop/team');

@@ -6,6 +6,7 @@ import 'package:bim/features/auth/data/models.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
 import 'package:bim/features/bimshop/presentation/product_screen.dart';
+import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/bimshop/presentation/shop_profile_screen.dart';
 import 'package:bim/features/messaging/data/messaging_api.dart';
 import 'package:flutter/material.dart';
@@ -112,6 +113,14 @@ Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool
     GoRoute(path: '/bimshop/products/:id', builder: (_, s) => ShopProductScreen(productId: s.pathParameters['id']!)),
     GoRoute(path: '/bimshop/shops/:slug', builder: (_, s) => ShopProfileScreen(slug: s.pathParameters['slug']!)),
     GoRoute(path: '/messages/:id', builder: (_, s) => Scaffold(body: Text('conversation ${s.pathParameters['id']}'))),
+    GoRoute(
+      path: '/orders/checkout',
+      builder: (_, s) {
+        final a = s.extra! as CheckoutArgs;
+        final l = a.lines.single;
+        return Scaffold(body: Text('checkout ${a.shopId} ${l.line.productId} ${l.line.variantId} ${l.line.quantity} ${l.unitPriceFcfa}'));
+      },
+    ),
   ],);
   await tester.pumpWidget(ProviderScope(
     overrides: [
@@ -161,7 +170,7 @@ void main() {
     expect(find.text('Vêtements · Soirée'), findsOneWidget);
   });
 
-  testWidgets('écran 34 : taille épuisée non choisissable ; cœur ; « Commander » annonce la commande sans paiement', (tester) async {
+  testWidgets('écran 34 : taille épuisée non choisissable ; cœur ; « Commander » demande la taille puis ouvre le récapitulatif', (tester) async {
     final api = _FakeBimShop();
     await _pump(tester, api, '/bimshop/products/p1');
     expect(find.text('Robe Plumes'), findsOneWidget);
@@ -172,9 +181,17 @@ void main() {
     await tester.pump();
     expect(api.calls, ['favorite p1 true']);
     expect(find.byIcon(Icons.favorite), findsOneWidget);
+    // 7-B : sans taille choisie, rien ne part ; avec la taille S, le récapitulatif s'ouvre (aucun paiement ici).
+    await tester.tap(find.byKey(const ValueKey('order')));
+    await tester.pump();
+    expect(find.text('Choisis d’abord la taille ou le modèle.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'S'));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('order')));
     await tester.pumpAndSettle();
-    expect(find.text('Bientôt disponible'), findsOneWidget);
+    expect(find.textContaining('checkout '), findsOneWidget);
+    expect(find.textContaining(' p1 v1 1 '), findsOneWidget);
   });
 
   testWidgets('visiteur : le cœur invite à créer un compte, rien n’est envoyé', (tester) async {

@@ -85,6 +85,13 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
                   icon: const Icon(Icons.favorite_border),
                   onPressed: () => widget.visitor ? showVisitorGate(context, ref) : context.push('/bimshop/favorites'),
                 ),
+                // 7-B : mes commandes.
+                IconButton(
+                  key: const ValueKey('bimshop-orders'),
+                  tooltip: 'Mes commandes',
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  onPressed: () => widget.visitor ? showVisitorGate(context, ref) : context.push('/orders'),
+                ),
               ],
             ),
             const SizedBox(height: BimSpacing.md),

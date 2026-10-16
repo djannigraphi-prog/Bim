@@ -13,6 +13,7 @@ import '../../../core/widgets/feedback.dart';
 import '../../account/data/account_api.dart';
 import '../../auth/application/session_controller.dart';
 import '../../messaging/data/messaging_api.dart';
+import '../../orders/data/orders_api.dart';
 import '../data/shop_api.dart';
 
 /// Lot 5-B — Écran 55, espace marchand : la boutique, ses articles et prestations.
@@ -64,7 +65,8 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
   void _refresh() {
     ref
       ..invalidate(shopDashboardProvider)
-      ..invalidate(shopProductsProvider);
+      ..invalidate(shopProductsProvider)
+      ..invalidate(shopOrderCountsProvider);
   }
 
   @override
@@ -119,19 +121,8 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   ],
                 ),
                 const SizedBox(height: BimSpacing.md),
-                Container(
-                  padding: const EdgeInsets.all(BimSpacing.lg),
-                  decoration: BoxDecoration(color: scheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(BimRadius.card)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.receipt_long_outlined),
-                      const SizedBox(width: BimSpacing.md),
-                      Expanded(
-                        child: Text('Ventes du jour et commandes à traiter : bientôt, avec les commandes.', style: theme.textTheme.bodyMedium),
-                      ),
-                    ],
-                  ),
-                ),
+                // 7-B : commandes à traiter (compteurs réels), pour qui peut les consulter.
+                if (d.can('orders.read')) const _OrdersCard(),
                 const SizedBox(height: BimSpacing.lg),
                 // 7-A : les actions suivent mes permissions (le serveur les contrôle de toute façon).
                 Row(
@@ -429,6 +420,39 @@ class _ProductTile extends StatelessWidget {
               const Icon(Icons.chevron_right),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Commandes à traiter : à confirmer, à préparer, prêtes ; un appui ouvre « Commandes reçues ».
+class _OrdersCard extends ConsumerWidget {
+  const _OrdersCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final c = ref.watch(shopOrderCountsProvider).valueOrNull;
+    final text = c == null
+        ? 'Commandes reçues'
+        : (c.toConfirm + c.toPrepare + c.ready == 0
+            ? 'Aucune commande à traiter.'
+            : [if (c.toConfirm > 0) '${c.toConfirm} à confirmer', if (c.toPrepare > 0) '${c.toPrepare} à préparer', if (c.ready > 0) '${c.ready} prête${c.ready > 1 ? 's' : ''}'].join(' · '));
+    return InkWell(
+      key: const ValueKey('shop-orders'),
+      borderRadius: BorderRadius.circular(BimRadius.card),
+      onTap: () => context.push('/shop/orders'),
+      child: Container(
+        padding: const EdgeInsets.all(BimSpacing.lg),
+        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(BimRadius.card)),
+        child: Row(
+          children: [
+            const Icon(Icons.receipt_long_outlined),
+            const SizedBox(width: BimSpacing.md),
+            Expanded(child: Text(text, key: const ValueKey('shop-orders-counts'), style: theme.textTheme.bodyMedium)),
+            const Icon(Icons.chevron_right),
+          ],
         ),
       ),
     );

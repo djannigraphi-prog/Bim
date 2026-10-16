@@ -5773,6 +5773,518 @@
         ]
       }
     },
+    "/v1/orders/preview": {
+      "post": {
+        "operationId": "OrdersController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Récapitulatif avant confirmation : lignes, frais calculés par le serveur, délai, règle d’attente",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders": {
+      "post": {
+        "operationId": "OrdersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commander sur le BimShop (en attente de la boutique) ; clé anti-doublon",
+        "tags": [
+          "Commandes"
+        ]
+      },
+      "get": {
+        "operationId": "OrdersController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes commandes",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders/{id}": {
+      "get": {
+        "operationId": "OrdersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Détail : lignes figées, frais, état, historique, code de remise (client seulement)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders/{id}/accept": {
+      "post": {
+        "operationId": "OrdersController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accepter une proposition de la boutique (mode, adresse, moyen prévu ; montant vérifié)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/orders/{id}/cancel": {
+      "post": {
+        "operationId": "OrdersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionalReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser une proposition, ou annuler avant la préparation",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/v1/shop/orders": {
+      "get": {
+        "operationId": "ShopOrdersController_list",
+        "parameters": [
+          {
+            "name": "box",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "todo",
+                "active",
+                "done"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/counts": {
+      "get": {
+        "operationId": "ShopOrdersController_counts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/proposals": {
+      "post": {
+        "operationId": "ShopOrdersController_propose",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Proposer une commande dans une conversation (vaut confirmation de la boutique)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}": {
+      "get": {
+        "operationId": "ShopOrdersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/confirm": {
+      "post": {
+        "operationId": "ShopOrdersController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/decline": {
+      "post": {
+        "operationId": "ShopOrdersController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/prepare": {
+      "post": {
+        "operationId": "ShopOrdersController_prepare",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/ready": {
+      "post": {
+        "operationId": "ShopOrdersController_ready",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/handover": {
+      "post": {
+        "operationId": "ShopOrdersController_handover",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retrait en boutique : saisir le code du client (essais limités, usage unique)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/cancel": {
+      "post": {
+        "operationId": "ShopOrdersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Annuler (motif obligatoire) ou retirer une proposition",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -7709,6 +8221,227 @@
         },
         "required": [
           "minutes"
+        ]
+      },
+      "OrderLineDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "productId",
+          "variantId",
+          "quantity"
+        ]
+      },
+      "PreviewOrderDto": {
+        "type": "object",
+        "properties": {
+          "deliveryMode": {
+            "type": "string",
+            "enum": [
+              "pickup",
+              "express",
+              "economy"
+            ]
+          },
+          "communeCode": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "mobile_money",
+              "cash"
+            ]
+          },
+          "shopId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderLineDto"
+            }
+          }
+        },
+        "required": [
+          "deliveryMode",
+          "paymentMethod",
+          "shopId",
+          "items"
+        ]
+      },
+      "CreateOrderDto": {
+        "type": "object",
+        "properties": {
+          "deliveryMode": {
+            "type": "string",
+            "enum": [
+              "pickup",
+              "express",
+              "economy"
+            ]
+          },
+          "communeCode": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "mobile_money",
+              "cash"
+            ]
+          },
+          "shopId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderLineDto"
+            }
+          },
+          "expectedTotalFcfa": {
+            "type": "number",
+            "description": "Montant total affiché au client ; refusé (PRICE_CHANGED) s’il diffère du calcul du serveur"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Clé anti-doublon générée par l’app pour cette commande"
+          }
+        },
+        "required": [
+          "deliveryMode",
+          "paymentMethod",
+          "shopId",
+          "items",
+          "expectedTotalFcfa",
+          "idempotencyKey"
+        ]
+      },
+      "AcceptProposalDto": {
+        "type": "object",
+        "properties": {
+          "deliveryMode": {
+            "type": "string",
+            "enum": [
+              "pickup",
+              "express",
+              "economy"
+            ]
+          },
+          "communeCode": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "mobile_money",
+              "cash"
+            ]
+          },
+          "expectedTotalFcfa": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "deliveryMode",
+          "paymentMethod",
+          "expectedTotalFcfa"
+        ]
+      },
+      "OptionalReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ProposalLineDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "variantId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "appliedPriceFcfa": {
+            "type": "number",
+            "description": "Prix négocié (A15 : jamais au-dessus du prix du catalogue)"
+          }
+        },
+        "required": [
+          "productId",
+          "variantId",
+          "quantity"
+        ]
+      },
+      "ProposeOrderDto": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposalLineDto"
+            }
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId",
+          "items",
+          "idempotencyKey"
+        ]
+      },
+      "ReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "HandoverDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "1234"
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "AdminLoginDto": {
