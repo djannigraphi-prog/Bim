@@ -92,8 +92,8 @@ class _CourierWorkSectionState extends ConsumerState<CourierWorkSection> {
             ),
           ),
         const SizedBox(height: BimSpacing.md),
-        Text('Courses en cours', style: theme.textTheme.titleMedium),
-        if (current.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: BimSpacing.sm), child: Text('Aucune course en cours.', key: ValueKey('courses-empty'))),
+        Text('Courses à faire', style: theme.textTheme.titleMedium),
+        if (current.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: BimSpacing.sm), child: Text('Aucune course à faire.', key: ValueKey('courses-empty'))),
         for (final c in current)
           ListTile(
             key: ValueKey('course-${c.deliveryId}'),
