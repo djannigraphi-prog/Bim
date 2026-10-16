@@ -494,7 +494,7 @@ class _Pending extends StatelessWidget {
     final theme = Theme.of(context);
     Widget line(String text) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(children: [const Icon(Icons.check_circle_outline, color: BimColors.success), const SizedBox(width: BimSpacing.sm), Text(text)]),
+          child: Row(children: [const Icon(Icons.check_circle_outline, color: BimColors.success), const SizedBox(width: BimSpacing.sm), Expanded(child: Text(text))]),
         );
     return ListView(
       padding: const EdgeInsets.all(BimSpacing.screen),
