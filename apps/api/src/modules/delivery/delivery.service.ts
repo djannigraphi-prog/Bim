@@ -40,6 +40,7 @@ export class DeliveryService {
       password_reset: 'pour réinitialiser ton mot de passe',
       contact_add: 'pour confirmer cette nouvelle coordonnée',
       step_up: 'pour confirmer une opération sensible',
+      payout_number: 'pour confirmer le numéro Mobile Money de ta boutique',
     };
     const body = `BIM : ton code est ${code} ${reason[purpose] ?? ''}. Il expire dans ${Math.round(this.cfg.OTP_TTL_SECONDS / 60)} min. Ne le communique à personne.`;
     await this.send({ channel, destination, subject: 'Ton code BIM', body, code, sentAt: new Date() });

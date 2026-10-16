@@ -63,6 +63,14 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return data as T;
 }
 
+/** Fichier protégé (pièce d'identité) lu avec le jeton d'administration, jamais par un lien public. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new ApiError(res.status, 'UNKNOWN', 'Fichier illisible.', {});
+  return res.blob();
+}
+
 export type Permission =
   | 'settings.read'
   | 'settings.write'
@@ -78,7 +86,8 @@ export type Permission =
   | 'reports.read'
   | 'reports.resolve'
   | 'content.read'
-  | 'content.moderate';
+  | 'content.moderate'
+  | 'merchants.review';
 
 export interface AdminProfile {
   id: string;

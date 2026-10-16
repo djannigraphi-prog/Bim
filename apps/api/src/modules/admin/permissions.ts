@@ -17,6 +17,8 @@ export const ADMIN_PERMISSIONS = {
   /** Modération du social (lot 4) : lecture des signalements de contenus, décision (masquer, rétablir). */
   'content.read': ['super_admin', 'support', 'moderator'],
   'content.moderate': ['super_admin', 'moderator'],
+  /** Lot 5 : vérification des demandes de boutique (pièces d'identité) — proposition, à valider. */
+  'merchants.review': ['super_admin', 'support'],
   'admins.manage': ['super_admin'],
   /** Surveillance technique (état du worker des rappels…) : exploitation, pas d'accès aux données des personnes. */
   'system.health': ['super_admin', 'tech', 'support'],

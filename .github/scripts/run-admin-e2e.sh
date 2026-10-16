@@ -9,6 +9,8 @@ export NODE_ENV=development SMS_PROVIDER=console EMAIL_PROVIDER=console PORT=300
 export MEDIA_STORAGE=local MEDIA_LOCAL_DIR="${RUNNER_TEMP:-/tmp}/admin-e2e-media"
 export ADMIN_E2E_EMAIL="admin.e2e.$(date +%s)@bim.test"
 export ADMIN_E2E_PASSWORD="Admin-E2E-$(openssl rand -hex 8)"
+# Clé de chiffrement de TEST des pièces d'identité (lot 5), aucune valeur réelle.
+export KYC_ENCRYPTION_KEY="$(printf 'admin-e2e-kyc-key-0123456789abcd' | base64)"
 export ADMIN_E2E_APP_USERNAME="e2e.user$(date +%s | tail -c 7)"
 
 cd "$ROOT/apps/api"
@@ -49,6 +51,20 @@ const fs = require('fs');
   await c.query(\"insert into posts (id, user_id, kind, text, visibility) values (\$1, \$2, 'post', 'Achetez mes produits miracles (test)', 'public')\", [post, id]);
   await c.query(\"insert into post_media (id, post_id, position, kind, storage_key, width, height, bytes) values (\$1, \$2, 0, 'image', \$3, 240, 300, 1000)\", [uuidv7(), post, pkey]);
   await c.query(\"insert into content_reports (id, reporter_id, target_type, target_id, target_user_id, reason, message) values (\$1, \$2, 'post', \$3, \$4, 'spam', 'Publicité (test)')\", [uuidv7(), rep, post, id]);
+  // Lot 5 : une demande de boutique envoyée, avec pièces chiffrées (images de test), pour la page « Boutiques ».
+  const { encryptBytes } = require('./dist/common/crypto');
+  const shop = uuidv7();
+  const appId = uuidv7();
+  await c.query(\"insert into shops (id, owner_user_id, name, slug, status, city, commune) values (\$1, \$2, 'Boutique Test E2E', \$3, 'pending_verification', 'Abidjan', 'Cocody')\", [shop, id, 'boutique-test-' + shop.slice(-6)]);
+  await c.query(\"insert into shop_members (shop_id, user_id, role) values (\$1, \$2, 'owner')\", [shop, id]);
+  await c.query(\"insert into merchant_applications (id, user_id, shop_id, status, id_doc_type, payout_phone, payout_operator, payout_verified_at, submitted_at) values (\$1, \$2, \$3, 'submitted', 'cni', '+2250102030405', 'wave', now(), now())\", [appId, id, shop]);
+  for (const kind of ['id_front', 'id_back', 'selfie']) {
+    const dk = 'kyc/' + appId + '/' + kind + '.bin';
+    fs.mkdirSync(process.env.MEDIA_LOCAL_DIR + '/kyc/' + appId, { recursive: true });
+    const img = await sharp({ create: { width: 200, height: 130, channels: 3, background: 'teal' } }).jpeg().toBuffer();
+    fs.writeFileSync(process.env.MEDIA_LOCAL_DIR + '/' + dk, encryptBytes(img, process.env.KYC_ENCRYPTION_KEY));
+    await c.query(\"insert into merchant_documents (id, application_id, kind, storage_key, width, height, bytes) values (\$1, \$2, \$3, \$4, 200, 130, 1000)\", [uuidv7(), appId, kind, dk]);
+  }
   await c.query('commit');
   c.release();
   await p.end();

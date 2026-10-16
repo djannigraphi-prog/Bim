@@ -148,6 +148,13 @@
       "when": 1792112123093,
       "tag": "0020_stories_social_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792115537543,
+      "tag": "0021_merchant_applications",
+      "breakpoints": true
     }
   ]
 }

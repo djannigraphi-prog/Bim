@@ -36,6 +36,8 @@ export async function startHarness(extraEnv: Record<string, string> = {}): Promi
     JWT_ACCESS_SECRET: 'test-access-secret-0123456789-abcdefghij',
     OTP_SECRET: 'test-otp-secret-0123456789-abcdefghijklmn',
     ADMIN_TOTP_ENCRYPTION_KEY: 'Y2ktb25seS1hZG1pbi10b3RwLWtleS0zMmJ5dGVzISE=',
+    // Clé de test (aucune valeur réelle) : chiffrement des pièces d'identité (lot 5).
+    KYC_ENCRYPTION_KEY: Buffer.from('ci-only-kyc-key-0123456789abcdef').toString('base64'),
     SMS_PROVIDER: 'test',
     EMAIL_PROVIDER: 'test',
     HTTP_THROTTLE_ENABLED: 'false',

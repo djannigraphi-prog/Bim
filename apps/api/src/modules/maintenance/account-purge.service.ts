@@ -41,6 +41,8 @@ export const PURGE_BLOCKING_TABLES = [
   'content_reports',
   'stories',
   'story_views',
+  // Lot 5 : une demande d'ouverture de boutique est une activité.
+  'merchant_applications',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */

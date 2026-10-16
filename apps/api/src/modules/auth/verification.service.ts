@@ -9,7 +9,7 @@ import { verificationCodes } from '../../database/schema';
 import { DeliveryService } from '../delivery/delivery.service';
 import { maskDestination } from './identifiers';
 
-export type Purpose = 'signup' | 'password_reset' | 'contact_add' | 'step_up';
+export type Purpose = 'signup' | 'password_reset' | 'contact_add' | 'step_up' | 'payout_number';
 
 export interface Challenge {
   challengeId: string;

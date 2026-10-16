@@ -11,7 +11,7 @@ import { reminderMessage } from './reminders';
  */
 export const INBOX_TEMPLATES_VERSION = 'v2';
 
-export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden';
+export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected';
 export type InboxCategory = 'projects' | 'support' | 'social';
 
 export interface InboxSource {
@@ -29,7 +29,7 @@ export interface InboxSource {
 
 const SOCIAL: InboxType[] = ['post_liked', 'post_commented', 'new_follower'];
 export const inboxCategory = (type: InboxType): InboxCategory =>
-  type === 'report_answered' || type === 'content_hidden' ? 'support' : SOCIAL.includes(type) ? 'social' : 'projects';
+  type === 'report_answered' || type === 'content_hidden' || type === 'merchant_approved' || type === 'merchant_rejected' ? 'support' : SOCIAL.includes(type) ? 'social' : 'projects';
 export const inboxSender = (type: InboxType): 'peni' | 'bim' => (type === 'chest_opened' || type === 'task_reminder' ? 'peni' : 'bim');
 
 const quoted = (title: string | null) => (title ? `« ${title} »` : 'ton projet');
@@ -53,6 +53,10 @@ export function inboxText(s: InboxSource): string {
     }
     case 'new_follower':
       return `${s.actorName ?? 'Quelqu’un'} s’est abonné·e à toi.`;
+    case 'merchant_approved':
+      return `Ta boutique « ${s.snippet ?? ''} » est validée par l’équipe BIM. Bienvenue parmi les marchands !`;
+    case 'merchant_rejected':
+      return `Ta demande pour « ${s.snippet ?? ''} » est à corriger avant d’ouvrir ta boutique. Consulte le motif dans ta demande.`;
     case 'content_hidden': {
       const what = s.snippet === 'comment' ? 'Un de tes commentaires a été masqué' : s.snippet === 'story' ? 'Une de tes stories a été masquée' : 'Une de tes publications a été masquée';
       return `${what} par la modération de BIM, après un signalement. Si tu penses que c’est une erreur, écris-nous depuis « Résoudre un problème ».`;

@@ -200,6 +200,25 @@ test('modération (lot 4) : publication signalée, photo affichée, masquée pui
   await expect(done).toContainText('État du contenu : en ligne');
 });
 
+test('boutiques (lot 5) : demande examinée, pièces déchiffrées affichées, validation', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Boutiques' }).click();
+  const card = page.getByLabel('Demande de boutique « Boutique Test E2E »');
+  await expect(card).toContainText('Carte nationale d’identité · Wave confirmé par SMS');
+  await card.getByRole('button', { name: 'Examiner' }).click();
+  await expect(card).toContainText('Numéro Mobile Money : +2250102030405 (Wave)');
+  for (const alt of ['Pièce d’identité, recto', 'Pièce d’identité, verso', 'Selfie']) {
+    const img = card.getByRole('img', { name: alt });
+    await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(200);
+  }
+  await expect(card.getByRole('button', { name: 'Demander une correction' })).toBeDisabled();
+  await page.screenshot({ path: 'test-results/captures/boutiques.png' });
+  await card.getByRole('button', { name: 'Valider et ouvrir la boutique' }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('button', { name: 'Validées' }).click();
+  await expect(page.getByLabel('Demande de boutique « Boutique Test E2E »')).toBeVisible();
+});
+
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Administrateurs' }).click();

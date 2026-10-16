@@ -17,6 +17,7 @@ import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PeniModule } from './modules/peni/peni.module';
 import { SocialModule } from './modules/social/social.module';
+import { MerchantsModule } from './modules/merchants/merchants.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
@@ -66,6 +67,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     MaintenanceModule,
     PeniModule,
     SocialModule,
+    MerchantsModule,
     AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

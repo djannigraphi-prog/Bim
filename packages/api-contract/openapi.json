@@ -2902,6 +2902,452 @@
         ]
       }
     },
+    "/v1/merchant/applications/mine": {
+      "get": {
+        "operationId": "MerchantApplicationsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ma demande d’ouverture de boutique (statut et liste de contrôle, écran 09)",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications": {
+      "post": {
+        "operationId": "MerchantApplicationsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer une demande : la boutique (nom, ville, présentation). Âge minimum des marchands appliqué (F15).",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}": {
+      "patch": {
+        "operationId": "MerchantApplicationsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifier la demande (boutique, type de pièce, adresse)",
+        "tags": [
+          "Marchands"
+        ]
+      },
+      "delete": {
+        "operationId": "MerchantApplicationsController_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abandonner une demande non validée (pièces effacées)",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/documents/{kind}": {
+      "put": {
+        "operationId": "MerchantApplicationsController_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "photo"
+                ],
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pièce d’identité (id_front, id_back) ou selfie : ré-encodée puis chiffrée",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/payout-number": {
+      "post": {
+        "operationId": "MerchantApplicationsController_startPayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutNumberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numéro Mobile Money de la boutique : un code est envoyé par SMS",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/payout-number/verify": {
+      "post": {
+        "operationId": "MerchantApplicationsController_verifyPayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyPayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmer le numéro Mobile Money avec le code reçu",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/submit": {
+      "post": {
+        "operationId": "MerchantApplicationsController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Envoyer pour validation par l’équipe BIM",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications": {
+      "get": {
+        "operationId": "MerchantReviewController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "submitted",
+                "approved",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Demandes d’ouverture de boutique",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}": {
+      "get": {
+        "operationId": "MerchantReviewController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}/documents/{kind}": {
+      "get": {
+        "operationId": "MerchantReviewController_document",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pièce d’identité ou selfie déchiffré (lecture inscrite au journal d’audit)",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}/approve": {
+      "post": {
+        "operationId": "MerchantReviewController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Valider : la boutique est ouverte",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}/reject": {
+      "post": {
+        "operationId": "MerchantReviewController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser avec un motif (la personne corrige et renvoie)",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -4371,6 +4817,114 @@
             "description": "Identifiant d’une réponse rapide proposée par le dernier message de Peni"
           }
         }
+      },
+      "CreateApplicationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Boutique Élégance"
+          },
+          "city": {
+            "type": "string",
+            "example": "Abidjan"
+          },
+          "commune": {
+            "type": "string",
+            "example": "Cocody"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "name",
+          "city"
+        ]
+      },
+      "UpdateApplicationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "commune": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "idDocType": {
+            "type": "string",
+            "enum": [
+              "cni",
+              "passport",
+              "permis"
+            ],
+            "description": "Pièce d’identité (écran 07)"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Adresse de la boutique ou du domicile (facultative, jamais publique)"
+          }
+        }
+      },
+      "PayoutNumberDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+2250707123456"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "wave",
+              "orange",
+              "mtn",
+              "moov"
+            ]
+          }
+        },
+        "required": [
+          "phone",
+          "operator"
+        ]
+      },
+      "VerifyPayoutDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
+        ]
+      },
+      "RejectApplicationDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Motif donné à la personne (ce qu’il faut corriger)"
+          }
+        },
+        "required": [
+          "reason"
+        ]
       },
       "AdminLoginDto": {
         "type": "object",

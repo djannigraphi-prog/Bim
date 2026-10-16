@@ -70,7 +70,13 @@ export class InboxService {
       SELECT 'moderation:' || r.target_type || ':' || r.target_id, 'content_hidden', max(r.resolved_at), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, r.target_type
       FROM content_reports r
       WHERE r.target_user_id = ${userId} AND r.action = 'hidden' AND r.resolved_at > ${since}
-      GROUP BY r.target_type, r.target_id`;
+      GROUP BY r.target_type, r.target_id
+      -- Lot 5 : décision sur une demande d'ouverture de boutique.
+      UNION ALL
+      SELECT 'merchant:' || m.id || ':' || m.status, CASE WHEN m.status = 'approved' THEN 'merchant_approved' ELSE 'merchant_rejected' END, m.reviewed_at,
+             NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, s.name
+      FROM merchant_applications m JOIN shops s ON s.id = m.shop_id
+      WHERE m.user_id = ${userId} AND m.status IN ('approved', 'rejected') AND m.reviewed_at > ${since}`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {
@@ -87,7 +93,7 @@ export class InboxService {
       this.db.execute<Row>(sql`
         SELECT * FROM (${this.sources(userId, since)}) x
         WHERE (${opts.category ?? null}::text IS NULL
-               OR (CASE WHEN x.type IN ('report_answered', 'content_hidden') THEN 'support'
+               OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected') THEN 'support'
                         WHEN x.type IN ('post_liked', 'post_commented', 'new_follower') THEN 'social'
                         ELSE 'projects' END) = ${opts.category ?? null}::text)
           AND (${opts.before ?? null}::timestamptz IS NULL OR x.at < ${opts.before ?? null}::timestamptz)
@@ -157,5 +163,8 @@ function link(r: Row): string | null {
       return r.actor_username ? `/people/${r.actor_username}` : null;
     case 'content_hidden':
       return null;
+    case 'merchant_approved':
+    case 'merchant_rejected':
+      return '/merchant/apply';
   }
 }

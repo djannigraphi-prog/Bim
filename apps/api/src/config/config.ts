@@ -62,6 +62,15 @@ const schema = z
     ADMIN_TOTP_ENCRYPTION_KEY: z
       .string()
       .refine((v) => Buffer.from(v, 'base64').length === 32, 'ADMIN_TOTP_ENCRYPTION_KEY doit faire 32 octets encodés en base64'),
+    /**
+     * Lot 5 : clé de chiffrement des pièces d'identité et selfies des demandes de boutique (AES-256-GCM), 32 octets en
+     * base64 (openssl rand -base64 32), à conserver dans AWS Secrets Manager. Absente : l'ouverture de boutique est
+     * indisponible (aucune pièce d'identité n'est jamais stockée en clair).
+     */
+    KYC_ENCRYPTION_KEY: z
+      .string()
+      .refine((v) => Buffer.from(v, 'base64').length === 32, 'KYC_ENCRYPTION_KEY doit faire 32 octets encodés en base64')
+      .optional(),
     ADMIN_SESSION_TTL_MINUTES: z.coerce.number().int().min(15).max(720).default(480),
     ADMIN_LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(10).default(5),
     ADMIN_LOCK_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),

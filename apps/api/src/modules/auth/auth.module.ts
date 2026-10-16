@@ -31,6 +31,6 @@ import { VerificationService } from './verification.service';
     UsersService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  exports: [SessionService],
+  exports: [SessionService, VerificationService],
 })
 export class AuthModule {}

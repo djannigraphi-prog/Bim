@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -320,7 +321,11 @@ class _SpacesSheet extends ConsumerWidget {
                     label: 'Boutique',
                     icon: Icons.add_business_outlined,
                     variant: BimButtonVariant.subtle,
-                    onPressed: () => showComingSoon(context, feature: 'La création de boutique (avec vérification d’identité)'),
+                    key: const ValueKey('new-shop'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.push('/merchant/apply');
+                    },
                   ),
                 ),
                 const SizedBox(width: BimSpacing.sm),
@@ -355,7 +360,7 @@ class _SpaceTile extends ConsumerWidget {
       'courier' => 'Livreur',
       _ => 'Utilisateur · compte principal',
     };
-    final status = s.usable ? '' : ' · ${s.status == 'pending_verification' ? 'en vérification' : s.status}';
+    final status = s.usable ? '' : ' · ${const {'pending_verification': 'en vérification', 'draft': 'demande à compléter', 'suspended': 'suspendue'}[s.status] ?? s.status}';
     return Padding(
       padding: const EdgeInsets.only(bottom: BimSpacing.sm),
       child: Semantics(
@@ -363,9 +368,17 @@ class _SpaceTile extends ConsumerWidget {
         button: true,
         child: InkWell(
           borderRadius: BorderRadius.circular(BimRadius.card),
-          onTap: (!s.usable || s.active)
+          onTap: s.active
               ? null
-              : () async {
+              : !s.usable
+                  // Boutique en préparation, en vérification ou à corriger : on reprend la demande.
+                  ? (s.type == 'merchant'
+                      ? () {
+                          Navigator.pop(context);
+                          context.push('/merchant/apply');
+                        }
+                      : null)
+                  : () async {
                   try {
                     final token = await ref.read(accountApiProvider).switchSpace(s.type, s.id);
                     await ref.read(tokenStorageProvider).saveAccess(token);

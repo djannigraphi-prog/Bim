@@ -25,6 +25,7 @@ import '../../features/projects/presentation/reports_screen.dart';
 import '../../features/projects/presentation/transformation_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
+import '../../features/merchant/presentation/merchant_apply_screen.dart';
 import '../../features/social/presentation/composer_screen.dart';
 import '../../features/social/presentation/post_detail_screen.dart';
 import '../../features/social/presentation/profile_screen.dart';
@@ -51,7 +52,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc)) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search'].any(loc.startsWith)) ? '/home' : null,
+          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant'].any(loc.startsWith)) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -98,6 +99,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/people/:username', builder: (_, s) => ProfileScreen(username: s.pathParameters['username']!)),
       GoRoute(path: '/search', builder: (_, __) => const PeopleSearchScreen()),
       GoRoute(path: '/account/blocked', builder: (_, __) => const BlockedPeopleScreen()),
+      // Lot 5-A — ouvrir une boutique (écrans 07 à 09).
+      GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
       GoRoute(
         path: '/projects/:id/day/:day',
         builder: (_, s) => ProjectDayScreen(projectId: s.pathParameters['id']!, day: s.pathParameters['day']!),

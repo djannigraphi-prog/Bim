@@ -40,6 +40,8 @@ import 'package:bim/features/projects/presentation/project_map_screen.dart';
 import 'package:bim/features/projects/presentation/reports_screen.dart';
 import 'package:bim/features/projects/presentation/transformation_screen.dart';
 import 'package:bim/features/shell/presentation/home_shell.dart';
+import 'package:bim/features/merchant/data/merchant_api.dart';
+import 'package:bim/features/merchant/presentation/merchant_apply_screen.dart';
 import 'package:bim/features/social/data/social_api.dart';
 import 'package:bim/features/social/data/social_models.dart';
 import 'package:bim/features/social/presentation/composer_screen.dart';
@@ -220,6 +222,30 @@ class _FakeAuthApi extends AuthApi {
   Future<Map<String, bool>> socialProviders() async => const {'google': false, 'apple': false, 'facebook': false};
 }
 
+
+/// Demande de boutique de démonstration POUR LES CAPTURES UNIQUEMENT (écran 07, pièce et numéro déjà faits).
+class _FakeMerchantApi extends MerchantApi {
+  _FakeMerchantApi(super.api);
+
+  @override
+  Future<({MerchantApplication? application, bool available})> mine() async => (
+        application: const MerchantApplication(
+          id: 'a1',
+          status: 'draft',
+          shopName: 'Boutique Élégance',
+          city: 'Abidjan',
+          identity: true,
+          selfie: false,
+          payout: true,
+          address: false,
+          ready: false,
+          idDocType: 'cni',
+          payoutOperator: 'wave',
+          payoutPhoneEnd: '04',
+        ),
+        available: true,
+      );
+}
 
 /// Publications de démonstration POUR LES CAPTURES UNIQUEMENT (personnes et textes inventés, aucune photo réelle :
 /// les images s'affichent en emplacement neutre, faute de serveur).
@@ -471,6 +497,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     inboxApiProvider.overrideWithValue(_FakeInboxApi(client)),
     peniApiProvider.overrideWithValue(_FakePeniApi(client)),
     socialApiProvider.overrideWithValue(_FakeSocialApi(client)),
+    merchantApiProvider.overrideWithValue(_FakeMerchantApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -501,6 +528,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/posts/p1', builder: (_, __) => const PostDetailScreen(postId: 'p1')),
     GoRoute(path: '/people/yannick.doho', builder: (_, __) => const ProfileScreen(username: 'yannick.doho')),
     GoRoute(path: '/social/new', builder: (_, __) => const ComposerScreen()),
+    GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
   ],);
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
@@ -779,6 +807,10 @@ void main() {
     await signIn(c);
     await _settle(t);
     await _capture(t, 'x16_petit_ecran_fil');
+  });
+  testWidgets('07 vérification marchand', (t) async {
+    await _show(t, '/merchant/apply');
+    await _capture(t, '07_verif_marchand');
   });
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);

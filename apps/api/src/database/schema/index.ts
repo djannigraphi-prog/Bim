@@ -6,3 +6,4 @@ export * from './projects';
 export * from './notifications';
 export * from './peni';
 export * from './social';
+export * from './merchants';

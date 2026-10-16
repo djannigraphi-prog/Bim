@@ -31,6 +31,8 @@ export const verificationPurpose = pgEnum('verification_purpose', [
   'password_reset',
   'contact_add',
   'step_up',
+  // Lot 5 : numéro Mobile Money d'une boutique (écran 07), confirmé par un code SMS.
+  'payout_number',
 ]);
 
 const timestamps = {

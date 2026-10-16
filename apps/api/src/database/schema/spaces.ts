@@ -29,6 +29,14 @@ export const shops = pgTable(
     name: varchar('name', { length: 80 }).notNull(),
     slug: varchar('slug', { length: 80 }).notNull(),
     status: shopStatus('status').notNull().default('draft'),
+    /** Lot 5 : présentation publique de la boutique (écran 54). */
+    description: varchar('description', { length: 300 }),
+    city: varchar('city', { length: 80 }),
+    commune: varchar('commune', { length: 80 }),
+    /** Logo : clé du stockage privé, servi par lien temporaire. */
+    logoKey: varchar('logo_key', { length: 200 }),
+    /** Boutique validée par l'équipe BIM (vérification d'identité de la personne qui l'ouvre). */
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

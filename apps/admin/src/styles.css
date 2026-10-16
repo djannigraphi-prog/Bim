@@ -75,3 +75,5 @@ fieldset { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12p
   .split, .task { grid-template-columns: 1fr; }
 }
 .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line); vertical-align: middle; }
+.kyc-images { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+.kyc-image { display: block; max-width: 300px; max-height: 260px; border-radius: 10px; border: 1px solid var(--line); object-fit: contain; }
