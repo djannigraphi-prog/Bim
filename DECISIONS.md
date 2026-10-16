@@ -164,7 +164,31 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Les livreurs **freelances partenaires** et les livreurs **freelances indépendants** n'encaissent **jamais** d'espèces pour une commande BIM ; leurs livraisons suivent le parcours Mobile Money.
 - La règle est appliquée et vérifiée **côté serveur** (jamais seulement dans l'interface) et fait l'objet de tests dédiés. Le droit d'encaisser se déduit d'une relation d'emploi active avec la boutique de la commande ; il n'est jamais une option cochée par le marchand. Conséquence technique (lot 7) : la colonne `courier_shop_partnerships.can_collect_article_payment` (lot 0, jamais utilisée) ne doit pas servir aux espèces.
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
-- Règles détaillées du lot 7 (moment du paiement, frais de livraison, délais d'attribution, commandes sans livreur, droits des employés, annulations et litiges, code de remise, âges) : **proposées le 16/10/2026, en attente de validation**. Aucun développement des commandes sans accord explicite.
+- Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
+
+### L7-01 — Lot 7 : complément final (16/10/2026, 12 h 31) · Fondateur · **décidé** (développement non autorisé)
+
+Conception détaillée, contradictions et arbitrages : `docs/LOT7_CONCEPTION.md`. Règles décidées :
+
+- **Trois décisions séparées** : le client choisit le mode (rapide, économique en 2 jours au plus, retrait si proposé)
+  en connaissant prix des articles, frais et délai **avant** de confirmer ; le **marchand sélectionne le livreur**
+  (le client jamais) ; le serveur enregistre le livreur retenu, l'auteur et l'heure de l'attribution.
+- **Aucune modification imposée silencieusement** après confirmation : prix, délai ou mode présentés avant
+  application et soumis à l'accord du client.
+- **Économique** : partenaires prioritaires, sans obliger à choisir un partenaire indisponible ; tarif issu d'une règle
+  ou d'une offre valide, jamais d'un montant fixé dans le code ; jamais de promesse « 2 jours » sans mécanisme tenable.
+  **Rapide** : indépendant possible ; disponibilité confirmée avant la promesse.
+- **Paiement** : scénario A (boutique ordinaire) à la réception ; scénario B (boutique **Premium certifiée**, statut
+  attribué par un processus administratif, jamais par une donnée envoyée par l'app) avant livraison, sans second
+  paiement. Trois niveaux distincts : déclaré, confirmé par la boutique, confirmé techniquement par un prestataire.
+- **Code à 4 chiffres** créé à la confirmation, confidentiel, communiqué après examen du colis ; il n'est **jamais**
+  une preuve de paiement. Arrivée, code, paiement, remise déclarée, confirmation du client et confirmation ou
+  contestation de la boutique sont des événements distincts.
+- **Incidents** : état d'incident plutôt que réussite automatique ; aucun remboursement automatique ni pénalité sans
+  règle commerciale explicite. Notifications liées à une commande, sans effet financier en cas de répétition.
+- Historique horodaté non réécrit ; données limitées au nécessaire ; durées de conservation à définir.
+- Remplace dans les règles proposées le 16/10 au matin : paliers d'attribution automatiques, options « maintenant /
+  plus tard » choisies par le client, paiement avant expédition ouvert à toute boutique, code créé à l'attribution.
 
 ### C6 — Mode d'un projet et abonnement Premium : deux notions indépendantes · Fondateur · décidé (14/10/2026)
 - **Projet économique** : atteindre l'objectif avec des solutions gratuites ou économiques (exercices à la maison, astuces, conseils, méthodes pratiques, solutions à fabriquer soi-même). Exemple, prise de muscle : 10 pompes chaque matin et exercices à domicile.
