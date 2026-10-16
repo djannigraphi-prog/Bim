@@ -185,6 +185,10 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
   une commande n'est « terminée » qu'après confirmation par la boutique ; sans décision au bout de 3 jours : rappel et
   file « à vérifier » du support, jamais de confirmation implicite. Espèces au comptoir : montant attendu exigé (un écart
   se conteste). Permission d'administration proposée `payments.review` (rôle principal, support, finance).
+- **7-E** : comptes livreurs vérifiés comme les marchands ; âge `age.min_courier` non décidé = comptes fermés (F15) ;
+  espace livreur fermé à tout le reste de BIM (fil, profils, messagerie, boutiques) sauf compte et support — choix de
+  réalisation de L7-04 ; relation proposée par la boutique et acceptée par le livreur ; un seul emploi actif.
+  Permission d'administration proposée `couriers.review` (rôle principal, support).
 - **Non réalisé, en attente** : livraisons (7-F, arbitrage annonces / sélection L7-04), paiements réels (lot 8).
 
 ### L7-04 — Livreurs, fiches des articles et réputation : corrections (16/10/2026) · Fondateur · **décidé** ; fiches **réalisées**, livreurs **verrouillés** (aucune route livreur encore)

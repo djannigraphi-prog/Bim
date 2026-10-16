@@ -59,6 +59,8 @@ export const PURGE_BLOCKING_TABLES = [
   'order_handover_codes',
   // Lot 7-C : un paiement constaté ou décidé est une activité.
   'order_payments',
+  // Lot 7-E : proposer ou terminer une relation avec un livreur est une activité.
+  'courier_shop_partnerships',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -76,6 +78,7 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   orders: ['customer_id', 'created_by'],
   order_handover_codes: ['used_by'],
   order_payments: ['cash_observed_by', 'decided_by'],
+  courier_shop_partnerships: ['invited_by', 'ended_by'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [

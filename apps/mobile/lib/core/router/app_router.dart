@@ -27,6 +27,7 @@ import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/merchant/presentation/merchant_apply_screen.dart';
 import '../../features/messaging/presentation/conversation_screen.dart';
+import '../../features/courier/presentation/courier_screens.dart';
 import '../../features/orders/presentation/checkout_screen.dart';
 import '../../features/orders/presentation/order_screens.dart';
 import '../../features/bimshop/presentation/bimshop_view.dart';
@@ -64,13 +65,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
         // Espace boutique actif (lot 5-B) : l'accueil est l'espace marchand (écran 55) ; ailleurs, pas d'espace marchand.
         // Les projets et Peni sont réservés à l'espace utilisateur (le serveur répond 403 sinon, audit M-10).
+        // 7-E (L7-04) : l'espace livreur n'ouvre que son écran et le compte ; aucune autre partie de BIM.
+        SessionSignedIn(:final me) when me.activeSpaceType == 'courier' =>
+          (loc == '/courier' || loc.startsWith('/account')) ? null : '/courier',
         SessionSignedIn(:final me) when me.activeSpaceType == 'merchant' =>
-          (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc) || loc.startsWith('/projects') || loc.startsWith('/peni') || loc.startsWith('/messages') || loc.startsWith('/orders'))
+          (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc) || loc.startsWith('/projects') || loc.startsWith('/peni') || loc.startsWith('/messages') || loc.startsWith('/orders') || loc.startsWith('/courier'))
               ? '/shop'
               : null,
-        SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc) || loc.startsWith('/shop')) ? '/home' : null,
+        SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc) || loc.startsWith('/shop') || loc == '/courier') ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop', '/bimshop/favorites', '/messages', '/orders'].any(loc.startsWith)) ? '/home' : null,
+          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop', '/bimshop/favorites', '/messages', '/orders', '/courier'].any(loc.startsWith)) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -131,6 +135,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/orders/:id', builder: (_, s) => OrderScreen(orderId: s.pathParameters['id']!)),
       GoRoute(path: '/shop/orders', builder: (_, __) => const ShopOrdersScreen()),
       GoRoute(path: '/shop/orders/:id', builder: (_, s) => ShopOrderScreen(orderId: s.pathParameters['id']!)),
+      // Lot 7-E : livreurs.
+      GoRoute(path: '/courier', builder: (_, __) => const CourierSpaceScreen()),
+      GoRoute(path: '/courier/apply', builder: (_, __) => const CourierApplyScreen()),
+      GoRoute(path: '/shop/couriers', builder: (_, __) => const ShopCouriersScreen()),
       GoRoute(path: '/shop/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, asShop: true)),
       GoRoute(path: '/projects/:id/offers', builder: (_, s) => ProjectOffersScreen(projectId: s.pathParameters['id']!)),
       // Lot 5-C : BimShop (public, sauf « Mis de côté »).

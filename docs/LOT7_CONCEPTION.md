@@ -312,7 +312,15 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 - **Priorité Premium des livreurs (F17)** : seulement à l'intérieur d'une même catégorie [PROPOSÉ].
 - **Retirés** : client choisissant un livreur ; devis libre d'un livreur après confirmation ; paliers automatiques.
 
-### 8 bis. Accès des livreurs [APPROUVÉ, L7-04 ; **verrouillé** côté serveur, rien développé]
+### 8 bis. Accès des livreurs [APPROUVÉ, L7-04 ; **verrouillé** côté serveur ; comptes réalisés en 7-E]
+
+> **7-E réalisé** : demande de compte livreur (pièces chiffrées, lecture journalisée, âge `age.min_courier` — non
+> décidé = fermé), vérification par l'administration (`couriers.review`), espace livreur limité à
+> `/v1/courier/*` (profil : disponibilité, capacité, moyen de transport, communes ; relations), toutes les autres
+> routes sans espace imposé fermées depuis l'espace livreur sauf compte (`/v1/auth`, `/v1/me`) et support
+> (`/v1/reports`) — le constat ci-dessous est corrigé ; relations emploi / partenariat proposées par la boutique
+> (permission « paramètres de livraison ») et acceptées par le livreur, au plus un emploi actif (contrainte de la
+> base), fin immédiate ; catégorie et droit aux espèces déduits de la relation **active** seulement.
 
 - Le livreur ne voit **jamais** les commandes internes d'une boutique (commandes générales, non publiées, détails
   internes, équipe, messages, catalogue).

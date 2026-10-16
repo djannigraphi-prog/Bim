@@ -43,9 +43,16 @@ describe('Accès des livreurs (e2e)', () => {
   it('aucune route n’est ouverte à l’espace livreur ; toutes les routes des boutiques exigent l’espace boutique', () => {
     const all = routes();
     expect(all.length).toBeGreaterThan(100);
-    // Rien n'est encore développé pour les livreurs : dès qu'une route l'est, ce test devra lister explicitement
-    // les seules routes autorisées (annonces publiées, courses acceptées, historique personnel).
-    expect(all.filter((r) => r.space === 'courier')).toEqual([]);
+    // 7-E : les seules routes de l'espace livreur sont sous /v1/courier/ (profil, relations) ; aucune ne touche aux
+    // commandes. Les annonces publiées, les courses acceptées et l'historique personnel arriveront avec 7-F.
+    const courierRoutes = all.filter((r) => r.space === 'courier');
+    expect(courierRoutes.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
+      'GET /v1/courier/me',
+      'PATCH /v1/courier/me',
+      'POST /v1/courier/relations/:id/accept',
+      'POST /v1/courier/relations/:id/decline',
+      'POST /v1/courier/relations/:id/end',
+    ]);
     const shopRoutes = all.filter((r) => r.path.startsWith('/v1/shop/') || r.path === '/v1/shop');
     expect(shopRoutes.length).toBeGreaterThan(20);
     expect(shopRoutes.filter((r) => r.space !== 'merchant')).toEqual([]);
@@ -83,6 +90,15 @@ describe('Accès des livreurs (e2e)', () => {
     await h.http().get('/v1/projects').set(auth).expect(403);
     // Un partenariat ne donne pas l'espace boutique.
     await h.http().post('/v1/auth/switch-space').set(userAuth).send({ type: 'merchant', id: shopId }).expect(403);
+    // 7-E : le fil, les profils et les demandes de boutique sont fermés depuis l'espace livreur ; le compte reste ouvert.
+    await h.http().get('/v1/feed').set(auth).expect(403);
+    await h.http().get('/v1/merchant/applications/mine').set(auth).expect(403);
+    await h.http().get('/v1/courier-application').set(auth).expect(403);
+    await h.http().get('/v1/me').set(auth).expect(200);
+    // Son propre espace : profil et relation avec la boutique (nom seulement), aucune donnée de commande.
+    const me = (await h.http().get('/v1/courier/me').set(auth).expect(200)).body;
+    expect(me.relations).toEqual([expect.objectContaining({ shop: { name: 'Boutique Élégance', city: 'Abidjan', commune: null }, status: 'active' })]);
+    expect(JSON.stringify(me)).not.toMatch(/order|commande/i);
     // Commandes : ni celles des clients ni celles de la boutique depuis l'espace livreur ; pas encore de livraisons.
     await h.http().get('/v1/orders').set(auth).expect(403);
     await h.http().get('/v1/shop/orders').set(auth).expect(403);

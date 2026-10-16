@@ -13,3 +13,4 @@ export * from './messaging';
 export * from './logistics';
 export * from './orders';
 export * from './payments';
+export * from './couriers';

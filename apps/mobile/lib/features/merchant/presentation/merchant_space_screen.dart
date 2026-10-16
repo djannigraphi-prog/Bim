@@ -131,6 +131,9 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                       _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
                     _Action(icon: Icons.videocam_outlined, label: 'Live', onTap: () => showComingSoon(context, feature: 'Le live')),
                     _Action(icon: Icons.local_offer_outlined, label: 'Promo', onTap: () => showComingSoon(context, feature: 'Les promotions')),
+                    // 7-E : livreurs de la boutique (permission « paramètres de livraison »).
+                    if (d.can('deliveries.settings'))
+                      _Action(key: const ValueKey('action-couriers'), icon: Icons.delivery_dining_outlined, label: 'Livreurs', onTap: () => context.push('/shop/couriers')),
                     if (d.isOwner) ...[
                       _Action(key: const ValueKey('action-requests'), icon: Icons.assignment_outlined, label: 'Demandes', onTap: () => context.push('/shop/requests')),
                       _Action(key: const ValueKey('action-team'), icon: Icons.group_outlined, label: 'Équipe', onTap: () => context.push('/shop/team')),

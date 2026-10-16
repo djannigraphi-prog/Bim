@@ -18,6 +18,9 @@ import { StepUpService } from './step-up.service';
  *  3. si la route l'exige, permission dans la boutique active (7-A) ;
  *  4. si la route l'exige, autorisation d'opération sensible (step-up) consommée.
  */
+/** Routes sans espace imposé encore ouvertes depuis l'espace livreur (compte, changement d'espace, support). */
+export const COURIER_SPACE_OPEN = ['/v1/auth', '/v1/me', '/v1/reports'];
+
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -50,6 +53,12 @@ export class AuthGuard implements CanActivate {
       if (claims.space.type !== requiredSpace || !(await this.spaces.canUse(claims.sub, claims.space))) {
         throw Errors.forbidden("Cet espace n'est pas accessible avec ton compte.");
       }
+    }
+
+    // 7-E (L7-04) : depuis l'espace livreur, seules les routes de cet espace, du compte et du support sont ouvertes ;
+    // le fil, les profils, la messagerie, les boutiques et les demandes de boutique restent fermés.
+    if (!requiredSpace && claims.space.type === 'courier' && !COURIER_SPACE_OPEN.some((p) => req.path === p || req.path.startsWith(`${p}/`))) {
+      throw Errors.forbidden("Cette partie de BIM n'est pas accessible depuis l'espace livreur.");
     }
 
     // 7-A : permission de l'employé dans la boutique active (le propriétaire a tout), revérifiée en base.

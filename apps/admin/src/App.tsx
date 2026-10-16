@@ -14,6 +14,7 @@ import { Moderation } from './pages/Moderation';
 import { Merchants } from './pages/Merchants';
 import { Deliveries } from './pages/Deliveries';
 import { Payments } from './pages/Payments';
+import { Couriers } from './pages/Couriers';
 
 const NAV: Array<{ to: string; label: string; perm: Permission }> = [
   { to: '/reglages', label: 'Réglages', perm: 'settings.read' },
@@ -22,6 +23,7 @@ const NAV: Array<{ to: string; label: string; perm: Permission }> = [
   { to: '/signalements', label: 'Signalements', perm: 'reports.read' },
   { to: '/moderation', label: 'Modération', perm: 'content.read' },
   { to: '/boutiques', label: 'Boutiques', perm: 'merchants.review' },
+  { to: '/livreurs', label: 'Livreurs', perm: 'couriers.review' },
   { to: '/livraisons', label: 'Tarifs de livraison', perm: 'delivery_tariffs.read' },
   { to: '/paiements', label: 'Paiements à vérifier', perm: 'payments.review' },
   { to: '/utilisateurs', label: 'Utilisateurs', perm: 'users.read' },
@@ -87,6 +89,7 @@ export function App() {
           {can('reports.read') && <Route path="/signalements" element={<Reports canResolve={can('reports.resolve')} />} />}
           {can('content.read') && <Route path="/moderation" element={<Moderation canModerate={can('content.moderate')} />} />}
           {can('merchants.review') && <Route path="/boutiques" element={<Merchants />} />}
+          {can('couriers.review') && <Route path="/livreurs" element={<Couriers />} />}
           {can('delivery_tariffs.read') && <Route path="/livraisons" element={<Deliveries canWrite={can('delivery_tariffs.write')} />} />}
           {can('payments.review') && <Route path="/paiements" element={<Payments />} />}
           {can('users.read') && <Route path="/utilisateurs" element={<Users canSuspend={can('users.suspend')} />} />}

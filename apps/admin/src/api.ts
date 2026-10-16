@@ -97,7 +97,8 @@ export type Permission =
   | 'merchants.review'
   | 'delivery_tariffs.read'
   | 'delivery_tariffs.write'
-  | 'payments.review';
+  | 'payments.review'
+  | 'couriers.review';
 
 export interface AdminProfile {
   id: string;

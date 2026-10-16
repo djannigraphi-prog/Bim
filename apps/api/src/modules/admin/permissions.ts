@@ -24,6 +24,8 @@ export const ADMIN_PERMISSIONS = {
   'delivery_tariffs.write': ['super_admin'],
   /** 7-C : file « à vérifier » des paiements (lecture et note de vérification, journalisées). */
   'payments.review': ['super_admin', 'support', 'finance'],
+  /** 7-E : vérification des livreurs (pièces d'identité, lecture journalisée). */
+  'couriers.review': ['super_admin', 'support'],
   'admins.manage': ['super_admin'],
   /** Surveillance technique (état du worker des rappels…) : exploitation, pas d'accès aux données des personnes. */
   'system.health': ['super_admin', 'tech', 'support'],

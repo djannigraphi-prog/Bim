@@ -33,8 +33,8 @@ describe('Commandes (e2e)', () => {
     admin = await adminSession(h, ['super_admin']);
     await setAge(18);
     const c = (await h.http().post('/admin/v1/delivery/communes').set(admin).send({ city, name: 'Cocody' }).expect(201)).body.items;
-    shopCommune = c.find((x: { name: string }) => x.name === 'Cocody').code;
-    homeCommune = (await h.http().post('/admin/v1/delivery/communes').set(admin).send({ city, name: 'Yopougon' }).expect(201)).body.items.find((x: { name: string }) => x.name === 'Yopougon').code;
+    shopCommune = c.find((x: { name: string; city: string }) => x.name === 'Cocody' && x.city === city).code;
+    homeCommune = (await h.http().post('/admin/v1/delivery/communes').set(admin).send({ city, name: 'Yopougon' }).expect(201)).body.items.find((x: { name: string; city: string }) => x.name === 'Yopougon' && x.city === city).code;
     await h.http().put('/admin/v1/delivery/durations').set(admin).send({ fromCode: shopCommune, toCode: homeCommune, mode: 'express', minutes: 30 }).expect(200);
     await publishTariff('express');
   });

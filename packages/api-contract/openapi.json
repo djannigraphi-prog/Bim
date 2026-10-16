@@ -6488,6 +6488,509 @@
         ]
       }
     },
+    "/v1/courier-application": {
+      "get": {
+        "operationId": "CourierApplicationController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ma demande de compte livreur (étape, liste de contrôle)",
+        "tags": [
+          "Livreurs"
+        ]
+      },
+      "post": {
+        "operationId": "CourierApplicationController_apply",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer une demande (âge minimum des livreurs, F15 : non décidé = fermé)",
+        "tags": [
+          "Livreurs"
+        ]
+      },
+      "patch": {
+        "operationId": "CourierApplicationController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourierApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier-application/documents/{kind}": {
+      "put": {
+        "operationId": "CourierApplicationController_upload",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "photo"
+                ],
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pièce d’identité (id_front, id_back) ou selfie : ré-encodée puis chiffrée",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier-application/submit": {
+      "post": {
+        "operationId": "CourierApplicationController_submit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/me": {
+      "get": {
+        "operationId": "CourierSpaceController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      },
+      "patch": {
+        "operationId": "CourierSpaceController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourierProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disponibilité, capacité, moyen de transport, communes desservies",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/relations/{id}/accept": {
+      "post": {
+        "operationId": "CourierSpaceController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/relations/{id}/decline": {
+      "post": {
+        "operationId": "CourierSpaceController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/relations/{id}/end": {
+      "post": {
+        "operationId": "CourierSpaceController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/shop/couriers": {
+      "get": {
+        "operationId": "ShopCouriersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "post": {
+        "operationId": "ShopCouriersController_invite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteCourierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Proposer un emploi ou un partenariat à un livreur vérifié (il doit accepter)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/couriers/{id}/end": {
+      "post": {
+        "operationId": "ShopCouriersController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mettre fin à la relation (effet immédiat)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/admin/v1/courier-applications": {
+      "get": {
+        "operationId": "CourierReviewController_list",
+        "parameters": [
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "submitted",
+                "active",
+                "to_correct"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — livreurs"
+        ]
+      }
+    },
+    "/admin/v1/courier-applications/{id}": {
+      "get": {
+        "operationId": "CourierReviewController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — livreurs"
+        ]
+      }
+    },
+    "/admin/v1/courier-applications/{id}/documents/{kind}": {
+      "get": {
+        "operationId": "CourierReviewController_document",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pièce d’identité ou selfie déchiffré (lecture inscrite au journal d’audit)",
+        "tags": [
+          "Administration — livreurs"
+        ]
+      }
+    },
+    "/admin/v1/courier-applications/{id}/approve": {
+      "post": {
+        "operationId": "CourierReviewController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — livreurs"
+        ]
+      }
+    },
+    "/admin/v1/courier-applications/{id}/reject": {
+      "post": {
+        "operationId": "CourierReviewController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCourierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — livreurs"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -8676,6 +9179,84 @@
         },
         "required": [
           "note"
+        ]
+      },
+      "CourierApplicationDto": {
+        "type": "object",
+        "properties": {
+          "idDocType": {
+            "type": "string",
+            "enum": [
+              "cni",
+              "passport",
+              "permis"
+            ]
+          },
+          "vehicle": {
+            "type": "string",
+            "enum": [
+              "moto",
+              "velo",
+              "voiture",
+              "pied"
+            ]
+          }
+        }
+      },
+      "CourierProfileDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "capacity": {
+            "type": "number"
+          },
+          "vehicle": {
+            "type": "string",
+            "enum": [
+              "moto",
+              "velo",
+              "voiture",
+              "pied"
+            ]
+          },
+          "communes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InviteCourierDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "employee",
+              "partner"
+            ]
+          }
+        },
+        "required": [
+          "username",
+          "relation"
+        ]
+      },
+      "RejectCourierDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "AdminLoginDto": {

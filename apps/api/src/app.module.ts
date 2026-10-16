@@ -27,6 +27,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
 import { TariffsModule } from './modules/tariffs/tariffs.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { CouriersModule } from './modules/couriers/couriers.module';
 
 /**
  * Monolithe modulaire : un module par domaine. Les modules transverses (configuration, base, réglages, audit,
@@ -80,6 +81,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     ShopTeamModule,
     TariffsModule,
     OrdersModule,
+    CouriersModule,
     AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

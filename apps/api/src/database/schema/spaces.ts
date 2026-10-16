@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, check, index, pgEnum, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, boolean, check, index, integer, pgEnum, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './identity';
 
 /**
@@ -110,12 +110,28 @@ export const courierAccounts = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
+    /** Indicatif seulement : la catégorie d'un livreur pour une commande se déduit de sa relation avec la boutique (7-E). */
     type: courierType('type').notNull(),
     status: courierStatus('status').notNull().default('pending_verification'),
+    // 7-E : vérification (pièces chiffrées, comme les marchands), puis profil de travail.
+    idDocType: varchar('id_doc_type', { length: 12 }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewedBy: uuid('reviewed_by'),
+    rejectReason: varchar('reject_reason', { length: 300 }),
+    /** Disponible pour des courses (déclaré par le livreur). */
+    available: boolean('available').notNull().default(false),
+    /** Courses simultanées au plus (déclaré). */
+    capacity: integer('capacity').notNull().default(1),
+    vehicle: varchar('vehicle', { length: 10 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('courier_accounts_user_uq').on(t.userId)],
+  (t) => [
+    uniqueIndex('courier_accounts_user_uq').on(t.userId),
+    check('courier_accounts_capacity_ck', sql`${t.capacity} BETWEEN 1 AND 20`),
+    check('courier_accounts_vehicle_ck', sql`${t.vehicle} IS NULL OR ${t.vehicle} IN ('moto', 'velo', 'voiture', 'pied')`),
+  ],
 );
 
 export const courierShopPartnerships = pgTable(
@@ -129,7 +145,12 @@ export const courierShopPartnerships = pgTable(
       .notNull()
       .references(() => shops.id),
     status: partnershipStatus('status').notNull().default('pending'),
-    /** Droit, accordé par le marchand, d'encaisser le paiement des articles pour la boutique. */
+    /** 7-E : employee (employé de la boutique) · partner (partenaire). Seul l'emploi actif autorise les espèces (F3 bis). */
+    relation: varchar('relation', { length: 10 }).notNull().default('partner'),
+    invitedBy: uuid('invited_by').references(() => users.id),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    endedBy: uuid('ended_by').references(() => users.id),
+    /** Ancien champ, **jamais** utilisé comme autorisation d'espèces (L7-02). */
     canCollectArticlePayment: boolean('can_collect_article_payment').notNull().default(false),
     /** Encours maximal (FCFA) que le livreur peut détenir pour la boutique avant de reverser. Null = non fixé. */
     maxOutstandingFcfa: bigint('max_outstanding_fcfa', { mode: 'number' }),
@@ -141,5 +162,10 @@ export const courierShopPartnerships = pgTable(
     uniqueIndex('courier_shop_active_uq')
       .on(t.courierId, t.shopId)
       .where(sql`${t.status} <> 'ended'`),
+    // Au plus un emploi actif par livreur.
+    uniqueIndex('courier_one_employment_uq')
+      .on(t.courierId)
+      .where(sql`${t.relation} = 'employee' AND ${t.status} = 'active'`),
+    check('courier_shop_relation_ck', sql`${t.relation} IN ('employee', 'partner')`),
   ],
 );

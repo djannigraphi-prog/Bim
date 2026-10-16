@@ -33,7 +33,7 @@ const DOC: Record<string, string> = { cni: 'Carte nationale d’identité', pass
 const OPERATOR: Record<string, string> = { wave: 'Wave', orange: 'Orange Money', mtn: 'MTN MoMo', moov: 'Moov Money' };
 
 /** Pièce d'identité ou selfie : lu avec le jeton d'administration (chaque lecture est inscrite au journal d'audit). */
-function ProtectedImage({ path, alt }: { path: string; alt: string }) {
+export function ProtectedImage({ path, alt }: { path: string; alt: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {

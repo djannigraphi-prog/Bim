@@ -337,7 +337,11 @@ class _SpacesSheet extends ConsumerWidget {
                     label: 'Livreur',
                     icon: Icons.pedal_bike,
                     variant: BimButtonVariant.subtle,
-                    onPressed: () => showComingSoon(context, feature: 'Le compte livreur'),
+                    key: const ValueKey('new-courier'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.push('/courier/apply');
+                    },
                   ),
                 ),
               ],
@@ -375,12 +379,11 @@ class _SpaceTile extends ConsumerWidget {
               ? null
               : !s.usable
                   // Boutique en préparation, en vérification ou à corriger : on reprend la demande.
-                  ? (s.type == 'merchant'
-                      ? () {
-                          Navigator.pop(context);
-                          context.push('/merchant/apply');
-                        }
-                      : null)
+                  // 7-E : compte livreur en vérification ou à corriger : on reprend la demande.
+                  ? () {
+                      Navigator.pop(context);
+                      context.push(s.type == 'merchant' ? '/merchant/apply' : '/courier/apply');
+                    }
                   : () async {
                   try {
                     final token = await ref.read(accountApiProvider).switchSpace(s.type, s.id);
@@ -390,7 +393,7 @@ class _SpaceTile extends ConsumerWidget {
                     await ref.read(sessionProvider.notifier).refreshMe();
                     if (context.mounted) {
                       Navigator.pop(context);
-                      context.go(s.type == 'merchant' ? '/shop' : '/home');
+                      context.go(switch (s.type) { 'merchant' => '/shop', 'courier' => '/courier', _ => '/home' });
                     }
                   } on ApiException catch (e) {
                     if (context.mounted) showApiError(context, e);

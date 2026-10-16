@@ -251,6 +251,13 @@ test('paiements à vérifier (7-C) : page accessible, aucune confirmation implic
   await expect(page.getByText('Aucun paiement à vérifier.')).toBeVisible();
 });
 
+test('livreurs (7-E) : page de vérification accessible, aucune demande au départ', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Livreurs' }).click();
+  await expect(page.getByRole('heading', { name: 'Livreurs' })).toBeVisible();
+  await expect(page.getByText('Aucune demande.')).toBeVisible();
+});
+
 test('administrateurs : création d’un compte support, double authentification à configurer', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Administrateurs' }).click();
