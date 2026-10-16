@@ -71,6 +71,9 @@ void main() {
 
     // « Voir plus » ajoute la page suivante sans doublon.
     await tester.scrollUntilVisible(find.byKey(const ValueKey('comments-more')), 300, scrollable: find.byType(Scrollable).first);
+    // Le bouton peut être construit juste sous le bord de la liste : on l'amène entièrement à l'écran avant de le toucher.
+    await tester.ensureVisible(find.byKey(const ValueKey('comments-more')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('comments-more')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
