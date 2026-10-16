@@ -62,7 +62,9 @@ class SessionController extends Notifier<SessionState> {
 
   /// Profil mis à jour par le serveur (ex. après l'ajout d'une coordonnée).
   void updateMe(Me me) {
-    if (state is SessionSignedIn) state = SessionSignedIn(me);
+    final current = state;
+    // Certaines réponses ne disent pas l'espace actif : on garde celui qu'on connaît.
+    if (current is SessionSignedIn) state = SessionSignedIn(me.activeSpaceType == null ? me.withActiveSpace(current.me.activeSpaceType) : me);
   }
 
   Future<void> refreshMe() async => updateMe(await _api.me());

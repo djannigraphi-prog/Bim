@@ -26,6 +26,8 @@ import '../../features/projects/presentation/transformation_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/merchant/presentation/merchant_apply_screen.dart';
+import '../../features/merchant/presentation/merchant_space_screen.dart';
+import '../../features/merchant/presentation/product_editor_screen.dart';
 import '../../features/social/presentation/composer_screen.dart';
 import '../../features/social/presentation/post_detail_screen.dart';
 import '../../features/social/presentation/profile_screen.dart';
@@ -50,9 +52,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       return switch (session) {
         SessionUnknown() => loc == '/splash' ? null : '/splash',
-        SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc)) ? '/home' : null,
+        // Espace boutique actif (lot 5-B) : l'accueil est l'espace marchand (écran 55) ; ailleurs, pas d'espace marchand.
+        SessionSignedIn(:final me) when me.activeSpaceType == 'merchant' => (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc)) ? '/shop' : null,
+        SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc) || loc.startsWith('/shop')) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant'].any(loc.startsWith)) ? '/home' : null,
+          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop'].any(loc.startsWith)) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -101,6 +105,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/account/blocked', builder: (_, __) => const BlockedPeopleScreen()),
       // Lot 5-A — ouvrir une boutique (écrans 07 à 09).
       GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
+      GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+      GoRoute(path: '/shop/products/new', builder: (_, __) => const ProductEditorScreen()),
+      GoRoute(path: '/shop/products/:id', builder: (_, s) => ProductEditorScreen(productId: s.pathParameters['id'])),
       GoRoute(
         path: '/projects/:id/day/:day',
         builder: (_, s) => ProjectDayScreen(projectId: s.pathParameters['id']!, day: s.pathParameters['day']!),

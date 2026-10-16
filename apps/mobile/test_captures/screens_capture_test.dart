@@ -42,6 +42,9 @@ import 'package:bim/features/projects/presentation/transformation_screen.dart';
 import 'package:bim/features/shell/presentation/home_shell.dart';
 import 'package:bim/features/merchant/data/merchant_api.dart';
 import 'package:bim/features/merchant/presentation/merchant_apply_screen.dart';
+import 'package:bim/features/merchant/data/shop_api.dart';
+import 'package:bim/features/merchant/presentation/merchant_space_screen.dart';
+import 'package:bim/features/merchant/presentation/product_editor_screen.dart';
 import 'package:bim/features/social/data/social_api.dart';
 import 'package:bim/features/social/data/social_models.dart';
 import 'package:bim/features/social/presentation/composer_screen.dart';
@@ -244,6 +247,45 @@ class _FakeMerchantApi extends MerchantApi {
           payoutPhoneEnd: '04',
         ),
         available: true,
+      );
+}
+
+/// Boutique de démonstration POUR LES CAPTURES UNIQUEMENT (écran 55 ; articles inventés, sans photo faute de serveur).
+class _FakeShopApi extends ShopApi {
+  _FakeShopApi(super.api);
+
+  static const _items = [
+    ProductSummary(id: 'x1', kind: 'product', title: 'Robe soirée à plumes', priceFcfa: 45000, compareAtFcfa: 60000, status: 'published', stock: 7),
+    ProductSummary(id: 'x2', kind: 'product', title: 'Ensemble wax corporate', priceFcfa: 32000, status: 'published', stock: 0),
+    ProductSummary(id: 'x3', kind: 'service', title: 'Retouche et ajustement', priceFcfa: 5000, status: 'published'),
+  ];
+
+  @override
+  Future<ShopDashboard> dashboard() async =>
+      const ShopDashboard(id: 's1', name: 'Boutique Élégance', status: 'active', verified: true, city: 'Abidjan', commune: 'Cocody', published: 3, drafts: 1, followers: 0);
+
+  @override
+  Future<List<ProductSummary>> products({required String status}) async => status == 'published' ? _items : const [];
+
+  // Rubriques identiques à la migration 0022 (extrait).
+  @override
+  Future<List<ShopCategory>> categories() async => const [
+        ShopCategory(code: 'vetements', label: 'Vêtements', children: [ShopCategory(code: 'vetements_soiree', label: 'Soirée'), ShopCategory(code: 'vetements_corporate', label: 'Corporate')]),
+        ShopCategory(code: 'services', label: 'Services'),
+      ];
+
+  @override
+  Future<ProductDetail> product(String id) async => const ProductDetail(
+        id: 'x1',
+        kind: 'product',
+        title: 'Robe soirée à plumes',
+        description: 'Plumes cousues main, doublure satin.',
+        categoryCode: 'vetements_soiree',
+        priceFcfa: 45000,
+        compareAtFcfa: 60000,
+        status: 'published',
+        photos: [ProductPhoto(id: 'm1', url: null)],
+        variants: [ProductVariant(id: 'v1', label: 'S', stock: 2), ProductVariant(id: 'v2', label: 'M', stock: 3), ProductVariant(id: 'v3', label: 'L', stock: 2)],
       );
 }
 
@@ -498,6 +540,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     peniApiProvider.overrideWithValue(_FakePeniApi(client)),
     socialApiProvider.overrideWithValue(_FakeSocialApi(client)),
     merchantApiProvider.overrideWithValue(_FakeMerchantApi(client)),
+    shopApiProvider.overrideWithValue(_FakeShopApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -529,6 +572,8 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/people/yannick.doho', builder: (_, __) => const ProfileScreen(username: 'yannick.doho')),
     GoRoute(path: '/social/new', builder: (_, __) => const ComposerScreen()),
     GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
+    GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+    GoRoute(path: '/shop/products/x1', builder: (_, __) => const ProductEditorScreen(productId: 'x1')),
   ],);
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
@@ -811,6 +856,18 @@ void main() {
   testWidgets('07 vérification marchand', (t) async {
     await _show(t, '/merchant/apply');
     await _capture(t, '07_verif_marchand');
+  });
+  testWidgets('55 espace marchand', (t) async {
+    await _show(t, '/shop');
+    await _capture(t, '55_espace_marchand');
+  });
+  testWidgets('55 article (modification)', (t) async {
+    await _show(t, '/shop/products/x1');
+    await _capture(t, 'x17_article');
+  });
+  testWidgets('55 espace marchand (sombre)', (t) async {
+    await _show(t, '/shop', mode: ThemeMode.dark);
+    await _capture(t, 'x18_espace_marchand_sombre');
   });
   testWidgets('accueil visiteur (sombre)', (t) async {
     final c = await _show(t, '/home', mode: ThemeMode.dark);

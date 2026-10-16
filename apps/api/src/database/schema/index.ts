@@ -7,3 +7,4 @@ export * from './notifications';
 export * from './peni';
 export * from './social';
 export * from './merchants';
+export * from './catalog';

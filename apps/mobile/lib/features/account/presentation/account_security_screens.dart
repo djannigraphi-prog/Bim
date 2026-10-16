@@ -383,6 +383,12 @@ class _SpaceTile extends ConsumerWidget {
                     final token = await ref.read(accountApiProvider).switchSpace(s.type, s.id);
                     await ref.read(tokenStorageProvider).saveAccess(token);
                     ref.invalidate(_spacesProvider);
+                    // Lot 5-B : l'espace actif décide de l'accueil (espace marchand ou accueil utilisateur).
+                    await ref.read(sessionProvider.notifier).refreshMe();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      context.go(s.type == 'merchant' ? '/shop' : '/home');
+                    }
                   } on ApiException catch (e) {
                     if (context.mounted) showApiError(context, e);
                   }

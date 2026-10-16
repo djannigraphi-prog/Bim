@@ -43,6 +43,10 @@ export const PURGE_BLOCKING_TABLES = [
   'story_views',
   // Lot 5 : une demande d'ouverture de boutique est une activité.
   'merchant_applications',
+  // Lot 5-B : gérer un stock, suivre une boutique ou mettre un article de côté est une activité.
+  'inventory_movements',
+  'shop_follows',
+  'product_favorites',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -51,6 +55,7 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   follows: ['follower_id', 'followee_id'],
   user_blocks: ['blocker_id', 'blocked_id'],
   content_reports: ['reporter_id', 'target_user_id'],
+  inventory_movements: ['created_by'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [

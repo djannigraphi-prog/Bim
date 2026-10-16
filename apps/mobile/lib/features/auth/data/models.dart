@@ -51,6 +51,7 @@ class Me {
     required this.city,
     required this.theme,
     required this.contacts,
+    this.activeSpaceType,
   });
 
   factory Me.fromJson(Map<String, dynamic> j) => Me(
@@ -63,8 +64,13 @@ class Me {
             .map((c) => (c as Map<String, dynamic>))
             .map((c) => (id: (c['id'] ?? '') as String, type: c['type'] as String, value: c['value'] as String, verified: c['verified'] as bool))
             .toList(),
+        activeSpaceType: (j['activeSpace'] as Map<String, dynamic>?)?['type'] as String?,
       );
 
+  /// Espace actif (« user » ou « merchant », lot 5-B) ; null si la réponse ne le précise pas.
+  Me withActiveSpace(String? type) => Me(id: id, fullName: fullName, username: username, city: city, theme: theme, contacts: contacts, activeSpaceType: type);
+
+  final String? activeSpaceType;
   final String id;
   final String fullName;
   final String username;
