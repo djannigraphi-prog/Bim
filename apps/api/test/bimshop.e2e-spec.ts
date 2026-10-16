@@ -77,12 +77,14 @@ describe('BimShop (e2e)', () => {
   });
 
   it('tri par prix et pagination sans doublon ni oubli', async () => {
-    const m = await merchant('Grande Boutique Kalia');
+    // Mot unique : d'autres suites créent aussi des boutiques et des articles dans la même base.
+    const tag = `Pagi${Date.now().toString(36)}`;
+    const m = await merchant(`Grande Boutique ${tag}`);
     const base = Date.now();
     for (let i = 0; i < 25; i++) {
       await h.pool.query(
         "insert into products (id, shop_id, category_code, title, price_fcfa, status, published_at) values ($1, $2, 'vetements_sport', $3, $4, 'published', $5)",
-        [uuidv7(), m.shopId, `Kalia tenue ${i}`, 1000 + (i % 5) * 100, new Date(base - i * 1000)],
+        [uuidv7(), m.shopId, `${tag} tenue ${i}`, 1000 + (i % 5) * 100, new Date(base - i * 1000)],
       );
     }
     for (const sort of ['recent', 'price_asc', 'price_desc']) {
@@ -91,7 +93,7 @@ describe('BimShop (e2e)', () => {
       let cursor: string | null = null;
       do {
         const page: { items: { id: string; priceFcfa: number }[]; nextCursor: string | null } = (
-          await h.http().get('/v1/bimshop/products').query({ q: 'Kalia', sort, ...(cursor ? { cursor } : {}) }).expect(200)
+          await h.http().get('/v1/bimshop/products').query({ q: tag, sort, ...(cursor ? { cursor } : {}) }).expect(200)
         ).body;
         seen.push(...page.items.map((p) => p.id));
         prices.push(...page.items.map((p) => p.priceFcfa));
