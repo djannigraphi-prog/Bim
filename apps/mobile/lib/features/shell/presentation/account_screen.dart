@@ -49,7 +49,7 @@ class AccountScreen extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const CircleAvatar(radius: 28, child: Icon(Icons.person_outline)),
                 title: Text(me.fullName, style: theme.textTheme.titleMedium),
-                subtitle: Text('@${me.username} · voir mon profil'),
+                subtitle: Text('@${me.username} · compte utilisateur'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => context.push('/people/${me.username}'),
               ),

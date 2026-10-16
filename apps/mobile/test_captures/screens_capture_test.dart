@@ -728,7 +728,7 @@ void main() {
   Future<void> signIn(ProviderContainer c) => c.read(sessionProvider.notifier).completeSignIn((
         tokens: const Tokens(accessToken: 'a', refreshToken: 'r'),
         me: const Me(id: 'u0', fullName: 'Doho Yannick', username: 'yannick.doho', city: 'Abidjan', theme: 'system', contacts: []),
-      ));
+      ),);
   testWidgets('10 accueil (fil)', (t) async {
     final c = await _show(t, '/home');
     await signIn(c);

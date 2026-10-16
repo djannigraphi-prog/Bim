@@ -231,7 +231,7 @@ void main() {
     expect(find.text('Le parcours'), findsOneWidget);
     expect(find.text('Sport · Abdos · 30 jours · 24 étapes validées'), findsOneWidget);
     expect(find.text('🏆 30 jours'), findsOneWidget);
-    expect(find.bySemanticsLabel('Faire glisser pour comparer avant et après'), findsOneWidget);
+    expect(find.byIcon(Icons.compare_arrows_rounded), findsOneWidget); // poignée du curseur avant / après
   });
 
   testWidgets('écran 52 : mon profil (projets, photo) ; profil d’une autre personne (s’abonner)', (tester) async {
