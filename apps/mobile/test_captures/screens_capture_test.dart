@@ -43,6 +43,10 @@ import 'package:bim/features/shell/presentation/home_shell.dart';
 import 'package:bim/features/merchant/data/merchant_api.dart';
 import 'package:bim/features/merchant/presentation/merchant_apply_screen.dart';
 import 'package:bim/features/merchant/data/shop_api.dart';
+import 'package:bim/features/bimshop/data/bimshop_api.dart';
+import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
+import 'package:bim/features/bimshop/presentation/product_screen.dart';
+import 'package:bim/features/bimshop/presentation/shop_profile_screen.dart';
 import 'package:bim/features/merchant/presentation/merchant_space_screen.dart';
 import 'package:bim/features/merchant/presentation/product_editor_screen.dart';
 import 'package:bim/features/social/data/social_api.dart';
@@ -287,6 +291,62 @@ class _FakeShopApi extends ShopApi {
         photos: [ProductPhoto(id: 'm1', url: null)],
         variants: [ProductVariant(id: 'v1', label: 'S', stock: 2), ProductVariant(id: 'v2', label: 'M', stock: 3), ProductVariant(id: 'v3', label: 'L', stock: 2)],
       );
+}
+
+/// BimShop de démonstration POUR LES CAPTURES UNIQUEMENT (écrans 32, 33, 34, 54 ; boutiques et articles inventés,
+/// sans photo faute de serveur).
+class _FakeBimShopApi extends BimShopApi {
+  _FakeBimShopApi(super.api);
+
+  static const _elegance = ShopRef(id: 's1', name: 'Boutique Élégance', slug: 'boutique-elegance', verified: true, city: 'Abidjan', commune: 'Cocody');
+  static const _kalia = ShopRef(id: 's2', name: 'Kalia Sport', slug: 'kalia-sport', verified: false, city: 'Abidjan', commune: 'Marcory');
+  static const _cards = [
+    ShopCard(id: 'x1', kind: 'product', title: 'Robe soirée à plumes', priceFcfa: 45000, compareAtFcfa: 60000, available: true, shop: _elegance),
+    ShopCard(id: 'x2', kind: 'product', title: 'Ensemble wax corporate', priceFcfa: 32000, available: true, shop: _elegance),
+    ShopCard(id: 'x4', kind: 'product', title: 'Legging de sport respirant', priceFcfa: 8500, available: true, shop: _kalia),
+    ShopCard(id: 'x5', kind: 'product', title: 'Brassière maintien fort', priceFcfa: 7000, available: false, shop: _kalia),
+  ];
+
+  @override
+  Future<({List<ShopCard> items, String? nextCursor})> browse(BimShopQuery query, {String? cursor}) async => (items: _cards, nextCursor: null);
+
+  // Rubriques identiques à la migration 0022 ; nombres d'articles de démonstration.
+  @override
+  Future<List<Rubrique>> categories() async => const [
+        Rubrique(code: 'vetements', label: 'Vêtements', products: 2, children: [
+          Rubrique(code: 'vetements_corporate', label: 'Corporate', products: 1),
+          Rubrique(code: 'vetements_plage', label: 'Plage', products: 0),
+          Rubrique(code: 'vetements_artistique', label: 'Artistique / Créatif', products: 0),
+          Rubrique(code: 'vetements_traditionnel', label: 'Traditionnel / Culturel', products: 0),
+          Rubrique(code: 'vetements_soiree', label: 'Soirée', products: 1),
+          Rubrique(code: 'vetements_sport', label: 'Sport', products: 0),
+          Rubrique(code: 'vetements_autres', label: 'Autres', products: 0),
+        ],),
+        Rubrique(code: 'accessoires', label: 'Accessoires', products: 0),
+        Rubrique(code: 'sante', label: 'Santé / Esthétique', products: 0),
+        Rubrique(code: 'sport', label: 'Sport & Coaching', products: 2),
+        Rubrique(code: 'services', label: 'Services', products: 0),
+      ];
+
+  @override
+  Future<ShopProduct> product(String id) async => ShopProduct(
+        id: 'x1',
+        kind: 'product',
+        title: 'Robe soirée à plumes',
+        description: 'Plumes cousues main, doublure satin. Retouches offertes en boutique.',
+        priceFcfa: 45000,
+        compareAtFcfa: 60000,
+        categoryLabel: 'Vêtements · Soirée',
+        available: true,
+        photos: const [null, null, null],
+        variants: const [(id: 'v1', label: 'S', available: true), (id: 'v2', label: 'M', available: true), (id: 'v3', label: 'L', available: false)],
+        shop: _elegance,
+        moreFromShop: [_cards[1]],
+      );
+
+  @override
+  Future<PublicShop> shop(String slug) async =>
+      PublicShop(shop: _elegance, description: 'Robes de soirée et tenues corporate, retouches sur place.', followers: 0, productCount: 2, items: _cards.sublist(0, 2));
 }
 
 /// Publications de démonstration POUR LES CAPTURES UNIQUEMENT (personnes et textes inventés, aucune photo réelle :
@@ -541,6 +601,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     socialApiProvider.overrideWithValue(_FakeSocialApi(client)),
     merchantApiProvider.overrideWithValue(_FakeMerchantApi(client)),
     shopApiProvider.overrideWithValue(_FakeShopApi(client)),
+    bimShopApiProvider.overrideWithValue(_FakeBimShopApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -573,6 +634,9 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/social/new', builder: (_, __) => const ComposerScreen()),
     GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
     GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+    GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
+    GoRoute(path: '/bimshop/products/x1', builder: (_, __) => const ShopProductScreen(productId: 'x1')),
+    GoRoute(path: '/bimshop/shops/boutique-elegance', builder: (_, __) => const ShopProfileScreen(slug: 'boutique-elegance')),
     GoRoute(path: '/shop/products/x1', builder: (_, __) => const ProductEditorScreen(productId: 'x1')),
   ],);
   await tester.pumpWidget(UncontrolledProviderScope(
@@ -856,6 +920,26 @@ void main() {
   testWidgets('07 vérification marchand', (t) async {
     await _show(t, '/merchant/apply');
     await _capture(t, '07_verif_marchand');
+  });
+  testWidgets('32 BimShop', (t) async {
+    await _show(t, '/home');
+    await t.tap(find.text('BimShop'));
+    await _settle(t);
+    await _capture(t, '32_bimshop');
+  });
+  testWidgets('33 rubriques', (t) async {
+    await _show(t, '/bimshop/categories');
+    await t.tap(find.text('Vêtements'));
+    await _settle(t);
+    await _capture(t, '33_rubriques');
+  });
+  testWidgets('34 fiche article', (t) async {
+    await _show(t, '/bimshop/products/x1');
+    await _capture(t, '34_fiche_article');
+  });
+  testWidgets('54 profil boutique', (t) async {
+    await _show(t, '/bimshop/shops/boutique-elegance');
+    await _capture(t, '54_profil_boutique');
   });
   testWidgets('55 espace marchand', (t) async {
     await _show(t, '/shop');

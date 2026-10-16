@@ -3830,6 +3830,319 @@
         ]
       }
     },
+    "/v1/bimshop/categories": {
+      "get": {
+        "operationId": "BimShopController_categories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rubriques avec le nombre d’articles en ligne (écran 33)",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/products": {
+      "get": {
+        "operationId": "BimShopController_browse",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Rubrique ou sous-rubrique",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Recherche dans le nom, la description et le nom de la boutique",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "recent",
+                "price_asc",
+                "price_desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Articles en ligne (écran 32)",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/products/{id}": {
+      "get": {
+        "operationId": "BimShopController_product",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Fiche article (écran 34) ; disponibilité sans stock exact",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/shops/{slug}": {
+      "get": {
+        "operationId": "BimShopController_shopProfile",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Profil public d’une boutique et ses articles (écran 54)",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/products/{id}/me": {
+      "get": {
+        "operationId": "BimShopController_productState",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Article mis de côté ? Boutique suivie ?",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/products/{id}/favorite": {
+      "put": {
+        "operationId": "BimShopController_favorite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mettre de côté (cœur)",
+        "tags": [
+          "BimShop"
+        ]
+      },
+      "delete": {
+        "operationId": "BimShopController_unfavorite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/favorites": {
+      "get": {
+        "operationId": "BimShopController_favorites",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes articles mis de côté",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/shops/{slug}/me": {
+      "get": {
+        "operationId": "BimShopController_shopState",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/shops/{slug}/follow": {
+      "put": {
+        "operationId": "BimShopController_follow",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suivre une boutique",
+        "tags": [
+          "BimShop"
+        ]
+      },
+      "delete": {
+        "operationId": "BimShopController_unfollow",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
