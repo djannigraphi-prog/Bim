@@ -4143,6 +4143,248 @@
         ]
       }
     },
+    "/v1/shop/project-requests": {
+      "get": {
+        "operationId": "ShopOffersController_requests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Demandes de projet anonymisées des rubriques de la boutique",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/project-requests/{projectId}/offers": {
+      "post": {
+        "operationId": "ShopOffersController_offer",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Faire une offre (une par projet ; 3 articles au plus ; limite quotidienne)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/offers": {
+      "get": {
+        "operationId": "ShopOffersController_sent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Offres envoyées et leur suite (refusée, retirée)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/offers/{id}": {
+      "delete": {
+        "operationId": "ShopOffersController_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer une offre",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/projects/{id}/offers": {
+      "get": {
+        "operationId": "ProjectOffersController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Offres des marchands pour mon projet",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/offers/{offerId}/decline": {
+      "post": {
+        "operationId": "ProjectOffersController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser une offre (la boutique ne pourra plus en faire pour ce projet)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/merchant-offers": {
+      "put": {
+        "operationId": "ProjectOffersController_receive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveOffersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recevoir ou ne plus recevoir les offres des marchands",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/v1/projects/{id}/recommendations": {
+      "get": {
+        "operationId": "ProjectOffersController_recommendations",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "« Recommandé pour toi » : articles du BimShop liés au projet (projets Premium)",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -5839,6 +6081,38 @@
         },
         "required": [
           "quantity"
+        ]
+      },
+      "OfferDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Bonjour ! Nos tenues de sport respirantes sont idéales pour ton programme.",
+            "maxLength": 500
+          },
+          "productIds": {
+            "description": "Articles en ligne de ta boutique (3 au plus)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ReceiveOffersDto": {
+        "type": "object",
+        "properties": {
+          "receive": {
+            "type": "boolean",
+            "description": "Recevoir les offres des marchands pour ce projet (écran 21)"
+          }
+        },
+        "required": [
+          "receive"
         ]
       },
       "AdminLoginDto": {

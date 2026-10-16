@@ -30,6 +30,8 @@ import '../../features/bimshop/presentation/bimshop_view.dart';
 import '../../features/bimshop/presentation/product_screen.dart';
 import '../../features/bimshop/presentation/shop_profile_screen.dart';
 import '../../features/merchant/presentation/merchant_space_screen.dart';
+import '../../features/offers/presentation/project_offers_screen.dart';
+import '../../features/offers/presentation/shop_requests_screen.dart';
 import '../../features/merchant/presentation/product_editor_screen.dart';
 import '../../features/social/presentation/composer_screen.dart';
 import '../../features/social/presentation/post_detail_screen.dart';
@@ -109,6 +111,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Lot 5-A — ouvrir une boutique (écrans 07 à 09).
       GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
       GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+      GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
+      GoRoute(path: '/projects/:id/offers', builder: (_, s) => ProjectOffersScreen(projectId: s.pathParameters['id']!)),
       // Lot 5-C : BimShop (public, sauf « Mis de côté »).
       GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
       GoRoute(path: '/bimshop/favorites', builder: (_, __) => const ShopFavoritesScreen()),

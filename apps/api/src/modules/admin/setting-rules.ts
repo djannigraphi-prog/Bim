@@ -64,6 +64,7 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^social\.stories_daily_limit$/, intIn(1, 200)],
   // Conservation des pièces d'identité : null tant qu'elle n'est pas validée (aucune suppression).
   [/^kyc\.document_retention_days$/, intIn(30, 3650, true)],
+  [/^offers\.max_per_shop_per_day$/, intIn(1, 500)],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

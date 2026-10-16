@@ -9,6 +9,7 @@ import '../../../core/widgets/bim_icons.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../offers/presentation/project_offers_screen.dart';
 import '../../peni/presentation/peni_task_sheet.dart';
 import '../application/projects_providers.dart';
 import '../data/projects_api.dart';
@@ -191,16 +192,21 @@ class _Program extends ConsumerWidget {
                 const SizedBox(height: BimSpacing.lg),
                 Text('Recommandé pour toi', style: theme.textTheme.titleLarge),
                 const SizedBox(height: BimSpacing.sm),
-                Container(
-                  padding: const EdgeInsets.all(BimSpacing.lg),
-                  decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
-                  child: Text(
-                    'Les salles, coachs, soins et produits recommandés par des marchands vérifiés arriveront avec le BimShop. '
-                    'Les achats se feront sur le BimShop, jamais dans ton projet.',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
+                // Lot 5-D : articles du BimShop liés à la catégorie du projet.
+                ProjectRecommendations(projectId: s.id),
               ],
+              const SizedBox(height: BimSpacing.lg),
+              Container(
+                decoration: BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(BimRadius.card)),
+                child: ListTile(
+                  key: const ValueKey('project-offers'),
+                  leading: const Icon(Icons.local_offer_outlined),
+                  title: const Text('Offres des marchands', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Voir les offres, les refuser ou ne plus en recevoir'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/projects/${s.id}/offers'),
+                ),
+              ),
               const SizedBox(height: BimSpacing.lg),
               Container(
                 decoration: BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(BimRadius.card)),

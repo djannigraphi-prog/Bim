@@ -44,6 +44,9 @@ import 'package:bim/features/merchant/data/merchant_api.dart';
 import 'package:bim/features/merchant/presentation/merchant_apply_screen.dart';
 import 'package:bim/features/merchant/data/shop_api.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
+import 'package:bim/features/offers/data/offers_api.dart';
+import 'package:bim/features/offers/presentation/project_offers_screen.dart';
+import 'package:bim/features/offers/presentation/shop_requests_screen.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
 import 'package:bim/features/bimshop/presentation/product_screen.dart';
 import 'package:bim/features/bimshop/presentation/shop_profile_screen.dart';
@@ -349,6 +352,37 @@ class _FakeBimShopApi extends BimShopApi {
       PublicShop(shop: _elegance, description: 'Robes de soirée et tenues corporate, retouches sur place.', followers: 0, productCount: 2, items: _cards.sublist(0, 2));
 }
 
+/// Offres et demandes de démonstration POUR LES CAPTURES UNIQUEMENT (écrans 24, 49, 55 ; boutiques inventées).
+class _FakeOffersApi extends OffersApi {
+  _FakeOffersApi(super.api);
+
+  @override
+  Future<({bool premiumOnly, List<ShopCard> items})> recommendations(String projectId) async => (premiumOnly: false, items: _FakeBimShopApi._cards.sublist(2));
+
+  @override
+  Future<({bool receiveOffers, List<ProjectOffer> items})> projectOffers(String projectId) async => (
+        receiveOffers: true,
+        items: [
+          ProjectOffer(
+            id: 'o1',
+            message: 'Bonjour ! Pour ton programme abdos, nos leggings respirants tiennent bien pendant les séances. Livraison à Abidjan.',
+            shop: _FakeBimShopApi._kalia,
+            products: _FakeBimShopApi._cards.sublist(2, 3),
+            createdAt: DateTime(2026, 10, 16, 9),
+          ),
+        ],
+      );
+
+  @override
+  Future<({List<ProjectRequest> items, String? hint})> requests() async => (
+        items: const [
+          ProjectRequest(id: 'r1', category: 'Sport', title: 'Renforcer mes abdos', goal: 'Abdos', mode: 'premium', durationDays: 30, city: 'Cocody'),
+          ProjectRequest(id: 'r2', category: 'Sport', title: 'Perdre 6 kg', goal: 'Perte de poids', mode: 'eco', durationDays: 60, offerStatus: 'sent'),
+        ],
+        hint: null,
+      );
+}
+
 /// Publications de démonstration POUR LES CAPTURES UNIQUEMENT (personnes et textes inventés, aucune photo réelle :
 /// les images s'affichent en emplacement neutre, faute de serveur).
 class _FakeSocialApi extends SocialApi {
@@ -602,6 +636,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     merchantApiProvider.overrideWithValue(_FakeMerchantApi(client)),
     shopApiProvider.overrideWithValue(_FakeShopApi(client)),
     bimShopApiProvider.overrideWithValue(_FakeBimShopApi(client)),
+    offersApiProvider.overrideWithValue(_FakeOffersApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -634,6 +669,8 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/social/new', builder: (_, __) => const ComposerScreen()),
     GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
     GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+    GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
+    GoRoute(path: '/projects/p1/offers', builder: (_, __) => const ProjectOffersScreen(projectId: 'p1')),
     GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
     GoRoute(path: '/bimshop/products/x1', builder: (_, __) => const ShopProductScreen(productId: 'x1')),
     GoRoute(path: '/bimshop/shops/boutique-elegance', builder: (_, __) => const ShopProfileScreen(slug: 'boutique-elegance')),
@@ -940,6 +977,14 @@ void main() {
   testWidgets('54 profil boutique', (t) async {
     await _show(t, '/bimshop/shops/boutique-elegance');
     await _capture(t, '54_profil_boutique');
+  });
+  testWidgets('49 offres du projet', (t) async {
+    await _show(t, '/projects/p1/offers');
+    await _capture(t, '49_offres_projet');
+  });
+  testWidgets('55 demandes de projet (marchand)', (t) async {
+    await _show(t, '/shop/requests');
+    await _capture(t, 'x19_demandes_marchand');
   });
   testWidgets('55 espace marchand', (t) async {
     await _show(t, '/shop');

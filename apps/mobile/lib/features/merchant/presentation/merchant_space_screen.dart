@@ -114,7 +114,7 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                     _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
                     _Action(icon: Icons.videocam_outlined, label: 'Live', onTap: () => showComingSoon(context, feature: 'Le live')),
                     _Action(icon: Icons.local_offer_outlined, label: 'Promo', onTap: () => showComingSoon(context, feature: 'Les promotions')),
-                    _Action(icon: Icons.assignment_outlined, label: 'Demandes', onTap: () => showComingSoon(context, feature: 'Les demandes de projet')),
+                    _Action(key: const ValueKey('action-requests'), icon: Icons.assignment_outlined, label: 'Demandes', onTap: () => context.push('/shop/requests')),
                   ],
                 ),
                 const SizedBox(height: BimSpacing.xl),

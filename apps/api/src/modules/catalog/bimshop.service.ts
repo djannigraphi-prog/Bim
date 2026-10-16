@@ -41,7 +41,7 @@ export class BimShopService {
   }
 
   /** Résumés publics : première photo, disponibilité (articles), boutique. */
-  private async cards(rows: { p: ProductRow; s: ShopRow }[], apiBase: string) {
+  async cards(rows: { p: ProductRow; s: ShopRow }[], apiBase: string) {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.p.id);
     const [media, stock] = await Promise.all([
@@ -127,6 +127,40 @@ export class BimShopService {
     const nextCursor =
       rows.length > PAGE && last ? Buffer.from(JSON.stringify({ v: sort === 'recent' ? last.p.publishedAt!.toISOString() : last.p.priceFcfa, id: last.p.id })).toString('base64url') : null;
     return { items: await this.cards(page, apiBase), nextCursor };
+  }
+
+  /** Articles visibles parmi `ids`, dans l'ordre donné (offres de projet, lot 5-D). */
+  async visibleCards(ids: string[], apiBase: string) {
+    if (!ids.length) return [];
+    const rows = await this.db
+      .select({ p: products, s: shops })
+      .from(products)
+      .innerJoin(shops, eq(shops.id, products.shopId))
+      .innerJoin(users, eq(users.id, shops.ownerUserId))
+      .where(and(inArray(products.id, ids), this.visible()));
+    rows.sort((a, b) => ids.indexOf(a.p.id) - ids.indexOf(b.p.id));
+    return this.cards(rows, apiBase);
+  }
+
+  /** Recommandations : articles en ligne des rubriques données (et de leurs sous-rubriques), les plus récents. */
+  async recommend(categoryCodes: string[], limit: number, apiBase: string) {
+    if (!categoryCodes.length) return [];
+    const codes = (
+      await this.db
+        .select({ code: shopCategories.code })
+        .from(shopCategories)
+        .where(and(eq(shopCategories.active, true), or(inArray(shopCategories.code, categoryCodes), inArray(shopCategories.parentCode, categoryCodes))))
+    ).map((r) => r.code);
+    if (!codes.length) return [];
+    const rows = await this.db
+      .select({ p: products, s: shops })
+      .from(products)
+      .innerJoin(shops, eq(shops.id, products.shopId))
+      .innerJoin(users, eq(users.id, shops.ownerUserId))
+      .where(and(inArray(products.categoryCode, codes), this.visible()))
+      .orderBy(desc(products.publishedAt), desc(products.id))
+      .limit(limit);
+    return this.cards(rows, apiBase);
   }
 
   private async visibleProduct(id: string) {
