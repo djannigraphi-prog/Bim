@@ -47,6 +47,10 @@ export const PURGE_BLOCKING_TABLES = [
   'inventory_movements',
   'shop_follows',
   'product_favorites',
+  // Lot 6 : écrire ou recevoir des messages est une activité.
+  'conversations',
+  'conversation_members',
+  'messages',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -56,6 +60,8 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   user_blocks: ['blocker_id', 'blocked_id'],
   content_reports: ['reporter_id', 'target_user_id'],
   inventory_movements: ['created_by'],
+  conversations: ['created_by'],
+  messages: ['sender_id'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [

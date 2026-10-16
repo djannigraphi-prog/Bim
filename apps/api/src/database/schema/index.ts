@@ -9,3 +9,4 @@ export * from './social';
 export * from './merchants';
 export * from './catalog';
 export * from './offers';
+export * from './messaging';

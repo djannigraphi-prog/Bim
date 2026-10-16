@@ -65,6 +65,10 @@ const RULES: Array<[RegExp, Rule]> = [
   // Conservation des pièces d'identité : null tant qu'elle n'est pas validée (aucune suppression).
   [/^kyc\.document_retention_days$/, intIn(30, 3650, true)],
   [/^offers\.max_per_shop_per_day$/, intIn(1, 500)],
+  [/^messages\.daily_limit$/, intIn(1, 10000)],
+  [/^messages\.new_conversations_daily_limit$/, intIn(1, 500)],
+  // Conservation des messages privés : null tant qu'elle n'est pas validée (aucune suppression).
+  [/^messages\.retention_days$/, intIn(30, 3650, true)],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

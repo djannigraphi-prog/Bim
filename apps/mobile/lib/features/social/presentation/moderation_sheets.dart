@@ -57,7 +57,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final what = switch (widget.targetType) { 'comment' => 'ce commentaire', 'user' => 'ce profil', _ => 'cette publication' };
+    final what = switch (widget.targetType) { 'comment' => 'ce commentaire', 'user' => 'ce profil', 'message' => 'ce message', _ => 'cette publication' };
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.lg + MediaQuery.viewInsetsOf(context).bottom),

@@ -26,6 +26,7 @@ import '../../features/projects/presentation/transformation_screen.dart';
 import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/merchant/presentation/merchant_apply_screen.dart';
+import '../../features/messaging/presentation/conversation_screen.dart';
 import '../../features/bimshop/presentation/bimshop_view.dart';
 import '../../features/bimshop/presentation/product_screen.dart';
 import '../../features/bimshop/presentation/shop_profile_screen.dart';
@@ -60,10 +61,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         // Espace boutique actif (lot 5-B) : l'accueil est l'espace marchand (écran 55) ; ailleurs, pas d'espace marchand.
         // Les projets et Peni sont réservés à l'espace utilisateur (le serveur répond 403 sinon, audit M-10).
         SessionSignedIn(:final me) when me.activeSpaceType == 'merchant' =>
-          (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc) || loc.startsWith('/projects') || loc.startsWith('/peni')) ? '/shop' : null,
+          (loc == '/splash' || loc == '/home' || _publicRoutes.contains(loc) || loc.startsWith('/projects') || loc.startsWith('/peni') || loc.startsWith('/messages'))
+              ? '/shop'
+              : null,
         SessionSignedIn() => (loc == '/splash' || _publicRoutes.contains(loc) || loc.startsWith('/shop')) ? '/home' : null,
         SessionSignedOut(visitor: true) =>
-          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop', '/bimshop/favorites'].any(loc.startsWith)) ? '/home' : null,
+          (loc == '/splash' || const ['/account', '/projects', '/notifications', '/peni', '/social', '/posts', '/people', '/search', '/merchant', '/shop', '/bimshop/favorites', '/messages'].any(loc.startsWith)) ? '/home' : null,
         SessionSignedOut() => _publicRoutes.contains(loc) ? null : '/welcome',
       };
     },
@@ -113,6 +116,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Lot 5-A — ouvrir une boutique (écrans 07 à 09).
       GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
       GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
+      // Lot 6-A : messagerie entre personnes.
+      GoRoute(path: '/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!)),
       GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
       GoRoute(path: '/projects/:id/offers', builder: (_, s) => ProjectOffersScreen(projectId: s.pathParameters['id']!)),
       // Lot 5-C : BimShop (public, sauf « Mis de côté »).

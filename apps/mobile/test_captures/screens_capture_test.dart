@@ -44,6 +44,9 @@ import 'package:bim/features/merchant/data/merchant_api.dart';
 import 'package:bim/features/merchant/presentation/merchant_apply_screen.dart';
 import 'package:bim/features/merchant/data/shop_api.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
+import 'package:bim/features/messaging/data/messaging_api.dart';
+import 'package:bim/features/messaging/presentation/conversation_screen.dart';
+import 'package:bim/features/messaging/presentation/messages_view.dart';
 import 'package:bim/features/offers/data/offers_api.dart';
 import 'package:bim/features/offers/presentation/project_offers_screen.dart';
 import 'package:bim/features/offers/presentation/shop_requests_screen.dart';
@@ -383,6 +386,45 @@ class _FakeOffersApi extends OffersApi {
       );
 }
 
+/// Messages de démonstration POUR LES CAPTURES UNIQUEMENT (écran 47 ; personnes et textes inventés).
+class _FakeMessagingApi extends MessagingApi {
+  _FakeMessagingApi(super.api);
+
+  static const _awa = PersonRef(id: 'u2', username: 'awa.kone', fullName: 'Awa Koné');
+  static const _koffi = PersonRef(id: 'u3', username: 'koffi.coach', fullName: 'Koffi Yao');
+
+  @override
+  Future<({List<ConversationSummary> items, String? nextCursor})> conversations({bool requests = false, String? cursor}) async => (
+        items: requests
+            ? [ConversationSummary(id: 'r1', status: 'request', pendingForOther: false, person: _koffi, unread: 1, lastPreview: 'Bonjour ! Je suis coach à Cocody.', lastAt: DateTime.now().subtract(const Duration(hours: 3)))]
+            : [
+                ConversationSummary(id: 'c1', status: 'active', pendingForOther: false, person: _awa, unread: 2, lastPreview: 'On fait la séance ensemble samedi ?', lastAt: DateTime.now().subtract(const Duration(minutes: 4))),
+              ],
+        nextCursor: null,
+      );
+
+  @override
+  Future<({int conversations, int requests})> unreadCount() async => (conversations: 1, requests: 1);
+
+  @override
+  Future<ConversationSummary> conversation(String id) async =>
+      ConversationSummary(id: id, status: 'active', pendingForOther: false, person: _awa, unread: 0, lastPreview: null);
+
+  @override
+  Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async => (
+        items: [
+          ChatMessage(id: 'm4', mine: true, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 9, 6), text: 'Oui ! 8 h au parc ?', read: true),
+          ChatMessage(id: 'm3', mine: false, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 9, 4), text: 'On fait la séance ensemble samedi ?'),
+          ChatMessage(id: 'm2', mine: true, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 9, 1), text: 'Jour 12 validé, les abdos piquent 😅'),
+          ChatMessage(id: 'm1', mine: false, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 9), text: 'Alors, ce programme ?'),
+        ],
+        nextBefore: null,
+      );
+
+  @override
+  Future<void> read(String conversationId) async {}
+}
+
 /// Publications de démonstration POUR LES CAPTURES UNIQUEMENT (personnes et textes inventés, aucune photo réelle :
 /// les images s'affichent en emplacement neutre, faute de serveur).
 class _FakeSocialApi extends SocialApi {
@@ -637,6 +679,7 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     shopApiProvider.overrideWithValue(_FakeShopApi(client)),
     bimShopApiProvider.overrideWithValue(_FakeBimShopApi(client)),
     offersApiProvider.overrideWithValue(_FakeOffersApi(client)),
+    messagingApiProvider.overrideWithValue(_FakeMessagingApi(client)),
   ],);
   addTearDown(container.dispose);
   final router = GoRouter(initialLocation: location, routes: [
@@ -670,6 +713,8 @@ Future<ProviderContainer> _show(WidgetTester tester, String location, {ThemeMode
     GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
     GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
     GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
+    GoRoute(path: '/messages-tab', builder: (_, __) => const Scaffold(body: SafeArea(child: MessagesView()))),
+    GoRoute(path: '/messages/c1', builder: (_, __) => const ConversationScreen(conversationId: 'c1', refreshEvery: null)),
     GoRoute(path: '/projects/p1/offers', builder: (_, __) => const ProjectOffersScreen(projectId: 'p1')),
     GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
     GoRoute(path: '/bimshop/products/x1', builder: (_, __) => const ShopProductScreen(productId: 'x1')),
@@ -977,6 +1022,14 @@ void main() {
   testWidgets('54 profil boutique', (t) async {
     await _show(t, '/bimshop/shops/boutique-elegance');
     await _capture(t, '54_profil_boutique');
+  });
+  testWidgets('47 messages', (t) async {
+    await _show(t, '/messages-tab');
+    await _capture(t, '47_messages');
+  });
+  testWidgets('47 conversation', (t) async {
+    await _show(t, '/messages/c1');
+    await _capture(t, 'x20_conversation');
   });
   testWidgets('49 offres du projet', (t) async {
     await _show(t, '/projects/p1/offers');

@@ -6,7 +6,7 @@ import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users } from '../../database/schema';
+import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
@@ -175,6 +175,15 @@ export class PeopleService {
         throw Errors.notFound('Commentaire');
       });
       targetUserId = c.userId;
+    } else if (dto.targetType === 'message') {
+      // Lot 6-A : un message reçu, dans une conversation dont on est membre (jamais le sien).
+      const [m] = await this.db
+        .select({ senderId: messages.senderId })
+        .from(messages)
+        .innerJoin(conversationMembers, and(eq(conversationMembers.conversationId, messages.conversationId), eq(conversationMembers.userId, viewerId)))
+        .where(and(eq(messages.id, dto.targetId), eq(messages.status, 'published'), ne(messages.senderId, viewerId)));
+      if (!m) throw Errors.notFound('Message');
+      targetUserId = m.senderId;
     } else if (dto.targetType === 'story') {
       targetUserId = (await this.stories.visibleStory(viewerId, dto.targetId)).userId;
     } else {

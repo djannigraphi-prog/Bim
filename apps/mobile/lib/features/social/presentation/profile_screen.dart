@@ -7,6 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../messaging/presentation/messages_view.dart';
 import '../../projects/application/photo_source.dart';
 import '../application/social_providers.dart';
 import '../data/social_api.dart';
@@ -171,12 +172,28 @@ class ProfileScreen extends ConsumerWidget {
                         ],
                       )
                     else
-                      BimButton(
-                        key: const ValueKey('profile-follow'),
-                        label: p.followedByMe ? 'Abonné·e' : 'Suivre',
-                        icon: p.followedByMe ? Icons.check_rounded : null,
-                        variant: p.followedByMe ? BimButtonVariant.subtle : BimButtonVariant.primary,
-                        onPressed: () => _toggleFollow(context, ref, p),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: BimButton(
+                              key: const ValueKey('profile-follow'),
+                              label: p.followedByMe ? 'Abonné·e' : 'Suivre',
+                              icon: p.followedByMe ? Icons.check_rounded : null,
+                              variant: p.followedByMe ? BimButtonVariant.subtle : BimButtonVariant.primary,
+                              onPressed: () => _toggleFollow(context, ref, p),
+                            ),
+                          ),
+                          const SizedBox(width: BimSpacing.sm),
+                          // Lot 6-A : écrire à la personne (demande si elle ne suit pas l'auteur).
+                          Expanded(
+                            child: BimButton(
+                              key: const ValueKey('profile-message'),
+                              label: 'Message',
+                              variant: BimButtonVariant.outline,
+                              onPressed: () => openConversationWith(context, ref, p.person.username),
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),

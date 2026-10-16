@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,8 @@ import '../../../core/widgets/brand.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../bimshop/presentation/bimshop_view.dart';
+import '../../messaging/data/messaging_api.dart';
+import '../../messaging/presentation/messages_view.dart';
 import '../../notifications/data/inbox_api.dart';
 import '../../social/presentation/feed_view.dart';
 
@@ -22,6 +26,22 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _tab = 0;
+  Timer? _unreadTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Lot 6-A : pas de notification sur le téléphone ; la pastille Messages est mise à jour régulièrement.
+    _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (ref.read(sessionProvider) is SessionSignedIn) ref.invalidate(messagesUnreadProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _unreadTimer?.cancel();
+    super.dispose();
+  }
 
   static const _tabs = [
     (icon: Icons.home_outlined, active: Icons.home_rounded, label: 'Accueil', lot: 'Le fil d’actualité, les stories et les Reels'),
@@ -57,6 +77,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final tab = _tabs[_tab];
     // Pastille de la cloche : notifications pas encore vues (lot 2, écran 17).
     final unread = session is SessionSignedIn ? (ref.watch(inboxUnreadProvider).valueOrNull ?? 0) : 0;
+    final messagesUnread = session is SessionSignedIn ? ref.watch(messagesUnreadProvider).valueOrNull : null;
+    final messagesBadge = (messagesUnread?.conversations ?? 0) + (messagesUnread?.requests ?? 0);
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
@@ -90,7 +112,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       // Lot 5-C : l'onglet BimShop (écran 32), visiteurs compris.
       body: _tab == 0
           ? FeedView(visitor: session is! SessionSignedIn)
-          : _tab == 4
+          : _tab == 1 && session is SessionSignedIn
+              ? const MessagesView()
+              : _tab == 4
               ? BimShopView(visitor: session is! SessionSignedIn)
               : Center(
         child: Padding(
@@ -137,7 +161,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(_tab == i ? _tabs[i].active : _tabs[i].icon, color: _tab == i ? BimColors.red : scheme.onSurface),
+                              Badge(
+                                isLabelVisible: i == 1 && messagesBadge > 0,
+                                label: Text(messagesBadge > 99 ? '99+' : '$messagesBadge'),
+                                backgroundColor: BimColors.red,
+                                child: Icon(_tab == i ? _tabs[i].active : _tabs[i].icon, color: _tab == i ? BimColors.red : scheme.onSurface),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 _tabs[i].label,

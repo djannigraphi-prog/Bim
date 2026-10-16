@@ -3,7 +3,7 @@ import { api, errorText } from '../api';
 
 interface ContentReport {
   id: string;
-  targetType: 'post' | 'comment' | 'user';
+  targetType: 'post' | 'comment' | 'user' | 'story' | 'message';
   targetId: string;
   reason: string;
   message: string | null;
@@ -27,7 +27,8 @@ const REASONS: Record<string, string> = {
   false_info: 'Fausse information',
   other: 'Autre',
 };
-const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story' };
+// Lot 6-A : un message privé n'apparaît ici que s'il a été signalé ; chaque affichage est journalisé par l'API.
+const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé' };
 const STATUS: Record<string, string> = { published: 'en ligne', hidden: 'masqué', deleted: 'supprimé par son auteur' };
 
 /**

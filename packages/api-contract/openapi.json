@@ -4394,6 +4394,340 @@
         ]
       }
     },
+    "/v1/conversations": {
+      "get": {
+        "operationId": "MessagingController_list",
+        "parameters": [
+          {
+            "name": "box",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "inbox",
+                "requests"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conversations (« Tous ») ou demandes, la plus récente d’abord",
+        "tags": [
+          "Messages"
+        ]
+      },
+      "post": {
+        "operationId": "MessagingController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ouvrir ou retrouver la conversation avec une personne",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/unread-count": {
+      "get": {
+        "operationId": "MessagingController_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pastille de l’onglet Messages : conversations non lues, demandes en attente",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/messages": {
+      "get": {
+        "operationId": "MessagingController_messages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "Identifiant du plus ancien message déjà affiché",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Messages, du plus récent au plus ancien",
+        "tags": [
+          "Messages"
+        ]
+      },
+      "post": {
+        "operationId": "MessagingController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Envoyer un texte ou une photo (ré-encodée sans métadonnées)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/read": {
+      "post": {
+        "operationId": "MessagingController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conversation lue (« Vu » chez l’autre personne)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/accept": {
+      "post": {
+        "operationId": "MessagingController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accepter une demande",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/decline": {
+      "post": {
+        "operationId": "MessagingController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser une demande (l’autre personne n’est pas avertie)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}": {
+      "get": {
+        "operationId": "MessagingController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une conversation : la personne, le statut (demande ou non), les non-lus",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/messages/{id}": {
+      "delete": {
+        "operationId": "MessagingController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprimer mon message (« Message supprimé » chez les deux)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -5769,7 +6103,8 @@
               "post",
               "comment",
               "user",
-              "story"
+              "story",
+              "message"
             ]
           },
           "targetId": {
@@ -6131,6 +6466,19 @@
         },
         "required": [
           "receive"
+        ]
+      },
+      "StartConversationDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "awa.kone",
+            "description": "Nom d’utilisateur de la personne"
+          }
+        },
+        "required": [
+          "username"
         ]
       },
       "AdminLoginDto": {
