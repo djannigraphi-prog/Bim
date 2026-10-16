@@ -115,6 +115,16 @@ Décisions en attente (lot 5) : âge minimum des marchands (`age.min_merchant`, 
 
 Décisions à prendre (lot 5, suite) : correspondance catégories de projet → rubriques (**proposée**, table `project_category_rubriques`) ; exclusion des projets des moins de 18 ans des demandes vues par les marchands (**proposée**, par prudence) ; `offers.max_per_shop_per_day` = 20 (**provisoire**). « Discuter » avec une boutique : avec la messagerie (lot 6). Commande, réservation et paiement : lots 7 et 8.
 
+## Lot 6 — Messagerie (commencé le 16/10/2026)
+
+Aucune notification sur le téléphone (Firebase non activé) : la pastille de l'onglet Messages se met à jour toutes les 30 s et la conversation ouverte toutes les 5 s. Aucun service payant ni fournisseur externe.
+
+| Étape | Contenu | Tests | CI |
+| --- | --- | --- | --- |
+| 6-A | **Conversations à deux** (écran 47, onglet Messages) : texte et photo (ré-encodée sans métadonnées, stockée en privé, lien signé), « Vu », non-lus et pastille, messages précédents (curseur), supprimer pour tout le monde. **Demandes** (E10) : si la personne ne me suit pas, mon message arrive dans ses demandes ; lire une demande ne prévient pas son auteur ; répondre ou « Accepter » l'accepte ; « Refuser » la masque sans prévenir. **Jamais de message d'une personne non suivie vers un moins de 18 ans** ; blocage, comptes suspendus et espace boutique refusés. **Signalement** d'un message ; l'administration ne voit que les messages signalés, **chaque consultation est journalisée** (`admin.reported_message_viewed`), masquer / rétablir. Limites quotidiennes sous verrou. Bouton « Message » sur le profil. Migration 0025 (additive) | API : 6 e2e (suite : 359 réussis) ; Flutter : 3 + captures 47, x20 ; défaut détecté en CI et corrigé (contrôleur de saisie du dialogue « Nouveau message » libéré trop tôt) | verte (branche lot6a-wip, run 38882891779) |
+
+Décisions en attente (lot 6) : durée de conservation des messages (`messages.retention_days`, non fixée : rien n'est effacé automatiquement) ; `messages.daily_limit` = 500 et `messages.new_conversations_daily_limit` = 20 (**provisoires**) ; règle E10 et protection des mineurs ci-dessus (**proposées**). À venir : 6-B (« Discuter » depuis une offre ou un article, boîte de la boutique, écran 51) ; 6-C (réactions ; messages vocaux et groupes soumis à accord).
+
 ## Lot 2 — avancement (15/10/2026, partie sans dépense)
 
 Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'aucune décision en attente. **Rien n'est activé** : `WORKER_MODE=off`, `PUSH_PROVIDER=none` par défaut, réglage `notifications.reminders_enabled` = false (« en attente »), aucun projet Firebase, aucune ressource AWS.
