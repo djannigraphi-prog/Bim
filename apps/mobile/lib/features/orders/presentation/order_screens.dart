@@ -222,15 +222,18 @@ class _OrderBody extends StatelessWidget {
           const SizedBox(height: BimSpacing.lg),
           Text('Incidents', style: theme.textTheme.titleMedium),
           for (final i in o.incidents)
-            ListTile(
+            Padding(
               key: ValueKey('incident-${i.id}'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(incidentReasonLabel(i.reason)),
-              subtitle: Text(incidentStatusLabel(i.status)),
-              trailing: i.status == 'open' && onSupport != null
-                  ? TextButton(key: ValueKey('incident-support-${i.id}'), onPressed: () => onSupport!(i.id), child: const Text('Transmettre au support'))
-                  : null,
+              padding: const EdgeInsets.symmetric(vertical: BimSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(incidentReasonLabel(i.reason), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(incidentStatusLabel(i.status)),
+                  if (i.status == 'open' && onSupport != null)
+                    TextButton(key: ValueKey('incident-support-${i.id}'), onPressed: () => onSupport!(i.id), child: const Text('Transmettre au support')),
+                ],
+              ),
             ),
           Text('Aucune pénalité ni remboursement automatique : le support examine le dossier.', style: theme.textTheme.bodySmall),
         ],
@@ -857,7 +860,7 @@ class _CandidatesSheetState extends ConsumerState<_CandidatesSheet> {
                                 if (c.vehicle != null) vehicleLabel(c.vehicle),
                                 if (!c.selectable) 'un livreur prioritaire est disponible',
                                 if (c.selectable && c.reasonRequired) 'motif demandé',
-                              ].join(' · ')),
+                              ].join(' · '),),
                               trailing: const Icon(Icons.chevron_right),
                               enabled: c.selectable && !_busy,
                               onTap: c.selectable && !_busy ? () => _offer(c) : null,
