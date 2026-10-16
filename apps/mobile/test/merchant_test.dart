@@ -104,12 +104,14 @@ void main() {
     await _pump(tester, _FakeMerchant(_app(status: 'rejected', identity: true, selfie: false, payout: true, reason: 'Le selfie est flou.')));
     expect(find.text('À corriger : Le selfie est flou.'), findsOneWidget);
     expect(find.text('Wave · se terminant par 04'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('submit-application')), 300);
     expect(tester.widget<FilledButton>(find.descendant(of: find.byKey(const ValueKey('submit-application')), matching: find.byType(FilledButton))).onPressed, isNull);
   });
 
   testWidgets('écran 07 complet : envoi pour validation, puis écran 09 (vérification par l’équipe)', (tester) async {
     final api = _FakeMerchant(_app(identity: true, selfie: true, payout: true));
     await _pump(tester, api);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('submit-application')), 300);
     await tester.tap(find.byKey(const ValueKey('submit-application')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
