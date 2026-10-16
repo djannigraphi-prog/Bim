@@ -534,7 +534,7 @@ class _OrderCardView extends StatelessWidget {
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: [Icon(Icons.receipt_long_outlined, color: fg, size: 18), const SizedBox(width: 6), Text('Proposition ${card.number}', style: TextStyle(color: fg, fontWeight: FontWeight.w700))],
+              children: [Icon(Icons.receipt_long_outlined, color: fg, size: 18), const SizedBox(width: 6), Flexible(child: Text('Proposition ${card.number}', style: TextStyle(color: fg, fontWeight: FontWeight.w700)))],
             ),
             if (card.title != null) Text(card.title!, style: TextStyle(color: fg)),
             Text('${formatFcfa(card.itemsTotalFcfa)} · ${orderStatusLabel(card.status)}', style: TextStyle(color: fg, fontWeight: FontWeight.w600)),

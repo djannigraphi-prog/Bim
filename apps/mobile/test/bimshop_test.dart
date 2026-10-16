@@ -185,7 +185,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('order')));
     await tester.pump();
     expect(find.text('Choisis d’abord la taille ou le modèle.'), findsOneWidget);
+    // Le message disparaît (minuterie puis animation) avant de toucher de nouveau le bas de l'écran.
     await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ChoiceChip, 'S'));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('order')));

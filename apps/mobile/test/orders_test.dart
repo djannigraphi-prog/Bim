@@ -2,6 +2,7 @@ import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/network/api_exception.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/features/merchant/data/shop_api.dart' show formatFcfa;
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/orders/presentation/order_screens.dart';
@@ -133,10 +134,10 @@ void main() {
     final api = _FakeOrders();
     await _pump(tester, const CheckoutScreen(args: _args), orders: api);
     await tester.pumpAndSettle();
-    expect(_total(tester), '20 000 FCFA');
+    expect(_total(tester), formatFcfa(20000));
     await tester.tap(find.byKey(const ValueKey('qty-plus-0')));
     await tester.pumpAndSettle();
-    expect(_total(tester), '40 000 FCFA');
+    expect(_total(tester), formatFcfa(40000));
     // Espèces possibles au retrait en boutique.
     await tester.tap(find.byKey(const ValueKey('pay-cash')));
     await tester.pump();
@@ -159,8 +160,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Yopougon (Abidjan)').last);
     await tester.pumpAndSettle();
-    expect(find.text('Frais : 1 700 FCFA · trajet estimé 30 min'), findsOneWidget);
-    expect(_total(tester), '21 700 FCFA');
+    expect(find.text('Frais : ${formatFcfa(1700)} · trajet estimé 30 min'), findsOneWidget);
+    expect(_total(tester), formatFcfa(21700));
     expect(find.byKey(const ValueKey('checkout-wait')), findsOneWidget);
     FilledButton confirm() => tester.widget<FilledButton>(find.descendant(of: find.byKey(const ValueKey('checkout-confirm')), matching: find.byType(FilledButton)));
     expect(confirm().onPressed, isNull); // adresse manquante

@@ -1,6 +1,7 @@
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/features/merchant/data/shop_api.dart' show formatFcfa;
 import 'package:bim/features/messaging/data/messaging_api.dart';
 import 'package:bim/features/messaging/presentation/conversation_screen.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
@@ -256,7 +257,7 @@ void main() {
     expect(find.text('Il en reste 2 en noir.'), findsOneWidget);
     // 7-B : carte de la proposition ; un appui ouvre la commande.
     expect(find.text('Proposition CMD-000009'), findsOneWidget);
-    expect(find.text('18 000 FCFA · Proposition à accepter'), findsOneWidget);
+    expect(find.text('${formatFcfa(18000)} · Proposition à accepter'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('order-card-o9')));
     await tester.pumpAndSettle();
     expect(find.text('commande o9'), findsOneWidget);
