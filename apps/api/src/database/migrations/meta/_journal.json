@@ -155,6 +155,13 @@
       "when": 1792115537543,
       "tag": "0021_merchant_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792117437565,
+      "tag": "0022_catalog",
+      "breakpoints": true
     }
   ]
 }

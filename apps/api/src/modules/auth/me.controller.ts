@@ -22,9 +22,9 @@ export class MeController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Mon profil privé complet' })
-  me(@CurrentAuth() a: AuthContext) {
-    return this.users.me(a.userId);
+  @ApiOperation({ summary: 'Mon profil privé complet, avec l’espace actif (utilisateur ou boutique, lot 5-B)' })
+  async me(@CurrentAuth() a: AuthContext) {
+    return { ...(await this.users.me(a.userId)), activeSpace: a.space };
   }
 
   @Get('capabilities')

@@ -381,7 +381,7 @@
             "bearer": []
           }
         ],
-        "summary": "Mon profil privé complet",
+        "summary": "Mon profil privé complet, avec l’espace actif (utilisateur ou boutique, lot 5-B)",
         "tags": [
           "Mon compte"
         ]
@@ -3348,6 +3348,488 @@
         ]
       }
     },
+    "/v1/shop": {
+      "get": {
+        "operationId": "MerchantCatalogController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ma boutique : présentation, compteurs",
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "patch": {
+        "operationId": "MerchantCatalogController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShopDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifier la présentation de la boutique",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/logo": {
+      "put": {
+        "operationId": "MerchantCatalogController_logo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "photo"
+                ],
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products": {
+      "get": {
+        "operationId": "MerchantCatalogController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "published",
+                "draft"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mes articles et prestations (hors retirés)",
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "post": {
+        "operationId": "MerchantCatalogController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créer un article ou une prestation (brouillon)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}": {
+      "get": {
+        "operationId": "MerchantCatalogController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "patch": {
+        "operationId": "MerchantCatalogController_updateProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "delete": {
+        "operationId": "MerchantCatalogController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer l’article (photos effacées)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/publish": {
+      "post": {
+        "operationId": "MerchantCatalogController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publier sur le BimShop (une photo et une rubrique au moins ; boutique ouverte)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/unpublish": {
+      "post": {
+        "operationId": "MerchantCatalogController_unpublish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Repasser en brouillon (plus visible sur le BimShop)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/photos": {
+      "post": {
+        "operationId": "MerchantCatalogController_addPhotos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photos": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "maxItems": 6
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter des photos (6 au plus par article), ré-encodées sans métadonnées",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/photos/{photoId}": {
+      "delete": {
+        "operationId": "MerchantCatalogController_removePhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/variants": {
+      "put": {
+        "operationId": "MerchantCatalogController_variants",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Variantes (tailles, couleurs…) ; vide : « Unique »",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/products/{id}/variants/{variantId}/stock": {
+      "put": {
+        "operationId": "MerchantCatalogController_stock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fixer le stock d’une variante (mouvement d’ajustement enregistré)",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop-categories": {
+      "get": {
+        "operationId": "ShopCategoriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rubriques et sous-rubriques (écran 33)",
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
     "/admin/v1/auth/login": {
       "post": {
         "operationId": "AdminAuthController_login",
@@ -4924,6 +5406,126 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "UpdateShopDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "commune": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "product",
+              "service"
+            ],
+            "default": "product"
+          },
+          "title": {
+            "type": "string",
+            "example": "Robe soirée à plumes"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "categoryCode": {
+            "type": "string",
+            "example": "vetements_soiree",
+            "description": "Sous-rubrique (écran 33)"
+          },
+          "priceFcfa": {
+            "type": "number",
+            "example": 45000,
+            "description": "Prix en FCFA"
+          },
+          "compareAtFcfa": {
+            "type": "object",
+            "example": 60000,
+            "description": "Prix barré (promotion), supérieur au prix"
+          },
+          "durationMinutes": {
+            "type": "object",
+            "example": 60,
+            "description": "Prestation : durée en minutes"
+          }
+        },
+        "required": [
+          "title",
+          "categoryCode",
+          "priceFcfa"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryCode": {
+            "type": "string"
+          },
+          "priceFcfa": {
+            "type": "number"
+          },
+          "compareAtFcfa": {
+            "type": "object",
+            "nullable": true
+          },
+          "durationMinutes": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "VariantsDto": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "example": [
+              "XS",
+              "S",
+              "M",
+              "L",
+              "XL"
+            ],
+            "description": "Libellés des variantes (taille, couleur…) ; vide : « Unique »",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "labels"
+        ]
+      },
+      "StockDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "example": 12,
+            "description": "Nouveau stock de la variante (le mouvement est calculé)"
+          }
+        },
+        "required": [
+          "quantity"
         ]
       },
       "AdminLoginDto": {
