@@ -91,6 +91,14 @@ Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal
 
 Prochaines étapes possibles du lot 3 (sans dépense) : reprise d'une discussion interrompue ; messages de Peni à l'ouverture d'un coffre et à la fin du programme depuis le catalogue commun. Avec ton accord seulement : fournisseur d'IA ; durée de conservation des discussions (T-032).
 
+## Lot 4 — Social (commencé le 15/10/2026)
+
+| Étape | Contenu | Tests | CI |
+| --- | --- | --- | --- |
+| 4-A | **Cœur du social** : publications (texte, 4 photos ré-encodées sans métadonnées) ; **« J'ai fait mon BIM »** depuis les écrans 30 et 31 (photos avant / après copiées dans la publication, projet et photos privés intacts, résumé du parcours sans donnée privée) ; visibilité tout le monde / abonnés / moi seul ; fils « Pour toi » et « Abonnés » (écran 10, avec mes projets en tête) ; publication (11, curseur avant / après) ; commentaires et réponses (12) ; nouveau Bim (16) ; profil et photo de profil (05, 52 ; nombre de projets visible seulement par soi, ville selon la confidentialité) ; recherche de personnes ; abonnements ; **blocage** dans les deux sens ; **signalement** et page **Modération** de l'administration (masquer, rétablir, audit) ; limites anti-spam administrables (migration 0019, additive) | API : 9 e2e (visibilité, pagination, compteurs, blocage, modération, comptes suspendus, limites) ; admin : 1 test navigateur ; Flutter : 7 ; Android réel : BIM publié contre l'API puis vu dans le fil (captures `a16_publication`, `a10_fil`) ; captures 10, 11, 12, 16, 52, 63 | verte (branche lot4-wip, run 38828939190) |
+
+Hors de cette étape : stories et fil des visiteurs (4-B) ; pièces, « Encourager », donateurs et médailles (lot 9) ; Reels et vidéo (lot 11) ; « Produits et services utilisés » (lot 5) ; identifier des personnes et ajouter un lieu (non prévus tant qu'aucune règle de confidentialité ne les couvre). Décision à prendre : visibilité par défaut des publications des 16-17 ans (aujourd'hui « Tout le monde » pour tous, comme les maquettes).
+
 ## Lot 2 — avancement (15/10/2026, partie sans dépense)
 
 Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'aucune décision en attente. **Rien n'est activé** : `WORKER_MODE=off`, `PUSH_PROVIDER=none` par défaut, réglage `notifications.reminders_enabled` = false (« en attente »), aucun projet Firebase, aucune ressource AWS.
@@ -114,7 +122,7 @@ Cadre : développement autorisé s'il n'engage aucune dépense et ne dépend d'a
 | N | **Décisions du 15/10, 15 h 44 (T-030)** : heures calmes option B (rappel à l'heure choisie envoyé, relances bloquées, jamais reportées) ; textes de Peni v3 (tâche en tête, pose encourageante), provisoires ; bouton « Les 3 textes de Peni » pour les téléphones (T17) | unitaires (7 cas d'heures calmes, nuit minute par minute, textes, copie de l'app identique au serveur) ; e2e (relance bloquée après coup, rappel initial envoyé, aucun doublon) ; Flutter | voir `docs/CLOTURE_LOT2.md` |
 | O | **Purge des comptes jamais vérifiés** (30 jours), **désactivée et en simulation par défaut** : verrou, plafond de 500, aucun code récent, audit sans donnée personnelle, page Maintenance de l'administration (simulation à la demande) ; migration 0016 | 9 e2e (dont : comptes actifs, suspendus, supprimés, récents, utilisés jamais touchés ; simulation ; plafond ; passages simultanés ; tables liées classées) ; test navigateur de l'administration | voir `docs/CLOTURE_LOT2.md` |
 
-Suite API locale : 301 tests réussis le 15/10 après l'étape IA-2 (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
+Suite API locale : 310 tests réussis le 16/10 après le lot 4-A (1 ignoré, 1 à écrire, inchangés). Coût de Paris détaillé, mécanismes de fiabilité et décisions à valider : `docs/LOT2_RAPPELS_ETUDE.md`, sections 9 à 12. Prix exacts de Paris **non confirmés** (inaccessibles depuis l'environnement de travail) : estimation ≈ 16 à 17 USD/mois (NAT partagé) ou ≈ 23 à 24 USD/mois (adresses publiques), à confirmer avec le calculateur AWS avant toute activation.
 
 ## Tests exécutés (session 1, 14/10/2026)
 
