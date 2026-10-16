@@ -31,6 +31,7 @@ import '../../features/bimshop/presentation/bimshop_view.dart';
 import '../../features/bimshop/presentation/product_screen.dart';
 import '../../features/bimshop/presentation/shop_profile_screen.dart';
 import '../../features/merchant/presentation/merchant_space_screen.dart';
+import '../../features/messaging/presentation/shop_inbox_screen.dart';
 import '../../features/offers/presentation/project_offers_screen.dart';
 import '../../features/offers/presentation/shop_requests_screen.dart';
 import '../../features/merchant/presentation/product_editor_screen.dart';
@@ -119,6 +120,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Lot 6-A : messagerie entre personnes.
       GoRoute(path: '/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!)),
       GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
+      GoRoute(path: '/shop/messages', builder: (_, __) => const ShopInboxScreen()),
+      GoRoute(path: '/shop/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, asShop: true)),
       GoRoute(path: '/projects/:id/offers', builder: (_, s) => ProjectOffersScreen(projectId: s.pathParameters['id']!)),
       // Lot 5-C : BimShop (public, sauf « Mis de côté »).
       GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),

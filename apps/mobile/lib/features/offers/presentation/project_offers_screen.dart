@@ -9,10 +9,12 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../bimshop/presentation/bimshop_widgets.dart';
+import '../../messaging/presentation/messages_view.dart' show openShopConversation;
 import '../data/offers_api.dart';
 
 /// Lot 5-D — Écran 49, « Offres pour ton projet ». Les boutiques ne connaissent ni ton nom ni ton profil.
-/// « Discuter » arrive avec la messagerie (lot 6) ; « Refuser » est définitif pour cette boutique et ce projet.
+/// « Discuter » ouvre la conversation avec la boutique (6-B), après accord : la boutique saura alors qui tu es.
+/// « Refuser » est définitif pour cette boutique et ce projet.
 class ProjectOffersScreen extends ConsumerWidget {
   const ProjectOffersScreen({super.key, required this.projectId});
 
@@ -118,10 +120,11 @@ class ProjectOffersScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: BimButton(
+                                key: ValueKey('chat-${o.id}'),
                                 label: 'Discuter',
                                 icon: Icons.chat_bubble_outline_rounded,
                                 variant: BimButtonVariant.outline,
-                                onPressed: () => showComingSoon(context, feature: 'La messagerie'),
+                                onPressed: () => _chat(context, ref, o.shop.slug, o.id),
                               ),
                             ),
                             const SizedBox(width: BimSpacing.sm),
@@ -179,4 +182,22 @@ class ProjectRecommendations extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// L'offre a été vue sans que la boutique sache qui tu es (demande anonymisée, 5-D) : écrire la renseigne, donc on
+/// demande d'abord l'accord de la personne.
+Future<void> _chat(BuildContext context, WidgetRef ref, String shopSlug, String offerId) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Écrire à cette boutique ?'),
+      content: const Text('La boutique verra ton nom et ta photo de profil, et saura que tu lui écris à propos de ce projet.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+        TextButton(key: const ValueKey('chat-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Écrire')),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  await openShopConversation(context, ref, shopSlug, offerId: offerId);
 }

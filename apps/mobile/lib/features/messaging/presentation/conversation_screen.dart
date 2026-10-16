@@ -9,6 +9,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../merchant/data/shop_api.dart' show formatFcfa;
 import '../../projects/application/photo_source.dart';
 import '../../social/presentation/moderation_sheets.dart';
 import '../../social/presentation/social_widgets.dart';
@@ -18,11 +19,15 @@ import '../data/messaging_api.dart';
 const conversationRefresh = Duration(seconds: 5);
 
 /// Lot 6-A — Une conversation : messages (texte, photo), « Vu », demande à accepter ou refuser, signalement.
+/// Lot 6-B — Aussi avec une boutique (écran 48) : côté cliente (bandeau de l'article, « Commander » annoncé pour le
+/// lot 7) ou côté boutique (`asShop`, depuis l'espace boutique, avec les réponses rapides).
 class ConversationScreen extends ConsumerStatefulWidget {
-  const ConversationScreen({super.key, required this.conversationId, this.refreshEvery = conversationRefresh});
+  const ConversationScreen({super.key, required this.conversationId, this.refreshEvery = conversationRefresh, this.asShop = false});
 
   final String conversationId;
   final Duration? refreshEvery;
+  /// Répondre au nom de la boutique active (espace boutique).
+  final bool asShop;
 
   @override
   ConsumerState<ConversationScreen> createState() => _ConversationScreenState();
@@ -38,7 +43,19 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   Object? _error;
   Timer? _timer;
 
-  MessagingApi get _api => ref.read(messagingApiProvider);
+  ConversationBackend get _api => widget.asShop ? ref.read(shopInboxApiProvider) : ref.read(messagingApiProvider);
+
+  void _invalidateLists() {
+    if (widget.asShop) {
+      ref
+        ..invalidate(shopInboxProvider)
+        ..invalidate(shopInboxUnreadProvider);
+    } else {
+      ref
+        ..invalidate(conversationsProvider)
+        ..invalidate(messagesUnreadProvider);
+    }
+  }
 
   @override
   void initState() {
@@ -95,7 +112,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (_conversation?.isRequest ?? false) return; // lire une demande ne prévient pas son auteur
     try {
       await _api.read(widget.conversationId);
-      ref.invalidate(messagesUnreadProvider);
+      ref.invalidate(widget.asShop ? shopInboxUnreadProvider : messagesUnreadProvider);
     } catch (_) {}
   }
 
@@ -128,7 +145,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         final updated = await _api.conversation(widget.conversationId);
         if (mounted) setState(() => _conversation = updated);
       }
-      ref.invalidate(conversationsProvider);
+      ref.invalidate(widget.asShop ? shopInboxProvider : conversationsProvider);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
@@ -143,16 +160,15 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   Future<void> _answerRequest(bool accept) async {
     try {
+      final api = ref.read(messagingApiProvider);
       if (accept) {
-        await _api.accept(widget.conversationId);
+        await api.accept(widget.conversationId);
         await _load();
       } else {
-        await _api.decline(widget.conversationId);
+        await api.decline(widget.conversationId);
         if (mounted) context.canPop() ? context.pop() : context.go('/home');
       }
-      ref
-        ..invalidate(conversationsProvider)
-        ..invalidate(messagesUnreadProvider);
+      _invalidateLists();
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     }
@@ -203,14 +219,23 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   const BimBackButton(),
                   const SizedBox(width: BimSpacing.sm),
                   if (c != null) ...[
-                    InkWell(onTap: () => context.push('/people/${c.person.username}'), child: PersonAvatar(person: c.person)),
+                    InkWell(
+                      key: const ValueKey('conversation-counterpart'),
+                      onTap: () => c.shop != null ? context.push('/bimshop/shops/${c.shop!.slug}') : (c.person != null ? context.push('/people/${c.person!.username}') : null),
+                      child: c.shop != null ? ShopAvatar(shop: c.shop!) : (c.person != null ? PersonAvatar(person: c.person!) : const SizedBox(width: 40, height: 40)),
+                    ),
                     const SizedBox(width: BimSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(c.person.fullName, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium),
-                          Text('@${c.person.username}', style: theme.textTheme.bodySmall),
+                          Row(
+                            children: [
+                              Flexible(child: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium)),
+                              if (c.shop?.verified ?? false) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified, size: 16, color: BimColors.red)),
+                            ],
+                          ),
+                          Text(widget.asShop ? 'Client · @${c.person?.username ?? ''}' : c.subtitle, style: theme.textTheme.bodySmall),
                         ],
                       ),
                     ),
@@ -220,6 +245,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               ),
             ),
             const Divider(height: 1),
+            if (c?.context != null) _ContextBanner(info: c!.context!, asShop: widget.asShop),
             if (c?.pendingForOther ?? false)
               Container(
                 width: double.infinity,
@@ -263,7 +289,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 padding: const EdgeInsets.all(BimSpacing.md),
                 child: Column(
                   children: [
-                    Text('${c!.person.fullName} veut t’envoyer un message.', textAlign: TextAlign.center),
+                    Text('${c!.title} veut t’envoyer un message.', textAlign: TextAlign.center),
                     const SizedBox(height: BimSpacing.sm),
                     Row(
                       children: [
@@ -275,7 +301,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   ],
                 ),
               )
-            else
+            else ...[
+              if (widget.asShop) _QuickReplies(onPick: (t) => setState(() => _input.text = t)),
               Padding(
                 padding: EdgeInsets.fromLTRB(BimSpacing.sm, BimSpacing.xs, BimSpacing.sm, BimSpacing.sm + MediaQuery.viewInsetsOf(context).bottom),
                 child: Row(
@@ -301,6 +328,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   ],
                 ),
               ),
+            ],
           ],
         ),
       ),
@@ -325,6 +353,8 @@ class _Bubble extends StatelessWidget {
     final Widget content = switch (m.status) {
       'deleted' => Text('Message supprimé', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       'hidden' => Text('Message masqué par la modération', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
+      // Type à venir (cartes de commande, lot 7) : jamais de bulle vide.
+      _ when !m.supported => Text('Ce message s’affiche dans une version plus récente de BIM.', key: const ValueKey('message-unsupported'), style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       _ => m.kind == 'photo'
           ? ClipRRect(
               borderRadius: BorderRadius.circular(BimRadius.chip),
@@ -351,6 +381,118 @@ class _Bubble extends StatelessWidget {
             ),
           ),
           if (showRead) Text('Vu', key: const ValueKey('message-read'), style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+/// Avatar d'une boutique (logo, sinon icône).
+class ShopAvatar extends StatelessWidget {
+  const ShopAvatar({super.key, required this.shop, this.size = 40});
+
+  final ChatShop shop;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+        radius: size / 2,
+        backgroundColor: BimColors.redSoft,
+        foregroundImage: shop.logoUrl == null ? null : NetworkImage(shop.logoUrl!),
+        child: Icon(Icons.storefront_outlined, color: BimColors.red, size: size * 0.5),
+      );
+}
+
+/// Bandeau de l'écran 48 : l'article dont on parle (prix, disponible ou épuisé, jamais le stock) ou l'offre de projet.
+/// « Commander » annonce les commandes (lot 7) : aucune commande ni paiement ici.
+class _ContextBanner extends StatelessWidget {
+  const _ContextBanner({required this.info, required this.asShop});
+
+  final ChatContext info;
+  final bool asShop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final p = info.product;
+    return Container(
+      key: const ValueKey('conversation-context'),
+      width: double.infinity,
+      color: theme.colorScheme.surfaceContainerLow,
+      padding: const EdgeInsets.symmetric(horizontal: BimSpacing.md, vertical: BimSpacing.sm),
+      child: p == null
+          ? Row(
+              children: [
+                const Icon(Icons.assignment_outlined, size: 20),
+                const SizedBox(width: BimSpacing.sm),
+                Expanded(
+                  child: Text(
+                    asShop ? 'Réponse à ton offre de projet' : 'À propos de l’offre pour ton projet « ${info.offerProjectTitle ?? ''} »',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            )
+          : InkWell(
+              onTap: asShop ? null : () => context.push('/bimshop/products/${p.id}'),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(BimRadius.chip),
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: p.imageUrl == null ? const Icon(Icons.image_outlined) : Image.network(p.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined)),
+                    ),
+                  ),
+                  const SizedBox(width: BimSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
+                        Text('${formatFcfa(p.priceFcfa)} · ${p.available ? (p.kind == 'service' ? 'disponible' : 'en stock') : 'épuisé'}', style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  if (!asShop)
+                    FilledButton(
+                      key: const ValueKey('chat-order'),
+                      style: FilledButton.styleFrom(backgroundColor: BimColors.red, foregroundColor: Colors.white),
+                      onPressed: p.available ? () => showComingSoon(context, feature: p.kind == 'service' ? 'La réservation' : 'La commande') : null,
+                      child: Text(p.kind == 'service' ? 'Réserver' : 'Commander'),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+/// Réponses rapides de la boutique (écran 51), au-dessus de la saisie : un appui remplit le message.
+class _QuickReplies extends ConsumerWidget {
+  const _QuickReplies({required this.onPick});
+
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(shopQuickRepliesProvider).valueOrNull ?? const [];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        key: const ValueKey('quick-replies'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: BimSpacing.sm),
+        children: [
+          for (final q in items)
+            Padding(
+              padding: const EdgeInsets.only(right: BimSpacing.xs),
+              child: ActionChip(key: ValueKey('quick-reply-${q.id}'), label: Text(q.text), onPressed: () => onPick(q.text)),
+            ),
         ],
       ),
     );

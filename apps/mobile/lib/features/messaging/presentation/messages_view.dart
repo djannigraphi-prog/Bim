@@ -9,11 +9,25 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../social/presentation/social_widgets.dart';
 import '../data/messaging_api.dart';
+import 'conversation_screen.dart' show ShopAvatar;
 
 /// Ouvre (ou retrouve) la conversation avec une personne puis l'affiche.
 Future<void> openConversationWith(BuildContext context, WidgetRef ref, String username) async {
   try {
     final c = await ref.read(messagingApiProvider).start(username);
+    if (context.mounted) await context.push('/messages/${c.id}');
+    ref
+      ..invalidate(conversationsProvider)
+      ..invalidate(messagesUnreadProvider);
+  } on ApiException catch (e) {
+    if (context.mounted) showApiError(context, e);
+  }
+}
+
+/// Lot 6-B — « Discuter » avec une boutique (article, offre de projet ou profil de la boutique).
+Future<void> openShopConversation(BuildContext context, WidgetRef ref, String shopSlug, {String? productId, String? offerId}) async {
+  try {
+    final c = await ref.read(messagingApiProvider).startWithShop(shopSlug, productId: productId, offerId: offerId);
     if (context.mounted) await context.push('/messages/${c.id}');
     ref
       ..invalidate(conversationsProvider)
@@ -93,7 +107,18 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
                     const SizedBox(height: BimSpacing.md),
                     Text(_requests ? 'Aucune demande.' : 'Aucun message pour l’instant. Écris à une personne que tu suis !', textAlign: TextAlign.center),
                   ]
-                : [for (final c in page.items) _ConversationTile(conversation: c)],
+                : [
+                    for (final c in page.items)
+                      ConversationTile(
+                        conversation: c,
+                        onTap: () async {
+                          await context.push('/messages/${c.id}');
+                          ref
+                            ..invalidate(conversationsProvider)
+                            ..invalidate(messagesUnreadProvider);
+                        },
+                      ),
+                  ],
           ),
         ],
       ),
@@ -136,36 +161,43 @@ class _NewMessageDialogState extends State<_NewMessageDialog> {
       );
 }
 
-class _ConversationTile extends ConsumerWidget {
-  const _ConversationTile({required this.conversation});
+/// Une conversation dans une liste : avec une personne ou une boutique (écran 47), ou côté boutique (écran 51).
+class ConversationTile extends StatelessWidget {
+  const ConversationTile({super.key, required this.conversation, required this.onTap, this.onLongPress, this.trailingBadges = const []});
 
   final ConversationSummary conversation;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  /// Étiquettes sous l'aperçu (écran 51 : « Marquée »).
+  final List<Widget> trailingBadges;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final c = conversation;
     final bold = c.unread > 0;
     return ListTile(
       key: ValueKey('conversation-${c.id}'),
       contentPadding: EdgeInsets.zero,
-      leading: PersonAvatar(person: c.person, size: 48),
-      title: Text(c.person.fullName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
-      subtitle: Text(
-        c.lastPreview == null ? '@${c.person.username}' : '${c.lastFromMe ? 'Toi : ' : ''}${c.lastPreview}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: bold ? FontWeight.w700 : null),
+      leading: c.shop != null ? ShopAvatar(shop: c.shop!, size: 48) : (c.person != null ? PersonAvatar(person: c.person!, size: 48) : null),
+      title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            c.lastPreview == null ? c.subtitle : '${c.lastFromMe ? 'Toi : ' : ''}${c.lastPreview}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: bold ? FontWeight.w700 : null),
+          ),
+          if (trailingBadges.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Wrap(spacing: 6, children: trailingBadges)),
+        ],
       ),
       trailing: c.unread > 0
           ? Badge(label: Text('${c.unread}'), backgroundColor: BimColors.red)
           : (c.lastAt == null ? null : Text(_ago(c.lastAt!), style: theme.textTheme.bodySmall)),
-      onTap: () async {
-        await context.push('/messages/${c.id}');
-        ref
-          ..invalidate(conversationsProvider)
-          ..invalidate(messagesUnreadProvider);
-      },
+      onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 

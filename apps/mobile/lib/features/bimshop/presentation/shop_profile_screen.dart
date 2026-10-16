@@ -9,6 +9,7 @@ import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
+import '../../messaging/presentation/messages_view.dart' show openShopConversation;
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
@@ -29,6 +30,11 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
   bool? _following;
   int _delta = 0;
   bool _busy = false;
+
+  bool get _merchantSpace => switch (ref.read(sessionProvider)) {
+        SessionSignedIn(:final me) => me.activeSpaceType == 'merchant',
+        _ => false,
+      };
 
   Future<void> _toggle(bool current) async {
     if (ref.read(sessionProvider) is! SessionSignedIn) {
@@ -115,13 +121,32 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
               ],
               if (state?.own != true) ...[
                 const SizedBox(height: BimSpacing.lg),
-                BimButton(
-                  key: const ValueKey('follow-shop'),
-                  label: following ? 'Abonné' : 'Suivre',
-                  icon: following ? Icons.check : Icons.add,
-                  variant: following ? BimButtonVariant.outline : BimButtonVariant.primary,
-                  loading: _busy,
-                  onPressed: () => _toggle(following),
+                Row(
+                  children: [
+                    Expanded(
+                      child: BimButton(
+                        key: const ValueKey('follow-shop'),
+                        label: following ? 'Abonné' : 'Suivre',
+                        icon: following ? Icons.check : Icons.add,
+                        variant: following ? BimButtonVariant.outline : BimButtonVariant.primary,
+                        loading: _busy,
+                        onPressed: () => _toggle(following),
+                      ),
+                    ),
+                    // 6-B : écrire à la boutique (pas depuis l'espace boutique).
+                    if (!_merchantSpace) ...[
+                      const SizedBox(width: BimSpacing.sm),
+                      Expanded(
+                        child: BimButton(
+                          key: const ValueKey('shop-chat'),
+                          label: 'Écrire',
+                          icon: Icons.chat_bubble_outline_rounded,
+                          variant: BimButtonVariant.outline,
+                          onPressed: () => ref.read(sessionProvider) is SessionSignedIn ? openShopConversation(context, ref, widget.slug) : showVisitorGate(context, ref),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
               const SizedBox(height: BimSpacing.xl),

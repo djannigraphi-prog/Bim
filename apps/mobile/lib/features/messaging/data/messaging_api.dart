@@ -1,43 +1,104 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../bimshop/data/bimshop_api.dart' show ShopCard;
 import '../../social/data/social_models.dart' show PersonRef;
 
 /// Lot 6-A — Messagerie entre personnes (écran 47). Pas de notification sur le téléphone (Firebase non activé) :
 /// la pastille de l'onglet Messages et la conversation ouverte se mettent à jour régulièrement.
+
+/// Boutique dans une conversation (6-B).
+class ChatShop {
+  const ChatShop({required this.id, required this.name, required this.slug, this.logoUrl, this.verified = false});
+
+  final String id;
+  final String name;
+  final String slug;
+  final String? logoUrl;
+  final bool verified;
+
+  factory ChatShop.fromJson(Map<String, dynamic> j) => ChatShop(
+        id: j['id'] as String,
+        name: (j['name'] ?? '') as String,
+        slug: (j['slug'] ?? '') as String,
+        logoUrl: j['logoUrl'] as String?,
+        verified: (j['verified'] ?? false) as bool,
+      );
+}
+
+/// Ce dont on parle (bandeau de l'écran 48) : un article (disponible ou non, jamais le stock) ou une offre de projet.
+class ChatContext {
+  const ChatContext({this.product, this.offerId, this.offerProjectTitle});
+
+  final ShopCard? product;
+  final String? offerId;
+  final String? offerProjectTitle;
+
+  static ChatContext? fromJson(Map<String, dynamic>? j) {
+    if (j == null) return null;
+    final p = j['product'] as Map<String, dynamic>?;
+    final o = j['offer'] as Map<String, dynamic>?;
+    if (p == null && o == null) return null;
+    return ChatContext(product: p == null ? null : ShopCard.fromJson(p), offerId: o?['id'] as String?, offerProjectTitle: o?['projectTitle'] as String?);
+  }
+}
 
 class ConversationSummary {
   const ConversationSummary({
     required this.id,
     required this.status,
     required this.pendingForOther,
-    required this.person,
     required this.unread,
+    this.kind = 'direct',
+    this.person,
+    this.shop,
+    this.context,
+    this.archived = false,
+    this.marked = false,
     this.lastPreview,
     this.lastFromMe = false,
     this.lastAt,
   });
 
   final String id;
+  /// direct (avec une personne) · shop (avec une boutique, 6-B)
+  final String kind;
   /// active · request (demande reçue, à accepter)
   final String status;
   /// Ma demande n'a pas encore été acceptée par l'autre personne.
   final bool pendingForOther;
-  final PersonRef person;
+  /// L'autre personne ; côté boutique, la cliente. Absente quand je parle à une boutique.
+  final PersonRef? person;
+  /// La boutique, quand je lui écris (côté cliente).
+  final ChatShop? shop;
+  final ChatContext? context;
+  /// Côté boutique : rangée dans « Archivés », marquée.
+  final bool archived;
+  final bool marked;
   final int unread;
   final String? lastPreview;
   final bool lastFromMe;
   final DateTime? lastAt;
 
   bool get isRequest => status == 'request';
+  bool get withShop => kind == 'shop';
+  String get title => shop?.name ?? person?.fullName ?? '';
+  String get subtitle => shop != null ? 'Boutique' : '@${person?.username ?? ''}';
 
   factory ConversationSummary.fromJson(Map<String, dynamic> j) {
     final last = j['lastMessage'] as Map<String, dynamic>?;
+    final person = j['person'] as Map<String, dynamic>?;
+    final shop = j['shop'] as Map<String, dynamic>?;
     return ConversationSummary(
       id: j['id'] as String,
-      status: j['status'] as String,
+      kind: (j['kind'] ?? 'direct') as String,
+      status: (j['status'] ?? 'active') as String,
       pendingForOther: (j['pendingForOther'] ?? false) as bool,
-      person: PersonRef.fromJson(j['person'] as Map<String, dynamic>),
+      person: person == null ? null : PersonRef.fromJson(person),
+      shop: shop == null ? null : ChatShop.fromJson(shop),
+      context: ChatContext.fromJson(j['context'] as Map<String, dynamic>?),
+      archived: (j['archived'] ?? false) as bool,
+      marked: (j['marked'] ?? false) as bool,
       unread: (j['unread'] ?? 0) as int,
       lastPreview: last?['preview'] as String?,
       lastFromMe: (last?['senderIsMe'] ?? false) as bool,
@@ -61,6 +122,9 @@ class ChatMessage {
   final bool? read;
 
   bool get visible => status == 'published';
+  /// Types connus de cette version (texte, photo). Les types à venir (cartes de commande, lot 7) s'affichent
+  /// avec un texte neutre au lieu d'une bulle vide.
+  bool get supported => kind == 'text' || kind == 'photo';
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
         id: j['id'] as String,
@@ -74,7 +138,17 @@ class ChatMessage {
       );
 }
 
-class MessagingApi {
+/// Opérations d'une conversation ouverte : côté personne (6-A, et cliente d'une boutique) ou côté boutique (6-B).
+abstract class ConversationBackend {
+  Future<ConversationSummary> conversation(String id);
+  Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before});
+  Future<ChatMessage> sendText(String conversationId, String text);
+  Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes);
+  Future<void> read(String conversationId);
+  Future<void> deleteMessage(String id);
+}
+
+class MessagingApi implements ConversationBackend {
   MessagingApi(this._api);
   final ApiClient _api;
 
@@ -91,10 +165,17 @@ class MessagingApi {
     return (conversations: (r['conversations'] ?? 0) as int, requests: (r['requests'] ?? 0) as int);
   }
 
+  @override
   Future<ConversationSummary> conversation(String id) async => ConversationSummary.fromJson(await _api.get('/v1/conversations/$id'));
 
   Future<ConversationSummary> start(String username) async => ConversationSummary.fromJson(await _api.post('/v1/conversations', body: {'username': username}));
 
+  /// 6-B — « Discuter » avec une boutique, depuis un article, une offre ou son profil.
+  Future<ConversationSummary> startWithShop(String shopSlug, {String? productId, String? offerId}) async => ConversationSummary.fromJson(
+        await _api.post('/v1/conversations/shop', body: {'shopSlug': shopSlug, if (productId != null) 'productId': productId, if (offerId != null) 'offerId': offerId}),
+      );
+
+  @override
   Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async {
     final r = await _api.get('/v1/conversations/$conversationId/messages', query: {if (before != null) 'before': before});
     return (
@@ -103,21 +184,93 @@ class MessagingApi {
     );
   }
 
+  @override
   Future<ChatMessage> sendText(String conversationId, String text) async =>
       ChatMessage.fromJson(await _api.post('/v1/conversations/$conversationId/messages', body: {'text': text}));
 
+  @override
   Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes) async => ChatMessage.fromJson(
         await _api.upload('/v1/conversations/$conversationId/messages', field: 'photo', bytes: bytes, filename: 'photo.jpg', contentType: 'image/jpeg'),
       );
 
+  @override
   Future<void> read(String conversationId) => _api.post('/v1/conversations/$conversationId/read');
   Future<void> accept(String conversationId) => _api.post('/v1/conversations/$conversationId/accept');
   Future<void> decline(String conversationId) => _api.post('/v1/conversations/$conversationId/decline');
+  @override
   Future<void> deleteMessage(String id) => _api.delete('/v1/messages/$id');
+}
+
+/// Lot 6-B — Boîte de la boutique (écran 51), depuis l'espace boutique. La boutique ne démarche personne : elle
+/// répond aux conversations ouvertes par ses clientes.
+class ShopInboxApi implements ConversationBackend {
+  ShopInboxApi(this._api);
+  final ApiClient _api;
+
+  /// box : all · unread · archived · marked
+  Future<({List<ConversationSummary> items, String? nextCursor})> conversations({String box = 'all', String? cursor}) async {
+    final r = await _api.get('/v1/shop/inbox', query: {'box': box, if (cursor != null) 'cursor': cursor});
+    return (
+      items: [for (final c in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) ConversationSummary.fromJson(c)],
+      nextCursor: r['nextCursor'] as String?,
+    );
+  }
+
+  Future<({int unread, int all})> unreadCount() async {
+    final r = await _api.get('/v1/shop/inbox/unread-count');
+    return (unread: (r['unread'] ?? 0) as int, all: (r['all'] ?? 0) as int);
+  }
+
+  @override
+  Future<ConversationSummary> conversation(String id) async => ConversationSummary.fromJson(await _api.get('/v1/shop/inbox/$id'));
+
+  @override
+  Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async {
+    final r = await _api.get('/v1/shop/inbox/$conversationId/messages', query: {if (before != null) 'before': before});
+    return (
+      items: [for (final m in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) ChatMessage.fromJson(m)],
+      nextBefore: r['nextBefore'] as String?,
+    );
+  }
+
+  @override
+  Future<ChatMessage> sendText(String conversationId, String text) async =>
+      ChatMessage.fromJson(await _api.post('/v1/shop/inbox/$conversationId/messages', body: {'text': text}));
+
+  @override
+  Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes) async => ChatMessage.fromJson(
+        await _api.upload('/v1/shop/inbox/$conversationId/messages', field: 'photo', bytes: bytes, filename: 'photo.jpg', contentType: 'image/jpeg'),
+      );
+
+  @override
+  Future<void> read(String conversationId) => _api.post('/v1/shop/inbox/$conversationId/read');
+
+  @override
+  Future<void> deleteMessage(String id) => _api.delete('/v1/shop/inbox/messages/$id');
+
+  Future<ConversationSummary> setArchived(String id, bool on) async =>
+      ConversationSummary.fromJson(on ? await _api.put('/v1/shop/inbox/$id/archive') : await _api.delete('/v1/shop/inbox/$id/archive'));
+
+  Future<ConversationSummary> setMarked(String id, bool on) async =>
+      ConversationSummary.fromJson(on ? await _api.put('/v1/shop/inbox/$id/mark') : await _api.delete('/v1/shop/inbox/$id/mark'));
+
+  Future<List<({String id, String text})>> quickReplies() async {
+    final r = await _api.get('/v1/shop/inbox/quick-replies');
+    return [for (final q in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) (id: q['id'] as String, text: q['text'] as String)];
+  }
+
+  Future<void> addQuickReply(String text) => _api.post('/v1/shop/inbox/quick-replies', body: {'text': text});
+  Future<void> removeQuickReply(String id) => _api.delete('/v1/shop/inbox/quick-replies/$id');
 }
 
 final messagingApiProvider = Provider<MessagingApi>((ref) => MessagingApi(ref.watch(apiClientProvider)));
 final conversationsProvider = FutureProvider.autoDispose.family<({List<ConversationSummary> items, String? nextCursor}), bool>(
   (ref, requests) => ref.watch(messagingApiProvider).conversations(requests: requests),
 );
+final shopInboxApiProvider = Provider<ShopInboxApi>((ref) => ShopInboxApi(ref.watch(apiClientProvider)));
+final shopInboxProvider = FutureProvider.autoDispose.family<({List<ConversationSummary> items, String? nextCursor}), String>(
+  (ref, box) => ref.watch(shopInboxApiProvider).conversations(box: box),
+);
+final shopInboxUnreadProvider = FutureProvider.autoDispose<({int unread, int all})>((ref) => ref.watch(shopInboxApiProvider).unreadCount());
+final shopQuickRepliesProvider = FutureProvider.autoDispose<List<({String id, String text})>>((ref) => ref.watch(shopInboxApiProvider).quickReplies());
 final messagesUnreadProvider = FutureProvider.autoDispose<({int conversations, int requests})>((ref) => ref.watch(messagingApiProvider).unreadCount());

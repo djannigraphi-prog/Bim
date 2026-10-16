@@ -7,6 +7,7 @@ import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
 import 'package:bim/features/bimshop/presentation/product_screen.dart';
 import 'package:bim/features/bimshop/presentation/shop_profile_screen.dart';
+import 'package:bim/features/messaging/data/messaging_api.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,6 +79,19 @@ class _FakeBimShop extends BimShopApi {
   Future<void> setFollow(String slug, bool on) async => calls.add('follow $slug $on');
 }
 
+/// Messagerie simulée : « Discuter » ouvre la conversation avec la boutique (6-B).
+class _FakeMessaging extends MessagingApi {
+  _FakeMessaging() : super(_client());
+
+  final started = <String>[];
+
+  @override
+  Future<ConversationSummary> startWithShop(String shopSlug, {String? productId, String? offerId}) async {
+    started.add('$shopSlug|$productId|$offerId');
+    return const ConversationSummary(id: 'c9', kind: 'shop', status: 'active', pendingForOther: false, unread: 0, shop: ChatShop(id: 's1', name: 'Maison Plumes', slug: 'maison-plumes'));
+  }
+}
+
 class _SignedIn extends SessionController {
   @override
   SessionState build() => SessionSignedIn(Me.fromJson(const {'id': 'u1', 'fullName': 'Awa Koné', 'username': 'awa.kone', 'city': 'Cocody', 'contacts': <dynamic>[]}));
@@ -88,7 +102,7 @@ class _Visitor extends SessionController {
   SessionState build() => const SessionSignedOut(visitor: true);
 }
 
-Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool signedIn = true}) async {
+Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool signedIn = true, _FakeMessaging? messaging}) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -97,11 +111,13 @@ Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool
     GoRoute(path: '/bimshop/categories', builder: (_, __) => const RubriquesScreen()),
     GoRoute(path: '/bimshop/products/:id', builder: (_, s) => ShopProductScreen(productId: s.pathParameters['id']!)),
     GoRoute(path: '/bimshop/shops/:slug', builder: (_, s) => ShopProfileScreen(slug: s.pathParameters['slug']!)),
+    GoRoute(path: '/messages/:id', builder: (_, s) => Scaffold(body: Text('conversation ${s.pathParameters['id']}'))),
   ],);
   await tester.pumpWidget(ProviderScope(
     overrides: [
       apiClientProvider.overrideWithValue(_client()),
       bimShopApiProvider.overrideWithValue(api),
+      messagingApiProvider.overrideWithValue(messaging ?? _FakeMessaging()),
       sessionProvider.overrideWith(signedIn ? _SignedIn.new : _Visitor.new),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
@@ -180,5 +196,33 @@ void main() {
     expect(api.calls, ['follow maison-plumes true']);
     expect(tester.widget<Text>(find.byKey(const ValueKey('shop-counts'))).data, '2 articles · 2 abonnés');
     expect(find.text('Abonné'), findsOneWidget);
+  });
+
+  testWidgets('6-B : « Discuter » sur la fiche article et « Écrire » sur le profil ouvrent la conversation avec la boutique', (tester) async {
+    final api = _FakeBimShop();
+    final messaging = _FakeMessaging();
+    await _pump(tester, api, '/bimshop/products/p1', messaging: messaging);
+    await tester.tap(find.byKey(const ValueKey('product-chat')));
+    await tester.pumpAndSettle();
+    expect(messaging.started, ['maison-plumes|p1|null']);
+    expect(find.text('conversation c9'), findsOneWidget);
+  });
+
+  testWidgets('6-B : profil de boutique, « Écrire » ouvre la conversation', (tester) async {
+    final messaging = _FakeMessaging();
+    await _pump(tester, _FakeBimShop(), '/bimshop/shops/maison-plumes', messaging: messaging);
+    await tester.tap(find.byKey(const ValueKey('shop-chat')));
+    await tester.pumpAndSettle();
+    expect(messaging.started, ['maison-plumes|null|null']);
+    expect(find.text('conversation c9'), findsOneWidget);
+  });
+
+  testWidgets('6-B : visiteur, « Discuter » invite à créer un compte sans rien envoyer', (tester) async {
+    final messaging = _FakeMessaging();
+    await _pump(tester, _FakeBimShop(), '/bimshop/products/p1', signedIn: false, messaging: messaging);
+    await tester.tap(find.byKey(const ValueKey('product-chat')));
+    await tester.pumpAndSettle();
+    expect(find.text('Rejoins BIM pour réagir'), findsOneWidget);
+    expect(messaging.started, isEmpty);
   });
 }

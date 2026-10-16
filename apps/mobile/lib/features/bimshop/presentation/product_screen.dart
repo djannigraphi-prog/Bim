@@ -11,6 +11,7 @@ import '../../../core/widgets/step_header.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../merchant/data/shop_api.dart' show formatFcfa;
+import '../../messaging/presentation/messages_view.dart' show openShopConversation;
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
@@ -33,6 +34,12 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
   bool? _favorite;
 
   bool get _signedIn => ref.read(sessionProvider) is SessionSignedIn;
+
+  /// Espace boutique actif : on n'écrit pas à une boutique en son nom (la messagerie cliente est dans l'espace utilisateur).
+  bool get _merchantSpace => switch (ref.read(sessionProvider)) {
+        SessionSignedIn(:final me) => me.activeSpaceType == 'merchant',
+        _ => false,
+      };
 
   Future<void> _toggleFavorite(bool current) async {
     if (!_signedIn) {
@@ -242,10 +249,29 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.md),
-          child: BimButton(
-            key: const ValueKey('order'),
-            label: p.kind == 'service' ? 'Réserver' : 'Commander',
-            onPressed: p.available ? () => showComingSoon(context, feature: p.kind == 'service' ? 'La réservation' : 'La commande') : null,
+          child: Row(
+            children: [
+              // 6-B : écrire à la boutique à propos de cet article (visiteurs : invitation à créer un compte).
+              if (!_merchantSpace) ...[
+                Expanded(
+                  child: BimButton(
+                    key: const ValueKey('product-chat'),
+                    label: 'Discuter',
+                    icon: Icons.chat_bubble_outline_rounded,
+                    variant: BimButtonVariant.outline,
+                    onPressed: () => _signedIn ? openShopConversation(context, ref, p.shop.slug, productId: p.id) : showVisitorGate(context, ref),
+                  ),
+                ),
+                const SizedBox(width: BimSpacing.sm),
+              ],
+              Expanded(
+                child: BimButton(
+                  key: const ValueKey('order'),
+                  label: p.kind == 'service' ? 'Réserver' : 'Commander',
+                  onPressed: p.available ? () => showComingSoon(context, feature: p.kind == 'service' ? 'La réservation' : 'La commande') : null,
+                ),
+              ),
+            ],
           ),
         ),
       ],

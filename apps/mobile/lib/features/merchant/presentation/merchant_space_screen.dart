@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../account/data/account_api.dart';
 import '../../auth/application/session_controller.dart';
+import '../../messaging/data/messaging_api.dart';
 import '../data/shop_api.dart';
 
 /// Lot 5-B — Écran 55, espace marchand : la boutique, ses articles et prestations.
@@ -25,6 +28,20 @@ class MerchantSpaceScreen extends ConsumerStatefulWidget {
 class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
   String _tab = 'published';
   bool _leaving = false;
+  Timer? _unreadTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // 6-B : pas de notification sur le téléphone ; la pastille Messages de la boutique est mise à jour régulièrement.
+    _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) => ref.invalidate(shopInboxUnreadProvider));
+  }
+
+  @override
+  void dispose() {
+    _unreadTimer?.cancel();
+    super.dispose();
+  }
 
   /// Revenir au profil utilisateur (écran 53) : l'espace actif change côté serveur.
   Future<void> _backToProfile() async {
@@ -53,6 +70,7 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dash = ref.watch(shopDashboardProvider);
+    final inboxUnread = ref.watch(shopInboxUnreadProvider).valueOrNull?.unread ?? 0;
     return Scaffold(
       body: SafeArea(
         child: dash.when(
@@ -148,6 +166,28 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                     SizedBox(height: 2),
                     Text('Boutique', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: BimColors.red)),
                   ],
+                ),
+              ),
+              Expanded(
+                child: InkWell(
+                  key: const ValueKey('shop-messages'),
+                  onTap: () async {
+                    await context.push('/shop/messages');
+                    ref.invalidate(shopInboxUnreadProvider);
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Badge(
+                        isLabelVisible: inboxUnread > 0,
+                        label: Text(inboxUnread > 99 ? '99+' : '$inboxUnread'),
+                        backgroundColor: BimColors.red,
+                        child: Icon(Icons.chat_bubble_outline_rounded, color: scheme.onSurface),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('Messages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface)),
+                    ],
+                  ),
                 ),
               ),
               Expanded(
