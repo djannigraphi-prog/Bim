@@ -9,11 +9,13 @@ import { IncidentsService } from './incidents.service';
 import { ReviewsService } from './reviews.service';
 import { PaymentsService } from './payments.service';
 import { OrdersService } from './orders.service';
+import { OnlinePaymentsController, PaymentWebhooksController } from './online/online-payments.controller';
+import { OnlinePaymentsService } from './online/online-payments.service';
 
 @Module({
   imports: [TariffsModule, MessagingModule, CouriersModule],
-  controllers: [OrdersController, ShopOrdersController, PaymentsAdminController, MyReviewsController, PublicReviewsController, MyIncidentsController, ShopIncidentsController, CourierDeliveriesController, IncidentsAdminController],
-  providers: [OrdersService, PaymentsService, ReviewsService, IncidentsService, DeliveriesService, OrdersRunner],
+  controllers: [OrdersController, ShopOrdersController, PaymentsAdminController, MyReviewsController, PublicReviewsController, MyIncidentsController, ShopIncidentsController, CourierDeliveriesController, IncidentsAdminController, OnlinePaymentsController, PaymentWebhooksController],
+  providers: [OrdersService, PaymentsService, ReviewsService, IncidentsService, DeliveriesService, OrdersRunner, OnlinePaymentsService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

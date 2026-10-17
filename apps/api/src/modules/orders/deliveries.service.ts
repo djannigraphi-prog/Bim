@@ -396,7 +396,7 @@ export class DeliveriesService {
       if (d.status !== 'code_validated') throw changed(d.status);
       if (await this.incidents.hasOpen(tx, d.id)) throw new AppError('INCIDENT_OPEN', 'Un incident est ouvert sur cette livraison.', HttpStatus.CONFLICT);
       const [p] = await tx.select().from(orderPayments).where(and(eq(orderPayments.orderId, o.id), eq(orderPayments.kind, 'article'))).limit(1);
-      const paid = p && p.failure === 'none' && (p.method === 'cash' ? !!p.cashObservedAt : !!p.declaredAt);
+      const paid = p && p.failure === 'none' && (p.method === 'cash' ? !!p.cashObservedAt : !!p.declaredAt || p.providerStatus === 'confirmed');
       if (!paid) {
         throw new AppError(
           'PAYMENT_CONDITION_MISSING',

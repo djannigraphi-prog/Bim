@@ -104,6 +104,14 @@ const schema = z
      */
     PENI_LLM_PROVIDER: z.enum(['none']).default('none'),
     /**
+     * Lot 8 — Prestataire de paiement en ligne : « none » (aucun paiement en ligne) ou « simulator » (développement et
+     * tests seulement). Aucun prestataire réel (Paystack, CinetPay…) ne sera ajouté sans l'autorisation explicite du
+     * fondateur, après examen de l'étude ; aucune clé de production dans le dépôt.
+     */
+    PAYMENT_PROVIDER: z.enum(['none', 'simulator']).default('none'),
+    /** Secret de signature des notifications du simulateur (valeur de test, jamais une clé de prestataire). */
+    PAYMENT_SIMULATOR_SECRET: z.string().default(''),
+    /**
      * Compte de service Firebase (JSON complet), obligatoire avec PUSH_PROVIDER=fcm. Secret : injecté depuis AWS
      * (Parameter Store chiffré ou Secrets Manager), jamais écrit dans le dépôt ni dans les journaux.
      */
@@ -136,6 +144,12 @@ const schema = z
     }
     if (cfg.MEDIA_STORAGE === 's3' && !cfg.S3_BUCKET) {
       ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'S3_BUCKET est obligatoire avec MEDIA_STORAGE=s3' });
+    }
+    if (!devLike && cfg.PAYMENT_PROVIDER === 'simulator') {
+      ctx.addIssue({ code: 'custom', path: ['PAYMENT_PROVIDER'], message: 'Le simulateur de paiement est interdit hors développement' });
+    }
+    if (cfg.PAYMENT_PROVIDER === 'simulator' && cfg.PAYMENT_SIMULATOR_SECRET.length < 16) {
+      ctx.addIssue({ code: 'custom', path: ['PAYMENT_SIMULATOR_SECRET'], message: 'PAYMENT_SIMULATOR_SECRET (16 caractères au moins) est obligatoire avec le simulateur' });
     }
     if (!devLike && cfg.PUSH_PROVIDER === 'test') {
       ctx.addIssue({ code: 'custom', path: ['PUSH_PROVIDER'], message: 'Le fournisseur de notifications « test » est interdit hors développement' });

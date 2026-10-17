@@ -34,7 +34,8 @@ export function buildOpenApi(app: INestApplication): OpenAPIObject {
 }
 
 export async function createApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // rawBody : la signature des notifications des prestataires de paiement se vérifie sur le corps reçu tel quel.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   configureApp(app);
   return app;

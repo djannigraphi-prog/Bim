@@ -274,6 +274,13 @@
       "when": 1792224464785,
       "tag": "0038_cash_on_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792226263363,
+      "tag": "0039_online_payments_socle",
+      "breakpoints": true
     }
   ]
 }

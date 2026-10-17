@@ -48,7 +48,7 @@ export async function startHarness(extraEnv: Record<string, string> = {}): Promi
   });
   const adminClock = { t: Date.now(), now() { return this.t; } };
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(ADMIN_CLOCK).useValue(adminClock).compile();
-  const app = moduleRef.createNestApplication({ logger: ['error'] });
+  const app = moduleRef.createNestApplication({ logger: ['error'], rawBody: true });
   configureApp(app);
   await app.init();
   const delivery = app.get(DeliveryService);

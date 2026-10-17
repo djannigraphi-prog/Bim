@@ -39,6 +39,8 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `WORKER_MODE` | off | rappels (lot 2) : `off` (aucun envoi), `embedded` (dans le processus de l'API), `standalone` (service séparé `npm run start:worker`) | `PUSH_PROVIDER` obligatoire si différent de `off` ; le réglage `notifications.reminders_enabled` reste un second interrupteur |
 | `WORKER_HEALTH_PORT` | 3100 | port du contrôle de santé `/health` du worker séparé (200 = ok/dégradé/désactivé, 503 = arrêté) | |
 | `PUSH_PROVIDER` | none | envoi des notifications : `none`, `fcm` (Firebase), `test` (mémoire) | `test` refusé hors development/test |
+| `PAYMENT_PROVIDER` | none | paiement en ligne (lot 8) : `none` (fermé) ou `simulator` (tests) ; aucun prestataire réel sans autorisation du fondateur | `simulator` refusé hors development/test ; le réglage `payments.online_enabled` reste un second interrupteur |
+| `PAYMENT_SIMULATOR_SECRET` | (vide) | secret de signature des notifications du simulateur (valeur de test) | 16 caractères au moins avec `simulator` |
 | `FCM_SERVICE_ACCOUNT_JSON` | (vide) | compte de service Firebase (JSON) — **secret**, injecté depuis Parameter Store chiffré ou Secrets Manager | obligatoire et vérifié si `PUSH_PROVIDER=fcm` |
 | `PENI_LLM_PROVIDER` | none | fournisseur d'IA de Peni (lot 3) : seule valeur acceptée `none` (discussion guidée, aucune donnée envoyée) | un fournisseur ne sera ajouté qu'après accord du fondateur ; réglage `peni.llm_enabled` comme second interrupteur |
 | `FCM_API_BASE_URL`, `FCM_TOKEN_URL` | (vide) | adresses de remplacement pour tester contre un faux serveur | refusées hors development/test |

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, index, integer, jsonb, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { shops } from './spaces';
 import { users } from './identity';
 import { orders } from './orders';
 
@@ -29,8 +30,10 @@ export const orderPayments = pgTable(
     cashObservedAmountFcfa: integer('cash_observed_amount_fcfa'),
     cashObservedBy: uuid('cash_observed_by').references(() => users.id),
     cashObservedByRole: varchar('cash_observed_by_role', { length: 10 }),
-    // 3. Confirmation technique : aucun prestataire intégré, donc toujours « unavailable ».
+    // 3. Confirmation technique : « unavailable » sans prestataire ; « confirmed » seulement après vérification serveur
+    //    d'un paiement par un prestataire (lot 8, désactivé tant que le fondateur n'a pas autorisé un prestataire).
     providerStatus: varchar('provider_status', { length: 12 }).notNull().default('unavailable'),
+    providerConfirmedAt: timestamp('provider_confirmed_at', { withTimezone: true }),
     // 4. Décision du bénéficiaire (la boutique pour l'article) : pending · confirmed · contested.
     decision: varchar('decision', { length: 10 }).notNull().default('pending'),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
@@ -52,12 +55,64 @@ export const orderPayments = pgTable(
     check('order_payments_kind_ck', sql`${t.kind} IN ('article', 'delivery_fee')`),
     check('order_payments_method_ck', sql`${t.method} IN ('mobile_money', 'cash')`),
     check('order_payments_amount_ck', sql`${t.amountFcfa} > 0`),
-    // Aucun prestataire : « confirmé par le prestataire » impossible (§5, information 3).
-    check('order_payments_provider_ck', sql`${t.providerStatus} = 'unavailable'`),
+    // Lot 8 : « confirmé par le prestataire » seulement avec la date de la vérification serveur (§5, information 3).
+    check('order_payments_provider_ck', sql`(${t.providerStatus} = 'unavailable' AND ${t.providerConfirmedAt} IS NULL) OR (${t.providerStatus} = 'confirmed' AND ${t.providerConfirmedAt} IS NOT NULL AND ${t.method} = 'mobile_money')`),
     check('order_payments_decision_ck', sql`${t.decision} IN ('pending', 'confirmed', 'contested')`),
     check('order_payments_failure_ck', sql`${t.failure} IN ('none', 'failed', 'cancelled')`),
     check('order_payments_contest_ck', sql`(${t.decision} = 'contested') = (${t.contestReason} IS NOT NULL)`),
     check('order_payments_cash_ck', sql`${t.cashObservedAt} IS NULL OR ${t.method} = 'cash'`),
     check('order_payments_declared_ck', sql`${t.declaredAt} IS NULL OR ${t.method} = 'mobile_money'`),
   ],
+);
+
+/**
+ * Lot 8 (socle, désactivé) — Paiement en ligne d'un paiement du registre, chez un prestataire. F4 (17/10/2026) : l'argent
+ * va directement à la boutique (`payee_shop_id`) ; BIM ne détient jamais les fonds. Aucun prestataire réel n'est intégré :
+ * seul un simulateur existe, interdit hors développement et tests.
+ * Statuts : pending (lancé, en attente du client) → succeeded · failed · expired.
+ */
+export const paymentIntents = pgTable(
+  'payment_intents',
+  {
+    id: uuid('id').primaryKey(),
+    orderPaymentId: uuid('order_payment_id')
+      .notNull()
+      .references(() => orderPayments.id),
+    payeeShopId: uuid('payee_shop_id')
+      .notNull()
+      .references(() => shops.id),
+    provider: varchar('provider', { length: 20 }).notNull(),
+    providerRef: varchar('provider_ref', { length: 100 }).notNull(),
+    amountFcfa: integer('amount_fcfa').notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('XOF'),
+    status: varchar('status', { length: 10 }).notNull().default('pending'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    settledAt: timestamp('settled_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('payment_intents_ref_uq').on(t.provider, t.providerRef),
+    // Un seul paiement en ligne en cours par paiement du registre.
+    uniqueIndex('payment_intents_open_uq').on(t.orderPaymentId).where(sql`${t.status} = 'pending'`),
+    check('payment_intents_status_ck', sql`${t.status} IN ('pending', 'succeeded', 'failed', 'expired')`),
+    check('payment_intents_amount_ck', sql`${t.amountFcfa} > 0`),
+    check('payment_intents_currency_ck', sql`${t.currency} = 'XOF'`),
+  ],
+);
+
+/** Notifications reçues des prestataires (signature vérifiée), en écriture seule ; une clé d'événement n'est traitée qu'une fois. */
+export const paymentProviderEvents = pgTable(
+  'payment_provider_events',
+  {
+    id: uuid('id').primaryKey(),
+    provider: varchar('provider', { length: 20 }).notNull(),
+    eventKey: varchar('event_key', { length: 160 }).notNull(),
+    intentId: uuid('intent_id').references(() => paymentIntents.id),
+    outcome: varchar('outcome', { length: 20 }).notNull(),
+    payload: jsonb('payload').notNull().default({}),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('payment_provider_events_key_uq').on(t.provider, t.eventKey)],
 );

@@ -7869,6 +7869,35 @@
         ]
       }
     },
+    "/v1/orders/{id}/payment/online": {
+      "post": {
+        "operationId": "OnlinePaymentsController_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lancer le paiement en ligne de l’article (fermé tant qu’aucun prestataire n’est autorisé)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/courier-application": {
       "get": {
         "operationId": "CourierApplicationController_mine",

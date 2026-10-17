@@ -19,6 +19,8 @@ export function paymentStatus(p: Payment): string {
   if (p.decision === 'confirmed') return 'confirmed_by_shop';
   if (p.decision === 'contested') return 'contested_by_shop';
   if (p.cashObservedAt) return 'cash_received_to_confirm';
+  // Lot 8 : paiement vérifié chez un prestataire (la boutique décide encore ; jamais « terminée » sans elle).
+  if (p.providerStatus === 'confirmed') return 'confirmed_by_provider';
   if (p.declaredAt) return 'declared_by_customer';
   return 'not_paid';
 }

@@ -168,6 +168,7 @@ String paymentStatusLabel(String s) => switch (s) {
       'not_paid' => 'À payer à la remise',
       'declared_by_customer' => 'Déclaré par le client — à confirmer par la boutique',
       'cash_received_to_confirm' => 'Espèces reçues par la boutique — à confirmer',
+      'confirmed_by_provider' => 'Paiement vérifié par le prestataire — à confirmer par la boutique',
       'confirmed_by_shop' => 'Confirmé par la boutique',
       'contested_by_shop' => 'Contesté par la boutique',
       'cancelled' => 'Annulé',

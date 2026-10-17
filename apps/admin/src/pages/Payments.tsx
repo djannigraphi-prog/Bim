@@ -21,6 +21,7 @@ const STATUS: Record<string, string> = {
   not_paid: 'Aucune déclaration, aucune décision de la boutique',
   declared_by_customer: 'Déclaré par le client, sans décision de la boutique',
   cash_received_to_confirm: 'Espèces reçues par la boutique, sans décision',
+  confirmed_by_provider: 'Vérifié par le prestataire, sans décision de la boutique',
   contested_by_shop: 'Contesté par la boutique',
 };
 

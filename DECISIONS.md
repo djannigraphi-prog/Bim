@@ -166,6 +166,17 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L8-00 — Paiements en ligne : étude et socle multi-prestataires désactivé (17/10/2026, 08 h 06) · Fondateur · **étude remise** ; socle **réalisé**, intégration réelle **non autorisée**
+
+- Étude demandée : Paystack (premier candidat) et CinetPay (alternative) — Mobile Money (Orange, Wave, MTN, Moov),
+  frais, KYC, test, confirmation technique, remboursements, versement direct aux boutiques, multi-commerçants,
+  abonnements récurrents, règles des magasins. Remise dans le document « Étude paiements Mobile Money — Paystack et
+  CinetPay » (faits confirmés séparés des points à confirmer auprès des services commerciaux).
+- **Aucune dépense autorisée** ; aucun contrat, abonnement, compte ni clé de production ; aucune intégration de
+  production sans autorisation explicite du fondateur après examen de l'étude.
+- Réalisé : architecture compatible avec plusieurs prestataires, désactivée (`PAYMENT_PROVIDER` = « none » ; simulateur
+  pour les tests seulement ; réglage `payments.online_enabled` = false, « en attente »).
+
 ### L7-07 — Espèces à la livraison, délais, circuit des fonds (17/10/2026, 07 h 47) · Fondateur · **décidé** ; espèces et délais **réalisés**
 
 - **Espèces à la livraison** : autorisées seulement si la boutique a au moins un livreur **employé** actif ; la course est

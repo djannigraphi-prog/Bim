@@ -67,6 +67,8 @@ export const PURGE_BLOCKING_TABLES = [
   'delivery_offers',
   // Lot 6-C : réagir à un message est une activité.
   'message_reactions',
+  // Lot 8 : lancer un paiement en ligne est une activité.
+  'payment_intents',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -87,6 +89,7 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   courier_shop_partnerships: ['invited_by', 'ended_by'],
   reviews: ['author_id'],
   delivery_offers: ['offered_by'],
+  payment_intents: ['created_by'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [
