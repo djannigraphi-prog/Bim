@@ -114,6 +114,42 @@ class PeniTaskExplanation {
       );
 }
 
+/// Message de Peni tiré du catalogue commun du serveur (coffre du chemin, fin du programme).
+class PeniMilestone {
+  const PeniMilestone({required this.title, required this.text, required this.pose});
+
+  static PeniMilestone? fromJson(Object? j) {
+    if (j is! Map<String, dynamic>) return null;
+    final title = j['title'], text = j['text'];
+    if (title is! String || text is! String) return null;
+    return PeniMilestone(title: title, text: text, pose: j['pose'] as String? ?? 'happy');
+  }
+
+  final String title;
+  final String text;
+  final String pose;
+
+  PeniPose? get peniPose => PeniPose.values.where((p) => p.name == pose).firstOrNull;
+}
+
+/// Messages de Peni d'un projet : un par coffre (clé « week:N » ou « final ») et celui de la fin du programme.
+class PeniMilestones {
+  const PeniMilestones({required this.chests, this.completion});
+
+  factory PeniMilestones.fromJson(Map<String, dynamic> j) => PeniMilestones(
+        chests: {
+          for (final c in (j['chests'] as List<dynamic>? ?? const []))
+            if (c is Map<String, dynamic> && PeniMilestone.fromJson(c) != null) chestKey(c['kind'] as String?, c['week'] as int?): PeniMilestone.fromJson(c)!,
+        },
+        completion: PeniMilestone.fromJson(j['completion']),
+      );
+
+  static String chestKey(String? kind, int? week) => kind == 'final' ? 'final' : 'week:$week';
+
+  final Map<String, PeniMilestone> chests;
+  final PeniMilestone? completion;
+}
+
 class PeniApi {
   PeniApi(this._api);
   final ApiClient _api;
@@ -143,6 +179,8 @@ class PeniApi {
     return PeniTurn(conversationId: j['id'] as String, messages: PeniTurn._messages(j), draft: PeniTurn._draft(j));
   }
 
+  Future<PeniMilestones> milestones(String projectId) async => PeniMilestones.fromJson(await _api.get('/v1/peni/projects/$projectId/milestones'));
+
   Future<PeniTaskExplanation> explainTask(String projectId, String taskId) async =>
       PeniTaskExplanation.fromJson(await _api.get('/v1/peni/projects/$projectId/tasks/$taskId/explanation'));
 
@@ -167,6 +205,16 @@ final peniEncouragementProvider = FutureProvider.autoDispose.family<PeniEncourag
   ref.watch(projectsRevisionProvider);
   try {
     return await ref.watch(peniApiProvider).encouragement(k.projectId, context: k.context, day: k.day);
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Messages de Peni des coffres et de la fin du programme ; null en cas d'erreur (l'app garde ses propres textes).
+final peniMilestonesProvider = FutureProvider.autoDispose.family<PeniMilestones?, String>((ref, projectId) async {
+  ref.watch(projectsRevisionProvider);
+  try {
+    return await ref.watch(peniApiProvider).milestones(projectId);
   } catch (_) {
     return null;
   }

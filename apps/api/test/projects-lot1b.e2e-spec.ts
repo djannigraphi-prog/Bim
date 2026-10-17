@@ -228,9 +228,7 @@ describe('Projets — lot 1, suite (e2e)', () => {
       for (const day of week1.slice(0, 4)) await h.http().put(`/v1/projects/${p.id}/days/${day}/tasks/${task}/done`).set(u.auth).expect(200);
       expect((await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body.chests[0]).toMatchObject({ done: 4, state: 'missed' }); // 57 %
       await h.http().put(`/v1/projects/${p.id}/days/${week1[4]}/tasks/${task}/done`).set(u.auth).expect(200);
-      const opened = (await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body;
-      expect(opened.chests[0]).toMatchObject({ done: 5, state: 'open', peni: { key: 'chest_week_open', title: 'Semaine 1 tenue !', pose: 'cheer', version: 'v1' } }); // 71 %
-      expect(opened.peniCompletion).toBeNull();
+      expect((await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body.chests[0]).toMatchObject({ done: 5, state: 'open' }); // 71 %
       const events = async () => (await h.pool.query("select payload from project_events where project_id = $1 and type = 'chest_opened'", [p.id])).rows.map((r: { payload: string }) => r.payload);
       expect(await events()).toEqual(['week:1']);
       // Décocher repasse sous le seuil : le coffre se referme (aucun nouvel événement).

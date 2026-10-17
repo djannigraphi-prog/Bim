@@ -189,25 +189,8 @@ class ProjectDay {
 
 /// Coffre du chemin (écran 26, décision du 15/10/2026) : récompense symbolique (badge et message de Peni),
 /// jamais financière. S'ouvre à 70 % des tâches prévues de la semaine (ou du programme pour le coffre final).
-/// Message de Peni tiré du catalogue commun du serveur (coffre, fin du programme).
-class PeniMilestone {
-  const PeniMilestone({required this.title, required this.text, required this.pose});
-
-  static PeniMilestone? fromJson(Object? j) {
-    if (j is! Map<String, dynamic>) return null;
-    final title = j['title'], text = j['text'];
-    if (title is! String || text is! String) return null;
-    return PeniMilestone(title: title, text: text, pose: j['pose'] as String? ?? 'happy');
-  }
-
-  final String title;
-  final String text;
-  /// cheer · happy · think · wave
-  final String pose;
-}
-
 class ProjectChest {
-  const ProjectChest({required this.kind, this.week, required this.day, required this.due, required this.done, required this.state, this.peni});
+  const ProjectChest({required this.kind, this.week, required this.day, required this.due, required this.done, required this.state});
 
   factory ProjectChest.fromJson(Map<String, dynamic> j) => ProjectChest(
         kind: j['kind'] as String,
@@ -216,11 +199,7 @@ class ProjectChest {
         due: j['due'] as int,
         done: j['done'] as int,
         state: j['state'] as String,
-        peni: PeniMilestone.fromJson(j['peni']),
       );
-
-  /// Message de Peni du serveur (absent d'une ancienne API : le texte de l'app est utilisé).
-  final PeniMilestone? peni;
 
   /// week ou final.
   final String kind;
@@ -241,7 +220,7 @@ class ProjectChest {
 }
 
 class ProjectDetail {
-  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget, this.programTitle, this.validatedBy, this.measurement, this.chests = const [], this.peniCompletion});
+  const ProjectDetail({required this.summary, required this.goalLabel, required this.programSource, required this.totalSteps, required this.completedSteps, required this.bestStreak, required this.sessionsPerWeek, required this.tasks, required this.days, required this.today, this.healthNote, this.budget, this.programTitle, this.validatedBy, this.measurement, this.chests = const []});
 
   factory ProjectDetail.fromJson(Map<String, dynamic> j) => ProjectDetail(
         summary: ProjectSummary.fromJson(j),
@@ -260,7 +239,6 @@ class ProjectDetail {
         days: (j['days'] as List<dynamic>).map((e) => ProjectDay.fromJson(e as Map<String, dynamic>)).toList(),
         today: j['today'] as String,
         chests: ((j['chests'] as List<dynamic>?) ?? const []).map((e) => ProjectChest.fromJson(e as Map<String, dynamic>)).toList(),
-        peniCompletion: PeniMilestone.fromJson(j['peniCompletion']),
       );
 
   final ProjectSummary summary;
@@ -283,8 +261,6 @@ class ProjectDetail {
   final List<ProjectDay> days;
   final String today;
   final List<ProjectChest> chests;
-  /// Message de Peni à la fin du programme (écran 30), depuis le catalogue du serveur.
-  final PeniMilestone? peniCompletion;
 
   /// Séances par semaine affichées sur l'écran 24 : la réponse de la personne si elle existe,
   /// sinon la tâche la plus fréquente (une habitude quotidienne ne compte pas comme 7 séances choisies).

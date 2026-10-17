@@ -13,6 +13,7 @@ import { loadReminderSettings } from '../notifications/reminder-data';
 import { inQuietHours, QuietWindow } from '../notifications/reminders';
 import { EncouragementQueryDto, PeniMessageDto, StartPeniConversationDto } from './dto';
 import { encouragement } from './encouragements';
+import { chestMilestone, completionMilestone } from './milestones';
 import { explainTask } from './task-explanations';
 import { EngineContext, EngineInput, EngineResult, handleInput, InvalidChoiceError, PENI_ENGINE_VERSION, PeniReply, PeniState, QuickReply, startConversation } from './engine';
 import { LLM_PROVIDER, LlmProvider } from './llm-provider';
@@ -265,6 +266,18 @@ export class PeniService {
    * Encouragement de Peni pour la journée (écran 27) ou la carte (écran 26). Lecture seule, aucune notification :
    * le texte s'affiche dans l'app. Heures calmes de la personne (ou celles par défaut, 22 h – 6 h) respectées.
    */
+  /**
+   * Messages de Peni pour les coffres du chemin (écran 26) et la fin du programme (écran 30), depuis le catalogue
+   * commun (`milestones.ts`). Lecture seule, aucune notification ; le projet ne dépend pas de Peni (règle C6).
+   */
+  async milestones(userId: string, projectId: string) {
+    const p = await this.projects.detail(userId, projectId);
+    return {
+      chests: p.chests.map((c) => ({ kind: c.kind, week: c.week, state: c.state, ...chestMilestone(c) })),
+      completion: completionMilestone({ status: p.status, title: p.title }),
+    };
+  }
+
   async encouragement(userId: string, projectId: string, q: EncouragementQueryDto) {
     const p = await this.projects.detail(userId, projectId);
     const dayStr = q.day ?? p.today;

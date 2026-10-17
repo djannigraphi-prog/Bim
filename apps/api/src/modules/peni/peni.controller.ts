@@ -43,6 +43,12 @@ export class PeniController {
     return this.peni.encouragement(a.userId, projectId, q);
   }
 
+  @Get('projects/:projectId/milestones')
+  @ApiOperation({ summary: 'Messages de Peni des coffres (26) et de la fin du programme (30), depuis le catalogue commun ; aucune notification' })
+  milestones(@CurrentAuth() a: AuthContext, @Param('projectId', ParseUUIDPipe) projectId: string) {
+    return this.peni.milestones(a.userId, projectId);
+  }
+
   @Get('projects/:projectId/tasks/:taskId/explanation')
   @ApiOperation({ summary: 'Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte' })
   explainTask(@CurrentAuth() a: AuthContext, @Param('projectId', ParseUUIDPipe) projectId: string, @Param('taskId', ParseUUIDPipe) taskId: string) {

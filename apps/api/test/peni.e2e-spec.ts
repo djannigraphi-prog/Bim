@@ -468,6 +468,27 @@ describe('Peni (e2e)', () => {
     });
   });
 
+  it('messages des coffres et de la fin du programme (26, 30) : catalogue commun, états du serveur ; projet d’autrui invisible', async () => {
+    const u = await user();
+    const p = (await h.http().post('/v1/projects').set(u.auth).send({ mode: 'eco', categoryCode: 'sport', goalCode: 'sport_abdos', sessionsPerWeek: 7, durationDays: 30 }).expect(201)).body;
+    const m = (await h.http().get(`/v1/peni/projects/${p.id}/milestones`).set(u.auth).expect(200)).body;
+    const detail = (await h.http().get(`/v1/projects/${p.id}`).set(u.auth)).body;
+    expect(m.chests).toHaveLength(detail.chests.length);
+    expect(m.chests[0]).toMatchObject({ kind: 'week', week: 1, state: 'upcoming', key: 'chest_week_upcoming', title: 'Coffre de la semaine 1', pose: 'think', version: 'v1' });
+    expect(m.chests.at(-1)).toMatchObject({ kind: 'final', key: 'chest_final_upcoming' });
+    expect(m.completion).toBeNull();
+    // Programme terminé : message de fin.
+    const start = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const end = new Date(Date.now() - 1 * 86_400_000).toISOString().slice(0, 10);
+    await h.pool.query('update projects set start_date = $2, planned_end_date = $3 where id = $1', [p.id, start, end]);
+    const done = (await h.http().get(`/v1/peni/projects/${p.id}/milestones`).set(u.auth).expect(200)).body;
+    expect(done.completion).toMatchObject({ key: 'program_completed', pose: 'cheer' });
+    expect(done.completion.text).toContain('Je suis tellement fière de toi');
+    const other = await user();
+    await h.http().get(`/v1/peni/projects/${p.id}/milestones`).set(other.auth).expect(404);
+    await h.http().get(`/v1/peni/projects/${p.id}/milestones`).expect(401);
+  });
+
   describe('Peni explique une tâche (écran 24)', () => {
     async function project() {
       const u = await user();

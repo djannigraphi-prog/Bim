@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { chestMilestone, completionMilestone } from '../peni/milestones';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
@@ -386,9 +385,7 @@ export class ProjectsService {
       completedSteps: doneSessions,
       bestStreak: s.bestStreak,
       /** Coffres du chemin (écran 26) : symboliques, jamais financiers. */
-      chests: s.chests.map((c) => ({ ...c, peni: chestMilestone(c) })),
-      /** Message de Peni à la fin du programme (écran 30), depuis le catalogue commun ; null avant la fin. */
-      peniCompletion: completionMilestone({ status: p.status, title: p.title }),
+      chests: s.chests,
       tasks: parts.tasks.map((t) => ({ id: t.id, title: t.title, detail: t.detail, icon: t.icon, timeOfDay: t.timeOfDay, weekdays: t.weekdays, origin: t.origin })),
       days: s.days,
       today: this.today(p.tz),

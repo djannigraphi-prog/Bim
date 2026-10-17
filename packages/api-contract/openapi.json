@@ -3838,6 +3838,35 @@
         ]
       }
     },
+    "/v1/peni/projects/{projectId}/milestones": {
+      "get": {
+        "operationId": "PeniController_milestones",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Messages de Peni des coffres (26) et de la fin du programme (30), depuis le catalogue commun ; aucune notification",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
     "/v1/peni/projects/{projectId}/tasks/{taskId}/explanation": {
       "get": {
         "operationId": "PeniController_explainTask",

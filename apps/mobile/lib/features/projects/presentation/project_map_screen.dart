@@ -204,7 +204,7 @@ class _Map extends ConsumerWidget {
               ],
             ),
           ),
-        Expanded(child: _Path(project: project)),
+        Expanded(child: _Path(project: project, milestones: ref.watch(peniMilestonesProvider(project.summary.id)).valueOrNull)),
         Padding(
           padding: const EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.lg),
           child: completed
@@ -244,9 +244,12 @@ class _Banner extends StatelessWidget {
 
 /// Chemin des jours, en zigzag, du jour 1 (en bas) au dernier jour (en haut).
 class _Path extends StatefulWidget {
-  const _Path({required this.project});
+  const _Path({required this.project, this.milestones});
 
   final ProjectDetail project;
+
+  /// Messages de Peni du serveur (null : textes de l'app).
+  final PeniMilestones? milestones;
 
   @override
   State<_Path> createState() => _PathState();
@@ -353,7 +356,7 @@ class _PathState extends State<_Path> {
                                 key: ValueKey('chest-${chest.isFinal ? 'final' : chest.week}'),
                                 chest: chest,
                                 size: size,
-                                onTap: () => showChest(context, chest),
+                                onTap: () => showChest(context, chest, peni: widget.milestones?.chests[PeniMilestones.chestKey(chest.kind, chest.week)]),
                               ),
                             ],
                           ],
@@ -414,7 +417,7 @@ class _ChestNode extends StatelessWidget {
 }
 
 /// Fenêtre d'un coffre : badge et message de Peni, sans reproche. Aucune valeur financière.
-Future<void> showChest(BuildContext context, ProjectChest chest) {
+Future<void> showChest(BuildContext context, ProjectChest chest, {PeniMilestone? peni}) {
   final theme = Theme.of(context);
   final week = 'la semaine ${chest.week}';
   final local = switch ((chest.isFinal, chest.state)) {
@@ -439,39 +442,40 @@ Future<void> showChest(BuildContext context, ProjectChest chest) {
       ),
   };
   // Texte du catalogue commun de Peni (serveur) quand il est fourni ; sinon celui de l'app.
-  final api = chest.peni;
-  final (PeniPose pose, String title, String message) =
-      api == null ? local : (PeniPose.values.where((p) => p.name == api.pose).firstOrNull ?? local.$1, api.title, api.text);
+  final (PeniPose pose, String title, String message) = peni == null ? local : (peni.peniPose ?? local.$1, peni.title, peni.text);
   return showModalBottomSheet<void>(
     context: context,
     builder: (ctx) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(BimSpacing.xl, 0, BimSpacing.xl, BimSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Peni(pose: pose, size: 88),
-            const SizedBox(height: BimSpacing.sm),
-            Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
-            const SizedBox(height: BimSpacing.sm),
-            Text(message, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
-            if (chest.isOpen) ...[
+        // Défilable : jamais de texte coupé sur un petit écran ou avec une grande taille de police.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Peni(pose: pose, size: 88),
+              const SizedBox(height: BimSpacing.sm),
+              Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
+              const SizedBox(height: BimSpacing.sm),
+              Text(message, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+              if (chest.isOpen) ...[
+                const SizedBox(height: BimSpacing.md),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(10)),
+                  child: Text('🏅 Badge « ${chest.badge} »', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+                ),
+              ],
               const SizedBox(height: BimSpacing.md),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(10)),
-                child: Text('🏅 Badge « ${chest.badge} »', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+              Text(
+                'Un coffre est une récompense symbolique : un badge et un message de Peni. Il ne contient ni pièces ni argent.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
+              const SizedBox(height: BimSpacing.md),
+              BimButton(label: 'Continuer', variant: BimButtonVariant.dark, onPressed: () => Navigator.pop(ctx)),
             ],
-            const SizedBox(height: BimSpacing.md),
-            Text(
-              'Un coffre est une récompense symbolique : un badge et un message de Peni. Il ne contient ni pièces ni argent.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: BimSpacing.md),
-            BimButton(label: 'Continuer', variant: BimButtonVariant.dark, onPressed: () => Navigator.pop(ctx)),
-          ],
+          ),
         ),
       ),
     ),
