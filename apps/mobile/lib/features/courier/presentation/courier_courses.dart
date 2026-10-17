@@ -160,6 +160,7 @@ class CourseScreen extends ConsumerStatefulWidget {
 class _CourseScreenState extends ConsumerState<CourseScreen> {
   final _code = TextEditingController();
   bool _busy = false;
+  bool _released = false;
   String? _codeError;
 
   @override
@@ -200,6 +201,23 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
     if (r != null && mounted) await _run((api) => api.incident(widget.deliveryId, r.reason, description: r.description), done: 'Incident signalé');
   }
 
+  /// Désistement : possible seulement avant la prise en charge ; le motif est transmis à la boutique.
+  Future<void> _release() async {
+    final reason = await showDialog<String>(context: context, builder: (_) => const ReleaseDialog());
+    if (reason == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(courierApiProvider).release(widget.deliveryId, reason);
+      ref.invalidate(coursesProvider);
+      if (mounted) setState(() => _released = true);
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+      ref.invalidate(courseProvider(widget.deliveryId));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _reportReview(String reviewId) async {
     final reason = await showDialog<String>(
       context: context,
@@ -217,6 +235,20 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (_released) {
+      return Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(BimSpacing.screen),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const BimBackButton(),
+              const SizedBox(height: BimSpacing.md),
+              Text('Course rendue à la boutique. Elle va choisir un autre livreur.', key: const ValueKey('course-released'), style: theme.textTheme.titleMedium),
+            ]),
+          ),
+        ),
+      );
+    }
     final async = ref.watch(courseProvider(widget.deliveryId));
     return Scaffold(
       body: SafeArea(
@@ -285,6 +317,7 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
                   onPressed: _busy ? null : () => _run((api) => api.clientAbsent(c.mission.deliveryId), done: 'Absence signalée'),
                 ),
               ],
+              if (c.can('release')) TextButton(key: const ValueKey('course-release'), onPressed: _busy ? null : _release, child: const Text('Je ne peux plus faire cette course')),
               if (c.can('report_incident')) TextButton(key: const ValueKey('course-incident'), onPressed: _busy ? null : _incident, child: const Text('Signaler un problème')),
               if (c.reviewRating != null) ...[
                 const SizedBox(height: BimSpacing.lg),
@@ -302,6 +335,40 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
 
 /// Signaler un incident : motif dans la liste, description (obligatoire pour « Autre »). Le champ appartient à la
 /// boîte de dialogue. Aucune pénalité ni remboursement automatique : le dossier peut être transmis au support.
+/// Motif du désistement (3 à 300 caractères, comme côté serveur).
+class ReleaseDialog extends StatefulWidget {
+  const ReleaseDialog({super.key});
+
+  @override
+  State<ReleaseDialog> createState() => _ReleaseDialogState();
+}
+
+class _ReleaseDialogState extends State<ReleaseDialog> {
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = _reason.text.trim().length >= 3;
+    return AlertDialog(
+      title: const Text('Rendre la course'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Possible seulement avant d’avoir pris le colis. La boutique sera prévenue et choisira un autre livreur.'),
+        TextField(key: const ValueKey('release-reason'), controller: _reason, maxLength: 300, decoration: const InputDecoration(labelText: 'Motif'), onChanged: (_) => setState(() {})),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+        TextButton(key: const ValueKey('release-send'), onPressed: ok ? () => Navigator.pop(context, _reason.text.trim()) : null, child: const Text('Confirmer')),
+      ],
+    );
+  }
+}
+
 class IncidentDialog extends StatefulWidget {
   const IncidentDialog({super.key, required this.reasons});
   final List<String> reasons;

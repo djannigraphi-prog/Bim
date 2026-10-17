@@ -322,6 +322,24 @@ export class DeliveriesService {
     void courierUserId;
   }
 
+  /**
+   * Le livreur ne peut plus faire la course, avant la prise en charge du colis : la livraison revient en recherche, au
+   * même mode et au même prix (frais figés à la commande) ; il n'est plus proposé pour cette livraison. Après la prise en
+   * charge, il signale un incident (le colis doit revenir ou être remis). Aucune pénalité.
+   */
+  async release(courierUserId: string, courierId: string, deliveryId: string, reason: string, meta: RequestMeta) {
+    await this.step(courierUserId, courierId, deliveryId, ['accepted'], async (tx, d, o) => {
+      await tx.update(deliveries).set({ status: 'searching', courierId: null, courierCategory: null, acceptedAt: null }).where(eq(deliveries.id, d.id));
+      await tx
+        .update(deliveryOffers)
+        .set({ status: 'withdrawn', answeredAt: new Date() })
+        .where(and(eq(deliveryOffers.deliveryId, d.id), eq(deliveryOffers.courierId, courierId), eq(deliveryOffers.status, 'accepted')));
+      await this.event(tx, d.id, 'released', 'courier', courierUserId, { reason });
+      await this.orders.event(tx, o.id, 'courier_released', 'courier', courierUserId, null, null);
+      await this.audit.log({ actorType: 'user', actorId: courierUserId, action: 'deliveries.mission_released', targetType: 'order', targetId: o.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { courierId } }, tx);
+    });
+  }
+
   /** Colis pris en charge à la boutique : la commande passe « en livraison ». */
   async pickedUp(courierUserId: string, courierId: string, deliveryId: string) {
     await this.step(courierUserId, courierId, deliveryId, ['accepted'], async (tx, d, o, now) => {
@@ -486,7 +504,7 @@ export class DeliveriesService {
   static courierActions(d: Delivery, p: typeof orderPayments.$inferSelect | null): string[] {
     switch (d.status) {
       case 'accepted':
-        return ['picked_up'];
+        return ['picked_up', 'release'];
       case 'picked_up':
         return ['arrived'];
       case 'arrived':

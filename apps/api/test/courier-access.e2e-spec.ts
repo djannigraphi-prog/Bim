@@ -59,6 +59,7 @@ describe('Accès des livreurs (e2e)', () => {
       'POST /v1/courier/courses/:id/code',
       'POST /v1/courier/courses/:id/incidents',
       'POST /v1/courier/courses/:id/picked-up',
+      'POST /v1/courier/courses/:id/release',
       'POST /v1/courier/incidents/:id/notes',
       'POST /v1/courier/incidents/:id/support',
       'POST /v1/courier/missions/:offerId/accept',

@@ -511,6 +511,7 @@ String orderEventLabel(OrderEvent e) => switch (e.type) {
       'payment_reviewed' => 'Vérifié par le support',
       'completed' => 'Commande terminée',
       'courier_assigned' => 'Livreur attribué',
+      'courier_released' => 'Livreur désisté : nouvelle recherche',
       'picked_up' => 'Colis pris en charge',
       'courier_arrived' => 'Livreur arrivé',
       'delivered' => 'Livrée',

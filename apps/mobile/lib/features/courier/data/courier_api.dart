@@ -214,6 +214,8 @@ class CourierApi {
   Future<CourseDetail> code(String deliveryId, String code) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/code', body: {'code': code}));
   Future<CourseDetail> cash(String deliveryId, int amountFcfa) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/cash', body: {'amountFcfa': amountFcfa}));
   Future<void> clientAbsent(String deliveryId, {String? note}) => _api.post('/v1/courier/courses/$deliveryId/client-absent', body: {if (note != null && note.isNotEmpty) 'note': note});
+  /// Désistement avant la prise en charge (motif obligatoire) : la boutique choisit un autre livreur.
+  Future<void> release(String deliveryId, String reason) => _api.post('/v1/courier/courses/$deliveryId/release', body: {'reason': reason});
   Future<void> incident(String deliveryId, String reason, {String? description}) =>
       _api.post('/v1/courier/courses/$deliveryId/incidents', body: {'reason': reason, if (description != null && description.isNotEmpty) 'description': description});
   Future<void> reportReview(String reviewId, String reason) => _api.post('/v1/courier/reviews/$reviewId/report', body: {'reason': reason});

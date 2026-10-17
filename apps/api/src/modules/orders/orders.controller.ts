@@ -446,6 +446,14 @@ export class CourierDeliveriesController {
     return this.deliveries.course(this.c(a), id);
   }
 
+  @Post('courses/:id/release')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Je ne peux plus faire la course (avant la prise en charge) : la boutique sollicite un autre livreur' })
+  async release(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @ReqMeta() meta: RequestMeta) {
+    await this.deliveries.release(a.userId, this.c(a), id, dto.reason, meta);
+    return { released: true };
+  }
+
   @Post('courses/:id/picked-up')
   @HttpCode(200)
   async pickedUp(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {

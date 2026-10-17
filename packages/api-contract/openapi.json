@@ -7453,6 +7453,45 @@
         ]
       }
     },
+    "/v1/courier/courses/{id}/release": {
+      "post": {
+        "operationId": "CourierDeliveriesController_release",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Je ne peux plus faire la course (avant la prise en charge) : la boutique sollicite un autre livreur",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
     "/v1/courier/courses/{id}/picked-up": {
       "post": {
         "operationId": "CourierDeliveriesController_pickedUp",

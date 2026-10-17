@@ -356,7 +356,11 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 > **7-G réalisé** : tables `incidents` et `incident_events` (écriture seule), motifs par partie, description, suivi
 > ouvert → au support → résolu, page d'administration journalisée (`incidents.review`). Réalisé du tableau ci-dessous :
 > refus de l'article (motif, incident, code et clôture bloqués), client absent (après le délai), code bloqué (7-B).
-> Non réalisé : statuts de commande « incident » / « litige », réattribution, retour en boutique, pièces jointes
+> **Désistement réalisé (17/10)** : avant la prise en charge, le livreur rend la course avec un motif
+> (`POST /v1/courier/courses/:id/release`) ; la livraison revient en recherche, même mode, même prix ; il n'est plus
+> proposé pour cette livraison ; aucune pénalité ; historique `released` / `courier_released` et audit. Après la prise
+> en charge : refusé (409), il faut signaler un incident.
+> Non réalisé : statuts de commande « incident » / « litige », réattribution après prise en charge, retour en boutique, pièces jointes
 > (stockage et conservation des preuves à décider) ; aucun effet financier automatique.
 
 Aucun frais d'annulation, remboursement ou pénalité automatique sans règle commerciale explicite (A8). Chaque incident

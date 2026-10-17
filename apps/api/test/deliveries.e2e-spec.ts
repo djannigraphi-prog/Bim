@@ -194,6 +194,39 @@ describe('Livraisons (e2e)', () => {
     ]);
   });
 
+  it('désistement avant la prise en charge : nouvelle recherche, même mode et même prix ; le livreur n’est plus proposé ; après la prise en charge : impossible', async () => {
+    const s = await shop();
+    const client = await person();
+    const first = await courier([home], { shopId: s.shopId, kind: 'partner' });
+    const second = await courier([home], { shopId: s.shopId, kind: 'partner' });
+    const id = await readyOrder(s, client);
+    const fee = (await h.http().get(`/v1/orders/${id}`).set(client.auth)).body.deliveryFeeFcfa;
+    await h.http().post(`/v1/shop/orders/${id}/delivery/start`).set(s.auth).expect(200);
+    await h.http().post(`/v1/shop/orders/${id}/delivery/offer`).set(s.auth).send({ courierId: first.courierId }).expect(200);
+    const offer1 = (await h.http().get('/v1/courier/missions').set(first.space)).body.items[0].offerId;
+    const dId = (await h.http().post(`/v1/courier/missions/${offer1}/accept`).set(first.space).expect(200)).body.items[0].deliveryId;
+    expect((await h.http().get(`/v1/courier/courses/${dId}`).set(first.space)).body.actions).toEqual(['picked_up', 'release']);
+    // Motif obligatoire ; un autre livreur ne peut pas se désister à sa place.
+    await h.http().post(`/v1/courier/courses/${dId}/release`).set(first.space).send({}).expect(400);
+    await h.http().post(`/v1/courier/courses/${dId}/release`).set(second.space).send({ reason: 'Pas moi' }).expect(404);
+    await h.http().post(`/v1/courier/courses/${dId}/release`).set(first.space).send({ reason: 'Moto en panne' }).expect(200);
+    // La course n'est plus à lui ; la boutique relance la sélection ; frais inchangés.
+    await h.http().get(`/v1/courier/courses/${dId}`).set(first.space).expect(404);
+    const so = (await h.http().get(`/v1/shop/orders/${id}`).set(s.auth)).body;
+    expect(so).toMatchObject({ status: 'ready', tracking: { status: 'searching', courier: null }, deliveryFeeFcfa: fee });
+    expect(so.actions).toContain('select_courier');
+    const ids = (await h.http().get(`/v1/shop/orders/${id}/delivery/candidates`).set(s.auth)).body.items.map((c: { courierId: string }) => c.courierId);
+    expect(ids).toContain(second.courierId);
+    expect(ids).not.toContain(first.courierId);
+    await h.http().post(`/v1/shop/orders/${id}/delivery/offer`).set(s.auth).send({ courierId: second.courierId }).expect(200);
+    const offer2 = (await h.http().get('/v1/courier/missions').set(second.space)).body.items[0].offerId;
+    await h.http().post(`/v1/courier/missions/${offer2}/accept`).set(second.space).expect(200);
+    await h.http().post(`/v1/courier/courses/${dId}/picked-up`).set(second.space).expect(200);
+    // Après la prise en charge : plus de désistement (signaler un incident).
+    expect((await h.http().post(`/v1/courier/courses/${dId}/release`).set(second.space).send({ reason: 'Trop loin' }).expect(409)).body.error.code).toBe('DELIVERY_STATE_CHANGED');
+    expect((await h.http().get(`/v1/orders/${id}`).set(client.auth)).body.deliveryFeeFcfa).toBe(fee);
+  });
+
   it('parcours complet : sollicitation, acceptation, prise en charge, arrivée, code, « J’ai payé », clôture, terminée, évaluation', async () => {
     const s = await shop();
     const client = await person();
@@ -218,7 +251,7 @@ describe('Livraisons (e2e)', () => {
     const dId = courses[0].deliveryId;
     await h.http().post(`/v1/courier/missions/${missions[0].offerId}/accept`).set(c.space).expect(409);
     let course = (await h.http().get(`/v1/courier/courses/${dId}`).set(c.space).expect(200)).body;
-    expect(course).toMatchObject({ status: 'accepted', client: { firstName: 'Awa', address: 'Rue des jardins, près de la pharmacie', phone: client.destination }, actions: ['picked_up'], payment: { method: 'mobile_money', amountToCollectFcfa: null } });
+    expect(course).toMatchObject({ status: 'accepted', client: { firstName: 'Awa', address: 'Rue des jardins, près de la pharmacie', phone: client.destination }, actions: ['picked_up', 'release'], payment: { method: 'mobile_money', amountToCollectFcfa: null } });
     expect(JSON.stringify(course)).not.toMatch(/handoverCode|"code"/);
     await h.http().get(`/v1/courier/courses/${dId}`).set(other.space).expect(404);
     // Côté client : livreur (prénom), notification.

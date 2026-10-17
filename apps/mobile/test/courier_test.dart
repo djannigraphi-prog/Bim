@@ -157,6 +157,9 @@ class _FakeCourier extends CourierApi {
   }
 
   @override
+  Future<void> release(String deliveryId, String reason) async => calls.add('release $reason');
+
+  @override
   Future<void> incident(String deliveryId, String reason, {String? description}) async => calls.add('incident $reason ${description ?? ''}'.trim());
 }
 
@@ -300,6 +303,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.calls, ['step picked-up', 'step arrived', 'code 1111', 'incident other Portail fermé', 'code 4821', 'cash 40000', 'step close']);
     expect(tester.widget<Text>(find.byKey(const ValueKey('course-status'))).data, 'Livraison terminée');
+  });
+
+  testWidgets('7-F désistement avant prise en charge : motif obligatoire, puis course rendue', (tester) async {
+    final api = _FakeCourier();
+    api._detail('accepted', const ['picked_up', 'release']);
+    await _pump(tester, const CourseScreen(deliveryId: 'd1'), courier: api);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('course-release')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextButton>(find.byKey(const ValueKey('release-send'))).onPressed, isNull);
+    await tester.enterText(find.byKey(const ValueKey('release-reason')), 'Moto en panne');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('release-send')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['release Moto en panne']);
+    expect(find.byKey(const ValueKey('course-released')), findsOneWidget);
+  });
+
+  testWidgets('7-F désistement absent une fois le colis pris en charge', (tester) async {
+    final api = _FakeCourier();
+    api._detail('picked_up', const ['arrived']);
+    await _pump(tester, const CourseScreen(deliveryId: 'd1'), courier: api);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('course-release')), findsNothing);
   });
 
   testWidgets('7-E livreurs de la boutique : proposer un emploi, puis y mettre fin', (tester) async {
