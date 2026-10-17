@@ -244,7 +244,7 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
               const BimBackButton(),
               const SizedBox(height: BimSpacing.md),
               Text('Course rendue à la boutique. Elle va choisir un autre livreur.', key: const ValueKey('course-released'), style: theme.textTheme.titleMedium),
-            ]),
+            ],),
           ),
         ),
       );
@@ -358,9 +358,9 @@ class _ReleaseDialogState extends State<ReleaseDialog> {
     return AlertDialog(
       title: const Text('Rendre la course'),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Possible seulement avant d’avoir pris le colis. La boutique sera prévenue et choisira un autre livreur.'),
+        const Text('Possible seulement avant d’avoir pris le colis. La boutique le verra dans la commande et choisira un autre livreur.'),
         TextField(key: const ValueKey('release-reason'), controller: _reason, maxLength: 300, decoration: const InputDecoration(labelText: 'Motif'), onChanged: (_) => setState(() {})),
-      ]),
+      ],),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
         TextButton(key: const ValueKey('release-send'), onPressed: ok ? () => Navigator.pop(context, _reason.text.trim()) : null, child: const Text('Confirmer')),
