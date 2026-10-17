@@ -1,5 +1,5 @@
 /// <reference types="multer" />
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -7,7 +7,7 @@ import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { SendMessageDto, StartConversationDto, StartShopConversationDto } from './dto';
+import { ReactionDto, SendMessageDto, StartConversationDto, StartShopConversationDto } from './dto';
 import { MessagingService } from './messaging.service';
 
 /** Lot 6-A — Messagerie entre personnes (écran 47) ; 6-B : conversations avec une boutique, côté cliente. Espace utilisateur ; aucune notification sur le téléphone. */
@@ -57,8 +57,8 @@ export class MessagingController {
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
   @ApiConsumes('application/json', 'multipart/form-data')
-  @ApiBody({ schema: { type: 'object', properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' } } } })
-  @ApiOperation({ summary: 'Envoyer un texte ou une photo (ré-encodée sans métadonnées)' })
+  @ApiBody({ schema: { type: 'object', properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, replyToId: { type: 'string', format: 'uuid' } } } })
+  @ApiOperation({ summary: 'Envoyer un texte ou une photo (ré-encodée sans métadonnées), en citant éventuellement un message' })
   send(
     @CurrentAuth() a: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -67,7 +67,7 @@ export class MessagingController {
     @ReqMeta() meta: RequestMeta,
     @Req() req: Request,
   ) {
-    return this.messaging.send(a.userId, id, { text: dto.text, photo }, meta, apiBase(req));
+    return this.messaging.send(a.userId, id, { text: dto.text, photo, replyToId: dto.replyToId }, meta, apiBase(req));
   }
 
   @Post('conversations/:id/read')
@@ -95,6 +95,19 @@ export class MessagingController {
   @ApiOperation({ summary: 'Une conversation : la personne, le statut (demande ou non), les non-lus' })
   get(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.messaging.summary(a.userId, id, apiBase(req));
+  }
+
+  @Put('messages/:id/reaction')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Réagir à un message (une réaction par personne, remplace la précédente)' })
+  react(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReactionDto, @Req() req: Request) {
+    return this.messaging.react(a.userId, id, dto.emoji, apiBase(req));
+  }
+
+  @Delete('messages/:id/reaction')
+  @ApiOperation({ summary: 'Retirer ma réaction' })
+  unreact(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.messaging.react(a.userId, id, null, apiBase(req));
   }
 
   @Delete('messages/:id')

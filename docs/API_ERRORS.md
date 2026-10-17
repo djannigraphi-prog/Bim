@@ -47,6 +47,7 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INCIDENT_NOT_ALLOWED` | 409 | 7-G : un incident concerne une commande confirmée |
 | `INCIDENT_STATE_CHANGED` | 409 | 7-G : incident déjà transmis au support ou résolu |
 | `INCIDENT_RESOLVED` | 409 | 7-G : incident résolu, plus de précision possible |
+| `REQUEST_PENDING` | 409 | 6-C : réaction à une demande non acceptée (l'accepter d'abord) |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |
 | `PRODUCT_CONTENT_LOCKED` | 409 | L7-04 : nom, description et prix normal ne se modifient plus après la création ; rubrique, durée et variantes plus après la première publication ; créer une nouvelle fiche ; `details.fields` (liste des champs refusés) |
 | `REPUTATION_RESET_REQUIRED` | 409 | **Retiré (L7-04)** : n'est plus renvoyé ; `confirmReputationReset` est refusé (400) |

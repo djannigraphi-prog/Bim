@@ -4636,6 +4636,10 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "replyToId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 }
               }
@@ -4651,6 +4655,10 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "replyToId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 }
               }
@@ -4667,7 +4675,7 @@
             "bearer": []
           }
         ],
-        "summary": "Envoyer un texte ou une photo (ré-encodée sans métadonnées)",
+        "summary": "Envoyer un texte ou une photo (ré-encodée sans métadonnées), en citant éventuellement un message",
         "tags": [
           "Messages"
         ]
@@ -4784,6 +4792,72 @@
           }
         ],
         "summary": "Une conversation : la personne, le statut (demande ou non), les non-lus",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/messages/{id}/reaction": {
+      "put": {
+        "operationId": "MessagingController_react",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Réagir à un message (une réaction par personne, remplace la précédente)",
+        "tags": [
+          "Messages"
+        ]
+      },
+      "delete": {
+        "operationId": "MessagingController_unreact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer ma réaction",
         "tags": [
           "Messages"
         ]
@@ -4958,6 +5032,72 @@
         ]
       }
     },
+    "/v1/shop/inbox/messages/{id}/reaction": {
+      "put": {
+        "operationId": "ShopInboxController_react",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Réagir au nom de la boutique (une réaction pour toute l’équipe)",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      },
+      "delete": {
+        "operationId": "ShopInboxController_unreact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer la réaction de la boutique",
+        "tags": [
+          "Messages de la boutique"
+        ]
+      }
+    },
     "/v1/shop/inbox/messages/{id}": {
       "delete": {
         "operationId": "ShopInboxController_remove",
@@ -5079,6 +5219,10 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "replyToId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 }
               }
@@ -5094,6 +5238,10 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "replyToId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 }
               }
@@ -9959,6 +10107,26 @@
         },
         "required": [
           "shopSlug"
+        ]
+      },
+      "ReactionDto": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "enum": [
+              "❤️",
+              "😂",
+              "😮",
+              "😢",
+              "🙏",
+              "👍"
+            ],
+            "example": "❤️"
+          }
+        },
+        "required": [
+          "emoji"
         ]
       },
       "QuickReplyDto": {

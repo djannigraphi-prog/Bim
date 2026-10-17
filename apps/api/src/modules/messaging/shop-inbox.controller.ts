@@ -7,7 +7,7 @@ import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { QuickReplyDto, SendMessageDto } from './dto';
+import { QuickReplyDto, ReactionDto, SendMessageDto } from './dto';
 import { ShopInboxBox, ShopInboxService } from './shop-inbox.service';
 
 const BOXES: ShopInboxBox[] = ['all', 'unread', 'archived', 'marked'];
@@ -54,6 +54,19 @@ export class ShopInboxController {
     return this.inbox.removeQuickReply(a.space.id, id);
   }
 
+  @Put('messages/:id/reaction')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Réagir au nom de la boutique (une réaction pour toute l’équipe)' })
+  react(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReactionDto, @Req() req: Request) {
+    return this.inbox.react(a.userId, a.space.id, id, dto.emoji, apiBase(req));
+  }
+
+  @Delete('messages/:id/reaction')
+  @ApiOperation({ summary: 'Retirer la réaction de la boutique' })
+  unreact(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.inbox.react(a.userId, a.space.id, id, null, apiBase(req));
+  }
+
   @Delete('messages/:id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Supprimer un message de la boutique (son auteur ou le propriétaire)' })
@@ -78,7 +91,7 @@ export class ShopInboxController {
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
   @ApiConsumes('application/json', 'multipart/form-data')
-  @ApiBody({ schema: { type: 'object', properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' } } } })
+  @ApiBody({ schema: { type: 'object', properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, replyToId: { type: 'string', format: 'uuid' } } } })
   @ApiOperation({ summary: 'Répondre au nom de la boutique (texte ou photo ré-encodée sans métadonnées)' })
   send(
     @CurrentAuth() a: AuthContext,
@@ -88,7 +101,7 @@ export class ShopInboxController {
     @ReqMeta() meta: RequestMeta,
     @Req() req: Request,
   ) {
-    return this.inbox.send(a.userId, a.space.id, id, { text: dto.text, photo }, meta, apiBase(req));
+    return this.inbox.send(a.userId, a.space.id, id, { text: dto.text, photo, replyToId: dto.replyToId }, meta, apiBase(req));
   }
 
   @Post(':id/read')

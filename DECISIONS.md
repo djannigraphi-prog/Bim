@@ -166,6 +166,14 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### M-6C — Messagerie : réactions et réponses citées (17/10/2026) · Fondateur (« poursuivre sans attendre le lot 8 ») · **réalisé** ; choix de réalisation à confirmer
+
+- Sous-lot prévu (« À venir : 6-C ») choisi parce qu'il ne dépend d'aucune décision ouverte, d'aucun paiement ni
+  d'aucun service externe. Messages vocaux, groupes et appels restent **soumis à accord**.
+- **Choix à confirmer** : six réactions (❤️ 😂 😮 😢 🙏 👍) ; une réaction par personne, ou une seule pour toute
+  l'équipe d'une boutique ; pas de réaction ni de réponse sur une demande non acceptée (règle E10 : lire une demande ne
+  prévient pas son auteur) ; aucune notification pour une réaction ; la citation affiche l'état actuel du message cité.
+
 ### L7-06 — Attribution des livraisons, 7-F, 7-G, évaluation des livraisons (16/10/2026, 22 h 27) · Fondateur · **décidé** ; **réalisé** ; choix de réalisation à confirmer
 
 - **Décision de référence (remplace l'arbitrage annonces / sélection de L7-04, §8 bis)** : la commande prête, le marchand

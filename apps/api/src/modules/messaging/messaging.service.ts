@@ -7,7 +7,7 @@ import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { conversationMembers, conversations, follows, messages, orderItems, orders, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
+import { MESSAGE_REACTIONS, conversationMembers, conversations, follows, messageReactions, messages, orderItems, orders, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
 import { ageOn } from '../age-policy/age';
 import { AuditService } from '../audit/audit.service';
 import { BimShopService } from '../catalog/bimshop.service';
@@ -21,6 +21,14 @@ type ConversationRow = typeof conversations.$inferSelect;
 type MemberRow = typeof conversationMembers.$inferSelect;
 type ShopRow = typeof shops.$inferSelect;
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/** 6-C — Partie qui lit : une personne en son nom, ou une boutique (toute son équipe). */
+export interface Viewer {
+  userId: string;
+  shopId: string | null;
+}
+
+export type Reaction = (typeof MESSAGE_REACTIONS)[number];
 
 /** Accès d'une personne à une conversation (6-A : avec une personne ; 6-B : avec une boutique, côté cliente). */
 interface Access {
@@ -354,9 +362,31 @@ export class MessagingService {
 
   // ------------------------------------------------------------------------------------------------ Messages
 
+  /** 6-C : le message a-t-il été écrit par cette partie ? */
+  static byViewer(m: MessageRow, v: Viewer) {
+    return v.shopId ? m.senderShopId === v.shopId : m.senderId === v.userId && m.senderShopId === null;
+  }
+
+  /** 6-C : message cité, vu par cette partie (aperçu actuel : « Message supprimé » si l'original l'est). */
+  private async quoted(replyToId: string | null, v: Viewer) {
+    if (!replyToId) return null;
+    const [q] = await this.db.select().from(messages).where(eq(messages.id, replyToId)).limit(1);
+    if (!q) return null;
+    return { id: q.id, senderIsMe: MessagingService.byViewer(q, v), kind: q.kind, status: q.status, preview: this.preview(q) };
+  }
+
+  /** 6-C : réactions d'un message publié (par émoji, dans l'ordre de la liste) et celle de cette partie. */
+  private async reactionsOf(messageId: string, v: Viewer) {
+    const rows = await this.db.select().from(messageReactions).where(eq(messageReactions.messageId, messageId));
+    const items = MESSAGE_REACTIONS.map((emoji) => ({ emoji, count: rows.filter((r) => r.emoji === emoji).length })).filter((x) => x.count > 0);
+    const mine = rows.find((r) => (v.shopId ? r.shopId === v.shopId : r.userId === v.userId && r.shopId === null));
+    return { items, mine: mine?.emoji ?? null };
+  }
+
   /** Vue d'un message ; `mine` = écrit par moi (ou par ma boutique, côté boutique). */
-  async view(m: MessageRow, mine: boolean, otherReadId: string | null, apiBase: string) {
+  async view(m: MessageRow, mine: boolean, otherReadId: string | null, apiBase: string, viewer?: Viewer) {
     const visible = m.status === 'published';
+    const v = viewer ?? { userId: m.senderId, shopId: null };
     return {
       id: m.id,
       senderIsMe: mine,
@@ -370,6 +400,10 @@ export class MessagingService {
       read: mine ? !!otherReadId && otherReadId >= m.id : null,
       /** 7-B : carte d'une proposition de commande (l'état réel se lit dans la commande). */
       order: visible && m.kind === 'order' && m.orderId ? await this.orderCard(m.orderId) : null,
+      /** 6-C : message cité (réponse citée). */
+      replyTo: visible ? await this.quoted(m.replyToId, v) : null,
+      /** 6-C : réactions (aucune sur un message supprimé ou masqué). */
+      reactions: visible ? await this.reactionsOf(m.id, v) : { items: [], mine: null },
     };
   }
 
@@ -399,7 +433,7 @@ export class MessagingService {
    * même transaction (état de lecture, archivage). La photo est effacée du stockage si l'enregistrement échoue.
    */
   async persist(
-    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; meta: RequestMeta },
+    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; replyToId?: string; meta: RequestMeta },
     after: (tx: Tx, id: string, now: Date) => Promise<void>,
   ): Promise<MessageRow> {
     const text = p.text?.trim();
@@ -407,6 +441,14 @@ export class MessagingService {
     if (text && p.photo) throw Errors.validation({ fields: { text: ['Un message contient un texte ou une photo.'] } });
     if (text && text.length > 2000) throw Errors.validation({ fields: { text: ['2000 caractères au plus.'] } });
     if (p.photo && !this.storage.available) throw Errors.notConfigured('Le stockage des photos');
+    if (p.replyToId) {
+      // 6-C : on ne cite qu'un message publié de la même conversation.
+      const [q] = await this.db
+        .select({ id: messages.id })
+        .from(messages)
+        .where(and(eq(messages.id, p.replyToId), eq(messages.conversationId, p.conversationId), eq(messages.status, 'published')));
+      if (!q) throw Errors.validation({ fields: { replyToId: ['Ce message ne peut pas être cité.'] } });
+    }
     const max = await this.limit('messages.daily_limit', 500);
     const id = uuidv7();
     let key: string | null = null;
@@ -432,6 +474,7 @@ export class MessagingService {
           mediaKey: key,
           mediaWidth: img?.width ?? null,
           mediaHeight: img?.height ?? null,
+          replyToId: p.replyToId ?? null,
           createdAt: now,
         });
         await tx.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, p.conversationId));
@@ -445,7 +488,7 @@ export class MessagingService {
             targetId: p.conversationId,
             ip: p.meta.ip,
             userAgent: p.meta.userAgent,
-            metadata: { kind: img ? 'photo' : 'text', ...(p.senderShopId ? { shopId: p.senderShopId } : {}) },
+            metadata: { kind: img ? 'photo' : 'text', ...(p.senderShopId ? { shopId: p.senderShopId } : {}), ...(p.replyToId ? { reply: true } : {}) },
           },
           tx,
         );
@@ -463,13 +506,13 @@ export class MessagingService {
     const { otherReadId } = await this.access(userId, conversationId);
     const { rows, nextBefore } = await this.page(conversationId, before);
     const items = [];
-    for (const m of rows) items.push(await this.view(m, this.mine(m, userId), otherReadId, apiBase));
+    for (const m of rows) items.push(await this.view(m, this.mine(m, userId), otherReadId, apiBase, { userId, shopId: null }));
     return { items, nextBefore };
   }
 
-  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File }, meta: RequestMeta, apiBase: string) {
+  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
     const { conv, me, otherReadId } = await this.access(userId, conversationId);
-    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, meta }, async (tx, id, now) => {
+    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, replyToId: input.replyToId, meta }, async (tx, id, now) => {
       // Répondre à une demande vaut acceptation ; mon propre message est lu.
       await tx
         .update(conversationMembers)
@@ -479,7 +522,51 @@ export class MessagingService {
       if (conv.kind === 'shop') await tx.update(conversations).set({ shopArchivedAt: null }).where(eq(conversations.id, conversationId));
       // L'autre personne avait refusé ma demande : le message reste invisible pour elle (elle n'est pas relancée).
     });
-    return this.view(m, true, otherReadId, apiBase);
+    return this.view(m, true, otherReadId, apiBase, { userId, shopId: null });
+  }
+
+  // ------------------------------------------------------------------------------------------------ Réactions (6-C)
+
+  static checkReaction(emoji: string): Reaction {
+    if (!(MESSAGE_REACTIONS as readonly string[]).includes(emoji)) throw Errors.validation({ fields: { emoji: [`Réactions possibles : ${MESSAGE_REACTIONS.join(' ')}`] } });
+    return emoji as Reaction;
+  }
+
+  /**
+   * Pose, change (`emoji`) ou retire (`null`) la réaction d'une partie sur un message publié. Une seule par partie :
+   * l'index unique de la base départage deux requêtes simultanées.
+   */
+  async setReaction(tx: Database | Tx, messageId: string, v: Viewer, emoji: Reaction | null) {
+    if (emoji === null) {
+      await tx
+        .delete(messageReactions)
+        .where(and(eq(messageReactions.messageId, messageId), v.shopId ? eq(messageReactions.shopId, v.shopId) : and(eq(messageReactions.userId, v.userId), isNull(messageReactions.shopId))));
+      return;
+    }
+    const values = { id: uuidv7(), messageId, userId: v.userId, shopId: v.shopId, emoji };
+    if (v.shopId) {
+      await tx
+        .insert(messageReactions)
+        .values(values)
+        .onConflictDoUpdate({ target: [messageReactions.messageId, messageReactions.shopId], targetWhere: sql`shop_id IS NOT NULL`, set: { emoji, userId: v.userId, createdAt: new Date() } });
+    } else {
+      await tx
+        .insert(messageReactions)
+        .values(values)
+        .onConflictDoUpdate({ target: [messageReactions.messageId, messageReactions.userId], targetWhere: sql`shop_id IS NULL`, set: { emoji, createdAt: new Date() } });
+    }
+  }
+
+  /** Réagir (ou retirer ma réaction) à un message d'une conversation où j'écris en mon nom. */
+  async react(userId: string, messageId: string, emoji: string | null, apiBase: string) {
+    const [m] = await this.db.select().from(messages).where(eq(messages.id, messageId));
+    if (!m) throw Errors.notFound('Message');
+    const { me, otherReadId } = await this.access(userId, m.conversationId);
+    // Réagir à une demande préviendrait son auteur qu'elle a été lue (E10) : accepter d'abord.
+    if (me.status === 'request') throw Errors.conflict('REQUEST_PENDING', 'Accepte d’abord cette demande pour réagir.');
+    if (m.status !== 'published') throw Errors.notFound('Message');
+    await this.setReaction(this.db, m.id, { userId, shopId: null }, emoji === null ? null : MessagingService.checkReaction(emoji));
+    return this.view(m, this.mine(m, userId), otherReadId, apiBase, { userId, shopId: null });
   }
 
   /** Conversation lue jusqu'au dernier message (statut « Vu » chez l'autre personne). */
@@ -510,6 +597,7 @@ export class MessagingService {
     if (!m) throw Errors.notFound('Message');
     await this.access(userId, m.conversationId);
     await this.db.update(messages).set({ status: 'deleted', text: null, mediaKey: null }).where(eq(messages.id, m.id));
+    await this.db.delete(messageReactions).where(eq(messageReactions.messageId, m.id));
     if (m.mediaKey) await this.storage.remove(m.mediaKey).catch(() => undefined);
   }
 

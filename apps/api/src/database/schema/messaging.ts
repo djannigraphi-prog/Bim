@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { AnyPgColumn, check, index, integer, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { products } from './catalog';
 import { orders } from './orders';
 import { users } from './identity';
@@ -98,6 +98,8 @@ export const messages = pgTable(
     orderId: uuid('order_id').references(() => orders.id),
     mediaWidth: integer('media_width'),
     mediaHeight: integer('media_height'),
+    /** 6-C : message cité (réponse citée), toujours de la même conversation (contrôlé par le serveur et la base). */
+    replyToId: uuid('reply_to_id').references((): AnyPgColumn => messages.id),
     status: varchar('status', { length: 10 }).notNull().default('published'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -107,6 +109,35 @@ export const messages = pgTable(
     check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo', 'order')`),
     check('messages_status_ck', sql`${t.status} IN ('published', 'deleted', 'hidden')`),
     check('messages_content_ck', sql`(${t.kind} = 'text' AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR (${t.kind} = 'order' AND ${t.orderId} IS NOT NULL) OR ${t.status} <> 'published'`),
+  ],
+);
+
+/** 6-C — Réactions proposées (liste fermée, administrée dans le code). */
+export const MESSAGE_REACTIONS = ['❤️', '😂', '😮', '😢', '🙏', '👍'] as const;
+
+/**
+ * 6-C — Réaction à un message : une par partie (une personne, ou la boutique pour toute son équipe), modifiable ou
+ * retirée. `user_id` garde la personne qui a réagi (au nom de la boutique, la personne de l'équipe).
+ */
+export const messageReactions = pgTable(
+  'message_reactions',
+  {
+    id: uuid('id').primaryKey(),
+    messageId: uuid('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Réaction au nom de la boutique (conversation avec une boutique, côté boutique). */
+    shopId: uuid('shop_id').references(() => shops.id),
+    emoji: varchar('emoji', { length: 16 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('message_reactions_person_uq').on(t.messageId, t.userId).where(sql`${t.shopId} IS NULL`),
+    uniqueIndex('message_reactions_shop_uq').on(t.messageId, t.shopId).where(sql`${t.shopId} IS NOT NULL`),
+    check('message_reactions_emoji_ck', sql.raw(`emoji IN (${MESSAGE_REACTIONS.map((e) => `'${e}'`).join(', ')})`)),
   ],
 );
 

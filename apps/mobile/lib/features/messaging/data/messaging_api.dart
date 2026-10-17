@@ -119,8 +119,35 @@ class OrderCard {
       OrderCard(id: j['id'] as String, number: j['number'] as String, status: j['status'] as String, itemsTotalFcfa: j['itemsTotalFcfa'] as int, title: j['title'] as String?);
 }
 
+/// 6-C — Réactions proposées (liste fermée, la même que celle du serveur).
+const messageReactions = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
+
+/// 6-C — Message cité dans une réponse : aperçu actuel (« Message supprimé » si l'original l'est).
+class QuotedMessage {
+  const QuotedMessage({required this.id, required this.mine, required this.preview, this.status = 'published'});
+  final String id;
+  final bool mine;
+  final String preview;
+  final String status;
+  factory QuotedMessage.fromJson(Map<String, dynamic> j) =>
+      QuotedMessage(id: j['id'] as String, mine: (j['senderIsMe'] ?? false) as bool, preview: (j['preview'] ?? '') as String, status: (j['status'] ?? 'published') as String);
+}
+
 class ChatMessage {
-  const ChatMessage({required this.id, required this.mine, required this.kind, required this.status, required this.createdAt, this.text, this.photoUrl, this.read, this.order});
+  const ChatMessage({
+    required this.id,
+    required this.mine,
+    required this.kind,
+    required this.status,
+    required this.createdAt,
+    this.text,
+    this.photoUrl,
+    this.read,
+    this.order,
+    this.replyTo,
+    this.reactions = const [],
+    this.myReaction,
+  });
 
   final String id;
   final bool mine;
@@ -133,6 +160,11 @@ class ChatMessage {
   /// Mes messages : lus par l'autre personne.
   final bool? read;
   final OrderCard? order;
+  /// 6-C : message cité.
+  final QuotedMessage? replyTo;
+  /// 6-C : réactions par émoji (ordre de la liste) et la mienne (ou celle de ma boutique).
+  final List<({String emoji, int count})> reactions;
+  final String? myReaction;
 
   bool get visible => status == 'published';
   /// Types connus de cette version (texte, photo). Les types à venir (cartes de commande, lot 7) s'affichent
@@ -149,17 +181,31 @@ class ChatMessage {
         photoUrl: j['photoUrl'] as String?,
         read: j['read'] as bool?,
         order: j['order'] == null ? null : OrderCard.fromJson(j['order'] as Map<String, dynamic>),
+        replyTo: j['replyTo'] == null ? null : QuotedMessage.fromJson(j['replyTo'] as Map<String, dynamic>),
+        reactions: [
+          for (final r in ((j['reactions'] as Map<String, dynamic>?)?['items'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) (emoji: r['emoji'] as String, count: r['count'] as int),
+        ],
+        myReaction: (j['reactions'] as Map<String, dynamic>?)?['mine'] as String?,
       );
+
+  /// Aperçu court (bandeau « Réponse à »).
+  String get preview => switch (status) {
+        'deleted' => 'Message supprimé',
+        'hidden' => 'Message masqué par la modération',
+        _ => kind == 'photo' ? 'Photo' : (kind == 'order' ? 'Proposition de commande' : (text ?? '')),
+      };
 }
 
 /// Opérations d'une conversation ouverte : côté personne (6-A, et cliente d'une boutique) ou côté boutique (6-B).
 abstract class ConversationBackend {
   Future<ConversationSummary> conversation(String id);
   Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before});
-  Future<ChatMessage> sendText(String conversationId, String text);
+  Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId});
   Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes);
   Future<void> read(String conversationId);
   Future<void> deleteMessage(String id);
+  /// 6-C : poser ou changer (`emoji`) ou retirer (`null`) ma réaction ; renvoie le message à jour.
+  Future<ChatMessage> react(String messageId, String? emoji);
 }
 
 class MessagingApi implements ConversationBackend {
@@ -199,8 +245,13 @@ class MessagingApi implements ConversationBackend {
   }
 
   @override
-  Future<ChatMessage> sendText(String conversationId, String text) async =>
-      ChatMessage.fromJson(await _api.post('/v1/conversations/$conversationId/messages', body: {'text': text}));
+  Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId}) async =>
+      ChatMessage.fromJson(await _api.post('/v1/conversations/$conversationId/messages', body: {'text': text, if (replyToId != null) 'replyToId': replyToId}));
+
+  @override
+  Future<ChatMessage> react(String messageId, String? emoji) async => ChatMessage.fromJson(
+        emoji == null ? await _api.delete('/v1/messages/$messageId/reaction') : await _api.put('/v1/messages/$messageId/reaction', body: {'emoji': emoji}),
+      );
 
   @override
   Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes) async => ChatMessage.fromJson(
@@ -248,8 +299,13 @@ class ShopInboxApi implements ConversationBackend {
   }
 
   @override
-  Future<ChatMessage> sendText(String conversationId, String text) async =>
-      ChatMessage.fromJson(await _api.post('/v1/shop/inbox/$conversationId/messages', body: {'text': text}));
+  Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId}) async =>
+      ChatMessage.fromJson(await _api.post('/v1/shop/inbox/$conversationId/messages', body: {'text': text, if (replyToId != null) 'replyToId': replyToId}));
+
+  @override
+  Future<ChatMessage> react(String messageId, String? emoji) async => ChatMessage.fromJson(
+        emoji == null ? await _api.delete('/v1/shop/inbox/messages/$messageId/reaction') : await _api.put('/v1/shop/inbox/messages/$messageId/reaction', body: {'emoji': emoji}),
+      );
 
   @override
   Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes) async => ChatMessage.fromJson(

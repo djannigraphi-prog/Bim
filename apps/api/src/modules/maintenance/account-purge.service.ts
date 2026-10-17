@@ -65,6 +65,8 @@ export const PURGE_BLOCKING_TABLES = [
   'reviews',
   // Lot 7-F : solliciter un livreur est une activité.
   'delivery_offers',
+  // Lot 6-C : réagir à un message est une activité.
+  'message_reactions',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */

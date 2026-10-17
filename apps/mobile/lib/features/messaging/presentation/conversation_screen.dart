@@ -22,6 +22,8 @@ const conversationRefresh = Duration(seconds: 5);
 /// Lot 6-A — Une conversation : messages (texte, photo), « Vu », demande à accepter ou refuser, signalement.
 /// Lot 6-B — Aussi avec une boutique (écran 48) : côté cliente (bandeau de l'article, « Commander » annoncé pour le
 /// lot 7) ou côté boutique (`asShop`, depuis l'espace boutique, avec les réponses rapides).
+/// Lot 6-C — Réagir à un message (appui long : un émoji, une réaction par personne ou par boutique) et répondre en le
+/// citant.
 class ConversationScreen extends ConsumerStatefulWidget {
   const ConversationScreen({super.key, required this.conversationId, this.refreshEvery = conversationRefresh, this.asShop = false});
 
@@ -42,6 +44,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   bool _loading = true;
   bool _sending = false;
   Object? _error;
+  /// 6-C : message auquel je réponds (bandeau au-dessus de la saisie).
+  ChatMessage? _replyTo;
   Timer? _timer;
 
   ConversationBackend get _api => widget.asShop ? ref.read(shopInboxApiProvider) : ref.read(messagingApiProvider);
@@ -137,10 +141,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (photo == null && text.isEmpty) return;
     setState(() => _sending = true);
     try {
-      final m = photo != null ? await _api.sendPhoto(widget.conversationId, photo) : await _api.sendText(widget.conversationId, text);
+      final m = photo != null ? await _api.sendPhoto(widget.conversationId, photo) : await _api.sendText(widget.conversationId, text, replyToId: _replyTo?.id);
       if (!mounted) return;
       if (photo == null) _input.clear();
-      setState(() => _messages = [m, ..._messages]);
+      setState(() {
+        _messages = [m, ..._messages];
+        if (photo == null) _replyTo = null;
+      });
       // Répondre à une demande vaut acceptation : statut mis à jour.
       if (_conversation?.isRequest ?? false) {
         final updated = await _api.conversation(widget.conversationId);
@@ -187,14 +194,46 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     }
   }
 
+  /// 6-C : poser, changer ou retirer (même émoji) ma réaction ; le serveur renvoie le message à jour.
+  Future<void> _react(ChatMessage m, String emoji) async {
+    try {
+      final updated = await _api.react(m.id, m.myReaction == emoji ? null : emoji);
+      if (mounted) setState(() => _messages = [for (final x in _messages) x.id == m.id ? updated : x]);
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
   Future<void> _messageMenu(ChatMessage m) async {
     if (!m.visible) return;
+    // Demande pas encore acceptée : ni réaction ni réponse (lire une demande ne prévient pas son auteur).
+    final canAnswer = !(_conversation?.isRequest ?? false);
     final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (canAnswer) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: BimSpacing.sm),
+                child: Wrap(
+                  key: const ValueKey('reaction-picker'),
+                  alignment: WrapAlignment.center,
+                  spacing: BimSpacing.xs,
+                  children: [
+                    for (final (i, e) in messageReactions.indexed)
+                      ChoiceChip(
+                        key: ValueKey('reaction-$i'),
+                        label: Text(e, style: const TextStyle(fontSize: 22)),
+                        selected: m.myReaction == e,
+                        onSelected: (_) => Navigator.pop(ctx, 'react:$e'),
+                      ),
+                  ],
+                ),
+              ),
+              ListTile(key: const ValueKey('message-reply'), leading: const Icon(Icons.reply_outlined), title: const Text('Répondre'), onTap: () => Navigator.pop(ctx, 'reply')),
+            ],
             if (m.mine)
               ListTile(key: const ValueKey('message-delete'), leading: const Icon(Icons.delete_outline), title: const Text('Supprimer pour tout le monde'), onTap: () => Navigator.pop(ctx, 'delete'))
             else
@@ -204,13 +243,26 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       ),
     );
     if (!mounted || choice == null) return;
+    if (choice.startsWith('react:')) {
+      await _react(m, choice.substring(6));
+      return;
+    }
+    if (choice == 'reply') {
+      setState(() => _replyTo = m);
+      return;
+    }
     if (choice == 'report') {
       await showReportContentSheet(context, ref, targetType: 'message', targetId: m.id);
       return;
     }
     try {
       await _api.deleteMessage(m.id);
-      if (mounted) setState(() => _messages = [for (final x in _messages) x.id == m.id ? ChatMessage(id: x.id, mine: true, kind: x.kind, status: 'deleted', createdAt: x.createdAt) : x]);
+      if (mounted) {
+        setState(() {
+          _messages = [for (final x in _messages) x.id == m.id ? ChatMessage(id: x.id, mine: true, kind: x.kind, status: 'deleted', createdAt: x.createdAt) : x];
+          if (_replyTo?.id == m.id) _replyTo = null;
+        });
+      }
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     }
@@ -293,7 +345,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                               return Center(child: TextButton(key: const ValueKey('messages-older'), onPressed: _more, child: const Text('Messages précédents')));
                             }
                             final m = _messages[i];
-                            return _Bubble(message: m, asShop: widget.asShop, showRead: identical(m, lastMineRead) && (m.read ?? false), onLongPress: () => _messageMenu(m));
+                            return _Bubble(
+                              message: m,
+                              asShop: widget.asShop,
+                              otherName: c?.title ?? '',
+                              showRead: identical(m, lastMineRead) && (m.read ?? false),
+                              onLongPress: () => _messageMenu(m),
+                            );
                           },
                         ),
             ),
@@ -315,6 +373,27 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 ),
               )
             else ...[
+              if (_replyTo != null)
+                Container(
+                  key: const ValueKey('reply-banner'),
+                  color: theme.colorScheme.surfaceContainerLow,
+                  padding: const EdgeInsets.fromLTRB(BimSpacing.md, BimSpacing.xs, BimSpacing.xs, BimSpacing.xs),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.reply_outlined, size: 18),
+                      const SizedBox(width: BimSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Réponse à ${_replyTo!.mine ? 'toi' : (c?.title ?? '')} : ${_replyTo!.preview}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      IconButton(key: const ValueKey('reply-cancel'), tooltip: 'Ne plus répondre à ce message', icon: const Icon(Icons.close), onPressed: () => setState(() => _replyTo = null)),
+                    ],
+                  ),
+                ),
               if (widget.asShop) _QuickReplies(onPick: (t) => setState(() => _input.text = t)),
               Padding(
                 padding: EdgeInsets.fromLTRB(BimSpacing.sm, BimSpacing.xs, BimSpacing.sm, BimSpacing.sm + MediaQuery.viewInsetsOf(context).bottom),
@@ -353,9 +432,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, required this.showRead, required this.onLongPress, this.asShop = false});
+  const _Bubble({required this.message, required this.showRead, required this.onLongPress, this.asShop = false, this.otherName = ''});
 
   final ChatMessage message;
+  final String otherName;
   final bool asShop;
   final bool showRead;
   final VoidCallback onLongPress;
@@ -382,6 +462,7 @@ class _Bubble extends StatelessWidget {
             )
           : Text(m.text ?? '', style: TextStyle(color: fg, fontSize: 16)),
     };
+    final q = m.visible ? m.replyTo : null;
     return Align(
       alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
@@ -395,9 +476,57 @@ class _Bubble extends StatelessWidget {
               margin: const EdgeInsets.symmetric(vertical: 3),
               padding: m.kind == 'photo' && m.visible ? const EdgeInsets.all(4) : const EdgeInsets.symmetric(horizontal: BimSpacing.md, vertical: BimSpacing.sm),
               decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(BimRadius.card)),
-              child: content,
+              child: q == null
+                  ? content
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 6-C : message cité.
+                        Container(
+                          key: ValueKey('quote-${m.id}'),
+                          margin: const EdgeInsets.only(bottom: BimSpacing.xs),
+                          padding: const EdgeInsets.symmetric(horizontal: BimSpacing.sm, vertical: BimSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: fg.withValues(alpha: 0.12),
+                            border: Border(left: BorderSide(color: fg, width: 3)),
+                            borderRadius: BorderRadius.circular(BimRadius.chip),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(q.mine ? 'Toi' : otherName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12)),
+                              Text(
+                                q.preview,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: fg, fontSize: 13, fontStyle: q.status == 'published' ? FontStyle.normal : FontStyle.italic),
+                              ),
+                            ],
+                          ),
+                        ),
+                        content,
+                      ],
+                    ),
             ),
           ),
+          // 6-C : réactions sous la bulle.
+          if (m.visible && m.reactions.isNotEmpty)
+            Wrap(
+              key: ValueKey('reactions-${m.id}'),
+              spacing: 4,
+              children: [
+                for (final r in m.reactions)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: r.emoji == m.myReaction ? BimColors.redSoft : scheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(BimRadius.chip),
+                    ),
+                    child: Text(r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji, style: const TextStyle(fontSize: 13)),
+                  ),
+              ],
+            ),
           if (showRead) Text('Vu', key: const ValueKey('message-read'), style: theme.textTheme.bodySmall),
         ],
       ),

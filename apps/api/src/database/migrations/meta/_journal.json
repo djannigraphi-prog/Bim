@@ -253,6 +253,13 @@
       "when": 1792189762003,
       "tag": "0035_deliveries",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792206358686,
+      "tag": "0036_messaging_reactions",
+      "breakpoints": true
     }
   ]
 }

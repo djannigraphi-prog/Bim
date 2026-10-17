@@ -65,11 +65,27 @@ class _FakeMessaging extends MessagingApi {
       );
 
   @override
-  Future<ChatMessage> sendText(String conversationId, String text) async {
-    calls.add('send $text');
-    final m = ChatMessage(id: 'm${4 + sent.length}', mine: true, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 10), text: text, read: false);
+  Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId}) async {
+    calls.add(replyToId == null ? 'send $text' : 'send $text (réponse à $replyToId)');
+    final quoted = replyToId == null ? null : QuotedMessage(id: replyToId, mine: false, preview: 'Ça va bien');
+    final m = ChatMessage(id: 'm${4 + sent.length}', mine: true, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 10), text: text, read: false, replyTo: quoted);
     sent.add(m);
     return m;
+  }
+
+  @override
+  Future<ChatMessage> react(String messageId, String? emoji) async {
+    calls.add('react $messageId ${emoji ?? '-'}');
+    return ChatMessage(
+      id: messageId,
+      mine: false,
+      kind: 'text',
+      status: 'published',
+      createdAt: DateTime(2026, 10, 16, 9, 1),
+      text: 'Ça va bien',
+      reactions: emoji == null ? const [] : [(emoji: emoji, count: 1)],
+      myReaction: emoji,
+    );
   }
 
   @override
@@ -161,7 +177,7 @@ class _FakeShopInbox extends ShopInboxApi {
       );
 
   @override
-  Future<ChatMessage> sendText(String conversationId, String text) async {
+  Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId}) async {
     calls.add('send $text');
     return ChatMessage(id: 'm2', mine: true, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 16, 10), text: text, read: false);
   }
@@ -313,5 +329,46 @@ void main() {
     // Rien n'est passé par la messagerie des personnes.
     expect(api.calls, isEmpty);
     expect(find.text('Oui, dès demain.'), findsWidgets);
+  });
+
+  testWidgets('6-C : réagir par appui long (une réaction, retirée en la touchant de nouveau), répondre en citant', (tester) async {
+    final api = _FakeMessaging();
+    await _pump(tester, api, const ConversationScreen(conversationId: 'c1', refreshEvery: null));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.longPress(find.byKey(const ValueKey('message-m2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reaction-picker')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('reaction-0')));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byKey(const ValueKey('reactions-m2')), matching: find.text('❤️')), findsOneWidget);
+    // Même émoji : la réaction est retirée.
+    await tester.longPress(find.byKey(const ValueKey('message-m2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reaction-0')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reactions-m2')), findsNothing);
+    // Répondre : bandeau, envoi avec le message cité, bandeau refermé.
+    await tester.longPress(find.byKey(const ValueKey('message-m2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('message-reply')));
+    await tester.pumpAndSettle();
+    expect(find.text('Réponse à Awa Koné : Ça va bien'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('message-input')), 'Super !');
+    await tester.tap(find.byKey(const ValueKey('message-send')));
+    await tester.pumpAndSettle();
+    expect(api.calls.where((c) => c.startsWith('react') || c.startsWith('send')), ['react m2 ❤️', 'react m2 -', 'send Super ! (réponse à m2)']);
+    expect(find.byKey(const ValueKey('reply-banner')), findsNothing);
+    expect(find.byKey(const ValueKey('quote-m4')), findsOneWidget);
+  });
+
+  testWidgets('6-C : demande reçue, ni réaction ni réponse (l’auteur n’apprend pas qu’elle est lue)', (tester) async {
+    final api = _FakeMessaging(status: 'request');
+    await _pump(tester, api, const ConversationScreen(conversationId: 'r1', refreshEvery: null));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.longPress(find.byKey(const ValueKey('message-m2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reaction-picker')), findsNothing);
+    expect(find.byKey(const ValueKey('message-reply')), findsNothing);
+    expect(find.byKey(const ValueKey('message-report')), findsOneWidget);
   });
 }

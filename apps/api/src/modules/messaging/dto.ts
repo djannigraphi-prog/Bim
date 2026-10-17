@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, Length, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, Length, MaxLength } from 'class-validator';
+import { MESSAGE_REACTIONS } from '../../database/schema';
 
 export class StartConversationDto {
   @ApiProperty({ example: 'awa.kone', description: 'Nom d’utilisateur de la personne' }) @IsString() @Length(2, 40) username!: string;
@@ -7,6 +8,12 @@ export class StartConversationDto {
 
 export class SendMessageDto {
   @ApiPropertyOptional({ maxLength: 2000 }) @IsOptional() @IsString() @MaxLength(2000) text?: string;
+  @ApiPropertyOptional({ description: '6-C : message cité (même conversation, publié)' }) @IsOptional() @IsUUID() replyToId?: string;
+}
+
+/** 6-C — Réaction à un message (liste fermée). */
+export class ReactionDto {
+  @ApiProperty({ enum: MESSAGE_REACTIONS, example: '❤️' }) @IsIn(MESSAGE_REACTIONS as unknown as string[]) emoji!: string;
 }
 
 /** 6-B — Écrire à une boutique (« Discuter »), depuis un article, une offre de projet ou le profil de la boutique. */

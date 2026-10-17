@@ -6,7 +6,7 @@ import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { conversationMembers, conversations, messages, shopMembers, shopQuickReplies, shops, users } from '../../database/schema';
+import { conversationMembers, conversations, messageReactions, messages, shopMembers, shopQuickReplies, shops, users } from '../../database/schema';
 import { StorageService } from '../media/storage';
 import { MessagingService } from './messaging.service';
 
@@ -133,17 +133,27 @@ export class ShopInboxService {
     const { member } = await this.access(shopId, conversationId);
     const { rows, nextBefore } = await this.messaging.page(conversationId, before);
     const items = [];
-    for (const m of rows) items.push(await this.messaging.view(m, m.senderShopId === shopId, member.lastReadMessageId, apiBase));
+    for (const m of rows) items.push(await this.messaging.view(m, m.senderShopId === shopId, member.lastReadMessageId, apiBase, { userId: '', shopId }));
     return { items, nextBefore };
   }
 
   /** Répondre au nom de la boutique ; la conversation est lue par la boutique jusqu'à ce message. */
-  async send(userId: string, shopId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File }, meta: RequestMeta, apiBase: string) {
+  async send(userId: string, shopId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
     const { member } = await this.access(shopId, conversationId);
-    const m = await this.messaging.persist({ conversationId, senderId: userId, senderShopId: shopId, text: input.text, photo: input.photo, meta }, async (tx, id) => {
+    const m = await this.messaging.persist({ conversationId, senderId: userId, senderShopId: shopId, text: input.text, photo: input.photo, replyToId: input.replyToId, meta }, async (tx, id) => {
       await tx.update(conversations).set({ shopLastReadMessageId: id }).where(eq(conversations.id, conversationId));
     });
-    return this.messaging.view(m, true, member.lastReadMessageId, apiBase);
+    return this.messaging.view(m, true, member.lastReadMessageId, apiBase, { userId, shopId });
+  }
+
+  /** 6-C — Réagir au nom de la boutique (une réaction pour toute l'équipe ; la personne qui l'a posée est gardée). */
+  async react(userId: string, shopId: string, messageId: string, emoji: string | null, apiBase: string) {
+    const [m] = await this.db.select().from(messages).where(eq(messages.id, messageId));
+    if (!m) throw Errors.notFound('Message');
+    const { member } = await this.access(shopId, m.conversationId);
+    if (m.status !== 'published') throw Errors.notFound('Message');
+    await this.messaging.setReaction(this.db, m.id, { userId, shopId }, emoji === null ? null : MessagingService.checkReaction(emoji));
+    return this.messaging.view(m, m.senderShopId === shopId, member.lastReadMessageId, apiBase, { userId, shopId });
   }
 
   /** Conversation lue par la boutique (statut « Vu » chez la cliente). */
@@ -184,6 +194,7 @@ export class ShopInboxService {
       if (!owner) throw Errors.forbidden('Seule la personne qui a écrit ce message, ou le propriétaire de la boutique, peut le supprimer.');
     }
     await this.db.update(messages).set({ status: 'deleted', text: null, mediaKey: null }).where(eq(messages.id, m.id));
+    await this.db.delete(messageReactions).where(eq(messageReactions.messageId, m.id));
     if (m.mediaKey) await this.storage.remove(m.mediaKey).catch(() => undefined);
   }
 
