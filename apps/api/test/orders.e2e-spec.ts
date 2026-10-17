@@ -168,6 +168,21 @@ describe('Commandes (e2e)', () => {
     expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body).toMatchObject({ status: 'ready', handoverCode: null, handoverCodeStatus: 'blocked' });
   });
 
+  it('confirmations simultanées répétées : jamais d’erreur interne (verrou de la variante pris avant le mouvement de stock)', async () => {
+    // Défaut constaté le 17/10/2026 (CI de main, run 39011291038) : 500 au lieu de 409, par interblocage entre le
+    // verrou de clé étrangère du mouvement de stock et le verrou de la variante pris ensuite par le déclencheur.
+    const s = await shop();
+    for (let round = 0; round < 8; round++) {
+      const p = await product(s, { stock: 1 });
+      const items = [{ productId: p.id, variantId: p.variant, quantity: 1 }];
+      const os = [];
+      for (let i = 0; i < 3; i++) os.push((await order(await person(), { shopId: s.shopId, items, deliveryMode: 'pickup', expectedTotalFcfa: 20000 })).body);
+      const rs = await Promise.all(os.map((o) => h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(s.auth)));
+      expect(rs.map((r) => r.status).sort()).toEqual([200, 409, 409]);
+      expect(await stock(p.variant)).toBe(0);
+    }
+  });
+
   it('survente impossible : deux commandes pour le dernier article, la seconde confirmation est refusée', async () => {
     const s = await shop();
     const p = await product(s, { stock: 1 });

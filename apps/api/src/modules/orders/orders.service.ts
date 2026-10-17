@@ -460,6 +460,11 @@ export class OrdersService {
   /** Stock retiré à la confirmation (mouvements « sale ») ; la base refuse tout stock négatif : survente impossible. */
   private async commitStock(tx: Tx, orderId: string, actorId: string) {
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+    // Verrou des variantes AVANT les mouvements, dans un ordre fixe : sinon deux confirmations simultanées prennent
+    // chacune le verrou partagé de la clé étrangère du mouvement, puis attendent l'une l'autre dans le déclencheur
+    // de stock (interblocage, erreur 500 au lieu de « stock insuffisant » ; CI de main, run 39011291038).
+    const variantIds = [...new Set(items.filter((it) => it.kind === 'product' && it.variantId).map((it) => it.variantId!))].sort();
+    for (const v of variantIds) await tx.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.id, v)).for('update');
     for (const it of items) {
       if (it.kind !== 'product') continue;
       try {
