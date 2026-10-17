@@ -7,7 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../bimshop/data/bimshop_api.dart';
-import '../application/social_providers.dart';
+import '../data/social_api.dart';
 import '../data/social_models.dart';
 
 /// Lot 5-E — « Produits et services utilisés » d'un « J'ai fait mon BIM » (écran 11, règle E2).

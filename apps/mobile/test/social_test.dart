@@ -140,7 +140,7 @@ class _FakeBimShop extends BimShopApi {
     queries.add(query.q);
     return (
       items: const [
-        ShopCard(id: 'x3', kind: 'product', title: 'Bandeau', priceFcfa: 3000, available: true, shop: ShopRef(id: 's2', name: 'Maison Awa', slug: 'maison-awa')),
+        ShopCard(id: 'x3', kind: 'product', title: 'Bandeau', priceFcfa: 3000, available: true, shop: ShopRef(id: 's2', name: 'Maison Awa', slug: 'maison-awa', verified: false)),
       ],
       nextCursor: null,
     );
