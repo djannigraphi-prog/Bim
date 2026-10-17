@@ -75,7 +75,8 @@ export const orders = pgTable(
     check('orders_mode_ck', sql`${t.deliveryMode} IS NULL OR ${t.deliveryMode} IN ('pickup', 'express', 'economy')`),
     check('orders_payment_ck', sql`${t.paymentMethod} IS NULL OR ${t.paymentMethod} IN ('mobile_money', 'cash')`),
     // Espèces : retrait en boutique seulement à ce stade (les livreurs employés arrivent au 7-E / 7-F).
-    check('orders_cash_ck', sql`${t.paymentMethod} IS DISTINCT FROM 'cash' OR ${t.deliveryMode} = 'pickup'`),
+    // L7-07 : la règle « espèces = retrait seulement » est remplacée par « espèces en livraison si livreur employé »
+    // (vérifiée par le serveur à la commande, à la sollicitation et à la remise des espèces).
     check('orders_delivery_ck', sql`${t.deliveryMode} IS DISTINCT FROM 'express' AND ${t.deliveryMode} IS DISTINCT FROM 'economy' OR (${t.deliveryCommuneCode} IS NOT NULL AND ${t.deliveryAddress} IS NOT NULL AND ${t.deliveryFeeFcfa} IS NOT NULL AND ${t.tariffId} IS NOT NULL)`),
     check('orders_conversation_ck', sql`(${t.source} = 'conversation') = (${t.conversationId} IS NOT NULL)`),
     check('orders_amounts_ck', sql`${t.itemsTotalFcfa} > 0 AND (${t.deliveryFeeFcfa} IS NULL OR ${t.deliveryFeeFcfa} >= 0)`),

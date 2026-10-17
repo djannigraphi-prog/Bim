@@ -47,6 +47,8 @@ class _FakeOrders extends OrdersApi {
   _FakeOrders() : super(_client());
   final calls = <String>[];
   OrderDetail current = _detail();
+  /// L7-07 : la boutique a un livreur employé (espèces possibles en livraison).
+  bool cashOnDelivery = false;
 
   @override
   Future<List<Commune>> communes() async => const [Commune(code: 'abidjan-yopougon', city: 'Abidjan', name: 'Yopougon')];
@@ -54,7 +56,7 @@ class _FakeOrders extends OrdersApi {
   @override
   Future<List<ModeQuote>> quote(String shopId, String communeCode) async {
     calls.add('quote $communeCode');
-    return const [ModeQuote(mode: 'express', available: true, feeFcfa: 1700, minutes: 30), ModeQuote(mode: 'economy', available: false, reason: 'NO_TARIFF')];
+    return [ModeQuote(mode: 'express', available: true, feeFcfa: 1700, minutes: 30, cashOnDelivery: cashOnDelivery), ModeQuote(mode: 'economy', available: false, reason: 'NO_TARIFF', cashOnDelivery: cashOnDelivery)];
   }
 
   @override
@@ -240,6 +242,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Livraison économique : pas encore proposée.'), findsOneWidget);
     expect(confirm().onPressed, isNull);
+  });
+
+  testWidgets('L7-07 livraison payée en espèces si la boutique a un livreur employé', (tester) async {
+    final api = _FakeOrders()..cashOnDelivery = true;
+    await _pump(tester, const CheckoutScreen(args: _args), orders: api);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mode-express')));
+    await tester.pumpAndSettle();
+    // Avant la commune : pas de devis, espèces encore indisponibles.
+    expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('pay-cash'))).onSelected, isNull);
+    await tester.tap(find.byKey(const ValueKey('checkout-commune')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yopougon (Abidjan)').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('pay-cash'))).onSelected, isNotNull);
+    await tester.tap(find.byKey(const ValueKey('pay-cash')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.descendant(of: find.byKey(const ValueKey('checkout-address')), matching: find.byType(TextField)), 'Rue des jardins');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('checkout-confirm')));
+    await tester.pumpAndSettle();
+    expect(api.calls.where((c) => c.startsWith('create')).single, startsWith('create express cash abidjan-yopougon 1'));
   });
 
   testWidgets('7-B commande (client) : code de remise affiché, annulation avec motif facultatif', (tester) async {

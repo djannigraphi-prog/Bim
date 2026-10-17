@@ -214,13 +214,25 @@ export class TariffsService {
     return { mode, available: true, minutes: d.minutes, feeFcfa: deliveryFee(breakdown, d.minutes), tariffId: t.id, tariffVersion: t.version, breakdown, waitFeesBilled: await this.waitFeesBilled() };
   }
 
+  /**
+   * L7-07 (décision du 17/10/2026) : les espèces en livraison ne sont possibles que si la boutique a au moins un livreur
+   * **employé** actif (relation active, compte livreur actif) ; la course est alors réservée à ses employés.
+   */
+  async shopHasEmployeeCourier(shopId: string, tx: DbOrTx = this.db): Promise<boolean> {
+    const r = await tx.execute<{ ok: number }>(sql`
+      SELECT 1 AS ok FROM courier_shop_partnerships p JOIN courier_accounts c ON c.id = p.courier_id
+      WHERE p.shop_id = ${shopId} AND p.relation = 'employee' AND p.status = 'active' AND c.status = 'active' LIMIT 1`);
+    return r.rows.length > 0;
+  }
+
   async quoteForShop(shopId: string, toCode: string) {
     const [s] = await this.db.select({ id: shops.id, status: shops.status }).from(shops).where(eq(shops.id, shopId)).limit(1);
     if (!s || s.status !== 'active') throw Errors.notFound('Boutique');
     const from = await this.shopCommune(shopId);
+    const cashOnDelivery = await this.shopHasEmployeeCourier(shopId);
     const quotes: ModeQuote[] = [];
     for (const m of DELIVERY_MODES) quotes.push(await this.quote(from, toCode, m));
-    return { shopCommune: from, toCommune: toCode, quotes };
+    return { shopCommune: from, toCommune: toCode, cashOnDelivery, quotes };
   }
 
   /** Simulation pour l'administration : une grille (brouillon compris) appliquée à une durée. */

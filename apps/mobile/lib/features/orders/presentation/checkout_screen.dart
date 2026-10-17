@@ -71,6 +71,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   ModeQuote? _quote(String mode) => _quotes.where((q) => q.mode == mode).firstOrNull;
 
+  /// Espèces : au retrait, ou en livraison si la boutique a un livreur employé (L7-07, revérifié par le serveur).
+  bool get _cashAllowed => _mode == 'pickup' || (_quote(_mode)?.cashOnDelivery ?? false);
+
   Fulfilment get _fulfilment => Fulfilment(mode: _mode, paymentMethod: _payment, communeCode: _commune, address: _address.text.trim());
 
   /// Montant total affiché : celui du serveur (récapitulatif), ou lignes de la proposition + frais du devis.
@@ -90,6 +93,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     _error = null;
     try {
       if (_commune != null) _quotes = await api.quote(a.shopId, _commune!);
+      if (!_cashAllowed) _payment = 'mobile_money';
       if (!a.isProposal && (_mode == 'pickup' || (_quote(_mode)?.available ?? false))) {
         _preview = await api.preview(a.shopId, _lines, _fulfilment);
       } else if (!a.isProposal) {
@@ -110,7 +114,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void _setMode(String m) {
     setState(() {
       _mode = m;
-      if (m != 'pickup') _payment = 'mobile_money';
+      if (!_cashAllowed) _payment = 'mobile_money';
     });
     _refresh();
   }
@@ -236,8 +240,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               spacing: BimSpacing.sm,
               children: [
                 ChoiceChip(key: const ValueKey('pay-mobile_money'), label: const Text('Mobile Money'), selected: _payment == 'mobile_money', onSelected: (_) => setState(() => _payment = 'mobile_money')),
-                // Espèces : au retrait en boutique seulement (livreurs employés plus tard).
-                ChoiceChip(key: const ValueKey('pay-cash'), label: const Text('Espèces'), selected: _payment == 'cash', onSelected: _mode == 'pickup' ? (_) => setState(() => _payment = 'cash') : null),
+                // Espèces : au retrait, ou en livraison par un livreur employé de la boutique (L7-07).
+                ChoiceChip(key: const ValueKey('pay-cash'), label: const Text('Espèces'), selected: _payment == 'cash', onSelected: _cashAllowed ? (_) => setState(() => _payment = 'cash') : null),
               ],
             ),
             const SizedBox(height: BimSpacing.xs),

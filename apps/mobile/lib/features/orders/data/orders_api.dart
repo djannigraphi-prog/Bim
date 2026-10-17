@@ -24,8 +24,10 @@ class Commune {
 
 /// Devis d'un mode : disponible avec ses frais, ou indisponible.
 class ModeQuote {
-  const ModeQuote({required this.mode, required this.available, this.feeFcfa, this.minutes, this.reason});
+  const ModeQuote({required this.mode, required this.available, this.feeFcfa, this.minutes, this.reason, this.cashOnDelivery = false});
   final String mode;
+  /// L7-07 : espèces possibles en livraison (la boutique a un livreur employé ; la course lui est réservée).
+  final bool cashOnDelivery;
   final bool available;
   final int? feeFcfa;
   final int? minutes;
@@ -36,6 +38,7 @@ class ModeQuote {
         feeFcfa: j['feeFcfa'] as int?,
         minutes: j['minutes'] as int?,
         reason: j['reason'] as String?,
+        cashOnDelivery: (j['cashOnDelivery'] ?? false) as bool,
       );
 }
 
@@ -492,7 +495,9 @@ class OrdersApi {
 
   Future<List<ModeQuote>> quote(String shopId, String communeCode) async {
     final r = await _api.get('/v1/shops/$shopId/delivery-quote', query: {'commune': communeCode});
-    return [for (final q in (r['quotes'] as List<dynamic>).cast<Map<String, dynamic>>()) ModeQuote.fromJson(q)];
+    // L7-07 : l'indication « espèces possibles en livraison » vaut pour toute la boutique.
+    final cash = (r['cashOnDelivery'] ?? false) as bool;
+    return [for (final q in (r['quotes'] as List<dynamic>).cast<Map<String, dynamic>>()) ModeQuote.fromJson({...q, 'cashOnDelivery': cash})];
   }
 
   Future<OrderPreview> preview(String shopId, List<OrderLine> lines, Fulfilment f) async =>

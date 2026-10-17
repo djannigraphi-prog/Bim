@@ -140,15 +140,15 @@ Aucun paiement réel, aucun prestataire, aucune dépense. Sous-lots 7-A à 7-H r
 
 **État du lot 7 (17/10/2026)** : **terminé techniquement** — fonctionnalités fusionnées dans main (commit 0949a60), CI verte (branche run 38980460129, main run 38982023796), tests existants préservés. **Non validé sur le plan métier** : la validation attend les décisions ci-dessous et un essai réel du parcours de livraison.
 
-Points métier ouverts (aucune décision prise à la place du fondateur) :
-- espèces à la livraison (aujourd'hui : espèces seulement au retrait en boutique ; proposition dans L7-06) ;
+Décidé et réalisé le 17/10/2026 (L7-07) : espèces à la livraison si la boutique a un livreur employé actif (course réservée à ses employés) ; délais de 5 et 15 minutes confirmés ; F4 : paiement en ligne directement au marchand.
+
+Points métier encore ouverts (aucune décision prise à la place du fondateur) :
 - stockage et durée de conservation des preuves photographiques d'incident (non réalisées) ;
 - frais des livreurs indépendants et partenaires (A3-b, aucun registre créé) ;
-- délais provisoires à confirmer : 5 minutes pour accepter une mission (`deliveries.mission_accept_minutes`), 15 minutes avant « client absent » (`deliveries.client_absent_after_minutes`) ;
 - seuils d'âge minimum (`age.min_other_payments`, `age.min_courier`, `age.min_merchant`) et durée de conservation des documents KYC (`kyc.document_retention_days`) ;
 - A17 : étoiles et statut Gold.
 
-**Lot 8 (paiements réels) bloqué** tant que le choix du prestataire, l'autorisation de dépense et l'avis juridique BCEAO ne sont pas obtenus. Décisions à prendre pour l'ouvrir (`docs/ANALYSE.md` §6.6) : **F4** (achat de projet payé en ligne : l'argent arrive sur un compte BIM qui reverse au marchand, ou directement au marchand — avis BCEAO si BIM reçoit l'argent de tiers), **F5** (carte Visa proposée ou non), **F6** (organisation en quatre circuits, §6.2, avec achat intégré Apple / Google pour les pièces et les abonnements dans l'app) ; plus F17 et les contrats agrégateur et magasins.
+**Lot 8 (paiements réels) bloqué** tant que le choix du prestataire et l'autorisation de dépense ne sont pas obtenus. Décisions (`docs/ANALYSE.md` §6.6) : **F4 décidée le 17/10/2026** — l'argent d'un paiement en ligne va directement au marchand, BIM ne détient pas les fonds (l'avis BCEAO reste à obtenir pour vérifier ce montage et pour les pièces du lot 9) ; restent **F5** (carte Visa proposée ou non), **F6** (organisation en quatre circuits, §6.2, avec achat intégré Apple / Google pour les pièces et les abonnements dans l'app), F17 et les contrats prestataire et magasins. Étude Paystack / CinetPay en cours (aucun compte, aucune clé, aucune dépense).
 
 | Étape | Contenu | Tests | CI |
 | --- | --- | --- | --- |

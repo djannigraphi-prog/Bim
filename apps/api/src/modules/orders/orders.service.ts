@@ -183,9 +183,10 @@ export class OrdersService {
     if (f.deliveryMode === 'pickup') {
       return { deliveryMode: 'pickup' as const, paymentMethod: f.paymentMethod, shopCommuneCode: await this.tariffs.shopCommune(shopId, tx), deliveryCommuneCode: null, deliveryAddress: null, fee: null };
     }
-    // Espèces : seulement au retrait en boutique tant que les livreurs employés n'existent pas (F3 bis, 7-E / 7-F).
-    if (f.paymentMethod === 'cash') {
-      throw Errors.validation({ fields: { paymentMethod: ['Les espèces ne sont possibles qu’au retrait en boutique pour le moment.'] } });
+    // L7-07 : espèces en livraison seulement si la boutique a un livreur employé actif ; la course est alors réservée à
+    // ses employés (F3 bis : jamais un partenaire ni un indépendant). Revérifié à la sollicitation et à la remise.
+    if (f.paymentMethod === 'cash' && !(await this.tariffs.shopHasEmployeeCourier(shopId, tx))) {
+      throw Errors.validation({ fields: { paymentMethod: ['Cette boutique n’a pas de livreur employé : en livraison, paie par Mobile Money.'] } });
     }
     const address = f.address?.trim();
     const fields: Record<string, string[]> = {};

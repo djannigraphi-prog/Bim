@@ -166,6 +166,17 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-07 — Espèces à la livraison, délais, circuit des fonds (17/10/2026, 07 h 47) · Fondateur · **décidé** ; espèces et délais **réalisés**
+
+- **Espèces à la livraison** : autorisées seulement si la boutique a au moins un livreur **employé** actif ; la course est
+  alors réservée à ses employés, qui reçoivent les espèces (F3 bis inchangée : jamais un partenaire ni un indépendant).
+  Contrôlé par le serveur à la commande (devis : `cashOnDelivery`), à la sollicitation et à la remise des espèces. La
+  contrainte de base « espèces = retrait seulement » (migration 0031) est retirée par la migration 0038.
+- **Délais confirmés** : 5 minutes pour qu'un livreur accepte une mission, 15 minutes avant « client absent » (réglages
+  passés à « décidé », toujours modifiables dans l'administration).
+- **F4 (lot 8)** : pour un paiement en ligne, l'argent va **directement au marchand** ; BIM ne détient pas les fonds.
+- **Prestataire de paiement** : aucun choisi, aucune dépense autorisée ; étude Paystack / CinetPay demandée.
+
 ### E2 — Aucun bouton d'achat sur l'Accueil ; « Produits et services utilisés » (17/10/2026) · Fondateur · **confirmé** ; **réalisé** (5-E)
 
 - Règle E2 (`docs/ANALYSE.md` §6.7) confirmée : aucun bouton d'achat sur l'Accueil ; seul le lien « Produits et services

@@ -127,6 +127,73 @@ describe('Livraisons (e2e)', () => {
     await h.http().post(`/v1/shop/orders/${eco}/delivery/offer`).set(s.auth).send({ courierId: independent.courierId, reason: 'test' }).expect(409);
   });
 
+  it('L7-07 espèces à la livraison : seulement si la boutique a un livreur employé ; course réservée aux employés ; espèces reçues par l’employé', async () => {
+    const client = await person();
+    const body = (shopId: string, productId: string, variantId: string) => ({
+      shopId,
+      items: [{ productId, variantId, quantity: 1 }],
+      deliveryMode: 'express',
+      communeCode: home,
+      address: 'Rue des jardins, près de la pharmacie',
+      paymentMethod: 'cash',
+      expectedTotalFcfa: 21700,
+      idempotencyKey: uuidv7().replace(/-/g, ''),
+    });
+    // Sans employé : espèces refusées en livraison ; le devis l'indique.
+    const plain = await shop();
+    await courier([home], { shopId: plain.shopId, kind: 'partner' });
+    expect((await h.http().get(`/v1/shops/${plain.shopId}/delivery-quote?commune=${home}`).set(client.auth).expect(200)).body.cashOnDelivery).toBe(false);
+    const refused = (await h.http().post('/v1/orders').set(client.auth).send(body(plain.shopId, plain.product.id, plain.product.variant)).expect(400)).body;
+    expect(Object.keys(refused.error.details.fields)).toEqual(['paymentMethod']);
+
+    // Avec un employé actif : possible ; seuls les employés sont proposés pour la course.
+    const s = await shop();
+    const employee = await courier([home], { shopId: s.shopId, kind: 'employee' });
+    const partner = await courier([home], { shopId: s.shopId, kind: 'partner' });
+    const independent = await courier([home]);
+    const quote = (await h.http().get(`/v1/shops/${s.shopId}/delivery-quote?commune=${home}`).set(client.auth).expect(200)).body;
+    expect(quote.cashOnDelivery).toBe(true);
+    const o = (await h.http().post('/v1/orders').set(client.auth).send(body(s.shopId, s.product.id, s.product.variant)).expect(201)).body;
+    expect(o).toMatchObject({ paymentMethod: 'cash', deliveryMode: 'express' });
+    for (const step of ['confirm', 'prepare', 'ready']) await h.http().post(`/v1/shop/orders/${o.id}/${step}`).set(s.auth).expect(200);
+    await h.http().post(`/v1/shop/orders/${o.id}/delivery/start`).set(s.auth).expect(200);
+    const ids = (await h.http().get(`/v1/shop/orders/${o.id}/delivery/candidates`).set(s.auth).expect(200)).body.items.map((c: { courierId: string }) => c.courierId);
+    expect(ids).toContain(employee.courierId);
+    expect(ids).not.toContain(partner.courierId);
+    expect(ids).not.toContain(independent.courierId);
+    await h.http().post(`/v1/shop/orders/${o.id}/delivery/offer`).set(s.auth).send({ courierId: partner.courierId, reason: 'test' }).expect(409);
+    await h.http().post(`/v1/shop/orders/${o.id}/delivery/offer`).set(s.auth).send({ courierId: employee.courierId }).expect(200);
+    const offerId = (await h.http().get('/v1/courier/missions').set(employee.space).expect(200)).body.items[0].offerId;
+    const dId = (await h.http().post(`/v1/courier/missions/${offerId}/accept`).set(employee.space).expect(200)).body.items[0].deliveryId;
+    let course = (await h.http().get(`/v1/courier/courses/${dId}`).set(employee.space).expect(200)).body;
+    expect(course.payment).toMatchObject({ method: 'cash', amountToCollectFcfa: 20000 });
+    const code = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/courier/courses/${dId}/picked-up`).set(employee.space).expect(200);
+    await h.http().post(`/v1/courier/courses/${dId}/arrived`).set(employee.space).expect(200);
+    course = (await h.http().post(`/v1/courier/courses/${dId}/code`).set(employee.space).send({ code }).expect(200)).body;
+    expect(course.actions).toEqual(['cash_received', 'close', 'report_incident']);
+    // Pas de clôture avant les espèces ; montant exact exigé.
+    expect((await h.http().post(`/v1/courier/courses/${dId}/close`).set(employee.space).expect(409)).body.error.code).toBe('PAYMENT_CONDITION_MISSING');
+    expect((await h.http().post(`/v1/courier/courses/${dId}/cash`).set(employee.space).send({ amountFcfa: 19000 }).expect(400)).body.error.code).toBe('CASH_AMOUNT_MISMATCH');
+    await h.http().post(`/v1/courier/courses/${dId}/cash`).set(employee.space).send({ amountFcfa: 20000 }).expect(200);
+    await h.http().post(`/v1/courier/courses/${dId}/close`).set(employee.space).expect(200);
+    const so = (await h.http().get(`/v1/shop/orders/${o.id}`).set(s.auth).expect(200)).body;
+    expect(so.status).toBe('delivered');
+    expect(so.actions).toContain('confirm_payment');
+    expect((await h.http().post(`/v1/shop/orders/${o.id}/payment/confirm`).set(s.auth).expect(200)).body.status).toBe('completed');
+    // L'emploi prend fin avant une nouvelle commande en espèces : refusée de nouveau.
+    await h.pool.query("update courier_shop_partnerships set status = 'ended', ended_at = now() where courier_id = $1", [employee.courierId]);
+    await h.http().post('/v1/orders').set(client.auth).send(body(s.shopId, s.product.id, s.product.variant)).expect(400);
+  });
+
+  it('L7-07 délais confirmés : réglages de livraison « décidés »', async () => {
+    const r = (await h.pool.query("select key, value, decision_status from app_settings where key in ('deliveries.mission_accept_minutes', 'deliveries.client_absent_after_minutes') order by key")).rows;
+    expect(r).toEqual([
+      { key: 'deliveries.client_absent_after_minutes', value: 15, decision_status: 'decided' },
+      { key: 'deliveries.mission_accept_minutes', value: 5, decision_status: 'decided' },
+    ]);
+  });
+
   it('parcours complet : sollicitation, acceptation, prise en charge, arrivée, code, « J’ai payé », clôture, terminée, évaluation', async () => {
     const s = await shop();
     const client = await person();
