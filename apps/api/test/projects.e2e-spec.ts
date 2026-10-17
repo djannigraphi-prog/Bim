@@ -186,6 +186,7 @@ describe('Projets (e2e)', () => {
     await h.pool.query('update projects set start_date = $2, planned_end_date = $3, duration_days = 30 where id = $1', [p.id, start, shift(start, 29)]);
     const d = (await h.http().get(`/v1/projects/${p.id}`).set(u.auth).expect(200)).body;
     expect(d.status).toBe('completed');
+    expect(d.peniCompletion).toMatchObject({ key: 'program_completed', pose: 'cheer' });
     const list = (await h.http().get('/v1/projects').set(u.auth).expect(200)).body;
     expect(list.activeCount).toBe(0);
     await h.http().put(`/v1/projects/${p.id}/days/${start}/tasks/${p.tasks[0].id}/done`).set(u.auth).expect(409);

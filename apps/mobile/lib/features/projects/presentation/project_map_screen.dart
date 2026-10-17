@@ -417,7 +417,7 @@ class _ChestNode extends StatelessWidget {
 Future<void> showChest(BuildContext context, ProjectChest chest) {
   final theme = Theme.of(context);
   final week = 'la semaine ${chest.week}';
-  final (PeniPose pose, String title, String message) = switch ((chest.isFinal, chest.state)) {
+  final local = switch ((chest.isFinal, chest.state)) {
     (false, 'open') => (PeniPose.cheer, 'Semaine ${chest.week} tenue !', 'Bravo, tu as fait ${chest.done} tâches sur ${chest.due} cette semaine. Je suis tellement fière de toi !'),
     (false, 'missed') => (
         PeniPose.happy,
@@ -438,6 +438,10 @@ Future<void> showChest(BuildContext context, ProjectChest chest) {
         'Il s’ouvre le dernier jour si tu as fait au moins ${chest.needed} des ${chest.due} tâches du programme. Pour l’instant : ${chest.done}.',
       ),
   };
+  // Texte du catalogue commun de Peni (serveur) quand il est fourni ; sinon celui de l'app.
+  final api = chest.peni;
+  final (PeniPose pose, String title, String message) =
+      api == null ? local : (PeniPose.values.where((p) => p.name == api.pose).firstOrNull ?? local.$1, api.title, api.text);
   return showModalBottomSheet<void>(
     context: context,
     builder: (ctx) => SafeArea(

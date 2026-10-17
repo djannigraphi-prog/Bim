@@ -67,7 +67,7 @@ class _Body extends ConsumerWidget {
           measured != null
               ? 'D’après tes mesures : $measured ${m!.unit}. ${finished ? 'Je suis tellement fière de toi ❤️' : 'Continue comme ça !'}'
               : finished
-                  ? 'Tu es allé·e au bout de « ${s.title} ». Je suis tellement fière de toi ❤️'
+                  ? (project.peniCompletion?.text ?? 'Tu es allé·e au bout de « ${s.title} ». Je suis tellement fière de toi ❤️')
                   : 'Voici où tu en es pour « ${s.title} ».',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),

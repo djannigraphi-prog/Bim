@@ -91,7 +91,9 @@ Analyse : `docs/DEPENDANCES_LOTS_2_3.md` (aucun blocage d'architecture ; journal
 
 **3-F Reprise d'une discussion interrompue (17/10/2026)** : en rouvrant Peni, la personne retrouve sa discussion commencée (même objet, mêmes choix de départ, au moins une réponse, ouverte, touchée depuis moins de 7 jours — durée **provisoire**, sans effet sur la conservation) et choisit « Reprendre » ou « Recommencer » ; sinon une nouvelle discussion s'ouvre comme avant (aussi si la vérification échoue). `GET /v1/peni/conversations/resumable`. Tests : 1 e2e API, 1 test Flutter.
 
-Prochaines étapes possibles du lot 3 (sans dépense) : messages de Peni à l'ouverture d'un coffre et à la fin du programme depuis le catalogue commun. Avec ton accord seulement : fournisseur d'IA ; durée de conservation des discussions (T-032).
+**3-G Messages de Peni des coffres et de la fin du programme (17/10/2026)** : textes déplacés dans le catalogue commun versionné du serveur (`peni/milestones.ts`, `v1`) : un message par état de coffre (ouvert, en cours, à rattraper ; semaine ou final) et un message de fin de programme ; renvoyés avec le projet (`chests[].peni`, `peniCompletion`) ; l'app les affiche et garde ses textes si une ancienne API ne les fournit pas. Aucune notification, aucune valeur financière. Tests : 3 unitaires (dont mots interdits sur tout le catalogue), 2 e2e complétés, 3 Flutter.
+
+Prochaine étape possible du lot 3 sans dépense : aucune identifiée ; le reste demande ton accord (fournisseur d'IA, durée de conservation des discussions T-032). Avec ton accord seulement : fournisseur d'IA ; durée de conservation des discussions (T-032).
 
 ## Lot 4 — Social (commencé le 15/10/2026)
 
