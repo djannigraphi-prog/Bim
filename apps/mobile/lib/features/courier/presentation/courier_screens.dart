@@ -231,15 +231,6 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
                   IconButton(tooltip: 'Une de plus', icon: const Icon(Icons.add_circle_outline), onPressed: _busy || p.capacity >= 20 ? null : () => _do((api) => api.updateProfile(capacity: p.capacity + 1))),
                 ],
               ),
-              // A3-b : en indépendant, le client te paie les frais de livraison sur ton numéro vérifié.
-              const Text('Mobile Money pour recevoir les frais (courses en indépendant)'),
-              Wrap(
-                spacing: BimSpacing.sm,
-                children: [
-                  for (final (k, l) in const [('orange', 'Orange Money'), ('mtn', 'MTN'), ('wave', 'Wave'), ('moov', 'Moov')])
-                    ChoiceChip(key: ValueKey('payout-$k'), label: Text(l), selected: p.payoutOperator == k, onSelected: _busy ? null : (_) => _do((api) => api.updateProfile(payoutOperator: k))),
-                ],
-              ),
               ListTile(
                 key: const ValueKey('courier-communes'),
                 contentPadding: EdgeInsets.zero,
@@ -278,6 +269,17 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
                     ),
                   ),
                 ),
+              const Divider(height: BimSpacing.xl),
+              // A3-b : en indépendant, le client te paie les frais de livraison sur ton numéro vérifié.
+              Text('Mobile Money pour recevoir les frais', style: theme.textTheme.titleMedium),
+              const Text('En course indépendante, le client te paie les frais de livraison sur ton numéro vérifié.'),
+              Wrap(
+                spacing: BimSpacing.sm,
+                children: [
+                  for (final (k, l) in const [('orange', 'Orange Money'), ('mtn', 'MTN'), ('wave', 'Wave'), ('moov', 'Moov')])
+                    ChoiceChip(key: ValueKey('payout-$k'), label: Text(l), selected: p.payoutOperator == k, onSelected: _busy ? null : (_) => _do((api) => api.updateProfile(payoutOperator: k))),
+                ],
+              ),
               const SizedBox(height: BimSpacing.xl),
               BimButton(label: 'Revenir à mon profil', variant: BimButtonVariant.subtle, onPressed: _backToProfile),
             ],
