@@ -77,9 +77,15 @@ class _FakeCourier extends CourierApi {
   Future<CourierProfile> profile() async => profileState;
 
   @override
-  Future<CourierProfile> updateProfile({bool? available, int? capacity, List<String>? communes}) async {
-    calls.add('profile ${available ?? capacity ?? communes}');
-    return profileState = CourierProfile(available: available ?? profileState.available, capacity: capacity ?? profileState.capacity, communes: const [], relations: profileState.relations);
+  Future<CourierProfile> updateProfile({bool? available, int? capacity, List<String>? communes, String? payoutOperator}) async {
+    calls.add('profile ${available ?? capacity ?? communes ?? payoutOperator}');
+    return profileState = CourierProfile(
+      available: available ?? profileState.available,
+      capacity: capacity ?? profileState.capacity,
+      communes: const [],
+      relations: profileState.relations,
+      payoutOperator: payoutOperator ?? profileState.payoutOperator,
+    );
   }
 
   @override
@@ -158,6 +164,12 @@ class _FakeCourier extends CourierApi {
 
   @override
   Future<void> release(String deliveryId, String reason) async => calls.add('release $reason');
+
+  @override
+  Future<CourseDetail> deliveryFee(String deliveryId, String decision, {String? reason}) async {
+    calls.add('fee $decision ${reason ?? ''}'.trim());
+    return detail = CourseDetail(mission: detail!.mission, status: 'closed', items: detail!.items, actions: const [], category: 'independent', feeAmountFcfa: 1500, feeStatus: decision == 'confirm' ? 'confirmed_by_courier' : 'contested_by_courier');
+  }
 
   @override
   Future<void> incident(String deliveryId, String reason, {String? description}) async => calls.add('incident $reason ${description ?? ''}'.trim());
@@ -344,5 +356,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(shop.calls, ['invite koffi.yao employee', 'end r9']);
     expect(find.byKey(const ValueKey('shop-couriers-empty')), findsOneWidget);
+  });
+
+  testWidgets('A3-b livreur indépendant : frais payés par le client, « Frais reçus » ou contestation motivée', (tester) async {
+    final api = _FakeCourier();
+    final base = api._detail('closed', const []);
+    api.detail = CourseDetail(mission: base.mission, status: 'closed', items: base.items, actions: const [], category: 'independent', feeAmountFcfa: 1500, feeStatus: 'declared_by_customer', feeActions: const ['confirm_delivery_fee', 'contest_delivery_fee']);
+    await _pump(tester, const CourseScreen(deliveryId: 'd1'), courier: api);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const ValueKey('course-fee'))).data, 'Frais de livraison : ${formatFcfa(1500)} — Le client indique avoir payé');
+    await tester.tap(find.byKey(const ValueKey('course-fee-contest')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('release-reason')), 'Rien reçu sur Wave');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('release-send')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['fee contest Rien reçu sur Wave']);
+    expect(find.byKey(const ValueKey('course-fee-confirm')), findsNothing);
   });
 }

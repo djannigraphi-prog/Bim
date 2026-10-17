@@ -9,6 +9,7 @@ import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorator
 import { AcceptProposalDto, CashReceivedDto, CreateOrderDto, DeclarePaymentDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto, ReviewDto, ReviewNoteDto, RefuseDeliveryDto, IncidentDto, OfferCourierDto, IncidentNoteDto, CodeDto, CourierNoteDto, ReportReviewDto } from './dto';
 import { ReviewsService } from './reviews.service';
 import { DeliveriesService } from './deliveries.service';
+import { DeliveryFeesService } from './delivery-fees.service';
 import { IncidentsService } from './incidents.service';
 import { PaymentsService } from './payments.service';
 import { OrdersService } from './orders.service';
@@ -25,6 +26,7 @@ export class OrdersController {
     private readonly reviews: ReviewsService,
     private readonly deliveries: DeliveriesService,
     private readonly incidents: IncidentsService,
+    private readonly fees: DeliveryFeesService,
   ) {}
 
   @Post(':id/delivery/refuse')
@@ -116,6 +118,14 @@ export class OrdersController {
     return this.deliveries.customerView(a.userId, id, apiBase(req));
   }
 
+  @Post(':id/payment/delivery-fee/declare')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'A3-b : « J’ai payé le livreur » (frais d’un livreur indépendant, Mobile Money) — déclaration, jamais une confirmation' })
+  async declareDeliveryFee(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DeclarePaymentDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.fees.declare(a.userId, id, dto.reference?.trim() || undefined, meta);
+    return this.deliveries.customerView(a.userId, id, apiBase(req));
+  }
+
   @Post(':id/cancel')
   @HttpCode(200)
   @ApiOperation({ summary: 'Refuser une proposition, ou annuler avant la préparation' })
@@ -136,6 +146,7 @@ export class ShopOrdersController {
     private readonly payments: PaymentsService,
     private readonly deliveries: DeliveriesService,
     private readonly incidents: IncidentsService,
+    private readonly fees: DeliveryFeesService,
   ) {}
 
   private shop(a: AuthContext) {
@@ -417,6 +428,7 @@ export class CourierDeliveriesController {
   constructor(
     private readonly deliveries: DeliveriesService,
     private readonly incidents: IncidentsService,
+    private readonly fees: DeliveryFeesService,
   ) {}
 
   private c(a: AuthContext) {
@@ -492,6 +504,22 @@ export class CourierDeliveriesController {
   @ApiOperation({ summary: 'Espèces reçues (employé actif de la boutique seulement)' })
   async cash(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CashReceivedDto, @ReqMeta() meta: RequestMeta) {
     await this.deliveries.cashReceived(a.userId, this.c(a), id, dto.amountFcfa, meta);
+    return this.deliveries.course(this.c(a), id);
+  }
+
+  @Post('courses/:id/delivery-fee/confirm')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'A3-b : le livreur indépendant confirme avoir reçu les frais de livraison' })
+  async feeConfirm(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
+    await this.fees.courierDecide(a.userId, this.c(a), id, 'confirm', undefined, meta);
+    return this.deliveries.course(this.c(a), id);
+  }
+
+  @Post('courses/:id/delivery-fee/contest')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'A3-b : le livreur indépendant conteste (frais non reçus, montant différent) avec un motif' })
+  async feeContest(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @ReqMeta() meta: RequestMeta) {
+    await this.fees.courierDecide(a.userId, this.c(a), id, 'contest', dto.reason, meta);
     return this.deliveries.course(this.c(a), id);
   }
 

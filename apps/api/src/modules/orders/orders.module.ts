@@ -5,6 +5,7 @@ import { OrdersRunner } from './orders-runner';
 import { CourierDeliveriesController, IncidentsAdminController, MyIncidentsController, MyReviewsController, OrdersController, PaymentsAdminController, PublicReviewsController, ShopIncidentsController, ShopOrdersController } from './orders.controller';
 import { CouriersModule } from '../couriers/couriers.module';
 import { DeliveriesService } from './deliveries.service';
+import { DeliveryFeesService } from './delivery-fees.service';
 import { IncidentsService } from './incidents.service';
 import { ReviewsService } from './reviews.service';
 import { PaymentsService } from './payments.service';
@@ -15,7 +16,7 @@ import { OnlinePaymentsService } from './online/online-payments.service';
 @Module({
   imports: [TariffsModule, MessagingModule, CouriersModule],
   controllers: [OrdersController, ShopOrdersController, PaymentsAdminController, MyReviewsController, PublicReviewsController, MyIncidentsController, ShopIncidentsController, CourierDeliveriesController, IncidentsAdminController, OnlinePaymentsController, PaymentWebhooksController, OnlinePaymentsAdminController, ShopOnlinePaymentsController],
-  providers: [OrdersService, PaymentsService, ReviewsService, IncidentsService, DeliveriesService, OrdersRunner, OnlinePaymentsService],
+  providers: [OrdersService, PaymentsService, ReviewsService, IncidentsService, DeliveriesService, DeliveryFeesService, OrdersRunner, OnlinePaymentsService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

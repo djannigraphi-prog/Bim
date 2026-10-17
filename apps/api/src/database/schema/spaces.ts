@@ -124,12 +124,15 @@ export const courierAccounts = pgTable(
     /** Courses simultanées au plus (déclaré). */
     capacity: integer('capacity').notNull().default(1),
     vehicle: varchar('vehicle', { length: 10 }),
+    /** A3-b : opérateur Mobile Money du livreur (numéro = son téléphone vérifié), affiché au client qui paie un indépendant. */
+    payoutOperator: varchar('payout_operator', { length: 8 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex('courier_accounts_user_uq').on(t.userId),
     check('courier_accounts_capacity_ck', sql`${t.capacity} BETWEEN 1 AND 20`),
+    check('courier_accounts_payout_operator_ck', sql`${t.payoutOperator} IS NULL OR ${t.payoutOperator} IN ('orange', 'mtn', 'wave', 'moov')`),
     check('courier_accounts_vehicle_ck', sql`${t.vehicle} IS NULL OR ${t.vehicle} IN ('moto', 'velo', 'voiture', 'pied')`),
   ],
 );

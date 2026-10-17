@@ -218,6 +218,11 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
     }
   }
 
+  Future<void> _contestFee(CourseDetail c) async {
+    final reason = await showDialog<String>(context: context, builder: (_) => const ReleaseDialog(title: 'Frais non reçus', intro: 'Explique ce qui ne va pas (rien reçu, montant différent…).', confirm: 'Envoyer'));
+    if (reason != null && mounted) await _run((api) => api.deliveryFee(c.mission.deliveryId, 'contest', reason: reason), done: 'Contestation enregistrée');
+  }
+
   Future<void> _reportReview(String reviewId) async {
     final reason = await showDialog<String>(
       context: context,
@@ -318,6 +323,20 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
                 ),
               ],
               if (c.can('release')) TextButton(key: const ValueKey('course-release'), onPressed: _busy ? null : _release, child: const Text('Je ne peux plus faire cette course')),
+              // A3-b : livreur indépendant — frais payés directement par le client (Mobile Money).
+              if (c.feeAmountFcfa != null) ...[
+                const SizedBox(height: BimSpacing.sm),
+                Text('Frais de livraison : ${formatFcfa(c.feeAmountFcfa!)} — ${deliveryFeeStatusLabel(c.feeStatus ?? 'to_pay')}', key: const ValueKey('course-fee')),
+                if (c.feeActions.contains('confirm_delivery_fee'))
+                  BimButton(
+                    key: const ValueKey('course-fee-confirm'),
+                    label: 'Frais reçus',
+                    loading: _busy,
+                    onPressed: _busy ? null : () => _run((api) => api.deliveryFee(c.mission.deliveryId, 'confirm'), done: 'Frais confirmés'),
+                  ),
+                if (c.feeActions.contains('contest_delivery_fee'))
+                  TextButton(key: const ValueKey('course-fee-contest'), onPressed: _busy ? null : () => _contestFee(c), child: const Text('Je n’ai pas reçu les frais')),
+              ],
               if (c.can('report_incident')) TextButton(key: const ValueKey('course-incident'), onPressed: _busy ? null : _incident, child: const Text('Signaler un problème')),
               if (c.reviewRating != null) ...[
                 const SizedBox(height: BimSpacing.lg),
@@ -337,7 +356,16 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
 /// boîte de dialogue. Aucune pénalité ni remboursement automatique : le dossier peut être transmis au support.
 /// Motif du désistement (3 à 300 caractères, comme côté serveur).
 class ReleaseDialog extends StatefulWidget {
-  const ReleaseDialog({super.key});
+  const ReleaseDialog({
+    super.key,
+    this.title = 'Rendre la course',
+    this.intro = 'Possible seulement avant d’avoir pris le colis. La boutique le verra dans la commande et choisira un autre livreur.',
+    this.confirm = 'Confirmer',
+  });
+
+  final String title;
+  final String intro;
+  final String confirm;
 
   @override
   State<ReleaseDialog> createState() => _ReleaseDialogState();
@@ -356,14 +384,14 @@ class _ReleaseDialogState extends State<ReleaseDialog> {
   Widget build(BuildContext context) {
     final ok = _reason.text.trim().length >= 3;
     return AlertDialog(
-      title: const Text('Rendre la course'),
+      title: Text(widget.title),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Possible seulement avant d’avoir pris le colis. La boutique le verra dans la commande et choisira un autre livreur.'),
+        Text(widget.intro),
         TextField(key: const ValueKey('release-reason'), controller: _reason, maxLength: 300, decoration: const InputDecoration(labelText: 'Motif'), onChanged: (_) => setState(() {})),
       ],),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-        TextButton(key: const ValueKey('release-send'), onPressed: ok ? () => Navigator.pop(context, _reason.text.trim()) : null, child: const Text('Confirmer')),
+        TextButton(key: const ValueKey('release-send'), onPressed: ok ? () => Navigator.pop(context, _reason.text.trim()) : null, child: Text(widget.confirm)),
       ],
     );
   }

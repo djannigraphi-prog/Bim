@@ -22,7 +22,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online, DateTime? disputeUntil, bool disputeOpen = true, bool inDispute = false}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online, DeliveryFeePayment? deliveryFee, DateTime? disputeUntil, bool disputeOpen = true, bool inDispute = false}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -44,6 +44,7 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       incidents: incidents,
       onlinePayment: online,
       disputeUntil: disputeUntil,
+      deliveryFee: deliveryFee,
       disputeOpen: disputeOpen,
       inDispute: inDispute,
     );
@@ -87,6 +88,12 @@ class _FakeOrders extends OrdersApi {
 
   @override
   Future<OrderDetail> order(String id) async => current;
+
+  @override
+  Future<OrderDetail> declareDeliveryFee(String id, {String? reference}) async {
+    calls.add('delivery fee declared');
+    return current = _detail(status: 'delivered', mode: 'express', actions: const [], deliveryFee: const DeliveryFeePayment(amountFcfa: 1500, status: 'declared_by_customer'));
+  }
 
   @override
   Future<OrderDetail> declarePayment(String id, {String? reference}) async {
@@ -514,5 +521,23 @@ void main() {
     expect(find.byKey(const ValueKey('order-incident')), findsNothing);
     expect(find.byKey(const ValueKey('order-in-dispute')), findsNothing);
     expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, 'Vente close : le délai pour signaler un problème est dépassé. Tu peux toujours évaluer la boutique.');
+  });
+
+  testWidgets('A3-b client : frais à payer au livreur indépendant (numéro, opérateur), puis « J’ai payé le livreur »', (tester) async {
+    final api = _FakeOrders()
+      ..current = _detail(
+        status: 'delivered',
+        mode: 'express',
+        actions: const [],
+        deliveryFee: const DeliveryFeePayment(amountFcfa: 1500, status: 'to_pay', payToName: 'Koffi', payToPhone: '+2250700000001', payToOperator: 'wave', actions: ['declare_delivery_fee']),
+      );
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const ValueKey('delivery-fee-payto'))).data, 'À payer à Koffi (livreur indépendant) : Wave +2250700000001');
+    await tester.tap(find.byKey(const ValueKey('declare-delivery-fee')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('delivery fee declared'));
+    expect(find.byKey(const ValueKey('declare-delivery-fee')), findsNothing);
+    expect(find.textContaining('paiement indiqué, en attente du livreur'), findsOneWidget);
   });
 }

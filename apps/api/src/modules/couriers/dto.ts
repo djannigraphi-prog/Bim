@@ -10,6 +10,8 @@ export class CourierProfileDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() available?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(20) capacity?: number;
   @ApiPropertyOptional({ enum: ['moto', 'velo', 'voiture', 'pied'] }) @IsOptional() @IsIn(['moto', 'velo', 'voiture', 'pied']) vehicle?: string;
+  /** A3-b : opérateur Mobile Money (numéro = téléphone vérifié) pour être payé par les clients en indépendant. */
+  @ApiPropertyOptional({ enum: ['orange', 'mtn', 'wave', 'moov'] }) @IsOptional() @IsIn(['orange', 'mtn', 'wave', 'moov']) payoutOperator?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @ArrayMaxSize(30) @IsString({ each: true }) @Matches(/^[a-z0-9-]{3,80}$/, { each: true }) communes?: string[];
 }
 

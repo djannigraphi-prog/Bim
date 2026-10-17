@@ -227,6 +227,61 @@ describe('Livraisons (e2e)', () => {
     expect((await h.http().get(`/v1/orders/${id}`).set(client.auth)).body.deliveryFeeFcfa).toBe(fee);
   });
 
+  it('A3-b livreur indépendant : le client lui paie les frais en Mobile Money (déclaration), le livreur confirme ; jamais pour un employé ni sans remise', async () => {
+    const s = await shop();
+    const client = await person();
+    const ind = await courier([home]);
+    await h.http().patch('/v1/courier/me').set(ind.space).send({ payoutOperator: 'wave' }).expect(200);
+    const deliver = async (c: { courierId: string; space: Auth }) => {
+      const id = await readyOrder(s, client);
+      await h.http().post(`/v1/shop/orders/${id}/delivery/start`).set(s.auth).expect(200);
+      await h.http().post(`/v1/shop/orders/${id}/delivery/offer`).set(s.auth).send({ courierId: c.courierId }).expect(200);
+      const m = (await h.http().get('/v1/courier/missions').set(c.space)).body.items[0];
+      const dId = (await h.http().post(`/v1/courier/missions/${m.offerId}/accept`).set(c.space).expect(200)).body.items.find((x: { number: string }) => x).deliveryId as string;
+      await h.http().post(`/v1/courier/courses/${dId}/picked-up`).set(c.space).expect(200);
+      await h.http().post(`/v1/courier/courses/${dId}/arrived`).set(c.space).expect(200);
+      return { id, dId };
+    };
+    const a = await deliver(ind);
+    // Avant la remise : rien à payer au livreur.
+    expect((await h.http().get(`/v1/orders/${a.id}`).set(client.auth)).body.deliveryFeePayment).toBeNull();
+    const code = (await h.http().get(`/v1/orders/${a.id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/courier/courses/${a.dId}/code`).set(ind.space).send({ code }).expect(200);
+    let mine = (await h.http().get(`/v1/orders/${a.id}`).set(client.auth)).body;
+    expect(mine.deliveryFeePayment).toMatchObject({ amountFcfa: mine.deliveryFeeFcfa, status: 'to_pay', payTo: { firstName: 'Awa', phone: expect.any(String), operator: 'wave' }, actions: ['declare_delivery_fee'] });
+    // La boutique voit l'état, jamais le numéro du livreur.
+    expect((await h.http().get(`/v1/shop/orders/${a.id}`).set(s.auth)).body.deliveryFeePayment).toEqual({ amountFcfa: mine.deliveryFeeFcfa, status: 'to_pay', payTo: null, actions: [] });
+    let course = (await h.http().get(`/v1/courier/courses/${a.dId}`).set(ind.space)).body;
+    expect(course.deliveryFee).toMatchObject({ status: 'to_pay', declaredByCustomer: false, actions: ['confirm_delivery_fee', 'contest_delivery_fee'] });
+    mine = (await h.http().post(`/v1/orders/${a.id}/payment/delivery-fee/declare`).set(client.auth).send({ reference: 'WAVE-123' }).expect(200)).body;
+    expect(mine.deliveryFeePayment).toMatchObject({ status: 'declared_by_customer', actions: [] });
+    await h.http().post(`/v1/orders/${a.id}/payment/delivery-fee/declare`).set(client.auth).send({}).expect(200); // répété : sans effet
+    const other = await courier([home]);
+    await h.http().post(`/v1/courier/courses/${a.dId}/delivery-fee/confirm`).set(other.space).expect(404);
+    await h.http().post(`/v1/courier/courses/${a.dId}/delivery-fee/contest`).set(ind.space).send({}).expect(400);
+    course = (await h.http().post(`/v1/courier/courses/${a.dId}/delivery-fee/confirm`).set(ind.space).expect(200)).body;
+    expect(course.deliveryFee).toMatchObject({ status: 'confirmed_by_courier', actions: [] });
+    await h.http().post(`/v1/courier/courses/${a.dId}/delivery-fee/confirm`).set(ind.space).expect(409);
+    mine = (await h.http().get(`/v1/orders/${a.id}`).set(client.auth)).body;
+    expect(mine.deliveryFeePayment).toMatchObject({ status: 'confirmed_by_courier', payTo: null });
+    // Le paiement de l'article reste indépendant (décision de la boutique).
+    expect(mine.payment).toMatchObject({ decision: 'pending' });
+    expect((await h.pool.query("select count(*)::int n from order_events where order_id = $1 and type in ('delivery_fee_declared', 'delivery_fee_confirmed')", [a.id])).rows[0].n).toBe(2);
+
+    // Refus du client : aucun frais à payer au livreur.
+    const b = await deliver(ind);
+    await h.http().post(`/v1/orders/${b.id}/delivery/refuse`).set(client.auth).send({ reason: 'incorrect' }).expect(200);
+    expect((await h.http().get(`/v1/orders/${b.id}`).set(client.auth)).body.deliveryFeePayment).toBeNull();
+    await h.http().post(`/v1/orders/${b.id}/payment/delivery-fee/declare`).set(client.auth).send({}).expect(409);
+    // Employé de la boutique : frais à la boutique, rien à payer au livreur.
+    const emp = await courier([home], { shopId: s.shopId, kind: 'employee' });
+    const c = await deliver(emp);
+    const code2 = (await h.http().get(`/v1/orders/${c.id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/courier/courses/${c.dId}/code`).set(emp.space).send({ code: code2 }).expect(200);
+    expect((await h.http().get(`/v1/orders/${c.id}`).set(client.auth)).body.deliveryFeePayment).toBeNull();
+    expect((await h.http().get(`/v1/courier/courses/${c.dId}`).set(emp.space)).body.deliveryFee).toBeNull();
+  });
+
   it('parcours complet : sollicitation, acceptation, prise en charge, arrivée, code, « J’ai payé », clôture, terminée, évaluation', async () => {
     const s = await shop();
     const client = await person();

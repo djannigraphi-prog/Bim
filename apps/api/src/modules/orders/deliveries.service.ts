@@ -25,6 +25,7 @@ import { CourierCategory, CouriersService } from '../couriers/couriers.service';
 import { SettingsService } from '../settings/settings.service';
 import { TariffsService } from '../tariffs/tariffs.service';
 import { waitFee } from '../tariffs/pricing';
+import { DeliveryFeesService } from './delivery-fees.service';
 import { IncidentsService } from './incidents.service';
 import { OnlinePaymentsService } from './online/online-payments.service';
 import { OrdersService } from './orders.service';
@@ -70,6 +71,7 @@ export class DeliveriesService {
     private readonly orders: OrdersService,
     private readonly couriers: CouriersService,
     private readonly incidents: IncidentsService,
+    private readonly fees: DeliveryFeesService,
     private readonly tariffs: TariffsService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
@@ -399,6 +401,8 @@ export class DeliveriesService {
       const now = new Date();
       await tx.update(deliveries).set({ status: 'code_validated', codeValidatedAt: now, ...(await this.stopWait(d, o, now)) }).where(eq(deliveries.id, d.id));
       await this.event(tx, d.id, 'code_validated', 'courier', courierUserId);
+      // A3-b : remise réussie avec un livreur indépendant → frais à payer au livreur par le client.
+      await this.fees.openInTx(tx, d, o);
       return r;
     });
     OrdersService.throwCodeResult(result);
@@ -516,8 +520,17 @@ export class DeliveriesService {
       arrivedAt: d.arrivedAt,
       waitedSeconds: d.waitedSeconds,
       review: review ?? null,
+      // A3-b : frais payés par le client au livreur indépendant.
+      deliveryFee: this.fees.courierView(await this.fees.forOrder(o.id)),
       actions: DeliveriesService.courierActions(d, p ?? null),
     };
+  }
+
+  /** La boutique voit seulement le montant et l'état des frais payés au livreur indépendant. */
+  static shopFeeView(f: typeof orderPayments.$inferSelect | null) {
+    if (!f) return null;
+    const status = f.failure !== 'none' ? 'cancelled' : f.decision === 'confirmed' ? 'confirmed_by_courier' : f.decision === 'contested' ? 'contested_by_courier' : f.declaredAt ? 'declared_by_customer' : 'to_pay';
+    return { amountFcfa: f.amountFcfa, status, payTo: null, actions: [] };
   }
 
   static courierActions(d: Delivery, p: typeof orderPayments.$inferSelect | null): string[] {
@@ -641,6 +654,8 @@ export class DeliveriesService {
       incidents: await this.incidents.summaryForOrder(orderId),
       dispute: { until: dispute.disputeUntil, open: dispute.disputeOpen ?? false, inDispute: dispute.inDispute },
       ...(party === 'customer' ? { onlinePayment: online } : {}),
+      // A3-b : frais de livraison payés directement au livreur indépendant (client : coordonnées et action).
+      deliveryFeePayment: party === 'customer' ? await this.fees.customerView(orderId) : DeliveriesService.shopFeeView(await this.fees.forOrder(orderId)),
       actions: [...v.actions, ...extra],
     };
   }

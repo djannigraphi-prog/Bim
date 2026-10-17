@@ -55,16 +55,19 @@ class CourierRelation {
 }
 
 class CourierProfile {
-  const CourierProfile({required this.available, required this.capacity, required this.communes, required this.relations, this.vehicle});
+  const CourierProfile({required this.available, required this.capacity, required this.communes, required this.relations, this.vehicle, this.payoutOperator});
   final bool available;
   final int capacity;
   final String? vehicle;
+  /// A3-b : opérateur Mobile Money (numéro = téléphone vérifié) pour être payé par les clients en indépendant.
+  final String? payoutOperator;
   final List<({String code, String label})> communes;
   final List<CourierRelation> relations;
   factory CourierProfile.fromJson(Map<String, dynamic> j) => CourierProfile(
         available: j['available'] as bool,
         capacity: j['capacity'] as int,
         vehicle: j['vehicle'] as String?,
+        payoutOperator: j['payoutOperator'] as String?,
         communes: [for (final c in (j['communes'] as List<dynamic>).cast<Map<String, dynamic>>()) (code: c['code'] as String, label: '${c['name']} (${c['city']})')],
         relations: [for (final r in (j['relations'] as List<dynamic>).cast<Map<String, dynamic>>()) CourierRelation.fromJson(r)],
       );
@@ -128,7 +131,7 @@ class Mission {
 
 /// Détail d'une course attribuée : contact et adresse du client seulement pendant la course ; jamais le code.
 class CourseDetail {
-  const CourseDetail({required this.mission, required this.status, required this.items, required this.actions, this.category, this.clientName, this.clientPhone, this.address, this.paymentMethod, this.amountToCollectFcfa, this.declaredByCustomer = false, this.cashReceived = false, this.reviewId, this.reviewRating, this.reviewComment});
+  const CourseDetail({required this.mission, required this.status, required this.items, required this.actions, this.category, this.clientName, this.clientPhone, this.address, this.paymentMethod, this.amountToCollectFcfa, this.declaredByCustomer = false, this.cashReceived = false, this.reviewId, this.reviewRating, this.reviewComment, this.feeAmountFcfa, this.feeStatus, this.feeActions = const []});
   final Mission mission;
   final String status;
   final String? category;
@@ -143,12 +146,17 @@ class CourseDetail {
   final String? reviewId;
   final int? reviewRating;
   final String? reviewComment;
+  /// A3-b : frais de livraison payés par le client au livreur indépendant.
+  final int? feeAmountFcfa;
+  final String? feeStatus;
+  final List<String> feeActions;
   final List<String> actions;
   bool can(String a) => actions.contains(a);
   factory CourseDetail.fromJson(Map<String, dynamic> j) {
     final c = j['client'] as Map<String, dynamic>?;
     final p = j['payment'] as Map<String, dynamic>?;
     final r = j['review'] as Map<String, dynamic>?;
+    final f = j['deliveryFee'] as Map<String, dynamic>?;
     return CourseDetail(
       mission: Mission.fromJson(j),
       status: j['status'] as String,
@@ -164,10 +172,23 @@ class CourseDetail {
       reviewId: r?['id'] as String?,
       reviewRating: r?['rating'] as int?,
       reviewComment: r?['comment'] as String?,
+      feeAmountFcfa: f?['amountFcfa'] as int?,
+      feeStatus: f?['status'] as String?,
+      feeActions: [for (final a in (f?['actions'] as List<dynamic>? ?? const [])) a as String],
       actions: (j['actions'] as List<dynamic>).cast<String>(),
     );
   }
 }
+
+/// Statut des frais payés par le client au livreur indépendant (A3-b).
+String deliveryFeeStatusLabel(String s) => const {
+      'to_pay': 'À payer au livreur',
+      'declared_by_customer': 'Le client indique avoir payé',
+      'confirmed_by_courier': 'Reçus par le livreur',
+      'contested_by_courier': 'Non reçus selon le livreur',
+      'cancelled': 'Annulés',
+    }[s] ??
+    s;
 
 String relationLabel(String r) => r == 'employee' ? 'Employé' : 'Partenaire';
 String vehicleLabel(String? v) => const {'moto': 'Moto', 'velo': 'Vélo', 'voiture': 'Voiture', 'pied': 'À pied'}[v] ?? '—';
@@ -195,9 +216,17 @@ class CourierApi {
   Future<CourierApplication> submit() async => _app(await _api.post('/v1/courier-application/submit'));
 
   Future<CourierProfile> profile() async => CourierProfile.fromJson(await _api.get('/v1/courier/me'));
-  Future<CourierProfile> updateProfile({bool? available, int? capacity, List<String>? communes}) async => CourierProfile.fromJson(
-        await _api.patch('/v1/courier/me', body: {if (available != null) 'available': available, if (capacity != null) 'capacity': capacity, if (communes != null) 'communes': communes}),
+  Future<CourierProfile> updateProfile({bool? available, int? capacity, List<String>? communes, String? payoutOperator}) async => CourierProfile.fromJson(
+        await _api.patch('/v1/courier/me', body: {
+          if (available != null) 'available': available,
+          if (capacity != null) 'capacity': capacity,
+          if (communes != null) 'communes': communes,
+          if (payoutOperator != null) 'payoutOperator': payoutOperator,
+        },),
       );
+  /// A3-b : frais de livraison reçus (confirm) ou non reçus (contest, motif).
+  Future<CourseDetail> deliveryFee(String deliveryId, String decision, {String? reason}) async =>
+      CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/delivery-fee/$decision', body: {if (reason != null) 'reason': reason}));
   Future<CourierProfile> relation(String id, String action) async => CourierProfile.fromJson(await _api.post('/v1/courier/relations/$id/$action'));
 
   List<Mission> _missions(Map<String, dynamic> r) => [for (final m in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) Mission.fromJson(m)];

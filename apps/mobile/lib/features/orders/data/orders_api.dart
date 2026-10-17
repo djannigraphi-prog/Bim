@@ -249,6 +249,41 @@ String deliveryStatusLabel(String s) => switch (s) {
       _ => s,
     };
 
+/// Statut des frais payés au livreur indépendant.
+String deliveryFeeStatusLabelFr(String s) => const {
+      'to_pay': 'à payer au livreur',
+      'declared_by_customer': 'paiement indiqué, en attente du livreur',
+      'confirmed_by_courier': 'reçus par le livreur',
+      'contested_by_courier': 'non reçus selon le livreur',
+      'cancelled': 'annulés',
+    }[s] ??
+    s;
+
+/// A3-b — Frais de livraison payés directement par le client au livreur indépendant (Mobile Money).
+class DeliveryFeePayment {
+  const DeliveryFeePayment({required this.amountFcfa, required this.status, this.payToName, this.payToPhone, this.payToOperator, this.actions = const []});
+
+  factory DeliveryFeePayment.fromJson(Map<String, dynamic> j) {
+    final to = j['payTo'] as Map<String, dynamic>?;
+    return DeliveryFeePayment(
+      amountFcfa: j['amountFcfa'] as int,
+      status: j['status'] as String,
+      payToName: to?['firstName'] as String?,
+      payToPhone: to?['phone'] as String?,
+      payToOperator: to?['operator'] as String?,
+      actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
+    );
+  }
+
+  final int amountFcfa;
+  /// to_pay · declared_by_customer · confirmed_by_courier · contested_by_courier · cancelled
+  final String status;
+  final String? payToName;
+  final String? payToPhone;
+  final String? payToOperator;
+  final List<String> actions;
+}
+
 class IncidentSummary {
   const IncidentSummary({required this.id, required this.status, required this.reason, this.afterDelivery = false});
   final String id;
@@ -360,6 +395,7 @@ class OrderDetail {
     this.incidents = const [],
     this.onlinePayment,
     this.disputeUntil,
+    this.deliveryFee,
     this.disputeOpen = true,
     this.inDispute = false,
   });
@@ -395,6 +431,8 @@ class OrderDetail {
   final OnlinePayment? onlinePayment;
   /// 7-G : fin du délai de contestation après la remise (null avant la remise).
   final DateTime? disputeUntil;
+  /// A3-b : frais à payer au livreur indépendant (null sinon).
+  final DeliveryFeePayment? deliveryFee;
   /// Faux une fois le délai dépassé : plus d'incident possible (le support reste joignable par « Aide »).
   final bool disputeOpen;
   /// Commande remise avec un incident non résolu ouvert depuis : « en litige ».
@@ -441,6 +479,7 @@ class OrderDetail {
       disputeUntil: DateTime.tryParse((j['dispute'] as Map<String, dynamic>?)?['until'] as String? ?? '')?.toLocal(),
       disputeOpen: ((j['dispute'] as Map<String, dynamic>?)?['until'] == null) || ((j['dispute'] as Map<String, dynamic>?)?['open'] == true),
       inDispute: (j['dispute'] as Map<String, dynamic>?)?['inDispute'] == true,
+      deliveryFee: j['deliveryFeePayment'] == null ? null : DeliveryFeePayment.fromJson(j['deliveryFeePayment'] as Map<String, dynamic>),
       events: [for (final e in (j['events'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) OrderEvent.fromJson(e)],
       actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
     );
@@ -566,6 +605,10 @@ class OrdersApi {
 
   Future<OrderDetail> accept(String id, Fulfilment f, {required int expectedTotalFcfa}) async =>
       OrderDetail.fromJson(await _api.post('/v1/orders/$id/accept', body: {...f.toJson(), 'expectedTotalFcfa': expectedTotalFcfa}));
+
+  /// A3-b : « J'ai payé le livreur » (frais d'un livreur indépendant, Mobile Money).
+  Future<OrderDetail> declareDeliveryFee(String id, {String? reference}) async =>
+      OrderDetail.fromJson(await _api.post('/v1/orders/$id/payment/delivery-fee/declare', body: {if (reference != null && reference.isNotEmpty) 'reference': reference}));
 
   Future<OrderDetail> declarePayment(String id, {String? reference}) async =>
       OrderDetail.fromJson(await _api.post('/v1/orders/$id/payment/declare', body: {if (reference != null && reference.isNotEmpty) 'reference': reference}));

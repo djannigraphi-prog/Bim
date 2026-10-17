@@ -6497,6 +6497,45 @@
         ]
       }
     },
+    "/v1/orders/{id}/payment/delivery-fee/declare": {
+      "post": {
+        "operationId": "OrdersController_declareDeliveryFee",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclarePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A3-b : « J’ai payé le livreur » (frais d’un livreur indépendant, Mobile Money) — déclaration, jamais une confirmation",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/orders/{id}/cancel": {
       "post": {
         "operationId": "OrdersController_cancel",
@@ -7765,6 +7804,74 @@
           }
         ],
         "summary": "Espèces reçues (employé actif de la boutique seulement)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/delivery-fee/confirm": {
+      "post": {
+        "operationId": "CourierDeliveriesController_feeConfirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A3-b : le livreur indépendant confirme avoir reçu les frais de livraison",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/delivery-fee/contest": {
+      "post": {
+        "operationId": "CourierDeliveriesController_feeContest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A3-b : le livreur indépendant conteste (frais non reçus, montant différent) avec un motif",
         "tags": [
           "Livreurs"
         ]
@@ -11233,6 +11340,15 @@
               "velo",
               "voiture",
               "pied"
+            ]
+          },
+          "payoutOperator": {
+            "type": "string",
+            "enum": [
+              "orange",
+              "mtn",
+              "wave",
+              "moov"
             ]
           },
           "communes": {

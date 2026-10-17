@@ -224,7 +224,12 @@ réellement opérationnel. Une interface de paiement ne suffit pas.
 | Article | Espèces possibles **pour le compte de la boutique**, selon les permissions | **Jamais d'espèces** ; Mobile Money au numéro de la boutique |
 | Automatisation | Aucune | **Aucun paiement Mobile Money automatisé** sans intégration réelle |
 
-**Points ouverts** [ARBITRAGE A3-b] :
+**A3-b décidé (17/10/2026, 18 h 50) et réalisé** : le client paie les frais d'un **livreur indépendant** directement au
+livreur par Mobile Money (montant de la grille, figé à la commande ; numéro = téléphone vérifié du livreur, opérateur
+choisi dans son profil) ; déclaration du client, puis confirmation ou contestation du livreur ; seulement après une remise
+réussie (code validé) : refus, absence et annulation ne créent aucun frais (A8). Partenaires : selon leur partenariat.
+
+**Points ouverts restants** (partenaires) [ARBITRAGE A3-b] :
 
 - Un **indépendant sans partenariat** n'a pas de « règles de partenariat » : quelle règle de rémunération lui
   appliquer (la grille BIM du §7 ?) ?

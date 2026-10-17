@@ -626,6 +626,38 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                   BimButton(key: const ValueKey('declare-payment'), label: 'J’ai payé', loading: _busy, onPressed: _busy ? null : () => _declare(o)),
                   const SizedBox(height: BimSpacing.sm),
                 ],
+                // A3-b : frais de livraison payés directement au livreur indépendant, puis déclarés.
+                if (o.deliveryFee != null) ...[
+                  Container(
+                    key: const ValueKey('delivery-fee'),
+                    padding: const EdgeInsets.all(BimSpacing.md),
+                    decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outline), borderRadius: BorderRadius.circular(BimRadius.card)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Frais de livraison : ${formatFcfa(o.deliveryFee!.amountFcfa)} — ${deliveryFeeStatusLabelFr(o.deliveryFee!.status)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        if (o.deliveryFee!.payToPhone != null)
+                          Text(
+                            'À payer à ${o.deliveryFee!.payToName ?? 'ton livreur'} (livreur indépendant) : ${o.deliveryFee!.payToOperator != null ? '${operatorLabel(o.deliveryFee!.payToOperator)} ' : 'Mobile Money '}${o.deliveryFee!.payToPhone}',
+                            key: const ValueKey('delivery-fee-payto'),
+                          ),
+                        if (o.deliveryFee!.actions.contains('declare_delivery_fee'))
+                          Text('Paie depuis ton application Mobile Money, puis indique-le ici. BIM ne fait aucun transfert.', style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  if (o.deliveryFee!.actions.contains('declare_delivery_fee')) ...[
+                    const SizedBox(height: BimSpacing.sm),
+                    BimButton(
+                      key: const ValueKey('declare-delivery-fee'),
+                      label: 'J’ai payé le livreur',
+                      variant: BimButtonVariant.outline,
+                      loading: _busy,
+                      onPressed: _busy ? null : () => _call(o, (api) => api.declareDeliveryFee(o.id), done: 'Paiement du livreur indiqué'),
+                    ),
+                  ],
+                  const SizedBox(height: BimSpacing.sm),
+                ],
                 // Lot 8 : paiement en ligne, seulement s'il est réellement ouvert (opérateurs du prestataire).
                 if (o.onlinePayment != null) ...[
                   if (o.onlinePayment!.lastStatus != null)

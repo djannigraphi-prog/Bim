@@ -188,7 +188,7 @@ export class PaymentsService {
       .select({ id: orderPayments.id, orderId: orderPayments.orderId })
       .from(orderPayments)
       .innerJoin(orders, eq(orders.id, orderPayments.orderId))
-      .where(and(eq(orderPayments.decision, 'pending'), eq(orderPayments.failure, 'none'), isNull(orderPayments.reviewQueuedAt), eq(orders.status, 'delivered'), lte(orders.deliveredAt, limit)))
+      .where(and(eq(orderPayments.kind, 'article'), eq(orderPayments.decision, 'pending'), eq(orderPayments.failure, 'none'), isNull(orderPayments.reviewQueuedAt), eq(orders.status, 'delivered'), lte(orders.deliveredAt, limit)))
       .limit(200);
     for (const d of due) {
       await this.db.transaction(async (tx) => {

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { AccountPurgeService, PurgeResult } from './account-purge.service';
 import { StoriesService } from '../social/stories.service';
+import { KycRetentionService } from './kyc-retention.service';
 import { PeniRetentionResult, PeniRetentionService } from './peni-retention.service';
 
 /** Heure du passage quotidien, à l'heure d'Abidjan (UTC) : la nuit, charge négligeable. */
@@ -24,6 +25,7 @@ export class MaintenanceRunner implements OnApplicationBootstrap, OnModuleDestro
     private readonly purge: AccountPurgeService,
     private readonly peniRetention: PeniRetentionService,
     private readonly stories: StoriesService,
+    private readonly kyc: KycRetentionService,
   ) {}
 
   get active(): boolean {
@@ -54,6 +56,11 @@ export class MaintenanceRunner implements OnApplicationBootstrap, OnModuleDestro
       // Stories (lot 4-B) : elles durent 24 h ; leurs fichiers sont effacés 24 h après l'expiration (sauf signalement ouvert).
       const stories = await this.stories.cleanupExpired(now).catch((e: Error) => {
         this.logger.error({ msg: 'maintenance.stories.error', error: e.message });
+        return null;
+      });
+      // Pièces d'identité : supprimées un an après la fermeture du compte (décision du 17/10/2026).
+      await this.kyc.runScheduled().catch((e: Error) => {
+        this.logger.error({ msg: 'maintenance.kyc_retention.error', error: e.message });
         return null;
       });
       return { purge, peniRetention, stories };

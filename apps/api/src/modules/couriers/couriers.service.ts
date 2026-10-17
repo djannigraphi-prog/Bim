@@ -232,10 +232,10 @@ export class CouriersService {
       .innerJoin(communes, eq(communes.code, courierCommunes.communeCode))
       .where(eq(courierCommunes.courierId, courierId))
       .orderBy(asc(communes.city), asc(communes.name));
-    return { id: c.id, available: c.available, capacity: c.capacity, vehicle: c.vehicle, communes: cs, relations: await this.relationsFor(courierId) };
+    return { id: c.id, available: c.available, capacity: c.capacity, vehicle: c.vehicle, payoutOperator: c.payoutOperator, communes: cs, relations: await this.relationsFor(courierId) };
   }
 
-  async updateProfile(userId: string, courierId: string, input: { available?: boolean; capacity?: number; vehicle?: string; communes?: string[] }, meta: RequestMeta) {
+  async updateProfile(userId: string, courierId: string, input: { available?: boolean; capacity?: number; vehicle?: string; payoutOperator?: string; communes?: string[] }, meta: RequestMeta) {
     await this.active(courierId);
     if (input.communes) {
       const codes = [...new Set(input.communes)];
@@ -250,6 +250,7 @@ export class CouriersService {
           ...(input.available !== undefined ? { available: input.available } : {}),
           ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
           ...(input.vehicle !== undefined ? { vehicle: input.vehicle } : {}),
+          ...(input.payoutOperator !== undefined ? { payoutOperator: input.payoutOperator } : {}),
           updatedAt: new Date(),
         })
         .where(eq(courierAccounts.id, courierId));

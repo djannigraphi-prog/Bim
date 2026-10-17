@@ -166,6 +166,21 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### D-1850 — Âges, livreurs indépendants, Gold, pièces d'identité, photos, mineurs (17/10/2026, 18 h 50) · Fondateur
+
+- **Âges** : commander dès **16 ans** (`age.min_other_payments` = 16) ; ouvrir une boutique : **18 ans**
+  (`age.min_merchant`) ; être livreur : **18 ans** (`age.min_courier`). Décidés (migration 0046). Une vérification
+  juridique du paiement par des mineurs de 16-17 ans reste recommandée avant le lancement public.
+- **Livreur indépendant (A3-b)** : le **client paie les frais de livraison directement au livreur** par Mobile Money, au
+  montant affiché ; déclaré par le client, confirmé (ou contesté) par le livreur ; BIM ne touche rien. **Réalisé.**
+- **Statut Gold (A17)** : **attribué avec l'abonnement Premium** (Q50 maintenue). Les abonnements n'existent pas encore
+  (lot 8 : achats intégrés F6 non décidés) : rien n'est affiché d'ici là.
+- **Pièces d'identité** : gardées **tant que le compte existe**, supprimées **365 jours après la fermeture du compte**
+  (`kyc.document_retention_days` = 365, décidé). **Réalisé** (passage quotidien de maintenance).
+- **Photos des problèmes** : jusqu'à **3 photos privées** par signalement, supprimées **30 jours après la clôture de la
+  vente**. À réaliser.
+- **Publications des 16-17 ans** : visibilité par défaut **« Tout le monde »**, comme les adultes (comportement actuel).
+
 ### L7-08 — Problème après la remise : 3 jours, réglé entre client et boutique (17/10/2026, 14 h 21) · Fondateur · **appliquée**
 
 - Un problème se signale au plus **3 jours** après la remise (`orders.dispute_window_days` = 3, décidé) ; ensuite la
