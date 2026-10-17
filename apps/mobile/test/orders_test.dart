@@ -450,8 +450,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('online-check')));
     await tester.pumpAndSettle();
     expect(api.calls.where((c) => c.startsWith('online')), ['online start', 'online check']);
-    expect(find.byKey(const ValueKey('online-status')), findsOneWidget);
-    expect(find.descendant(of: find.byKey(const ValueKey('online-status')), matching: find.text('Paiement vérifié par le prestataire')), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('online-status'))).data, 'Paiement vérifié par le prestataire');
     expect(find.byKey(const ValueKey('pay-online')), findsNothing);
   });
 }
