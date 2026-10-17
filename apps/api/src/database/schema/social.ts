@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { check, date, index, integer, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './identity';
+import { products } from './catalog';
 import { projects } from './projects';
 
 /**
@@ -230,4 +231,30 @@ export const storyViews = pgTable(
     viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.storyId, t.userId] })],
+);
+
+/**
+ * Lot 5-E — « Produits et services utilisés » (écran 11, règle E2) : articles du BimShop que l'auteur d'un « J'ai fait
+ * mon BIM » associe à son expérience (5 au plus). Simple lien vers la fiche : aucun achat ni commande depuis la
+ * publication, aucun effet sur la réputation de l'article. Chaque lecteur ne voit que les fiches visibles pour lui.
+ */
+export const postProducts = pgTable(
+  'post_products',
+  {
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.postId, t.productId] }),
+    // 5 au plus, garanti par la base : positions 0 à 4, une seule fois chacune.
+    uniqueIndex('post_products_position_uq').on(t.postId, t.position),
+    index('post_products_product_idx').on(t.productId),
+    check('post_products_position_ck', sql`${t.position} BETWEEN 0 AND 4`),
+  ],
 );

@@ -166,6 +166,14 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### E2 — Aucun bouton d'achat sur l'Accueil ; « Produits et services utilisés » (17/10/2026) · Fondateur · **confirmé** ; **réalisé** (5-E)
+
+- Règle E2 (`docs/ANALYSE.md` §6.7) confirmée : aucun bouton d'achat sur l'Accueil ; seul le lien « Produits et services
+  utilisés » du détail d'une publication (écran 11) renvoie vers la fiche du BimShop.
+- **Choix de réalisation à confirmer** : réservé aux « J'ai fait mon BIM » ; 5 articles au plus ; tout article visible du
+  BimShop est associable (l'achat n'est pas vérifié, les commandes étant fermées) — un marchand peut donc associer ses
+  propres articles à son propre BIM ; aucun prix affiché dans la publication ; liens absents des fils.
+
 ### M-6C — Messagerie : réactions et réponses citées (17/10/2026) · Fondateur (« poursuivre sans attendre le lot 8 ») · **réalisé** ; choix de réalisation à confirmer
 
 - Sous-lot prévu (« À venir : 6-C ») choisi parce qu'il ne dépend d'aucune décision ouverte, d'aucun paiement ni

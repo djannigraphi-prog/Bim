@@ -260,6 +260,13 @@
       "when": 1792206358686,
       "tag": "0036_messaging_reactions",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792217982761,
+      "tag": "0037_post_products",
+      "breakpoints": true
     }
   ]
 }

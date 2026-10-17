@@ -13,9 +13,10 @@ import '../data/social_models.dart';
 import 'comments_sheet.dart';
 import 'moderation_sheets.dart';
 import 'social_widgets.dart';
+import 'used_products.dart';
 
 /// Écran 11 — Publication : avant / après à comparer avec le curseur, résumé du parcours, j'aime et commentaires.
-/// « Produits et services utilisés » : lot 5 (BimShop) ; pièces : lot 9.
+/// 5-E : « Produits et services utilisés » (lien vers la fiche, jamais d'achat : règle E2) ; pièces : lot 9.
 class PostDetailScreen extends ConsumerStatefulWidget {
   const PostDetailScreen({super.key, required this.postId});
 
@@ -162,6 +163,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     TextSpan(text: post.text),
                   ],),
                 ),
+              if (post.isBim) UsedProductsSection(post: post, onChanged: (p) => setState(() => _local = p)),
             ],
           );
         },

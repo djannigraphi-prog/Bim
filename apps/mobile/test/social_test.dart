@@ -1,6 +1,7 @@
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/projects/data/projects_api.dart';
 import 'package:bim/features/projects/data/projects_models.dart';
 import 'package:bim/features/social/data/social_api.dart';
@@ -27,7 +28,7 @@ ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () asyn
 const _awa = PersonRef(id: 'u1', username: 'awa.k', fullName: 'Awa Koné');
 const _me = PersonRef(id: 'u0', username: 'moi', fullName: 'Yannick Doho');
 
-FeedPost _post(String id, {String kind = 'post', String? text, bool mine = false, int likes = 0, bool liked = false, List<PostMedia> media = const [], Journey? journey}) => FeedPost(
+FeedPost _post(String id, {String kind = 'post', String? text, bool mine = false, int likes = 0, bool liked = false, List<PostMedia> media = const [], Journey? journey, List<UsedProduct> used = const []}) => FeedPost(
       id: id,
       kind: kind,
       text: text,
@@ -41,6 +42,7 @@ FeedPost _post(String id, {String kind = 'post', String? text, bool mine = false
       likedByMe: liked,
       isMine: mine,
       followingAuthor: false,
+      usedProducts: used,
     );
 
 /// API simulée du social : garde les appels ; les règles (visibilité, blocages) sont testées côté API.
@@ -110,6 +112,41 @@ class _FakeSocial extends SocialApi {
   }
 }
 
+/// 5-E : publication « J'ai fait mon BIM » avec des produits et services utilisés ; recherche du BimShop simulée.
+const _gourde = UsedProduct(id: 'x1', title: 'Gourde isotherme', shopName: 'Boutique Élégance');
+const _tapis = UsedProduct(id: 'x2', title: 'Tapis de yoga', shopName: 'Maison Awa', available: false);
+
+class _FakeUsedSocial extends _FakeSocial {
+  _FakeUsedSocial({this.mine = false});
+  final bool mine;
+  List<UsedProduct> used = const [_gourde, _tapis];
+
+  @override
+  Future<FeedPost> post(String id) async => _post(id, kind: 'bim', mine: mine, text: 'Mon parcours', used: used);
+
+  @override
+  Future<FeedPost> setUsedProducts(String postId, List<String> productIds) async {
+    calls.add('used ${productIds.join(',')}');
+    used = [for (final id in productIds) id == 'x1' ? _gourde : UsedProduct(id: id, title: 'Bandeau', shopName: 'Maison Awa')];
+    return post(postId);
+  }
+}
+
+class _FakeBimShop extends BimShopApi {
+  _FakeBimShop() : super(_client());
+  final queries = <String>[];
+  @override
+  Future<({List<ShopCard> items, String? nextCursor})> browse(BimShopQuery query, {String? cursor}) async {
+    queries.add(query.q);
+    return (
+      items: const [
+        ShopCard(id: 'x3', kind: 'product', title: 'Bandeau', priceFcfa: 3000, available: true, shop: ShopRef(id: 's2', name: 'Maison Awa', slug: 'maison-awa')),
+      ],
+      nextCursor: null,
+    );
+  }
+}
+
 class _FakeProjects extends ProjectsApi {
   _FakeProjects({this.empty = true}) : super(_client());
 
@@ -130,7 +167,7 @@ class _FakeProjects extends ProjectsApi {
       );
 }
 
-Future<GoRouter> _pump(WidgetTester tester, Widget screen, _FakeSocial social, {bool emptyProjects = true}) async {
+Future<GoRouter> _pump(WidgetTester tester, Widget screen, _FakeSocial social, {bool emptyProjects = true, BimShopApi? bimshop}) async {
   final router = GoRouter(routes: [
     GoRoute(path: '/', builder: (_, __) => screen),
     GoRoute(path: '/posts/:id', builder: (_, s) => Scaffold(body: Text('détail ${s.pathParameters['id']}'))),
@@ -140,12 +177,14 @@ Future<GoRouter> _pump(WidgetTester tester, Widget screen, _FakeSocial social, {
     GoRoute(path: '/projects/new', builder: (_, __) => const Scaffold(body: Text('nouveau projet'))),
     GoRoute(path: '/search', builder: (_, __) => const Scaffold(body: Text('recherche'))),
     GoRoute(path: '/home', builder: (_, __) => const Scaffold(body: Text('accueil'))),
+    GoRoute(path: '/bimshop/products/:id', builder: (_, s) => Scaffold(body: Text('fiche ${s.pathParameters['id']}'))),
   ],);
   await tester.pumpWidget(ProviderScope(
     overrides: [
       apiClientProvider.overrideWithValue(_client()),
       socialApiProvider.overrideWithValue(social),
       projectsApiProvider.overrideWithValue(_FakeProjects(empty: emptyProjects)),
+      if (bimshop != null) bimShopApiProvider.overrideWithValue(bimshop),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);
@@ -311,5 +350,68 @@ void main() {
     await tester.pump(const Duration(seconds: 6)); // fin de la dernière story : retour
     await tester.pumpAndSettle();
     expect(find.text('ouvrir'), findsOneWidget);
+  });
+
+  testWidgets('5-E écran 11 (lecteur) : produits et services utilisés, lien vers la fiche, aucun prix ni achat', (tester) async {
+    tester.view.physicalSize = const Size(1170, 3600);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await _pump(tester, const PostDetailScreen(postId: 'p9'), _FakeUsedSocial());
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Produits et services utilisés'), findsOneWidget);
+    expect(find.text('Boutique Élégance'), findsOneWidget);
+    expect(find.text('Maison Awa · épuisé'), findsOneWidget);
+    expect(find.byKey(const ValueKey('used-products-edit')), findsNothing); // pas l'auteur
+    expect(find.textContaining(RegExp('Acheter|Commander|Réserver|F CFA|FCFA')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('used-product-x1')));
+    await tester.pumpAndSettle();
+    expect(find.text('fiche x1'), findsOneWidget);
+  });
+
+  testWidgets('5-E écran 11 (auteur) : chercher dans le BimShop, ajouter, retirer, enregistrer', (tester) async {
+    tester.view.physicalSize = const Size(1170, 3600);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final social = _FakeUsedSocial(mine: true);
+    final shop = _FakeBimShop();
+    await _pump(tester, const PostDetailScreen(postId: 'p9'), social, bimshop: shop);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('used-products-edit')));
+    await tester.pumpAndSettle();
+    // Retirer le tapis, chercher et ajouter un bandeau.
+    await tester.tap(find.byKey(const ValueKey('used-remove-x2')));
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('used-search')), 'bandeau');
+    await tester.tap(find.byKey(const ValueKey('used-search-go')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('used-result-x3')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('used-save')));
+    await tester.pumpAndSettle();
+    expect(shop.queries, ['bandeau']);
+    expect(social.calls.last, 'used x1,x3');
+    expect(find.byKey(const ValueKey('used-product-x3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('used-product-x2')), findsNothing);
+  });
+
+  testWidgets('5-E règle E2 : l’Accueil n’affiche aucun produit utilisé ni bouton d’achat', (tester) async {
+    final social = _FakeSocial()
+      ..forYou = [
+        _post(
+          'b1',
+          kind: 'bim',
+          text: 'Mon BIM',
+          media: const [
+            PostMedia(id: 'b', kind: 'before', width: 800, height: 1000, takenDay: '2026-09-14'),
+            PostMedia(id: 'a', kind: 'after', width: 800, height: 1000, takenDay: '2026-10-13'),
+          ],
+          used: const [_gourde],
+        ),
+      ];
+    await _pump(tester, const Scaffold(body: FeedView()), social);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('Mon BIM', findRichText: true), findsWidgets);
+    expect(find.text('Gourde isotherme'), findsNothing);
+    expect(find.textContaining(RegExp('Acheter|Commander')), findsNothing);
   });
 }

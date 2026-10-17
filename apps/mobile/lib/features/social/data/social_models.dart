@@ -68,6 +68,25 @@ class Journey {
       ].join(' · ');
 }
 
+/// 5-E — « Produits et services utilisés » (écran 11) : lien vers la fiche du BimShop, jamais d'achat (règle E2).
+class UsedProduct {
+  const UsedProduct({required this.id, required this.title, required this.shopName, this.kind = 'product', this.imageUrl, this.available = true});
+  final String id;
+  final String kind;
+  final String title;
+  final String shopName;
+  final String? imageUrl;
+  final bool available;
+  factory UsedProduct.fromJson(Map<String, dynamic> j) => UsedProduct(
+        id: j['id'] as String,
+        kind: (j['kind'] ?? 'product') as String,
+        title: j['title'] as String,
+        shopName: ((j['shop'] as Map<String, dynamic>?)?['name'] ?? '') as String,
+        imageUrl: j['imageUrl'] as String?,
+        available: (j['available'] ?? true) as bool,
+      );
+}
+
 class FeedPost {
   const FeedPost({
     required this.id,
@@ -83,6 +102,7 @@ class FeedPost {
     required this.followingAuthor,
     this.text,
     this.journey,
+    this.usedProducts = const [],
   });
 
   final String id;
@@ -102,6 +122,8 @@ class FeedPost {
   final bool likedByMe;
   final bool isMine;
   final bool followingAuthor;
+  /// 5-E : fiches associées, seulement dans le détail (les fils n'en contiennent pas).
+  final List<UsedProduct> usedProducts;
 
   bool get isBim => kind == 'bim';
   PostMedia? get before => media.where((m) => m.kind == 'before').firstOrNull;
@@ -121,6 +143,7 @@ class FeedPost {
         likedByMe: likedByMe ?? this.likedByMe,
         isMine: isMine,
         followingAuthor: followingAuthor ?? this.followingAuthor,
+        usedProducts: usedProducts,
       );
 
   factory FeedPost.fromJson(Map<String, dynamic> j) => FeedPost(
@@ -137,6 +160,7 @@ class FeedPost {
         likedByMe: (j['likedByMe'] ?? false) as bool,
         isMine: (j['isMine'] ?? false) as bool,
         followingAuthor: (j['followingAuthor'] ?? false) as bool,
+        usedProducts: [for (final u in ((j['usedProducts'] ?? const <dynamic>[]) as List<dynamic>).cast<Map<String, dynamic>>()) UsedProduct.fromJson(u)],
       );
 }
 

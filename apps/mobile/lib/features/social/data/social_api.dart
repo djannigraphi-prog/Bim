@@ -27,6 +27,9 @@ class SocialApi {
 
   Future<FeedPost> post(String id) async => FeedPost.fromJson(await _api.get('/v1/posts/$id'));
 
+  /// 5-E : remplacer les produits et services utilisés de mon « J'ai fait mon BIM » (5 au plus).
+  Future<FeedPost> setUsedProducts(String postId, List<String> productIds) async => FeedPost.fromJson(await _api.put('/v1/posts/$postId/products', body: {'productIds': productIds}));
+
   /// Publication simple : texte et 4 photos au plus.
   Future<FeedPost> create({String? text, required String visibility, List<List<int>> images = const []}) async {
     final fields = {if (text != null && text.trim().isNotEmpty) 'text': text.trim(), 'visibility': visibility};

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, Length, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength } from 'class-validator';
 
 export const VISIBILITIES = ['public', 'followers', 'private'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
@@ -18,6 +18,17 @@ export class CreateBimPostDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() projectId!: string;
   @ApiPropertyOptional({ maxLength: 2200 }) @IsOptional() @IsString() @MaxLength(2200) text?: string;
   @ApiPropertyOptional({ enum: VISIBILITIES, default: 'public' }) @IsOptional() @IsIn(VISIBILITIES) visibility?: Visibility;
+  @ApiPropertyOptional({ type: [String], maxItems: 5, description: '5-E : produits et services utilisés (articles visibles du BimShop)' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsUUID('all', { each: true })
+  productIds?: string[];
+}
+
+/** 5-E — Remplacer les produits et services utilisés d'un « J'ai fait mon BIM » (liste vide : tout retirer). */
+export class PostProductsDto {
+  @ApiProperty({ type: [String], maxItems: 5 }) @IsArray() @ArrayMaxSize(5) @IsUUID('all', { each: true }) productIds!: string[];
 }
 
 export class CreateCommentDto {

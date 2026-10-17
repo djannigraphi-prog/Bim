@@ -7,8 +7,9 @@ import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { commentLikes, follows, postComments, postLikes, postMedia, posts, projectPhotos, users } from '../../database/schema';
+import { commentLikes, follows, postComments, postLikes, postMedia, postProducts, posts, projectPhotos, shops, userBlocks, users } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { BimShopService } from '../catalog/bimshop.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { CLOCK, Clock, ProjectsService } from '../projects/projects.service';
@@ -17,6 +18,8 @@ import { notBlockedBetween, postVisibleTo, commentParentPublished, recountCommen
 import { CreateBimPostDto, CreateCommentDto, CreatePostDto } from './dto';
 
 export const MAX_POST_IMAGES = 4;
+/** 5-E : « Produits et services utilisés » d'un « J'ai fait mon BIM » (5 au plus, garanti par la base). */
+export const MAX_POST_PRODUCTS = 5;
 const PAGE = 20;
 const COMMENTS_PAGE = 30;
 
@@ -39,6 +42,7 @@ export class PostsService {
     private readonly settings: SettingsService,
     private readonly projects: ProjectsService,
     private readonly audit: AuditService,
+    private readonly bimshop: BimShopService,
   ) {}
 
   private async limit(key: string, fallback: number): Promise<number> {
@@ -107,6 +111,7 @@ export class PostsService {
       throw Errors.conflict('BIM_PHOTOS_MISSING', 'Ajoute tes photos « avant » et « après » pour publier ton BIM.');
     }
     await this.checkPostLimit(userId);
+    const productIds = dto.productIds?.length ? await this.linkableProducts(userId, dto.productIds) : [];
 
     const id = uuidv7(this.clock.now().getTime());
     const stored: string[] = [];
@@ -139,7 +144,11 @@ export class PostsService {
           updatedAt: this.clock.now(),
         });
         await tx.insert(postMedia).values(media);
-        await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.bim_published', targetType: 'post', targetId: id, ip: meta.ip, userAgent: meta.userAgent, metadata: { projectId: p.id } }, tx);
+        if (productIds.length) await tx.insert(postProducts).values(productIds.map((productId, position) => ({ postId: id, productId, position })));
+        await this.audit.log(
+          { actorType: 'user', actorId: userId, action: 'social.bim_published', targetType: 'post', targetId: id, ip: meta.ip, userAgent: meta.userAgent, metadata: { projectId: p.id, products: productIds.length } },
+          tx,
+        );
       });
     } catch (e) {
       for (const k of stored) await this.storage.remove(k).catch(() => undefined);
@@ -155,10 +164,77 @@ export class PostsService {
     await this.db.transaction(async (tx) => {
       await tx.update(posts).set({ status: 'deleted', text: null, updatedAt: this.clock.now() }).where(eq(posts.id, postId));
       await tx.delete(postMedia).where(eq(postMedia.postId, postId));
+      await tx.delete(postProducts).where(eq(postProducts.postId, postId));
       await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.post_deleted', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent }, tx);
     });
     // Fichiers effacés du stockage : une publication supprimée ne laisse pas d'image derrière elle.
     for (const m of media) await this.storage.remove(m.key).catch(() => undefined);
+  }
+
+  // ------------------------------------------------------------------------------------------------ Produits et services utilisés (5-E)
+
+  /**
+   * Articles que l'auteur peut associer : visibles dans le BimShop (fiche publiée, boutique ouverte, propriétaire
+   * actif) et sans blocage entre l'auteur et le propriétaire de la boutique. Doublons retirés, ordre conservé.
+   */
+  private async linkableProducts(userId: string, ids: string[]): Promise<string[]> {
+    const unique = [...new Set(ids)];
+    if (unique.length > MAX_POST_PRODUCTS) throw Errors.validation({ fields: { productIds: [`${MAX_POST_PRODUCTS} articles au plus.`] } });
+    if (!unique.length) return [];
+    const cards = await this.bimshop.visibleCards(unique, '');
+    const reachable = await this.reachableShopIds(userId, [...new Set(cards.map((c) => c.shop.id))]);
+    const ok = new Set(cards.filter((c) => reachable.has(c.shop.id)).map((c) => c.id));
+    if (unique.some((x) => !ok.has(x))) throw Errors.validation({ fields: { productIds: ['Un article n’est pas disponible dans le BimShop.'] } });
+    return unique;
+  }
+
+  /** Boutiques dont le propriétaire n'a aucun blocage avec `userId` (dans un sens ou dans l'autre). */
+  private async reachableShopIds(userId: string, shopIds: string[]): Promise<Set<string>> {
+    if (!shopIds.length) return new Set();
+    const rows = await this.db
+      .select({ id: shops.id })
+      .from(shops)
+      .where(
+        and(
+          inArray(shops.id, shopIds),
+          sql`NOT EXISTS (SELECT 1 FROM ${userBlocks} b WHERE (b.blocker_id = ${userId} AND b.blocked_id = ${shops.ownerUserId}) OR (b.blocker_id = ${shops.ownerUserId} AND b.blocked_id = ${userId}))`,
+        ),
+      );
+    return new Set(rows.map((r) => r.id));
+  }
+
+  /**
+   * Fiches associées à une publication, vues par `viewerId` : seulement celles qui sont visibles dans le BimShop et
+   * dont la boutique n'a pas de blocage avec lui ; les autres sont omises sans rien en dire. Aucun prix ici (E2 :
+   * la publication renvoie vers la fiche, jamais vers un achat).
+   */
+  private async usedProducts(viewerId: string, postId: string, apiBase: string) {
+    const rows = await this.db.select({ productId: postProducts.productId }).from(postProducts).where(eq(postProducts.postId, postId)).orderBy(asc(postProducts.position));
+    if (!rows.length) return [];
+    const cards = await this.bimshop.visibleCards(
+      rows.map((r) => r.productId),
+      apiBase,
+    );
+    const reachable = await this.reachableShopIds(viewerId, [...new Set(cards.map((c) => c.shop.id))]);
+    return cards
+      .filter((c) => reachable.has(c.shop.id))
+      .map((c) => ({ id: c.id, kind: c.kind, title: c.title, imageUrl: c.imageUrl, available: c.available, shop: { name: c.shop.name, slug: c.shop.slug, verified: c.shop.verified } }));
+  }
+
+  /** L'auteur remplace la liste des produits et services utilisés de son « J'ai fait mon BIM » (5 au plus). */
+  async setProducts(userId: string, postId: string, ids: string[], meta: RequestMeta, apiBase: string) {
+    const [p] = await this.db.select().from(posts).where(and(eq(posts.id, postId), eq(posts.userId, userId), eq(posts.status, 'published')));
+    if (!p) throw Errors.notFound('Publication');
+    if (p.kind !== 'bim') throw Errors.conflict('NOT_A_BIM', 'Les produits et services utilisés s’ajoutent à un « J’ai fait mon BIM ».');
+    const productIds = await this.linkableProducts(userId, ids);
+    await this.db.transaction(async (tx) => {
+      // Modifications simultanées : verrou sur la publication, puis remplacement complet.
+      await tx.select({ id: posts.id }).from(posts).where(eq(posts.id, postId)).for('update');
+      await tx.delete(postProducts).where(eq(postProducts.postId, postId));
+      if (productIds.length) await tx.insert(postProducts).values(productIds.map((productId, position) => ({ postId, productId, position })));
+      await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.post_products_set', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent, metadata: { count: productIds.length } }, tx);
+    });
+    return this.detail(userId, postId, apiBase);
   }
 
   // ------------------------------------------------------------------------------------------------ Lecture
@@ -225,10 +301,11 @@ export class PostsService {
     return row;
   }
 
+  /** Écran 11 : détail, avec les produits et services utilisés (absents des fils : aucun achat depuis l'Accueil, E2). */
   async detail(viewerId: string, postId: string, apiBase: string) {
     const row = await this.visible(viewerId, postId);
     const [view] = await this.views(viewerId, [row], apiBase);
-    return view;
+    return { ...view, usedProducts: row.post.kind === 'bim' ? await this.usedProducts(viewerId, postId, apiBase) : [] };
   }
 
   async avatarUrl(key: string | null, apiBase: string): Promise<string | null> {

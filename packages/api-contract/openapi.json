@@ -2094,6 +2094,45 @@
         ]
       }
     },
+    "/v1/posts/{id}/products": {
+      "put": {
+        "operationId": "SocialController_setProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProductsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "« Produits et services utilisés » de mon « J’ai fait mon BIM » (5 au plus ; simple lien vers la fiche, aucun achat)",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/v1/posts/{id}/like": {
       "put": {
         "operationId": "SocialController_like",
@@ -2721,639 +2760,6 @@
         "summary": "Rétablir une publication ou un commentaire masqué",
         "tags": [
           "Administration — modération"
-        ]
-      }
-    },
-    "/v1/peni/conversations": {
-      "post": {
-        "operationId": "PeniController_start",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartPeniConversationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Commencer une discussion avec Peni (sans IA : réponses écrites par l’équipe BIM)",
-        "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/peni/conversations/{id}": {
-      "get": {
-        "operationId": "PeniController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Relire une discussion avec Peni",
-        "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/peni/conversations/{id}/messages": {
-      "post": {
-        "operationId": "PeniController_send",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PeniMessageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Répondre à Peni (message libre ou réponse rapide) ; renvoie le brouillon de projet quand tout est noté",
-        "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/peni/projects/{projectId}/encouragement": {
-      "get": {
-        "operationId": "PeniController_encouragement",
-        "parameters": [
-          {
-            "name": "projectId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "context",
-            "required": true,
-            "in": "query",
-            "description": "day : écran 27 (journée) ; map : écran 26 (carte du projet)",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "day",
-                "map"
-              ]
-            }
-          },
-          {
-            "name": "day",
-            "required": false,
-            "in": "query",
-            "description": "Jour affiché (écran 27) ; aujourd’hui par défaut",
-            "schema": {
-              "example": "2026-10-15",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Encouragement de Peni pour la journée (27) ou la carte (26) ; heures calmes respectées, aucune notification",
-        "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/peni/projects/{projectId}/tasks/{taskId}/explanation": {
-      "get": {
-        "operationId": "PeniController_explainTask",
-        "parameters": [
-          {
-            "name": "projectId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "taskId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte",
-        "tags": [
-          "Peni"
-        ]
-      }
-    },
-    "/v1/merchant/applications/mine": {
-      "get": {
-        "operationId": "MerchantApplicationsController_mine",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Ma demande d’ouverture de boutique (statut et liste de contrôle, écran 09)",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/v1/merchant/applications": {
-      "post": {
-        "operationId": "MerchantApplicationsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateApplicationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Commencer une demande : la boutique (nom, ville, présentation). Âge minimum des marchands appliqué (F15).",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/v1/merchant/applications/{id}": {
-      "patch": {
-        "operationId": "MerchantApplicationsController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateApplicationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Modifier la demande (boutique, type de pièce, adresse)",
-        "tags": [
-          "Marchands"
-        ]
-      },
-      "delete": {
-        "operationId": "MerchantApplicationsController_withdraw",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Abandonner une demande non validée (pièces effacées)",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/v1/merchant/applications/{id}/documents/{kind}": {
-      "put": {
-        "operationId": "MerchantApplicationsController_upload",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "photo"
-                ],
-                "properties": {
-                  "photo": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Pièce d’identité (id_front, id_back) ou selfie : ré-encodée puis chiffrée",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/v1/merchant/applications/{id}/payout-number": {
-      "post": {
-        "operationId": "MerchantApplicationsController_startPayout",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PayoutNumberDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Numéro Mobile Money de la boutique : un code est envoyé par SMS",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/v1/merchant/applications/{id}/payout-number/verify": {
-      "post": {
-        "operationId": "MerchantApplicationsController_verifyPayout",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyPayoutDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Confirmer le numéro Mobile Money avec le code reçu",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/v1/merchant/applications/{id}/submit": {
-      "post": {
-        "operationId": "MerchantApplicationsController_submit",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Envoyer pour validation par l’équipe BIM",
-        "tags": [
-          "Marchands"
-        ]
-      }
-    },
-    "/admin/v1/merchant-applications": {
-      "get": {
-        "operationId": "MerchantReviewController_list",
-        "parameters": [
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "enum": [
-                "submitted",
-                "approved",
-                "rejected"
-              ],
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Demandes d’ouverture de boutique",
-        "tags": [
-          "Administration — marchands"
-        ]
-      }
-    },
-    "/admin/v1/merchant-applications/{id}": {
-      "get": {
-        "operationId": "MerchantReviewController_detail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Administration — marchands"
-        ]
-      }
-    },
-    "/admin/v1/merchant-applications/{id}/documents/{kind}": {
-      "get": {
-        "operationId": "MerchantReviewController_document",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Pièce d’identité ou selfie déchiffré (lecture inscrite au journal d’audit)",
-        "tags": [
-          "Administration — marchands"
-        ]
-      }
-    },
-    "/admin/v1/merchant-applications/{id}/approve": {
-      "post": {
-        "operationId": "MerchantReviewController_approve",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Valider : la boutique est ouverte",
-        "tags": [
-          "Administration — marchands"
-        ]
-      }
-    },
-    "/admin/v1/merchant-applications/{id}/reject": {
-      "post": {
-        "operationId": "MerchantReviewController_reject",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectApplicationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Refuser avec un motif (la personne corrige et renvoie)",
-        "tags": [
-          "Administration — marchands"
         ]
       }
     },
@@ -4209,6 +3615,639 @@
         ],
         "tags": [
           "BimShop"
+        ]
+      }
+    },
+    "/v1/peni/conversations": {
+      "post": {
+        "operationId": "PeniController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPeniConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer une discussion avec Peni (sans IA : réponses écrites par l’équipe BIM)",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/conversations/{id}": {
+      "get": {
+        "operationId": "PeniController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Relire une discussion avec Peni",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/conversations/{id}/messages": {
+      "post": {
+        "operationId": "PeniController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeniMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Répondre à Peni (message libre ou réponse rapide) ; renvoie le brouillon de projet quand tout est noté",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/projects/{projectId}/encouragement": {
+      "get": {
+        "operationId": "PeniController_encouragement",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "context",
+            "required": true,
+            "in": "query",
+            "description": "day : écran 27 (journée) ; map : écran 26 (carte du projet)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "map"
+              ]
+            }
+          },
+          {
+            "name": "day",
+            "required": false,
+            "in": "query",
+            "description": "Jour affiché (écran 27) ; aujourd’hui par défaut",
+            "schema": {
+              "example": "2026-10-15",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encouragement de Peni pour la journée (27) ou la carte (26) ; heures calmes respectées, aucune notification",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/peni/projects/{projectId}/tasks/{taskId}/explanation": {
+      "get": {
+        "operationId": "PeniController_explainTask",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Peni explique une tâche du programme (écran 24) ; sans IA, pauses, heures calmes et rappels pris en compte",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
+    "/v1/merchant/applications/mine": {
+      "get": {
+        "operationId": "MerchantApplicationsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ma demande d’ouverture de boutique (statut et liste de contrôle, écran 09)",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications": {
+      "post": {
+        "operationId": "MerchantApplicationsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer une demande : la boutique (nom, ville, présentation). Âge minimum des marchands appliqué (F15).",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}": {
+      "patch": {
+        "operationId": "MerchantApplicationsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifier la demande (boutique, type de pièce, adresse)",
+        "tags": [
+          "Marchands"
+        ]
+      },
+      "delete": {
+        "operationId": "MerchantApplicationsController_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abandonner une demande non validée (pièces effacées)",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/documents/{kind}": {
+      "put": {
+        "operationId": "MerchantApplicationsController_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "photo"
+                ],
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pièce d’identité (id_front, id_back) ou selfie : ré-encodée puis chiffrée",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/payout-number": {
+      "post": {
+        "operationId": "MerchantApplicationsController_startPayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutNumberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numéro Mobile Money de la boutique : un code est envoyé par SMS",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/payout-number/verify": {
+      "post": {
+        "operationId": "MerchantApplicationsController_verifyPayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyPayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmer le numéro Mobile Money avec le code reçu",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/v1/merchant/applications/{id}/submit": {
+      "post": {
+        "operationId": "MerchantApplicationsController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Envoyer pour validation par l’équipe BIM",
+        "tags": [
+          "Marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications": {
+      "get": {
+        "operationId": "MerchantReviewController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "submitted",
+                "approved",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Demandes d’ouverture de boutique",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}": {
+      "get": {
+        "operationId": "MerchantReviewController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}/documents/{kind}": {
+      "get": {
+        "operationId": "MerchantReviewController_document",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pièce d’identité ou selfie déchiffré (lecture inscrite au journal d’audit)",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}/approve": {
+      "post": {
+        "operationId": "MerchantReviewController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Valider : la boutique est ouverte",
+        "tags": [
+          "Administration — marchands"
+        ]
+      }
+    },
+    "/admin/v1/merchant-applications/{id}/reject": {
+      "post": {
+        "operationId": "MerchantReviewController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refuser avec un motif (la personne corrige et renvoie)",
+        "tags": [
+          "Administration — marchands"
         ]
       }
     },
@@ -9675,10 +9714,33 @@
               "private"
             ],
             "default": "public"
+          },
+          "productIds": {
+            "maxItems": 5,
+            "description": "5-E : produits et services utilisés (articles visibles du BimShop)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "projectId"
+        ]
+      },
+      "PostProductsDto": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "productIds"
         ]
       },
       "CreateCommentDto": {
@@ -9760,6 +9822,127 @@
         "required": [
           "action",
           "resolution"
+        ]
+      },
+      "UpdateShopDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "commune": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "product",
+              "service"
+            ],
+            "default": "product"
+          },
+          "title": {
+            "type": "string",
+            "example": "Robe soirée à plumes"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "categoryCode": {
+            "type": "string",
+            "example": "vetements_soiree",
+            "description": "Sous-rubrique (écran 33)"
+          },
+          "priceFcfa": {
+            "type": "number",
+            "example": 60000,
+            "description": "Prix normal en FCFA, fixé à la création (L7-04)"
+          },
+          "promoPriceFcfa": {
+            "type": "object",
+            "example": 45000,
+            "description": "Prix promotionnel, inférieur au prix normal"
+          },
+          "durationMinutes": {
+            "type": "object",
+            "example": 60,
+            "description": "Prestation : durée en minutes"
+          }
+        },
+        "required": [
+          "title",
+          "categoryCode",
+          "priceFcfa"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryCode": {
+            "type": "string"
+          },
+          "priceFcfa": {
+            "type": "number"
+          },
+          "promoPriceFcfa": {
+            "type": "object",
+            "nullable": true,
+            "description": "Promotion : activer ou modifier (montant), supprimer (null). Réputation conservée."
+          },
+          "durationMinutes": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "VariantsDto": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "example": [
+              "XS",
+              "S",
+              "M",
+              "L",
+              "XL"
+            ],
+            "description": "Libellés des variantes (taille, couleur…) ; vide : « Unique »",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "labels"
+        ]
+      },
+      "StockDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "example": 12,
+            "description": "Nouveau stock de la variante (le mouvement est calculé)"
+          }
+        },
+        "required": [
+          "quantity"
         ]
       },
       "StartPeniConversationDto": {
@@ -9920,127 +10103,6 @@
         },
         "required": [
           "reason"
-        ]
-      },
-      "UpdateShopDto": {
-        "type": "object",
-        "properties": {
-          "description": {
-            "type": "string"
-          },
-          "city": {
-            "type": "string"
-          },
-          "commune": {
-            "type": "string"
-          }
-        }
-      },
-      "ProductDto": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "product",
-              "service"
-            ],
-            "default": "product"
-          },
-          "title": {
-            "type": "string",
-            "example": "Robe soirée à plumes"
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "categoryCode": {
-            "type": "string",
-            "example": "vetements_soiree",
-            "description": "Sous-rubrique (écran 33)"
-          },
-          "priceFcfa": {
-            "type": "number",
-            "example": 60000,
-            "description": "Prix normal en FCFA, fixé à la création (L7-04)"
-          },
-          "promoPriceFcfa": {
-            "type": "object",
-            "example": 45000,
-            "description": "Prix promotionnel, inférieur au prix normal"
-          },
-          "durationMinutes": {
-            "type": "object",
-            "example": 60,
-            "description": "Prestation : durée en minutes"
-          }
-        },
-        "required": [
-          "title",
-          "categoryCode",
-          "priceFcfa"
-        ]
-      },
-      "UpdateProductDto": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "categoryCode": {
-            "type": "string"
-          },
-          "priceFcfa": {
-            "type": "number"
-          },
-          "promoPriceFcfa": {
-            "type": "object",
-            "nullable": true,
-            "description": "Promotion : activer ou modifier (montant), supprimer (null). Réputation conservée."
-          },
-          "durationMinutes": {
-            "type": "object",
-            "nullable": true
-          }
-        }
-      },
-      "VariantsDto": {
-        "type": "object",
-        "properties": {
-          "labels": {
-            "example": [
-              "XS",
-              "S",
-              "M",
-              "L",
-              "XL"
-            ],
-            "description": "Libellés des variantes (taille, couleur…) ; vide : « Unique »",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "labels"
-        ]
-      },
-      "StockDto": {
-        "type": "object",
-        "properties": {
-          "quantity": {
-            "type": "number",
-            "example": 12,
-            "description": "Nouveau stock de la variante (le mouvement est calculé)"
-          }
-        },
-        "required": [
-          "quantity"
         ]
       },
       "OfferDto": {

@@ -9,7 +9,7 @@ import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
 import { AuthContext, CurrentAuth, Public } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { CreateBimPostDto, CreateCommentDto, CreatePostDto, ReportContentDto, ResolveContentReportDto, VISIBILITIES } from './dto';
+import { CreateBimPostDto, CreateCommentDto, CreatePostDto, PostProductsDto, ReportContentDto, ResolveContentReportDto, VISIBILITIES } from './dto';
 import { ModerationService } from './moderation.service';
 import { PeopleService } from './people.service';
 import { MAX_POST_IMAGES, PostsService } from './posts.service';
@@ -105,6 +105,13 @@ export class SocialController {
   @ApiOperation({ summary: 'Détail d’une publication (écran 11)' })
   detail(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.posts.detail(a.userId, id, apiBase(req));
+  }
+
+  @Put('posts/:id/products')
+  @Throttle({ default: { limit: 30, ttl: 600_000 } })
+  @ApiOperation({ summary: '« Produits et services utilisés » de mon « J’ai fait mon BIM » (5 au plus ; simple lien vers la fiche, aucun achat)' })
+  setProducts(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PostProductsDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    return this.posts.setProducts(a.userId, id, dto.productIds, meta, apiBase(req));
   }
 
   @Delete('posts/:id')
