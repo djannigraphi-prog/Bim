@@ -221,9 +221,9 @@ class _OrderBody extends StatelessWidget {
         ...actions,
         // 7-G : litige en cours, et délai de contestation après la remise.
         if (o.inDispute)
-          Padding(
-            padding: const EdgeInsets.only(top: BimSpacing.sm),
-            child: Text('En litige : le problème signalé après la remise est en cours de traitement.', key: const ValueKey('order-in-dispute'), style: const TextStyle(fontWeight: FontWeight.w700)),
+          const Padding(
+            padding: EdgeInsets.only(top: BimSpacing.sm),
+            child: Text('En litige : le problème signalé après la remise est en cours de traitement.', key: ValueKey('order-in-dispute'), style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         if (o.disputeUntil != null)
           Padding(
