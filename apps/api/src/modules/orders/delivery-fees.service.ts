@@ -20,7 +20,7 @@ const notAllowed = (m: string) => new AppError('PAYMENT_NOT_ALLOWED', m, HttpSta
  * aucun fonds. Comme pour l'article : déclaration du client (jamais une confirmation), puis décision du bénéficiaire
  * (le livreur confirme la réception ou la conteste). Le paiement n'est attendu qu'après une remise réussie (code
  * validé) ; refus du client, absence et annulation ne créent aucun frais (politique financière A8 non définie).
- * Livreurs employés ou partenaires : non concernés (frais à la boutique, ou selon le partenariat).
+ * Décision du 17/10/2026 (20 h 10) : un **partenaire** est payé de la même façon. Employés : frais à la boutique.
  */
 @Injectable()
 export class DeliveryFeesService {
@@ -30,9 +30,9 @@ export class DeliveryFeesService {
     private readonly orders: OrdersService,
   ) {}
 
-  /** À la validation du code : frais attendus si le livreur est indépendant et que la livraison est payante. */
+  /** À la validation du code : frais attendus si le livreur est indépendant ou partenaire et que la livraison est payante. */
   async openInTx(tx: DbOrTx, d: Delivery, o: Order) {
-    if (d.courierCategory !== 'independent' || !o.deliveryFeeFcfa || o.deliveryFeeFcfa <= 0) return;
+    if ((d.courierCategory !== 'independent' && d.courierCategory !== 'partner') || !o.deliveryFeeFcfa || o.deliveryFeeFcfa <= 0) return;
     await tx.insert(orderPayments).values({ id: uuidv7(), orderId: o.id, kind: 'delivery_fee', method: 'mobile_money', amountFcfa: o.deliveryFeeFcfa }).onConflictDoNothing();
   }
 

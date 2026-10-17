@@ -272,7 +272,7 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
               const Divider(height: BimSpacing.xl),
               // A3-b : en indépendant, le client te paie les frais de livraison sur ton numéro vérifié.
               Text('Mobile Money pour recevoir les frais', style: theme.textTheme.titleMedium),
-              const Text('En course indépendante, le client te paie les frais de livraison sur ton numéro vérifié.'),
+              const Text('En indépendant ou en partenaire, le client te paie les frais de livraison sur ton numéro vérifié.'),
               Wrap(
                 spacing: BimSpacing.sm,
                 children: [

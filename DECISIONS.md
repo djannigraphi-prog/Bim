@@ -166,6 +166,17 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### D-2010 — Client absent, partenaires, Peni (17/10/2026, 20 h 10) · Fondateur · **appliquée**
+
+- **Client absent** : pas de nouvelle tentative ; le colis revient à la boutique, qui confirme le retour ; la commande est
+  annulée (déjà réalisé) ; le client recommande s'il le souhaite. Aucun frais supplémentaire.
+- **Livreur partenaire** : payé **comme un indépendant** (le client paie les frais directement au livreur par Mobile
+  Money ; déclaration puis confirmation du livreur). Employés : frais à la boutique (inchangé).
+- **Discussions avec Peni** : supprimées après **1 an sans activité** (`peni.conversation_retention_days` = 365, décidé,
+  migration 0048 ; mécanisme existant, lot 3-B).
+- **IA de Peni** : **pas encore** ; Peni garde ses réponses écrites (aucun fournisseur, aucune dépense) ; à revoir avant
+  le lancement.
+
 ### D-1850 — Âges, livreurs indépendants, Gold, pièces d'identité, photos, mineurs (17/10/2026, 18 h 50) · Fondateur
 
 - **Âges** : commander dès **16 ans** (`age.min_other_payments` = 16) ; ouvrir une boutique : **18 ans**

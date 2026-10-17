@@ -662,7 +662,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                         Text('Frais de livraison : ${formatFcfa(o.deliveryFee!.amountFcfa)} — ${deliveryFeeStatusLabelFr(o.deliveryFee!.status)}', style: const TextStyle(fontWeight: FontWeight.w700)),
                         if (o.deliveryFee!.payToPhone != null)
                           Text(
-                            'À payer à ${o.deliveryFee!.payToName ?? 'ton livreur'} (livreur indépendant) : ${o.deliveryFee!.payToOperator != null ? '${operatorLabel(o.deliveryFee!.payToOperator)} ' : 'Mobile Money '}${o.deliveryFee!.payToPhone}',
+                            'À payer à ${o.deliveryFee!.payToName ?? 'ton livreur'} (ton livreur) : ${o.deliveryFee!.payToOperator != null ? '${operatorLabel(o.deliveryFee!.payToOperator)} ' : 'Mobile Money '}${o.deliveryFee!.payToPhone}',
                             key: const ValueKey('delivery-fee-payto'),
                           ),
                         if (o.deliveryFee!.actions.contains('declare_delivery_fee'))

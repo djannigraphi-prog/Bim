@@ -227,7 +227,7 @@ describe('Livraisons (e2e)', () => {
     expect((await h.http().get(`/v1/orders/${id}`).set(client.auth)).body.deliveryFeeFcfa).toBe(fee);
   });
 
-  it('A3-b livreur indépendant : le client lui paie les frais en Mobile Money (déclaration), le livreur confirme ; jamais pour un employé ni sans remise', async () => {
+  it('A3-b livreur indépendant : le client lui paie les frais en Mobile Money (déclaration), le livreur confirme ; partenaire de même ; jamais pour un employé ni sans remise', async () => {
     const s = await shop();
     const client = await person();
     const ind = await courier([home]);
@@ -273,6 +273,12 @@ describe('Livraisons (e2e)', () => {
     await h.http().post(`/v1/orders/${b.id}/delivery/refuse`).set(client.auth).send({ reason: 'incorrect' }).expect(200);
     expect((await h.http().get(`/v1/orders/${b.id}`).set(client.auth)).body.deliveryFeePayment).toBeNull();
     await h.http().post(`/v1/orders/${b.id}/payment/delivery-fee/declare`).set(client.auth).send({}).expect(409);
+    // Partenaire de la boutique (décision du 17/10, 20 h 10) : payé comme un indépendant.
+    const partner = await courier([home], { shopId: s.shopId, kind: 'partner' });
+    const pa = await deliver(partner);
+    const codeP = (await h.http().get(`/v1/orders/${pa.id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/courier/courses/${pa.dId}/code`).set(partner.space).send({ code: codeP }).expect(200);
+    expect((await h.http().get(`/v1/orders/${pa.id}`).set(client.auth)).body.deliveryFeePayment).toMatchObject({ status: 'to_pay', actions: ['declare_delivery_fee'] });
     // Employé de la boutique : frais à la boutique, rien à payer au livreur.
     const emp = await courier([home], { shopId: s.shopId, kind: 'employee' });
     const c = await deliver(emp);

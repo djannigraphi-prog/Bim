@@ -227,9 +227,9 @@ réellement opérationnel. Une interface de paiement ne suffit pas.
 **A3-b décidé (17/10/2026, 18 h 50) et réalisé** : le client paie les frais d'un **livreur indépendant** directement au
 livreur par Mobile Money (montant de la grille, figé à la commande ; numéro = téléphone vérifié du livreur, opérateur
 choisi dans son profil) ; déclaration du client, puis confirmation ou contestation du livreur ; seulement après une remise
-réussie (code validé) : refus, absence et annulation ne créent aucun frais (A8). Partenaires : selon leur partenariat.
+réussie (code validé) : refus, absence et annulation ne créent aucun frais (A8). **Partenaires (décision du 17/10, 20 h 10) : payés de la même façon.**
 
-**Points ouverts restants** (partenaires) [ARBITRAGE A3-b] :
+**Points ouverts restants** [ARBITRAGE A3-b, tranchés le 17/10 (20 h 10) : partenaires payés comme les indépendants ; notes ci-dessous conservées pour l'historique] :
 
 - Un **indépendant sans partenariat** n'a pas de « règles de partenariat » : quelle règle de rémunération lui
   appliquer (la grille BIM du §7 ?) ?

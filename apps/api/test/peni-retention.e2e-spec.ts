@@ -32,11 +32,12 @@ describe('Conservation des discussions avec Peni (e2e)', () => {
     await h.pool.query(`delete from maintenance_runs where job = 'peni_retention'`);
   });
   afterAll(async () => {
-    await setRetention(null, 'pending');
+    // Décision du 17/10/2026 (20 h 10) : 1 an sans activité (état livré par la migration 0048).
+    await setRetention(365, 'decided');
     await h.close();
   });
 
-  it('par défaut : aucune durée fixée, rien n’est supprimé', async () => {
+  it('sans durée fixée : rien n’est supprimé', async () => {
     expect(await retention.config()).toEqual({ retentionDays: null, decided: false, active: false });
     const u = await registerAndActivate(h);
     const old = await conversation(bearer(u.tokens.accessToken), 800);

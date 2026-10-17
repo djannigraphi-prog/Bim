@@ -546,7 +546,7 @@ void main() {
       );
     await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
     await tester.pumpAndSettle();
-    expect(tester.widget<Text>(find.byKey(const ValueKey('delivery-fee-payto'))).data, 'À payer à Koffi (livreur indépendant) : Wave +2250700000001');
+    expect(tester.widget<Text>(find.byKey(const ValueKey('delivery-fee-payto'))).data, 'À payer à Koffi (ton livreur) : Wave +2250700000001');
     await tester.tap(find.byKey(const ValueKey('declare-delivery-fee')));
     await tester.pumpAndSettle();
     expect(api.calls, contains('delivery fee declared'));
