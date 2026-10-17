@@ -11,7 +11,8 @@ import { courierAccounts } from './spaces';
  * le délai. Un livreur ne voit que les missions qui lui sont proposées, ses courses et son historique.
  *
  * Statuts : searching (recherche) → offered (proposée à un livreur) → accepted → picked_up → arrived → code_validated →
- * closed (clôturée par le livreur). Sorties : refused_by_client · client_absent · cancelled.
+ * closed (clôturée par le livreur). Sorties : refused_by_client · client_absent · cancelled. Après un refus ou une absence,
+ * le colis revient en boutique : la boutique confirme le retour (returned_at), la commande est alors annulée et le stock remis.
  */
 export const deliveries = pgTable(
   'deliveries',
@@ -37,6 +38,9 @@ export const deliveries = pgTable(
     endReason: varchar('end_reason', { length: 300 }),
     /** Motif de refus du client (article incorrect, endommagé, incomplet, autre). */
     refusalReason: varchar('refusal_reason', { length: 20 }),
+    /** Retour en boutique (après refus ou absence du client) : la boutique confirme avoir récupéré le colis. */
+    returnedAt: timestamp('returned_at', { withTimezone: true }),
+    returnConfirmedBy: uuid('return_confirmed_by').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -45,6 +49,7 @@ export const deliveries = pgTable(
     check('deliveries_status_ck', sql`${t.status} IN ('searching', 'offered', 'accepted', 'picked_up', 'arrived', 'code_validated', 'closed', 'refused_by_client', 'client_absent', 'cancelled')`),
     check('deliveries_category_ck', sql`${t.courierCategory} IS NULL OR ${t.courierCategory} IN ('employee', 'partner', 'independent')`),
     check('deliveries_refusal_ck', sql`${t.refusalReason} IS NULL OR ${t.refusalReason} IN ('incorrect', 'damaged', 'incomplete', 'other')`),
+    check('deliveries_return_ck', sql`${t.returnedAt} IS NULL OR (${t.status} IN ('refused_by_client', 'client_absent') AND ${t.returnConfirmedBy} IS NOT NULL)`),
     check('deliveries_courier_ck', sql`${t.status} IN ('searching', 'offered', 'cancelled') OR ${t.courierId} IS NOT NULL`),
   ],
 );

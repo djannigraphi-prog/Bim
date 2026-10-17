@@ -1,0 +1,4 @@
+ALTER TABLE "deliveries" ADD COLUMN "returned_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "deliveries" ADD COLUMN "return_confirmed_by" uuid;--> statement-breakpoint
+ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_return_confirmed_by_users_id_fk" FOREIGN KEY ("return_confirmed_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_return_ck" CHECK ("deliveries"."returned_at" IS NULL OR ("deliveries"."status" IN ('refused_by_client', 'client_absent') AND "deliveries"."return_confirmed_by" IS NOT NULL));

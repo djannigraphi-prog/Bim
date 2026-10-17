@@ -36,6 +36,8 @@ type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 /** Statuts d'une course en cours (comptent dans la capacité du livreur). */
 const ON_COURSE = ['accepted', 'picked_up', 'arrived', 'code_validated'] as const;
 const ENDED = ['closed', 'refused_by_client', 'client_absent', 'cancelled'];
+/** Livraisons terminées sans remise : le colis doit revenir en boutique. */
+const RETURNABLE = ['refused_by_client', 'client_absent'];
 const RANK: Record<CourierCategory, number> = { employee: 0, partner: 1, independent: 2 };
 
 const changed = (status: string) => new AppError('DELIVERY_STATE_CHANGED', 'Cette livraison a changé entre-temps. Actualise pour voir son état.', HttpStatus.CONFLICT, { status });
@@ -340,6 +342,23 @@ export class DeliveriesService {
     });
   }
 
+  /**
+   * Retour en boutique : après un refus ou une absence du client, la boutique confirme avoir récupéré le colis. La
+   * commande est annulée (stock remis) ; l'incident reste ouvert pour le support. Une seule confirmation.
+   */
+  async confirmReturn(staffId: string, shopId: string, orderId: string, meta: RequestMeta) {
+    await this.db.transaction(async (tx) => {
+      const [o] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.shopId, shopId))).for('update').limit(1);
+      if (!o) throw Errors.notFound('Commande');
+      const [d] = await tx.select().from(deliveries).where(eq(deliveries.orderId, orderId)).for('update').limit(1);
+      if (!d || !RETURNABLE.includes(d.status) || d.returnedAt || o.status !== 'in_delivery') throw changed(d?.returnedAt ? 'returned' : (d?.status ?? 'none'));
+      await tx.update(deliveries).set({ returnedAt: new Date(), returnConfirmedBy: staffId }).where(eq(deliveries.id, d.id));
+      await this.event(tx, d.id, 'returned_to_shop', 'shop', staffId);
+      await this.orders.endAfterReturn(tx, o.id, staffId, d.status === 'client_absent' ? 'Client absent : colis revenu en boutique' : 'Refusée par le client : colis revenu en boutique');
+      await this.audit.log({ actorType: 'user', actorId: staffId, action: 'deliveries.returned_to_shop', targetType: 'order', targetId: o.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { shopId, deliveryStatus: d.status } }, tx);
+    });
+  }
+
   /** Colis pris en charge à la boutique : la commande passe « en livraison ». */
   async pickedUp(courierUserId: string, courierId: string, deliveryId: string) {
     await this.step(courierUserId, courierId, deliveryId, ['accepted'], async (tx, d, o, now) => {
@@ -570,6 +589,7 @@ export class DeliveriesService {
       waitedSeconds: d.waitedSeconds,
       waitFeeFcfa: d.waitFeeFcfa,
       refusalReason: d.refusalReason,
+      returnedAt: d.returnedAt,
       events: events.map((e) => ({ type: e.type, actorType: e.actorType, at: e.createdAt })),
       review: review ?? null,
     };
@@ -578,6 +598,7 @@ export class DeliveriesService {
   static partyActions(o: Order, d: Delivery | null, party: 'customer' | 'shop'): string[] {
     if (o.deliveryMode === 'pickup' || !o.deliveryMode) return [];
     if (party === 'shop') {
+      if (o.status === 'in_delivery' && d && RETURNABLE.includes(d.status) && !d.returnedAt) return ['confirm_return'];
       if (o.status !== 'ready') return [];
       if (!d) return ['start_delivery'];
       if (d.status === 'searching') return ['select_courier'];

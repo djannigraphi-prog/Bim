@@ -167,6 +167,9 @@ class _FakeShopOrders extends ShopOrdersApi {
     if (action == 'handover' && code != '4821') {
       throw const ApiException(code: 'HANDOVER_CODE_INVALID', message: 'Code incorrect.', status: 400, details: {'remaining': 4});
     }
+    if (action == 'delivery/returned') {
+      return current = _detail(status: 'cancelled', actions: const [], customer: 'Awa Koné', tracking: const DeliveryTracking(status: 'refused_by_client'));
+    }
     if (action == 'delivery/start') {
       return current = _detail(status: 'ready', mode: 'economy', actions: const ['cancel', 'select_courier'], customer: 'Awa Koné', tracking: const DeliveryTracking(status: 'searching'));
     }
@@ -388,6 +391,23 @@ void main() {
     expect(shop.calls, ['delivery/start', 'offer ind Employé trop loin']);
     expect(find.text('Livraison : Livreur sollicité, en attente de sa réponse'), findsOneWidget);
     expect(find.byKey(const ValueKey('delivery-withdraw')), findsOneWidget);
+  });
+
+  testWidgets('7 boutique : colis revenu après un refus, confirmation demandée, commande annulée', (tester) async {
+    final shop = _FakeShopOrders()..current = _detail(status: 'in_delivery', mode: 'express', actions: const ['confirm_return'], customer: 'Awa Koné', tracking: const DeliveryTracking(status: 'refused_by_client'));
+    await _pump(tester, const ShopOrderScreen(orderId: 'o1'), shop: shop);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('delivery-returned')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Annuler').last);
+    await tester.pumpAndSettle();
+    expect(shop.calls, isEmpty);
+    await tester.tap(find.byKey(const ValueKey('delivery-returned')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('returned-confirm')));
+    await tester.pumpAndSettle();
+    expect(shop.calls, ['delivery/returned']);
+    expect(find.byKey(const ValueKey('delivery-returned')), findsNothing);
   });
 
   testWidgets('7-F/7-G client : refuser la remise avec un motif ouvre un incident, transmis au support', (tester) async {

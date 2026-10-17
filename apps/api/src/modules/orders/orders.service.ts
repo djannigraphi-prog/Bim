@@ -640,6 +640,18 @@ export class OrdersService {
     });
   }
 
+  /**
+   * Colis revenu en boutique après un refus ou une absence du client (livraison terminée sans remise) : la commande
+   * « en livraison » est annulée par la boutique, le stock remis, le code de remise et le paiement en attente annulés.
+   * Aucun effet financier automatique (A8) : un paiement déjà confirmé se rembourse par le support, hors de ce geste.
+   */
+  async endAfterReturn(tx: Tx, orderId: string, staffId: string, reason: string) {
+    const { before } = await this.move(tx, orderId, ['in_delivery'], 'cancelled', { closedAt: new Date(), endedByType: 'shop', endedById: staffId, endReason: reason, endedFromStatus: 'in_delivery', expiresAt: null }, { type: 'cancelled', actorType: 'shop', actorId: staffId, data: { reason, returnedToShop: true } });
+    await this.returnStock(tx, before, staffId);
+    await tx.update(orderHandoverCodes).set({ status: 'cancelled' }).where(and(eq(orderHandoverCodes.orderId, orderId), eq(orderHandoverCodes.status, 'active')));
+    await this.payments.cancel(tx, orderId);
+  }
+
   // ------------------------------------------------------------------ Expiration
 
   /** Expire une proposition ou une commande en attente dont le délai est dépassé (aussi appelé à la lecture). */

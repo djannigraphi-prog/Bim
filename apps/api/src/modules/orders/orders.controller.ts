@@ -175,6 +175,15 @@ export class ShopOrdersController {
     return this.deliveries.shopView(this.shop(a), id, apiBase(req));
   }
 
+  @Post(':id/delivery/returned')
+  @HttpCode(200)
+  @RequireShopPermission('orders.prepare')
+  @ApiOperation({ summary: 'Colis revenu en boutique après un refus ou une absence du client : la commande est annulée, le stock remis' })
+  async confirmReturn(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.deliveries.confirmReturn(a.userId, this.shop(a), id, meta);
+    return this.deliveries.shopView(this.shop(a), id, apiBase(req));
+  }
+
   @Get(':id/incidents')
   @RequireShopPermission('orders.read')
   incidentsList(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {

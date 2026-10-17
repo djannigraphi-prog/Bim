@@ -6547,6 +6547,35 @@
         ]
       }
     },
+    "/v1/shop/orders/{id}/delivery/returned": {
+      "post": {
+        "operationId": "ShopOrdersController_confirmReturn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Colis revenu en boutique après un refus ou une absence du client : la commande est annulée, le stock remis",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
     "/v1/shop/orders/{id}/incidents": {
       "get": {
         "operationId": "ShopOrdersController_incidentsList",

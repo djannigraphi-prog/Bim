@@ -696,6 +696,21 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
     super.dispose();
   }
 
+  Future<void> _confirmReturn() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Colis revenu en boutique ?'),
+        content: const Text('Confirme seulement si tu as récupéré le colis. La commande sera annulée et le stock remis. Un paiement déjà reçu se rembourse avec le support.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(key: const ValueKey('returned-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmer')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) await _act('delivery/returned', done: 'Retour enregistré, commande annulée');
+  }
+
   Future<void> _act(String action, {String? reason, String? code, int? amountFcfa, String? done}) async {
     setState(() {
       _busy = true;
@@ -783,6 +798,9 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
                     loading: _busy,
                     onPressed: _busy ? null : () => _act('delivery/withdraw', done: 'Demande retirée'),
                   ),
+                // Retour en boutique après un refus ou une absence du client : la commande sera annulée, le stock remis.
+                if (o.can('confirm_return'))
+                  BimButton(key: const ValueKey('delivery-returned'), label: 'Colis revenu en boutique', loading: _busy, onPressed: _busy ? null : _confirmReturn),
                 if (o.can('handover')) ...[
                   TextField(
                     key: const ValueKey('handover-input'),

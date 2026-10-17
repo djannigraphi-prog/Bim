@@ -65,6 +65,8 @@ export const PURGE_BLOCKING_TABLES = [
   'reviews',
   // Lot 7-F : solliciter un livreur est une activité.
   'delivery_offers',
+  // Lot 7 : confirmer le retour d'un colis en boutique est une activité.
+  'deliveries',
   // Lot 6-C : réagir à un message est une activité.
   'message_reactions',
   // Lot 8 : lancer un paiement en ligne est une activité.
@@ -89,6 +91,7 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   courier_shop_partnerships: ['invited_by', 'ended_by'],
   reviews: ['author_id'],
   delivery_offers: ['offered_by'],
+  deliveries: ['return_confirmed_by'],
   payment_intents: ['created_by'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */

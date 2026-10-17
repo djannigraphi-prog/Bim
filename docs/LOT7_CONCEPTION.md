@@ -360,7 +360,11 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 > (`POST /v1/courier/courses/:id/release`) ; la livraison revient en recherche, même mode, même prix ; il n'est plus
 > proposé pour cette livraison ; aucune pénalité ; historique `released` / `courier_released` et audit. Après la prise
 > en charge : refusé (409), il faut signaler un incident.
-> Non réalisé : statuts de commande « incident » / « litige », réattribution après prise en charge, retour en boutique, pièces jointes
+> **Retour en boutique réalisé (17/10)** : après un refus ou une absence du client, la commande ne reste plus « en
+> livraison » sans issue : la boutique confirme avoir récupéré le colis (`POST /v1/shop/orders/:id/delivery/returned`,
+> une seule fois) ; la commande est annulée, le stock remis, le code et le paiement en attente annulés ; l'incident reste
+> ouvert pour le support ; aucun remboursement ni frais automatique (A8 : un paiement déjà confirmé se rembourse par le support).
+> Non réalisé : statuts de commande « incident » / « litige », réattribution après prise en charge, nouvelle tentative convenue, pièces jointes
 > (stockage et conservation des preuves à décider) ; aucun effet financier automatique.
 
 Aucun frais d'annulation, remboursement ou pénalité automatique sans règle commerciale explicite (A8). Chaque incident

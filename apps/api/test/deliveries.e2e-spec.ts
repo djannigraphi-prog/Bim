@@ -361,6 +361,53 @@ describe('Livraisons (e2e)', () => {
     expect((await h.pool.query("select count(*)::int n from delivery_offers o join deliveries d on d.id = o.delivery_id where d.order_id = $1 and o.status = 'offered'", [id])).rows[0].n).toBe(0);
   });
 
+  it('retour en boutique après refus ou absence : la boutique confirme, la commande est annulée, le stock remis ; une seule fois', async () => {
+    const s = await shop();
+    const client = await person();
+    const c = await courier([home], { shopId: s.shopId, kind: 'employee' });
+    const stock = async () => (await h.pool.query('select coalesce(sum(delta), 0)::int n from inventory_movements where variant_id = $1', [s.product.variant])).rows[0].n as number;
+    const arrived = async () => {
+      const id = await readyOrder(s, client);
+      await h.http().post(`/v1/shop/orders/${id}/delivery/start`).set(s.auth).expect(200);
+      await h.http().post(`/v1/shop/orders/${id}/delivery/offer`).set(s.auth).send({ courierId: c.courierId }).expect(200);
+      const m = (await h.http().get('/v1/courier/missions').set(c.space)).body.items[0];
+      const dId = (await h.http().post(`/v1/courier/missions/${m.offerId}/accept`).set(c.space).expect(200)).body.items.find((x: { number: string }) => x).deliveryId;
+      await h.http().post(`/v1/courier/courses/${dId}/picked-up`).set(c.space).expect(200);
+      await h.http().post(`/v1/courier/courses/${dId}/arrived`).set(c.space).expect(200);
+      return { id, dId };
+    };
+    const before = await stock();
+    const a = await arrived();
+    const reserved = await stock();
+    expect(reserved).toBeLessThan(before);
+    // Pas de retour tant que la livraison est en cours.
+    expect((await h.http().get(`/v1/shop/orders/${a.id}`).set(s.auth)).body.actions).not.toContain('confirm_return');
+    await h.http().post(`/v1/shop/orders/${a.id}/delivery/returned`).set(s.auth).expect(409);
+    await h.http().post(`/v1/orders/${a.id}/delivery/refuse`).set(client.auth).send({ reason: 'incorrect' }).expect(200);
+    expect((await h.http().get(`/v1/shop/orders/${a.id}`).set(s.auth)).body.actions).toContain('confirm_return');
+    // Autre boutique : introuvable ; client : pas de route boutique.
+    const other = await shop();
+    await h.http().post(`/v1/shop/orders/${a.id}/delivery/returned`).set(other.auth).expect(404);
+    const done = (await h.http().post(`/v1/shop/orders/${a.id}/delivery/returned`).set(s.auth).expect(200)).body;
+    expect(done).toMatchObject({ status: 'cancelled', tracking: { status: 'refused_by_client', returnedAt: expect.any(String) } });
+    expect(done.actions).not.toContain('confirm_return');
+    expect(await stock()).toBe(before);
+    await h.http().post(`/v1/shop/orders/${a.id}/delivery/returned`).set(s.auth).expect(409);
+    const mine = (await h.http().get(`/v1/orders/${a.id}`).set(client.auth)).body;
+    expect(mine).toMatchObject({ status: 'cancelled', payment: { failure: 'cancelled' } });
+    // L'incident reste ouvert pour le support ; historique et audit.
+    expect((await h.http().get(`/v1/orders/${a.id}/incidents`).set(client.auth)).body.items[0]).toMatchObject({ status: 'open' });
+    expect((await h.pool.query("select count(*)::int n from delivery_events where delivery_id = $1 and type = 'returned_to_shop'", [a.dId])).rows[0].n).toBe(1);
+    expect((await h.pool.query("select count(*)::int n from audit_logs where action = 'deliveries.returned_to_shop' and target_id = $1", [a.id])).rows[0].n).toBe(1);
+
+    // Client absent : même retour.
+    const b = await arrived();
+    await h.pool.query("update deliveries set arrived_at = now() - interval '20 minutes' where id = $1", [b.dId]);
+    await h.http().post(`/v1/courier/courses/${b.dId}/client-absent`).set(c.space).send({}).expect(200);
+    expect((await h.http().post(`/v1/shop/orders/${b.id}/delivery/returned`).set(s.auth).expect(200)).body).toMatchObject({ status: 'cancelled', ended: { reason: 'Client absent : colis revenu en boutique' } });
+    expect(await stock()).toBe(before);
+  });
+
   it('refus du client après examen : motif, incident, jamais « livrée » ; support ; client absent après le délai', async () => {
     const s = await shop();
     const client = await person();
