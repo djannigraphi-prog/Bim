@@ -20,6 +20,8 @@ interface Item {
   resolution: string | null;
   createdAt: string;
   events: IncidentEvent[];
+  /** Photos jointes par les parties (liens temporaires ; supprimées 30 jours après la clôture). */
+  photos?: { id: string; by: string; url: string | null }[];
   actions: string[];
 }
 
@@ -110,6 +112,17 @@ export function Incidents() {
               </li>
             ))}
           </ul>
+          {!!i.photos?.length && (
+            <p>
+              {i.photos.map((p) =>
+                p.url ? (
+                  <a key={p.id} href={p.url} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>
+                    <img src={p.url} alt={`Photo (${ACTORS[p.by] ?? p.by})`} width={96} height={96} style={{ objectFit: 'cover', borderRadius: 6 }} />
+                  </a>
+                ) : null,
+              )}
+            </p>
+          )}
           {i.resolution && <p>Décision : {i.resolution}</p>}
           {i.actions.includes('resolve') && (
             <>

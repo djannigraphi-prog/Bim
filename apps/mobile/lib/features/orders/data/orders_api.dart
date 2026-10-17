@@ -285,14 +285,26 @@ class DeliveryFeePayment {
 }
 
 class IncidentSummary {
-  const IncidentSummary({required this.id, required this.status, required this.reason, this.afterDelivery = false});
+  const IncidentSummary({required this.id, required this.status, required this.reason, this.afterDelivery = false, this.photoUrls = const [], this.canAddPhoto = false});
   final String id;
   final String status;
   final String reason;
   /// Signalé après la remise : à régler entre le client et la boutique (L7-08), sans le support.
   final bool afterDelivery;
-  factory IncidentSummary.fromJson(Map<String, dynamic> j) =>
-      IncidentSummary(id: j['id'] as String, status: j['status'] as String, reason: j['reason'] as String, afterDelivery: j['afterDelivery'] == true);
+  /// Photos jointes (liens temporaires, privés) ; 3 au plus.
+  final List<String> photoUrls;
+  final bool canAddPhoto;
+  factory IncidentSummary.fromJson(Map<String, dynamic> j) => IncidentSummary(
+        id: j['id'] as String,
+        status: j['status'] as String,
+        reason: j['reason'] as String,
+        afterDelivery: j['afterDelivery'] == true,
+        photoUrls: [
+          for (final p in (j['photos'] as List<dynamic>? ?? const []))
+            if (p is Map<String, dynamic> && p['url'] is String) p['url'] as String,
+        ],
+        canAddPhoto: j['canAddPhoto'] == true,
+      );
 }
 
 String incidentReasonLabel(String r) => const {
@@ -633,6 +645,9 @@ class OrdersApi {
       _api.post('/v1/orders/$orderId/incidents', body: {'reason': reason, if (description != null && description.isNotEmpty) 'description': description});
 
   Future<void> incidentToSupport(String incidentId) => _api.post('/v1/incidents/$incidentId/support');
+  /// Photo jointe au problème signalé (ré-encodée et stockée en privé par le serveur).
+  Future<void> addIncidentPhoto(String incidentId, List<int> bytes) =>
+      _api.upload('/v1/incidents/$incidentId/photos', field: 'photo', bytes: bytes, filename: 'photo.jpg', contentType: 'image/jpeg');
 
   /// Lot 8 : lancer le paiement en ligne ; renvoie la page du prestataire à ouvrir.
   Future<({String? redirectUrl, String status})> startOnlinePayment(String orderId) async {
@@ -703,6 +718,8 @@ class ShopOrdersApi {
       _api.post('/v1/shop/orders/$orderId/incidents', body: {'reason': reason, if (description != null && description.isNotEmpty) 'description': description});
 
   Future<void> incidentToSupport(String incidentId) => _api.post('/v1/shop/incidents/$incidentId/support');
+  Future<void> addIncidentPhoto(String incidentId, List<int> bytes) =>
+      _api.upload('/v1/shop/incidents/$incidentId/photos', field: 'photo', bytes: bytes, filename: 'photo.jpg', contentType: 'image/jpeg');
 
   Future<OrderDetail> offer(String id, String courierId, {String? reason}) async =>
       OrderDetail.fromJson(await _api.post('/v1/shop/orders/$id/delivery/offer', body: {'courierId': courierId, if (reason != null && reason.isNotEmpty) 'reason': reason}));

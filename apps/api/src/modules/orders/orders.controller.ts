@@ -1,6 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+/// <reference types="multer" />
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { APP_CONFIG, AppConfig } from '../../config/config';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, Public, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
@@ -46,8 +49,8 @@ export class OrdersController {
   }
 
   @Get(':id/incidents')
-  incidentsList(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    return this.incidents.forOrder(a.userId, 'customer', id);
+  incidentsList(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.incidents.forOrder(a.userId, 'customer', id, {}, apiBase(req));
   }
 
   @Post(':id/incidents')
@@ -197,8 +200,8 @@ export class ShopOrdersController {
 
   @Get(':id/incidents')
   @RequireShopPermission('orders.read')
-  incidentsList(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
-    return this.incidents.forOrder(a.userId, 'shop', id, { shopId: this.shop(a) });
+  incidentsList(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.incidents.forOrder(a.userId, 'shop', id, { shopId: this.shop(a) }, apiBase(req));
   }
 
   @Post(':id/incidents')
@@ -377,7 +380,21 @@ export class PublicReviewsController {
 @RequireSpace('user')
 @Controller('v1/incidents')
 export class MyIncidentsController {
-  constructor(private readonly incidents: IncidentsService) {}
+  constructor(
+    private readonly incidents: IncidentsService,
+    @Inject(APP_CONFIG) private readonly cfg: AppConfig,
+  ) {}
+
+  @Post(':id/photos')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 600_000 } })
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Joindre une photo au problème signalé (3 au plus ; privée ; supprimée 30 jours après la clôture)' })
+  photo(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined, @Req() req: Request) {
+    return this.incidents.addPhoto(a.userId, 'customer', id, file, this.cfg.MEDIA_MAX_UPLOAD_MB, {}, apiBase(req));
+  }
+
 
   @Post(':id/notes')
   @HttpCode(200)
@@ -399,7 +416,22 @@ export class MyIncidentsController {
 @RequireSpace('merchant')
 @Controller('v1/shop/incidents')
 export class ShopIncidentsController {
-  constructor(private readonly incidents: IncidentsService) {}
+  constructor(
+    private readonly incidents: IncidentsService,
+    @Inject(APP_CONFIG) private readonly cfg: AppConfig,
+  ) {}
+
+  @Post(':id/photos')
+  @RequireShopPermission('orders.prepare')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 600_000 } })
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Joindre une photo au problème signalé (3 au plus ; privée ; supprimée 30 jours après la clôture)' })
+  photo(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined, @Req() req: Request) {
+    return this.incidents.addPhoto(a.userId, 'shop', id, file, this.cfg.MEDIA_MAX_UPLOAD_MB, { shopId: a.space!.id }, apiBase(req));
+  }
+
 
   @Post(':id/notes')
   @HttpCode(200)
@@ -429,6 +461,7 @@ export class CourierDeliveriesController {
     private readonly deliveries: DeliveriesService,
     private readonly incidents: IncidentsService,
     private readonly fees: DeliveryFeesService,
+    @Inject(APP_CONFIG) private readonly cfg: AppConfig,
   ) {}
 
   private c(a: AuthContext) {
@@ -546,6 +579,16 @@ export class CourierDeliveriesController {
     return this.incidents.open(a.userId, 'courier', orderId, dto.reason, dto.description, meta, { courierId: this.c(a) });
   }
 
+  @Post('incidents/:id/photos')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 600_000 } })
+  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Joindre une photo au problème signalé (3 au plus ; privée ; supprimée 30 jours après la clôture)' })
+  incidentPhoto(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined, @Req() req: Request) {
+    return this.incidents.addPhoto(a.userId, 'courier', id, file, this.cfg.MEDIA_MAX_UPLOAD_MB, { courierId: this.c(a) }, apiBase(req));
+  }
+
   @Post('incidents/:id/notes')
   @HttpCode(200)
   incidentNote(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: IncidentNoteDto) {
@@ -575,8 +618,8 @@ export class IncidentsAdminController {
   @Get()
   @AdminRoute('incidents.review')
   @ApiQuery({ name: 'status', enum: ['with_support', 'open', 'resolved'], required: false })
-  list(@CurrentAdmin() a: AdminContext, @ReqMeta() meta: RequestMeta, @Query('status') status?: string) {
-    return this.incidents.adminList(a, status === 'open' || status === 'resolved' ? status : 'with_support', meta);
+  list(@CurrentAdmin() a: AdminContext, @ReqMeta() meta: RequestMeta, @Req() req: Request, @Query('status') status?: string) {
+    return this.incidents.adminList(a, status === 'open' || status === 'resolved' ? status : 'with_support', meta, apiBase(req));
   }
 
   @Post(':id/resolve')

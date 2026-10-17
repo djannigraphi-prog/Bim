@@ -178,7 +178,7 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - **Pièces d'identité** : gardées **tant que le compte existe**, supprimées **365 jours après la fermeture du compte**
   (`kyc.document_retention_days` = 365, décidé). **Réalisé** (passage quotidien de maintenance).
 - **Photos des problèmes** : jusqu'à **3 photos privées** par signalement, supprimées **30 jours après la clôture de la
-  vente**. À réaliser.
+  vente** (ou de la résolution, pour un incident pendant la livraison). **Réalisé.**
 - **Publications des 16-17 ans** : visibilité par défaut **« Tout le monde »**, comme les adultes (comportement actuel).
 
 ### L7-08 — Problème après la remise : 3 jours, réglé entre client et boutique (17/10/2026, 14 h 21) · Fondateur · **appliquée**

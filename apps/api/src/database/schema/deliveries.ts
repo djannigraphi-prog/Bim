@@ -139,6 +139,31 @@ export const incidents = pgTable(
   ],
 );
 
+/**
+ * Décision du 17/10/2026 (18 h 50) — Photos jointes à un incident par les parties (client, boutique, livreur) : 3 au
+ * plus par incident, ré-encodées sans métadonnées, stockées en privé (liens temporaires) ; supprimées 30 jours après la
+ * clôture (vente close ou incident résolu) par la maintenance quotidienne.
+ */
+export const incidentPhotos = pgTable(
+  'incident_photos',
+  {
+    id: uuid('id').primaryKey(),
+    incidentId: uuid('incident_id')
+      .notNull()
+      .references(() => incidents.id),
+    uploadedByType: varchar('uploaded_by_type', { length: 10 }).notNull(),
+    uploadedBy: uuid('uploaded_by')
+      .notNull()
+      .references(() => users.id),
+    storageKey: varchar('storage_key', { length: 200 }).notNull().unique(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    bytes: integer('bytes').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('incident_photos_incident_idx').on(t.incidentId, t.createdAt), check('incident_photos_by_ck', sql`${t.uploadedByType} IN ('customer', 'shop', 'courier')`)],
+);
+
 /** Messages et actions d'un incident (écriture seule) : description, ajouts des parties, transmission, décision. */
 export const incidentEvents = pgTable(
   'incident_events',

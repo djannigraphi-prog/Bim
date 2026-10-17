@@ -372,7 +372,7 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 > **Problème après la remise (17/10, L7-08)** : signalable 3 jours après la remise (décidé), réglé entre le client et
 > la boutique (pas de support), « problème signalé » affiché aux deux parties pendant ce délai ; ensuite vente close ;
 > le client garde son évaluation de la boutique. Refus : `DISPUTE_WINDOW_CLOSED`, `INCIDENT_NOT_FOR_SUPPORT`.
-> Non réalisé : statut de commande « incident » distinct (l'état reste porté par les incidents), réattribution après prise en charge, nouvelle tentative convenue, pièces jointes
+> Non réalisé : statut de commande « incident » distinct (l'état reste porté par les incidents), réattribution après prise en charge, nouvelle tentative convenue (pièces jointes : réalisées le 17/10, 3 photos, 30 jours après la clôture)
 > (stockage et conservation des preuves à décider) ; aucun effet financier automatique.
 
 Aucun frais d'annulation, remboursement ou pénalité automatique sans règle commerciale explicite (A8). Chaque incident

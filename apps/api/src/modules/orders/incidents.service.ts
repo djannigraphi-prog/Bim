@@ -4,14 +4,19 @@ import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database, DbOrTx } from '../../database/database.module';
-import { deliveries, incidentEvents, incidents, orders, shopMembers, shops, users } from '../../database/schema';
+import { deliveries, incidentEvents, incidentPhotos, incidents, orders, shopMembers, shops, users } from '../../database/schema';
 import type { AdminContext } from '../admin/admin.decorators';
 import { AuditService } from '../audit/audit.service';
+import { encodePrivateImage } from '../media/private-image';
+import { StorageService } from '../media/storage';
 import { SettingsService } from '../settings/settings.service';
 
 export const INCIDENT_REASONS = ['item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other'] as const;
 export type IncidentReason = (typeof INCIDENT_REASONS)[number];
 export type IncidentActor = 'customer' | 'shop' | 'courier';
+/** Décision du 17/10/2026 : 3 photos au plus par incident, supprimées 30 jours après la clôture. */
+export const INCIDENT_MAX_PHOTOS = 3;
+export const INCIDENT_PHOTO_RETENTION_DAYS = 30;
 
 type Incident = typeof incidents.$inferSelect;
 
@@ -35,7 +40,72 @@ export class IncidentsService {
     @Inject(DB) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
+    private readonly storage: StorageService,
   ) {}
+
+  /** Photos d'un incident ; liens temporaires seulement si l'adresse de l'API est connue (lecture). */
+  private async photos(incidentId: string, apiBase: string | null) {
+    const rows = await this.db.select().from(incidentPhotos).where(eq(incidentPhotos.incidentId, incidentId)).orderBy(asc(incidentPhotos.createdAt), asc(incidentPhotos.id));
+    return Promise.all(
+      rows.map(async (r) => ({ id: r.id, by: r.uploadedByType, at: r.createdAt, ...(apiBase && this.storage.available ? await this.storage.temporaryUrl(r.storageKey, apiBase) : { url: null, expiresAt: null }) })),
+    );
+  }
+
+  /**
+   * Décision du 17/10/2026 — Une partie joint une photo (3 au plus par incident) tant que l'incident est ouvert et la
+   * vente non close ; image ré-encodée sans métadonnées, stockée en privé.
+   */
+  async addPhoto(userId: string, as: IncidentActor, incidentId: string, file: Express.Multer.File | undefined, maxMb: number, ctx: { shopId?: string; courierId?: string } = {}, apiBase: string | null = null) {
+    const i = await this.authorized(userId, as, incidentId, ctx);
+    if (i.status === 'resolved') throw new AppError('INCIDENT_RESOLVED', 'Cet incident est résolu.', HttpStatus.CONFLICT);
+    if ((await this.postDelivery(i)).closed) throw new AppError('DISPUTE_WINDOW_CLOSED', 'La vente est close : plus de photo sur ce problème.', HttpStatus.CONFLICT);
+    const img = await encodePrivateImage(file, maxMb, 'photo');
+    const key = `incidents/${i.id}/${uuidv7()}.jpg`;
+    await this.storage.put(key, img.data, 'image/jpeg');
+    try {
+      await this.db.transaction(async (tx) => {
+        // Verrou de l'incident : deux envois simultanés ne dépassent jamais 3 photos.
+        await tx.select({ id: incidents.id }).from(incidents).where(eq(incidents.id, i.id)).for('update');
+        const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(incidentPhotos).where(eq(incidentPhotos.incidentId, i.id));
+        if (n >= INCIDENT_MAX_PHOTOS) throw new AppError('INCIDENT_PHOTOS_LIMIT', `${INCIDENT_MAX_PHOTOS} photos au plus par problème signalé.`, HttpStatus.CONFLICT, { max: INCIDENT_MAX_PHOTOS });
+        await tx.insert(incidentPhotos).values({ id: uuidv7(), incidentId: i.id, uploadedByType: as, uploadedBy: userId, storageKey: key, width: img.width, height: img.height, bytes: img.bytes });
+        await this.event(tx, i.id, 'photo', as, userId);
+      });
+    } catch (e) {
+      await this.storage.remove(key).catch(() => undefined);
+      throw e;
+    }
+    return this.view(i.id, as, apiBase);
+  }
+
+  /**
+   * Maintenance quotidienne : photos supprimées 30 jours après la clôture — vente close (remise + délai) pour un
+   * problème signalé après la remise, sinon résolution de l'incident ou fin de la commande (annulée, terminée).
+   */
+  async purgePhotos(now = new Date()) {
+    const days = await this.disputeWindowDays();
+    let deleted = 0;
+    for (let i = 0; i < 50; i++) {
+      const rows = (
+        await this.db.execute<{ id: string; key: string }>(sql`
+          SELECT p.id, p.storage_key AS key FROM incident_photos p
+          JOIN incidents i ON i.id = p.incident_id JOIN orders o ON o.id = i.order_id
+          WHERE GREATEST(
+            CASE WHEN o.delivered_at IS NOT NULL AND i.created_at >= o.delivered_at THEN o.delivered_at + make_interval(days => ${days}::int) END,
+            CASE WHEN i.status = 'resolved' THEN i.resolved_at END
+          ) < ${now}::timestamptz - make_interval(days => ${INCIDENT_PHOTO_RETENTION_DAYS}::int)
+          LIMIT 200`)
+      ).rows;
+      if (!rows.length) break;
+      for (const r of rows) {
+        await this.storage.remove(r.key);
+        await this.db.delete(incidentPhotos).where(eq(incidentPhotos.id, r.id));
+        deleted++;
+      }
+      if (rows.length < 200) break;
+    }
+    return { deleted };
+  }
 
   /** Délai pour signaler un problème après la remise (`orders.dispute_window_days` : 3 jours, décision L7-08). */
   async disputeWindowDays(): Promise<number> {
@@ -162,12 +232,17 @@ export class IncidentsService {
     return this.view(i.id, as);
   }
 
-  async view(incidentId: string, as: IncidentActor | 'admin') {
+  async view(incidentId: string, as: IncidentActor | 'admin', apiBase: string | null = null) {
     const [i] = await this.db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
     if (!i) throw Errors.notFound('Incident');
     const evs = await this.db.select().from(incidentEvents).where(eq(incidentEvents.incidentId, i.id)).orderBy(asc(incidentEvents.createdAt), asc(incidentEvents.id));
     const pd = await this.postDelivery(i);
-    const partyActions = i.status === 'resolved' || pd.closed ? [] : pd.post ? ['add_note'] : i.status === 'open' ? ['add_note', 'send_to_support'] : ['add_note'];
+    const photos = await this.photos(i.id, apiBase);
+    const canPhoto = i.status !== 'resolved' && !pd.closed && photos.length < INCIDENT_MAX_PHOTOS;
+    const partyActions = [
+      ...(i.status === 'resolved' || pd.closed ? [] : pd.post ? ['add_note'] : i.status === 'open' ? ['add_note', 'send_to_support'] : ['add_note']),
+      ...(canPhoto ? ['add_photo'] : []),
+    ];
     return {
       id: i.id,
       orderId: i.orderId,
@@ -180,6 +255,7 @@ export class IncidentsService {
       resolvedAt: i.resolvedAt,
       // L'identité des personnes de l'équipe du support n'est pas montrée aux parties.
       events: evs.map((e) => ({ type: e.type, actorType: e.actorType, note: e.note, at: e.createdAt })),
+      photos,
       /** L7-08 : après la remise, à régler entre le client et la boutique ; vente close après le délai. */
       afterDelivery: pd.post,
       saleClosed: pd.closed,
@@ -188,23 +264,30 @@ export class IncidentsService {
   }
 
   /** Incidents d'une commande visibles par cette partie. */
-  async forOrder(userId: string, as: IncidentActor, orderId: string, ctx: { shopId?: string; courierId?: string } = {}) {
+  async forOrder(userId: string, as: IncidentActor, orderId: string, ctx: { shopId?: string; courierId?: string } = {}, apiBase: string | null = null) {
     const o = await this.order(orderId);
     if ((as === 'shop' && o.shopId !== ctx.shopId) || !(await this.roleIn(o, userId, as, ctx.courierId))) throw Errors.notFound('Commande');
     const rows = await this.db.select({ id: incidents.id }).from(incidents).where(eq(incidents.orderId, o.id)).orderBy(desc(incidents.createdAt));
-    return { items: await Promise.all(rows.map((r) => this.view(r.id, as))) };
+    return { items: await Promise.all(rows.map((r) => this.view(r.id, as, apiBase))) };
   }
 
-  async summaryForOrder(orderId: string) {
+  async summaryForOrder(orderId: string, apiBase: string | null = null) {
     const rows = await this.db.select({ id: incidents.id, status: incidents.status, reason: incidents.reason, createdAt: incidents.createdAt }).from(incidents).where(eq(incidents.orderId, orderId)).orderBy(desc(incidents.createdAt));
     const o = await this.order(orderId);
     // L7-08 : signalé après la remise → à régler entre le client et la boutique (pas de transmission au support).
-    return rows.map(({ createdAt, ...r }) => ({ ...r, afterDelivery: !!o.deliveredAt && createdAt >= o.deliveredAt }));
+    return Promise.all(
+      rows.map(async ({ createdAt, ...r }) => {
+        const photos = await this.photos(r.id, apiBase);
+        const afterDelivery = !!o.deliveredAt && createdAt >= o.deliveredAt;
+        const closed = afterDelivery && o.deliveredAt!.getTime() + (await this.disputeWindowDays()) * 86_400_000 <= Date.now();
+        return { ...r, afterDelivery, photos: photos.map((p) => ({ id: p.id, url: p.url })), canAddPhoto: r.status !== 'resolved' && !closed && photos.length < INCIDENT_MAX_PHOTOS };
+      }),
+    );
   }
 
   // ------------------------------------------------------------------ Support
 
-  async adminList(a: AdminContext, status: 'with_support' | 'open' | 'resolved', meta: RequestMeta) {
+  async adminList(a: AdminContext, status: 'with_support' | 'open' | 'resolved', meta: RequestMeta, apiBase: string | null = null) {
     const rows = await this.db
       .select({ i: incidents, number: orders.number, shop: shops.name, customer: users.fullName })
       .from(incidents)
@@ -215,7 +298,7 @@ export class IncidentsService {
       .orderBy(asc(incidents.createdAt))
       .limit(100);
     await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.incidents_viewed', targetType: 'incident', ip: meta.ip, userAgent: meta.userAgent, metadata: { status, count: rows.length } });
-    return { items: await Promise.all(rows.map(async (r) => ({ ...(await this.view(r.i.id, 'admin')), orderNumber: r.number, shop: r.shop, customer: r.customer }))) };
+    return { items: await Promise.all(rows.map(async (r) => ({ ...(await this.view(r.i.id, 'admin', apiBase)), orderNumber: r.number, shop: r.shop, customer: r.customer }))) };
   }
 
   /** Décision du support : une note, sans pénalité ni remboursement automatique ; journalisée. */

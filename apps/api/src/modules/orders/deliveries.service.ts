@@ -628,16 +628,16 @@ export class DeliveriesService {
   async customerView(customerId: string, orderId: string, apiBase: string) {
     await this.expireOffers(new Date(), orderId);
     const v = await this.orders.getForCustomer(customerId, orderId, apiBase);
-    return this.decorate(v, orderId, 'customer');
+    return this.decorate(v, orderId, 'customer', apiBase);
   }
 
   async shopView(shopId: string, orderId: string, apiBase: string) {
     await this.expireOffers(new Date(), orderId);
     const v = await this.orders.getForShop(shopId, orderId, apiBase);
-    return this.decorate(v, orderId, 'shop');
+    return this.decorate(v, orderId, 'shop', apiBase);
   }
 
-  private async decorate<T extends { actions: string[] }>(v: T, orderId: string, party: 'customer' | 'shop') {
+  private async decorate<T extends { actions: string[] }>(v: T, orderId: string, party: 'customer' | 'shop', apiBase: string | null = null) {
     const [o] = await this.db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     const d = await this.forOrder(orderId);
     const tracking = await this.view(o, party);
@@ -651,7 +651,7 @@ export class DeliveriesService {
     return {
       ...v,
       tracking,
-      incidents: await this.incidents.summaryForOrder(orderId),
+      incidents: await this.incidents.summaryForOrder(orderId, apiBase),
       dispute: { until: dispute.disputeUntil, open: dispute.disputeOpen ?? false, inDispute: dispute.inDispute },
       ...(party === 'customer' ? { onlinePayment: online } : {}),
       // A3-b : frais de livraison payés directement au livreur indépendant (client : coordonnées et action).

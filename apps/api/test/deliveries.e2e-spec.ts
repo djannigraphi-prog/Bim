@@ -487,7 +487,7 @@ describe('Livraisons (e2e)', () => {
     await h.http().post(`/v1/courier/courses/${dId}/close`).set(c.space).expect(409);
     // Incident : vu par les parties seulement ; précisions ; transmission au support ; décision sans effet financier.
     const inc = (await h.http().get(`/v1/orders/${id}/incidents`).set(client.auth).expect(200)).body.items[0];
-    expect(inc).toMatchObject({ reason: 'item_damaged', description: 'Plumes arrachées', openedBy: 'customer', actions: ['add_note', 'send_to_support'] });
+    expect(inc).toMatchObject({ reason: 'item_damaged', description: 'Plumes arrachées', openedBy: 'customer', actions: ['add_note', 'send_to_support', 'add_photo'] });
     const stranger = await person();
     await h.http().get(`/v1/orders/${id}/incidents`).set(stranger.auth).expect(404);
     await h.http().post(`/v1/incidents/${inc.id}/notes`).set(stranger.auth).send({ note: 'Intrus' }).expect(404);
@@ -495,7 +495,7 @@ describe('Livraisons (e2e)', () => {
     await h.http().post(`/v1/shop/incidents/${inc.id}/notes`).set(s.auth).send({ note: 'Nous reprenons l’article' }).expect(200);
     await h.http().post(`/v1/courier/incidents/${inc.id}/notes`).set(c.space).send({ note: 'Colis intact au départ' }).expect(200);
     const sent = (await h.http().post(`/v1/incidents/${inc.id}/support`).set(client.auth).expect(200)).body;
-    expect(sent).toMatchObject({ status: 'with_support', actions: ['add_note'] });
+    expect(sent).toMatchObject({ status: 'with_support', actions: ['add_note', 'add_photo'] });
     await h.http().post(`/v1/incidents/${inc.id}/support`).set(client.auth).expect(409);
     const moderator = await adminSession(h, ['moderator']);
     await h.http().get('/admin/v1/incidents').set(moderator).expect(403);

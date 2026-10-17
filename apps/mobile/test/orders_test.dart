@@ -8,6 +8,7 @@ import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/orders/presentation/order_screens.dart';
 import 'package:bim/features/orders/presentation/shop_online_payments_screen.dart';
+import 'package:bim/features/projects/application/photo_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,6 +51,11 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
+class _Photos implements PhotoSource {
+  @override
+  Future<List<int>?> pick({required bool camera}) async => [0xff, 0xd8, 0xff, 0xe0];
+}
+
 class _FakeOrders extends OrdersApi {
   _FakeOrders() : super(_client());
   final calls = <String>[];
@@ -88,6 +94,12 @@ class _FakeOrders extends OrdersApi {
 
   @override
   Future<OrderDetail> order(String id) async => current;
+
+  @override
+  Future<void> addIncidentPhoto(String incidentId, List<int> bytes) async {
+    calls.add('photo $incidentId ${bytes.length}');
+    current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 20), inDispute: true, incidents: const [IncidentSummary(id: 'i1', status: 'open', reason: 'item_damaged', afterDelivery: true, photoUrls: ['http://127.0.0.1:9/p.jpg'], canAddPhoto: true)]);
+  }
 
   @override
   Future<OrderDetail> declareDeliveryFee(String id, {String? reference}) async {
@@ -216,6 +228,7 @@ Future<void> _pump(WidgetTester tester, Widget home, {_FakeOrders? orders, _Fake
     overrides: [
       apiClientProvider.overrideWithValue(_client()),
       ordersApiProvider.overrideWithValue(orders ?? _FakeOrders()),
+      photoSourceProvider.overrideWithValue(_Photos()),
       shopOrdersApiProvider.overrideWithValue(shop ?? _FakeShopOrders()),
       urlOpenerProvider.overrideWithValue((u) async {
         opened?.add(u);
@@ -539,5 +552,17 @@ void main() {
     expect(api.calls, contains('delivery fee declared'));
     expect(find.byKey(const ValueKey('declare-delivery-fee')), findsNothing);
     expect(find.textContaining('paiement indiqué, en attente du livreur'), findsOneWidget);
+  });
+
+  testWidgets('photos d’un problème : « Ajouter une photo » tant que possible, miniature affichée', (tester) async {
+    final api = _FakeOrders()
+      ..current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 20), inDispute: true, incidents: const [IncidentSummary(id: 'i1', status: 'open', reason: 'item_damaged', afterDelivery: true, canAddPhoto: true)]);
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('incident-photo-i1-0')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('incident-photo-add-i1')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('photo i1 4'));
+    expect(find.byKey(const ValueKey('incident-photo-i1-0')), findsOneWidget);
   });
 }

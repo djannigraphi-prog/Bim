@@ -2,6 +2,8 @@ import sharp from 'sharp';
 import { uuidv7 } from '../src/common/uuid';
 import { OrdersRunner } from '../src/modules/orders/orders-runner';
 import { adminSession } from './admin-helpers';
+import { IncidentsService } from '../src/modules/orders/incidents.service';
+import { StorageService } from '../src/modules/media/storage';
 import { bearer, Harness, registerAndActivate, startHarness } from './harness';
 
 type Auth = Record<string, string>;
@@ -167,7 +169,7 @@ describe('Commandes (e2e)', () => {
     expect(Math.abs(new Date(mine.dispute.until).getTime() - (Date.now() + 3 * 86_400_000))).toBeLessThan(60_000);
     const inc = (await h.http().post(`/v1/orders/${o.id}/incidents`).set(client.auth).send({ reason: 'item_damaged', description: 'Couture déchirée' }).expect(201)).body;
     // Réglé entre les deux parties : échanges possibles, pas de transmission au support.
-    expect(inc).toMatchObject({ afterDelivery: true, saleClosed: false, actions: ['add_note'] });
+    expect(inc).toMatchObject({ afterDelivery: true, saleClosed: false, actions: ['add_note', 'add_photo'] });
     expect((await h.http().post(`/v1/incidents/${inc.id}/support`).set(client.auth).expect(409)).body.error.code).toBe('INCIDENT_NOT_FOR_SUPPORT');
     await h.http().post(`/v1/shop/incidents/${inc.id}/notes`).set(s.auth).send({ note: 'Passez en boutique, nous échangeons' }).expect(200);
     expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.dispute.inDispute).toBe(true);
@@ -181,6 +183,47 @@ describe('Commandes (e2e)', () => {
     expect((await h.http().post(`/v1/incidents/${inc.id}/notes`).set(client.auth).send({ note: 'Toujours pas réglé' }).expect(409)).body.error.code).toBe('DISPUTE_WINDOW_CLOSED');
     mine = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body;
     expect(mine.dispute).toMatchObject({ open: false, inDispute: false });
+  });
+
+  it('photos des problèmes : 3 au plus, privées (liens temporaires), vues par l’autre partie ; refusées après la clôture ; supprimées 30 jours après', async () => {
+    const s = await shop();
+    const p = await product(s, { price: 20000, stock: 3 });
+    const client = await person();
+    const o = (await order(client, { shopId: s.shopId, items: [{ productId: p.id, variantId: p.variant, quantity: 1 }], deliveryMode: 'pickup', paymentMethod: 'cash', expectedTotalFcfa: 20000, idempotencyKey: key() })).body;
+    for (const step of ['confirm', 'prepare', 'ready']) await h.http().post(`/v1/shop/orders/${o.id}/${step}`).set(s.auth).expect(200);
+    const code = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code }).expect(200);
+    const inc = (await h.http().post(`/v1/orders/${o.id}/incidents`).set(client.auth).send({ reason: 'item_damaged', description: 'Couture déchirée' }).expect(201)).body;
+    expect(inc.actions).toContain('add_photo');
+    const jpg = await sharp({ create: { width: 400, height: 300, channels: 3, background: 'green' } }).withMetadata({ exif: { IFD0: { Artist: 'Awa' } } }).jpeg().toBuffer();
+    await h.http().post(`/v1/incidents/${inc.id}/photos`).set(client.auth).attach('photo', Buffer.from('pas une image'), { filename: 'x.jpg', contentType: 'image/jpeg' }).expect(400);
+    for (let i = 0; i < 2; i++) await h.http().post(`/v1/incidents/${inc.id}/photos`).set(client.auth).attach('photo', jpg, 'a.jpg').expect(200);
+    const third = (await h.http().post(`/v1/shop/incidents/${inc.id}/photos`).set(s.auth).attach('photo', jpg, 'b.jpg').expect(200)).body;
+    expect(third.photos.map((x: { by: string }) => x.by)).toEqual(['customer', 'customer', 'shop']);
+    expect(third.actions).not.toContain('add_photo');
+    expect((await h.http().post(`/v1/incidents/${inc.id}/photos`).set(client.auth).attach('photo', jpg, 'c.jpg').expect(409)).body.error).toMatchObject({ code: 'INCIDENT_PHOTOS_LIMIT', details: { max: 3 } });
+    // Une autre personne ne peut rien joindre.
+    const stranger = await person();
+    await h.http().post(`/v1/incidents/${inc.id}/photos`).set(stranger.auth).attach('photo', jpg, 'd.jpg').expect(404);
+    // L'autre partie voit les photos (liens temporaires) ; fichier ré-encodé, sans métadonnées.
+    const seen = (await h.http().get(`/v1/shop/orders/${o.id}`).set(s.auth)).body.incidents[0];
+    expect(seen.photos).toHaveLength(3);
+    const img = await h.http().get(new URL(seen.photos[0].url).pathname).expect(200);
+    const meta = await sharp(img.body as Buffer).metadata();
+    expect(meta.format).toBe('jpeg');
+    expect(meta.exif).toBeUndefined();
+    // Vente close : plus de photo ; 30 jours après la clôture, fichiers et lignes supprimés.
+    await h.pool.query("update orders set delivered_at = now() - interval '4 days' where id = $1", [o.id]);
+    await h.pool.query("update incidents set created_at = now() - interval '3 days' where id = $1", [inc.id]);
+    const keys = (await h.pool.query('select storage_key from incident_photos where incident_id = $1', [inc.id])).rows.map((r: { storage_key: string }) => r.storage_key);
+    const incidents = h.app.get(IncidentsService);
+    expect((await incidents.purgePhotos()).deleted).toBe(0); // close depuis moins de 30 jours
+    await h.pool.query("update orders set delivered_at = now() - interval '40 days' where id = $1", [o.id]);
+    await h.pool.query("update incidents set created_at = now() - interval '39 days' where id = $1", [inc.id]);
+    expect((await incidents.purgePhotos()).deleted).toBe(3);
+    expect((await h.pool.query('select count(*)::int n from incident_photos where incident_id = $1', [inc.id])).rows[0].n).toBe(0);
+    const storage = h.app.get(StorageService);
+    for (const k of keys) await expect(storage.read(k)).rejects.toThrow();
   });
 
   it('code de remise bloqué après 5 essais faux', async () => {

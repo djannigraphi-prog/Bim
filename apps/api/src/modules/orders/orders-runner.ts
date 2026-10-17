@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { OrdersService } from './orders.service';
 import { DeliveriesService } from './deliveries.service';
+import { IncidentsService } from './incidents.service';
 import { OnlinePaymentsService } from './online/online-payments.service';
 import { PaymentsService } from './payments.service';
 
@@ -22,7 +23,9 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly payments: PaymentsService,
     private readonly deliveries: DeliveriesService,
     private readonly online: OnlinePaymentsService,
+    private readonly incidents: IncidentsService,
   ) {}
+  private lastPhotoPurge = 0;
 
   get active(): boolean {
     return this.cfg.WORKER_MODE === 'embedded' || (this.cfg.WORKER_MODE === 'standalone' && process.env.BIM_PROCESS === 'worker');
@@ -44,6 +47,11 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
       await this.payments.queueOverdue(now);
       await this.deliveries.expireOffers(now);
       await this.online.expirePending(now);
+      // Photos des problèmes : supprimées 30 jours après la clôture (une fois par heure suffit).
+      if (now.getTime() - this.lastPhotoPurge >= 3_600_000) {
+        this.lastPhotoPurge = now.getTime();
+        await this.incidents.purgePhotos(now);
+      }
       return expired;
     } catch (e) {
       this.logger.error(`Expiration des commandes : ${(e as Error).message}`);

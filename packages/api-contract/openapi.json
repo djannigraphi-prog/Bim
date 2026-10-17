@@ -7365,6 +7365,35 @@
         ]
       }
     },
+    "/v1/incidents/{id}/photos": {
+      "post": {
+        "operationId": "MyIncidentsController_photo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Joindre une photo au problème signalé (3 au plus ; privée ; supprimée 30 jours après la clôture)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/incidents/{id}/notes": {
       "post": {
         "operationId": "MyIncidentsController_note",
@@ -7429,6 +7458,35 @@
         "summary": "Transmettre l’incident au support",
         "tags": [
           "Commandes"
+        ]
+      }
+    },
+    "/v1/shop/incidents/{id}/photos": {
+      "post": {
+        "operationId": "ShopIncidentsController_photo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Joindre une photo au problème signalé (3 au plus ; privée ; supprimée 30 jours après la clôture)",
+        "tags": [
+          "Espace marchand"
         ]
       }
     },
@@ -7977,6 +8035,35 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/incidents/{id}/photos": {
+      "post": {
+        "operationId": "CourierDeliveriesController_incidentPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Joindre une photo au problème signalé (3 au plus ; privée ; supprimée 30 jours après la clôture)",
         "tags": [
           "Livreurs"
         ]

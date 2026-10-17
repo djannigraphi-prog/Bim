@@ -12,6 +12,7 @@ import '../../../core/widgets/step_header.dart';
 import '../../courier/data/courier_api.dart' show vehicleLabel;
 import '../../courier/presentation/courier_courses.dart' show IncidentDialog;
 import '../../merchant/data/shop_api.dart' show formatFcfa;
+import '../../projects/application/photo_source.dart';
 import '../data/orders_api.dart';
 import 'checkout_screen.dart';
 
@@ -147,9 +148,11 @@ class ShopOrdersScreen extends ConsumerWidget {
 
 /// Détail commun : lignes figées, mode, frais, total, historique.
 class _OrderBody extends StatelessWidget {
-  const _OrderBody({required this.o, required this.top, required this.actions, this.asShop = false, this.onSupport});
+  const _OrderBody({required this.o, required this.top, required this.actions, this.asShop = false, this.onSupport, this.onAddPhoto});
   final OrderDetail o;
   final void Function(String incidentId)? onSupport;
+  /// Joindre une photo au problème signalé (3 au plus).
+  final void Function(String incidentId)? onAddPhoto;
   final List<Widget> top;
   final List<Widget> actions;
   final bool asShop;
@@ -251,10 +254,27 @@ class _OrderBody extends StatelessWidget {
                   // L7-08 : un problème signalé après la remise se règle entre le client et la boutique.
                   if (i.status == 'open' && !i.afterDelivery && onSupport != null)
                     TextButton(key: ValueKey('incident-support-${i.id}'), onPressed: () => onSupport!(i.id), child: const Text('Transmettre au support')),
+                  if (i.photoUrls.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: BimSpacing.xs),
+                      child: Wrap(
+                        spacing: BimSpacing.xs,
+                        children: [
+                          for (final (k, u) in i.photoUrls.indexed)
+                            ClipRRect(
+                              key: ValueKey('incident-photo-${i.id}-$k'),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(u, width: 72, height: 72, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(width: 72, height: 72, child: Icon(Icons.broken_image_outlined))),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (i.canAddPhoto && onAddPhoto != null)
+                    TextButton.icon(key: ValueKey('incident-photo-add-${i.id}'), onPressed: () => onAddPhoto!(i.id), icon: const Icon(Icons.add_a_photo_outlined), label: const Text('Ajouter une photo')),
                 ],
               ),
             ),
-          Text('Aucune pénalité ni remboursement automatique : le support examine le dossier.', style: theme.textTheme.bodySmall),
+          Text('Aucune pénalité ni remboursement automatique. Photos privées, supprimées 30 jours après la clôture.', style: theme.textTheme.bodySmall),
         ],
         const SizedBox(height: BimSpacing.lg),
         Text('Historique', style: theme.textTheme.titleMedium),
@@ -581,6 +601,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             child: _OrderBody(
               o: o,
               onSupport: (id) => _call(o, (api) => api.incidentToSupport(id), done: 'Dossier transmis au support'),
+              onAddPhoto: (id) async {
+                final bytes = await ref.read(photoSourceProvider).pick(camera: false);
+                if (bytes != null && mounted) await _call(o, (api) => api.addIncidentPhoto(id, bytes), done: 'Photo ajoutée');
+              },
               top: [
                 if (o.handoverCode != null)
                   Container(
@@ -829,6 +853,10 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
               o: o,
               asShop: true,
               onSupport: (id) => _call(() => ref.read(shopOrdersApiProvider).incidentToSupport(id), done: 'Dossier transmis au support'),
+              onAddPhoto: (id) async {
+                final bytes = await ref.read(photoSourceProvider).pick(camera: false);
+                if (bytes != null && mounted) await _call(() => ref.read(shopOrdersApiProvider).addIncidentPhoto(id, bytes), done: 'Photo ajoutée');
+              },
               top: [
                 if (o.status == 'pending_shop' && o.expiresAt != null)
                   Padding(padding: const EdgeInsets.only(top: BimSpacing.sm), child: Text('À confirmer avant le ${formatDateTimeFr(o.expiresAt!)}, sinon elle expire.')),
