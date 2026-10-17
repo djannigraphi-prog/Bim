@@ -9,7 +9,7 @@ import 'auth_interceptor.dart';
 
 /// Client HTTP unique de l'app. Les écrans n'appellent jamais Dio directement : ils passent par les *Api des fonctionnalités.
 class ApiClient {
-  ApiClient({required this.storage, required Future<void> Function() onSessionExpired, String? baseUrl, this.onUpdateRequired}) {
+  ApiClient({required this.storage, required Future<void> Function() onSessionExpired, String? baseUrl, this.onUpdateRequired, this.onUpdateAvailable}) {
     final platform = appPlatform();
     final options = BaseOptions(
       baseUrl: baseUrl ?? Env.apiUrl,
@@ -21,7 +21,13 @@ class ApiClient {
     );
     final refreshDio = Dio(options);
     dio = Dio(options)
-      ..interceptors.add(AuthInterceptor(storage: storage, refreshDio: refreshDio, onSessionExpired: onSessionExpired));
+      ..interceptors.add(AuthInterceptor(storage: storage, refreshDio: refreshDio, onSessionExpired: onSessionExpired))
+      // L7-09 : version recommandée annoncée par l'API → rappel non bloquant.
+      ..interceptors.add(InterceptorsWrapper(onResponse: (res, h) {
+        final v = res.headers.value('x-bim-update-available');
+        if (v != null && v.isNotEmpty) onUpdateAvailable?.call(v);
+        h.next(res);
+      },),);
   }
 
   final TokenStorage storage;
@@ -29,6 +35,9 @@ class ApiClient {
 
   /// Appelé quand l'API exige une version plus récente de l'app (APP_UPDATE_REQUIRED).
   final void Function()? onUpdateRequired;
+
+  /// Appelé quand l'API recommande une version plus récente (rappel non bloquant).
+  final void Function(String version)? onUpdateAvailable;
 
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) =>
       _run(() => dio.get<dynamic>(path, queryParameters: query));

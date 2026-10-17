@@ -10,8 +10,11 @@ export class AppVersionController {
 
   @Public()
   @Get('config')
-  @ApiOperation({ summary: 'Version minimale de l’app par plateforme (null : aucune exigence)' })
+  @ApiOperation({ summary: 'Versions de l’app par plateforme : recommandée (rappel non bloquant) et minimale (blocage, strict nécessaire) ; null : rien' })
   async config() {
-    return { minVersion: { android: await this.guard.minimum('android'), ios: await this.guard.minimum('ios') } };
+    return {
+      minVersion: { android: await this.guard.minimum('android'), ios: await this.guard.minimum('ios') },
+      recommendedVersion: { android: await this.guard.recommended('android'), ios: await this.guard.recommended('ios') },
+    };
   }
 }

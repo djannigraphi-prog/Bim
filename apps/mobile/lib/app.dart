@@ -26,7 +26,9 @@ class BimApp extends ConsumerWidget {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       // Rappels programmés sur le téléphone (lot 2) : synchronisés avec l'API, ouverture de la journée depuis une notification.
       // 7-A : une app trop ancienne affiche « Mise à jour nécessaire » à la place des écrans.
-      builder: (context, child) => ref.watch(updateRequiredProvider) ? const UpdateRequiredScreen() : ReminderSync(child: child ?? const SizedBox.shrink()),
+      // L7-09 : sinon, rappel non bloquant si une version plus récente est recommandée.
+      builder: (context, child) =>
+          ref.watch(updateRequiredProvider) ? const UpdateRequiredScreen() : UpdateReminder(child: ReminderSync(child: child ?? const SizedBox.shrink())),
     );
   }
 }

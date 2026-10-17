@@ -223,13 +223,15 @@ class _OrderBody extends StatelessWidget {
         if (o.inDispute)
           const Padding(
             padding: EdgeInsets.only(top: BimSpacing.sm),
-            child: Text('En litige : le problème signalé après la remise est en cours de traitement.', key: ValueKey('order-in-dispute'), style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text('Problème signalé après la remise : à régler directement entre le client et la boutique.', key: ValueKey('order-in-dispute'), style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         if (o.disputeUntil != null)
           Padding(
             padding: const EdgeInsets.only(top: BimSpacing.xs),
             child: Text(
-              o.disputeOpen ? 'Un problème ? Tu peux le signaler jusqu’au ${formatDateTimeFr(o.disputeUntil!)}.' : 'Le délai pour signaler un problème est dépassé. Le support reste joignable depuis « Aide ».',
+              o.disputeOpen
+                  ? 'Un problème ? Il se signale jusqu’au ${formatDateTimeFr(o.disputeUntil!)}.'
+                  : 'Vente close : le délai pour signaler un problème est dépassé.${asShop ? '' : ' Tu peux toujours évaluer la boutique.'}',
               key: const ValueKey('order-dispute-window'),
               style: theme.textTheme.bodySmall,
             ),
@@ -246,7 +248,8 @@ class _OrderBody extends StatelessWidget {
                 children: [
                   Text(incidentReasonLabel(i.reason), style: const TextStyle(fontWeight: FontWeight.w600)),
                   Text(incidentStatusLabel(i.status)),
-                  if (i.status == 'open' && onSupport != null)
+                  // L7-08 : un problème signalé après la remise se règle entre le client et la boutique.
+                  if (i.status == 'open' && !i.afterDelivery && onSupport != null)
                     TextButton(key: ValueKey('incident-support-${i.id}'), onPressed: () => onSupport!(i.id), child: const Text('Transmettre au support')),
                 ],
               ),

@@ -23,6 +23,7 @@ void runBim({List<Override> overrides = const []}) {
             storage: ref.read(tokenStorageProvider),
             onSessionExpired: () => ref.read(sessionProvider.notifier).onExpired(),
             onUpdateRequired: () => ref.read(updateRequiredProvider.notifier).state = true,
+            onUpdateAvailable: (v) => ref.read(updateAvailableProvider.notifier).state = v,
           ),
         ),
         // Notifications programmées sur le téléphone : Android pour l'instant (iOS pas encore compilé).

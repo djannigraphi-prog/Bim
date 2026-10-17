@@ -53,7 +53,7 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^notifications\.reminder_grace_minutes$/, intIn(5, 180)],
   [/^maintenance\.account_purge_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
   // 7-A : version minimale de l'app par plateforme (« x.y.z »), null : aucune exigence.
-  [/^app\.min_version_(android|ios)$/, (v) => (v === null || (typeof v === 'string' && /^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(v)) ? null : '« x.y.z » (ex. 1.2.0) ou null.')],
+  [/^app\.(min|recommended)_version_(android|ios)$/, (v) => (v === null || (typeof v === 'string' && /^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(v)) ? null : '« x.y.z » (ex. 1.2.0) ou null.')],
   [/^orders\.dispute_window_days$/, intIn(1, 90)],
   [/^payments\.online_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
   // L8-02 (17/10/2026) : la boutique supporte les frais, décision définitive ; un autre modèle exige une nouvelle décision.

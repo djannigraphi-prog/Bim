@@ -49,7 +49,8 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INCIDENT_RESOLVED` | 409 | 7-G : incident résolu, plus de précision possible |
 | `REQUEST_PENDING` | 409 | 6-C : réaction à une demande non acceptée (l'accepter d'abord) |
 | `SHOP_PAYMENT_ACCOUNT_MISSING` | 409 | Lot 8 : la boutique n'a pas de compte actif chez le prestataire (F4 : aucun paiement en ligne) |
-| `DISPUTE_WINDOW_CLOSED` | 409 | Lot 7-G : délai de contestation après la remise dépassé (`details.days`, `details.until`) ; le support reste joignable par « Aide » |
+| `INCIDENT_NOT_FOR_SUPPORT` | 409 | L7-08 : un problème signalé après la remise se règle entre le client et la boutique, sans le support |
+| `DISPUTE_WINDOW_CLOSED` | 409 | L7-08 : vente close — délai de 3 jours après la remise dépassé pour signaler un problème ou échanger sur un incident signalé après la remise (`details.days`) |
 | `APP_UPDATE_REQUIRED` | 426 | Lot 7-A : version de l'app plus ancienne que le minimum décidé pour sa plateforme (`details.minVersion`, `details.platform`) ; l'app affiche « Mise à jour nécessaire » |
 | `PAYEE_ACCOUNT_INVALID` | 422 | Lot 8 : compte de boutique refusé après contrôle chez le prestataire (introuvable, inactif, autre devise que XOF, ou part prévue pour le compte principal de BIM : elle doit être de 0 %) ; `details.problems` |
 | `PAYMENT_PROVIDER_UNAVAILABLE` | 503 | Lot 8 : le prestataire ne répond pas ou refuse ; réessayer plus tard |

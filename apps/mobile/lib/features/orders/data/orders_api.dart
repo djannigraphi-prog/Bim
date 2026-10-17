@@ -250,11 +250,14 @@ String deliveryStatusLabel(String s) => switch (s) {
     };
 
 class IncidentSummary {
-  const IncidentSummary({required this.id, required this.status, required this.reason});
+  const IncidentSummary({required this.id, required this.status, required this.reason, this.afterDelivery = false});
   final String id;
   final String status;
   final String reason;
-  factory IncidentSummary.fromJson(Map<String, dynamic> j) => IncidentSummary(id: j['id'] as String, status: j['status'] as String, reason: j['reason'] as String);
+  /// Signalé après la remise : à régler entre le client et la boutique (L7-08), sans le support.
+  final bool afterDelivery;
+  factory IncidentSummary.fromJson(Map<String, dynamic> j) =>
+      IncidentSummary(id: j['id'] as String, status: j['status'] as String, reason: j['reason'] as String, afterDelivery: j['afterDelivery'] == true);
 }
 
 String incidentReasonLabel(String r) => const {

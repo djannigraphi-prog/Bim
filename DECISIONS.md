@@ -166,6 +166,22 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L7-08 — Problème après la remise : 3 jours, réglé entre client et boutique (17/10/2026, 14 h 21) · Fondateur · **appliquée**
+
+- Un problème se signale au plus **3 jours** après la remise (`orders.dispute_window_days` = 3, décidé) ; ensuite la
+  **vente est close** : plus de signalement ni d'échange sur un incident signalé après la remise.
+- Il se règle **entre le client et la boutique**, sans le support (pas de transmission au support pour ces incidents,
+  `INCIDENT_NOT_FOR_SUPPORT`). Le client garde son **évaluation de la boutique** (7-H), qui agit sur sa réputation.
+- Remplace le délai provisoire de 7 jours et le passage par le support (7-G du même jour). Les incidents pendant la
+  livraison (avant la remise) restent transmissibles au support. La décision de la boutique sur le paiement reste
+  nécessaire pour qu'une commande soit « terminée ».
+
+### L7-09 — Mises à jour de l'app : rappel non bloquant (17/10/2026, 14 h 21) · Fondateur · **appliquée**
+
+- Cas ordinaire : **version recommandée** (`app.recommended_version_android` / `_ios`) → rappel non bloquant à chaque
+  ouverture de l'app, fermable, toutes les fonctionnalités restent accessibles.
+- **Blocage** (version minimale, `app.min_version_*`) réservé au **strict nécessaire** (sécurité, incompatibilité).
+
 ### L8-02 — Décisions définitives sur le lot 8 (17/10/2026, 11 h 42) · Fondateur · **appliquées dans le code** ; paiement en ligne **toujours fermé**
 
 1. **Paiement direct à la boutique : exigence obligatoire.** Jamais de transit des fonds des boutiques par BIM, même

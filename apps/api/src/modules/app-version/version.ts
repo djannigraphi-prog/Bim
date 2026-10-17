@@ -15,3 +15,4 @@ export const APP_PLATFORMS = ['android', 'ios'] as const;
 export type AppPlatform = (typeof APP_PLATFORMS)[number];
 export const VERSION_HEADER = 'x-bim-app-version';
 export const PLATFORM_HEADER = 'x-bim-platform';
+export const UPDATE_AVAILABLE_HEADER = 'x-bim-update-available';

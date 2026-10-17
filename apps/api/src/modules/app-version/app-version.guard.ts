@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AppError } from '../../common/errors';
 import { SettingsService } from '../settings/settings.service';
-import { APP_PLATFORMS, AppPlatform, compareVersions, PLATFORM_HEADER, VERSION_HEADER } from './version';
+import { APP_PLATFORMS, AppPlatform, compareVersions, PLATFORM_HEADER, UPDATE_AVAILABLE_HEADER, VERSION_HEADER } from './version';
 
 /** Routes jamais bloquées : santé, administration (navigateur), notifications des prestataires, configuration de l'app. */
 const EXEMPT = [/^\/health/, /^\/admin\//, /^\/v1\/payments\/webhooks\//, /^\/v1\/app\//];
@@ -13,6 +13,9 @@ const EXEMPT = [/^\/health/, /^\/admin\//, /^\/v1\/payments\/webhooks\//, /^\/v1
  * `app.min_version_ios`) et que la version est plus ancienne ou illisible, la requête est refusée (426,
  * APP_UPDATE_REQUIRED) et l'app affiche « Mise à jour nécessaire ». Sans minimum décidé : aucun effet.
  * Les requêtes sans plateforme mobile (administration, navigateur, outils) ne sont pas concernées.
+ * L7-09 : le blocage est réservé au strict nécessaire. Le cas ordinaire est la **version recommandée**
+ * (`app.recommended_version_*`) : la réponse porte l'en-tête `X-Bim-Update-Available` et l'app affiche un rappel non
+ * bloquant à chaque ouverture ; toutes les fonctionnalités restent accessibles.
  */
 @Injectable()
 export class AppVersionGuard implements CanActivate {
@@ -25,9 +28,11 @@ export class AppVersionGuard implements CanActivate {
     if (EXEMPT.some((r) => r.test(path))) return true;
     const platform = String(req.headers[PLATFORM_HEADER] ?? '').toLowerCase();
     if (!APP_PLATFORMS.includes(platform as AppPlatform)) return true;
+    const version = String(req.headers[VERSION_HEADER] ?? '');
+    const recommended = await this.recommended(platform as AppPlatform);
+    if (recommended && (compareVersions(version, recommended) ?? -1) < 0) ctx.switchToHttp().getResponse<Response>().setHeader(UPDATE_AVAILABLE_HEADER, recommended);
     const min = await this.minimum(platform as AppPlatform);
     if (!min) return true;
-    const version = String(req.headers[VERSION_HEADER] ?? '');
     const cmp = compareVersions(version, min);
     if (cmp === null || cmp < 0) {
       throw new AppError('APP_UPDATE_REQUIRED', 'Une nouvelle version de BIM est nécessaire. Mets l’app à jour pour continuer.', 426 as HttpStatus, { minVersion: min, platform });
@@ -36,7 +41,15 @@ export class AppVersionGuard implements CanActivate {
   }
 
   async minimum(platform: AppPlatform): Promise<string | null> {
-    const s = await this.settings.get<string | null>(`app.min_version_${platform}`);
+    return this.version(`app.min_version_${platform}`);
+  }
+
+  async recommended(platform: AppPlatform): Promise<string | null> {
+    return this.version(`app.recommended_version_${platform}`);
+  }
+
+  private async version(key: string): Promise<string | null> {
+    const s = await this.settings.get<string | null>(key);
     return s?.decisionStatus === 'decided' && typeof s.value === 'string' && compareVersions(s.value, s.value) === 0 ? s.value : null;
   }
 }

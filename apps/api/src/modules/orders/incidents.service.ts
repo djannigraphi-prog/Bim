@@ -37,15 +37,26 @@ export class IncidentsService {
     private readonly settings: SettingsService,
   ) {}
 
-  /** Délai de contestation après la remise (`orders.dispute_window_days`, 7 jours provisoires, §12). */
+  /** Délai pour signaler un problème après la remise (`orders.dispute_window_days` : 3 jours, décision L7-08). */
   async disputeWindowDays(): Promise<number> {
     const s = await this.settings.get<number>('orders.dispute_window_days');
-    return typeof s?.value === 'number' && Number.isInteger(s.value) && s.value > 0 ? s.value : 7;
+    return typeof s?.value === 'number' && Number.isInteger(s.value) && s.value > 0 ? s.value : 3;
   }
 
   /**
-   * Contestation après la remise (§9) : possible jusqu'à `deliveredAt` + délai ; une commande remise avec un incident
-   * non résolu ouvert depuis la remise est « en litige » (le support décide, sans effet financier automatique).
+   * L7-08 : un problème signalé après la remise se règle entre le client et la boutique (sans le support) ; une fois le
+   * délai passé, la vente est close : plus aucun échange sur l'incident. Le client garde son évaluation de la boutique.
+   */
+  private async postDelivery(i: Incident): Promise<{ post: boolean; closed: boolean }> {
+    const o = await this.order(i.orderId);
+    if (!o.deliveredAt || i.createdAt < o.deliveredAt) return { post: false, closed: false };
+    const until = o.deliveredAt.getTime() + (await this.disputeWindowDays()) * 86_400_000;
+    return { post: true, closed: Date.now() >= until };
+  }
+
+  /**
+   * Problème après la remise (L7-08) : signalable jusqu'à `deliveredAt` + 3 jours ; pendant ce délai, un incident non
+   * résolu ouvert depuis la remise est « problème signalé », à régler entre le client et la boutique ; ensuite, vente close.
    */
   async disputeState(o: typeof orders.$inferSelect, now = new Date()) {
     if (!o.deliveredAt || !['delivered', 'completed'].includes(o.status)) return { disputeUntil: null, inDispute: false };
@@ -55,7 +66,7 @@ export class IncidentsService {
       .from(incidents)
       .where(and(eq(incidents.orderId, o.id), inArray(incidents.status, ['open', 'with_support']), sql`${incidents.createdAt} >= ${o.deliveredAt}`))
       .limit(1);
-    return { disputeUntil: until, inDispute: !!x, disputeOpen: now < until };
+    return { disputeUntil: until, inDispute: !!x && now < until, disputeOpen: now < until };
   }
 
   private event(tx: DbOrTx, incidentId: string, type: string, actorType: string, actorId: string | null, note: string | null = null) {
@@ -110,7 +121,7 @@ export class IncidentsService {
     const dispute = await this.disputeState(o);
     if (dispute.disputeUntil && !dispute.disputeOpen) {
       const days = await this.disputeWindowDays();
-      throw new AppError('DISPUTE_WINDOW_CLOSED', `Le délai de contestation (${days} jours après la remise) est dépassé. Tu peux écrire au support depuis « Aide ».`, HttpStatus.CONFLICT, { days, until: dispute.disputeUntil.toISOString() });
+      throw new AppError('DISPUTE_WINDOW_CLOSED', `La vente est close : un problème se signale dans les ${days} jours qui suivent la remise. Tu peux toujours donner ton avis sur la boutique.`, HttpStatus.CONFLICT, { days, until: dispute.disputeUntil.toISOString() });
     }
     const [d] = await this.db.select({ id: deliveries.id }).from(deliveries).where(eq(deliveries.orderId, o.id)).limit(1);
     const id = await this.db.transaction(async (tx) => {
@@ -133,6 +144,7 @@ export class IncidentsService {
   async addNote(userId: string, as: IncidentActor, incidentId: string, note: string, ctx: { shopId?: string; courierId?: string } = {}) {
     const i = await this.authorized(userId, as, incidentId, ctx);
     if (i.status === 'resolved') throw new AppError('INCIDENT_RESOLVED', 'Cet incident est résolu.', HttpStatus.CONFLICT);
+    if ((await this.postDelivery(i)).closed) throw new AppError('DISPUTE_WINDOW_CLOSED', 'La vente est close : plus d’échange sur ce problème.', HttpStatus.CONFLICT);
     await this.event(this.db, i.id, 'note', as, userId, note.trim());
     return this.view(i.id, as);
   }
@@ -140,6 +152,8 @@ export class IncidentsService {
   /** Transmettre le dossier au support. */
   async transfer(userId: string, as: IncidentActor, incidentId: string, ctx: { shopId?: string; courierId?: string } = {}) {
     const i = await this.authorized(userId, as, incidentId, ctx);
+    // L7-08 : un problème signalé après la remise se règle entre le client et la boutique, sans le support.
+    if ((await this.postDelivery(i)).post) throw new AppError('INCIDENT_NOT_FOR_SUPPORT', 'Un problème signalé après la remise se règle directement entre toi et la boutique.', HttpStatus.CONFLICT);
     await this.db.transaction(async (tx) => {
       const [u] = await tx.update(incidents).set({ status: 'with_support' }).where(and(eq(incidents.id, i.id), eq(incidents.status, 'open'))).returning();
       if (!u) throw new AppError('INCIDENT_STATE_CHANGED', 'Cet incident est déjà au support ou résolu.', HttpStatus.CONFLICT);
@@ -152,6 +166,8 @@ export class IncidentsService {
     const [i] = await this.db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
     if (!i) throw Errors.notFound('Incident');
     const evs = await this.db.select().from(incidentEvents).where(eq(incidentEvents.incidentId, i.id)).orderBy(asc(incidentEvents.createdAt), asc(incidentEvents.id));
+    const pd = await this.postDelivery(i);
+    const partyActions = i.status === 'resolved' || pd.closed ? [] : pd.post ? ['add_note'] : i.status === 'open' ? ['add_note', 'send_to_support'] : ['add_note'];
     return {
       id: i.id,
       orderId: i.orderId,
@@ -164,7 +180,10 @@ export class IncidentsService {
       resolvedAt: i.resolvedAt,
       // L'identité des personnes de l'équipe du support n'est pas montrée aux parties.
       events: evs.map((e) => ({ type: e.type, actorType: e.actorType, note: e.note, at: e.createdAt })),
-      actions: as === 'admin' ? (i.status === 'resolved' ? [] : ['resolve']) : i.status === 'resolved' ? [] : i.status === 'open' ? ['add_note', 'send_to_support'] : ['add_note'],
+      /** L7-08 : après la remise, à régler entre le client et la boutique ; vente close après le délai. */
+      afterDelivery: pd.post,
+      saleClosed: pd.closed,
+      actions: as === 'admin' ? (i.status === 'resolved' ? [] : ['resolve']) : partyActions,
     };
   }
 
@@ -177,8 +196,10 @@ export class IncidentsService {
   }
 
   async summaryForOrder(orderId: string) {
-    const rows = await this.db.select({ id: incidents.id, status: incidents.status, reason: incidents.reason }).from(incidents).where(eq(incidents.orderId, orderId)).orderBy(desc(incidents.createdAt));
-    return rows;
+    const rows = await this.db.select({ id: incidents.id, status: incidents.status, reason: incidents.reason, createdAt: incidents.createdAt }).from(incidents).where(eq(incidents.orderId, orderId)).orderBy(desc(incidents.createdAt));
+    const o = await this.order(orderId);
+    // L7-08 : signalé après la remise → à régler entre le client et la boutique (pas de transmission au support).
+    return rows.map(({ createdAt, ...r }) => ({ ...r, afterDelivery: !!o.deliveredAt && createdAt >= o.deliveredAt }));
   }
 
   // ------------------------------------------------------------------ Support

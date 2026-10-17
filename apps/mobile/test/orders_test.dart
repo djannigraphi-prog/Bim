@@ -498,20 +498,21 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-fees'))).data, '1,95 % HT par paiement');
   });
 
-  testWidgets('7-G client : contestation dans le délai, commande « en litige » ; délai dépassé : plus de signalement', (tester) async {
+  testWidgets('L7-08 client : problème dans les 3 jours, réglé avec la boutique (pas de support) ; ensuite vente close', (tester) async {
     final api = _FakeOrders()
-      ..current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 24, 10), inDispute: true, incidents: const [IncidentSummary(id: 'i1', status: 'with_support', reason: 'item_damaged')]);
+      ..current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 20, 10), inDispute: true, incidents: const [IncidentSummary(id: 'i1', status: 'open', reason: 'item_damaged', afterDelivery: true)]);
     await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('order-in-dispute')), findsOneWidget);
-    expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, startsWith('Un problème ? Tu peux le signaler jusqu’au'));
+    expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, startsWith('Un problème ? Il se signale jusqu’au'));
     expect(find.byKey(const ValueKey('order-incident')), findsOneWidget);
+    expect(find.byKey(const ValueKey('incident-support-i1')), findsNothing);
 
     final late = _FakeOrders()..current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 1), disputeOpen: false);
     await _pump(tester, const OrderScreen(orderId: 'o1'), orders: late);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('order-incident')), findsNothing);
     expect(find.byKey(const ValueKey('order-in-dispute')), findsNothing);
-    expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, 'Le délai pour signaler un problème est dépassé. Le support reste joignable depuis « Aide ».');
+    expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, 'Vente close : le délai pour signaler un problème est dépassé. Tu peux toujours évaluer la boutique.');
   });
 }

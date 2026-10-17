@@ -364,10 +364,9 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 > livraison » sans issue : la boutique confirme avoir récupéré le colis (`POST /v1/shop/orders/:id/delivery/returned`,
 > une seule fois) ; la commande est annulée, le stock remis, le code et le paiement en attente annulés ; l'incident reste
 > ouvert pour le support ; aucun remboursement ni frais automatique (A8 : un paiement déjà confirmé se rembourse par le support).
-> **Contestation après la remise réalisée (17/10)** : incident possible jusqu'à la remise + `orders.dispute_window_days`
-> (7 j, provisoire, §12), pour le client, la boutique ou le livreur ; au-delà, refus `DISPUTE_WINDOW_CLOSED` (le support
-> reste joignable par « Aide ») ; commande remise avec un incident non résolu ouvert depuis la remise = « en litige »
-> (affiché aux deux parties, champ `dispute`), jusqu'à la décision du support ; aucun effet financier automatique.
+> **Problème après la remise (17/10, L7-08)** : signalable 3 jours après la remise (décidé), réglé entre le client et
+> la boutique (pas de support), « problème signalé » affiché aux deux parties pendant ce délai ; ensuite vente close ;
+> le client garde son évaluation de la boutique. Refus : `DISPUTE_WINDOW_CLOSED`, `INCIDENT_NOT_FOR_SUPPORT`.
 > Non réalisé : statut de commande « incident » distinct (l'état reste porté par les incidents), réattribution après prise en charge, nouvelle tentative convenue, pièces jointes
 > (stockage et conservation des preuves à décider) ; aucun effet financier automatique.
 
@@ -497,7 +496,7 @@ Tous réglables dans `app_settings` (modification réservée à `settings.write`
 | --- | --- | --- | --- |
 | `deliveries.mission_accept_minutes` | 5 min | Délai pour qu'un livreur accepte la mission choisie par le marchand ; sinon le marchand en choisit un autre | [NON VÉRIFIÉ] Sans notifications sur le téléphone, 5 min n'est réaliste que si le livreur a l'app ouverte |
 | `deliveries.client_absent_after_minutes` | 15 min | Après « Je suis arrivé », le livreur peut déclarer « client absent » | Doit être ≥ attente gratuite + plafond d'attente facturable |
-| `orders.dispute_window_days` | 7 jours | Contestation après livraison | — |
+| `orders.dispute_window_days` | **3 jours (décidé, L7-08)** | Problème après la remise, puis vente close | — |
 | `orders.proposal_ttl_hours` | 24 h | Expiration d'une **proposition de commande** du marchand (messagerie) | **Pas de système d'offres de livraison** : il n'est pas retenu |
 | `payments.shop_decision_reminder_days` | 3 jours (nouveau) | Rappel, puis file « à vérifier » si la boutique ne décide pas | Jamais de confirmation implicite |
 
