@@ -183,6 +183,21 @@ describe('Commandes (e2e)', () => {
     }
   });
 
+  it('annulations simultanées répétées : stock remis exactement, jamais d’erreur interne', async () => {
+    const s = await shop();
+    for (let round = 0; round < 5; round++) {
+      const p = await product(s, { stock: 3 });
+      const items = [{ productId: p.id, variantId: p.variant, quantity: 1 }];
+      const os = [];
+      for (let i = 0; i < 3; i++) os.push((await order(await person(), { shopId: s.shopId, items, deliveryMode: 'pickup', expectedTotalFcfa: 20000 })).body);
+      for (const o of os) await h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(s.auth).expect(200);
+      expect(await stock(p.variant)).toBe(0);
+      const rs = await Promise.all(os.map((o) => h.http().post(`/v1/shop/orders/${o.id}/cancel`).set(s.auth).send({ reason: 'Rupture chez le fournisseur' })));
+      expect(rs.map((r) => r.status)).toEqual([200, 200, 200]);
+      expect(await stock(p.variant)).toBe(3);
+    }
+  });
+
   it('survente impossible : deux commandes pour le dernier article, la seconde confirmation est refusée', async () => {
     const s = await shop();
     const p = await product(s, { stock: 1 });
