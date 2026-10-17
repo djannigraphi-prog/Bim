@@ -7,6 +7,7 @@ import { DB, Database, DbOrTx } from '../../database/database.module';
 import { deliveries, incidentEvents, incidents, orders, shopMembers, shops, users } from '../../database/schema';
 import type { AdminContext } from '../admin/admin.decorators';
 import { AuditService } from '../audit/audit.service';
+import { SettingsService } from '../settings/settings.service';
 
 export const INCIDENT_REASONS = ['item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other'] as const;
 export type IncidentReason = (typeof INCIDENT_REASONS)[number];
@@ -33,7 +34,29 @@ export class IncidentsService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** Délai de contestation après la remise (`orders.dispute_window_days`, 7 jours provisoires, §12). */
+  async disputeWindowDays(): Promise<number> {
+    const s = await this.settings.get<number>('orders.dispute_window_days');
+    return typeof s?.value === 'number' && Number.isInteger(s.value) && s.value > 0 ? s.value : 7;
+  }
+
+  /**
+   * Contestation après la remise (§9) : possible jusqu'à `deliveredAt` + délai ; une commande remise avec un incident
+   * non résolu ouvert depuis la remise est « en litige » (le support décide, sans effet financier automatique).
+   */
+  async disputeState(o: typeof orders.$inferSelect, now = new Date()) {
+    if (!o.deliveredAt || !['delivered', 'completed'].includes(o.status)) return { disputeUntil: null, inDispute: false };
+    const until = new Date(o.deliveredAt.getTime() + (await this.disputeWindowDays()) * 86_400_000);
+    const [x] = await this.db
+      .select({ id: incidents.id })
+      .from(incidents)
+      .where(and(eq(incidents.orderId, o.id), inArray(incidents.status, ['open', 'with_support']), sql`${incidents.createdAt} >= ${o.deliveredAt}`))
+      .limit(1);
+    return { disputeUntil: until, inDispute: !!x, disputeOpen: now < until };
+  }
 
   private event(tx: DbOrTx, incidentId: string, type: string, actorType: string, actorId: string | null, note: string | null = null) {
     return tx.insert(incidentEvents).values({ id: uuidv7(), incidentId, type, actorType, actorId, note });
@@ -83,6 +106,12 @@ export class IncidentsService {
     if (!REASONS_FOR[as].includes(reason)) throw Errors.validation({ fields: { reason: ['Motif non disponible.'] } });
     if (reason === 'other' && (!description || description.trim().length < 5)) throw Errors.validation({ fields: { description: ['Décris le problème.'] } });
     if (['proposed', 'pending_shop', 'declined', 'expired'].includes(o.status)) throw new AppError('INCIDENT_NOT_ALLOWED', 'Un incident concerne une commande confirmée.', HttpStatus.CONFLICT);
+    // Après la remise : contestation dans le délai seulement (§9, §12) ; au-delà, le support reste joignable par « Aide ».
+    const dispute = await this.disputeState(o);
+    if (dispute.disputeUntil && !dispute.disputeOpen) {
+      const days = await this.disputeWindowDays();
+      throw new AppError('DISPUTE_WINDOW_CLOSED', `Le délai de contestation (${days} jours après la remise) est dépassé. Tu peux écrire au support depuis « Aide ».`, HttpStatus.CONFLICT, { days, until: dispute.disputeUntil.toISOString() });
+    }
     const [d] = await this.db.select({ id: deliveries.id }).from(deliveries).where(eq(deliveries.orderId, o.id)).limit(1);
     const id = await this.db.transaction(async (tx) => {
       const nid = await this.openInTx(tx, { orderId: o.id, deliveryId: d?.id ?? null, actorType: as, actorId: userId, reason, description });

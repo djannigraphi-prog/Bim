@@ -364,7 +364,11 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 > livraison » sans issue : la boutique confirme avoir récupéré le colis (`POST /v1/shop/orders/:id/delivery/returned`,
 > une seule fois) ; la commande est annulée, le stock remis, le code et le paiement en attente annulés ; l'incident reste
 > ouvert pour le support ; aucun remboursement ni frais automatique (A8 : un paiement déjà confirmé se rembourse par le support).
-> Non réalisé : statuts de commande « incident » / « litige », réattribution après prise en charge, nouvelle tentative convenue, pièces jointes
+> **Contestation après la remise réalisée (17/10)** : incident possible jusqu'à la remise + `orders.dispute_window_days`
+> (7 j, provisoire, §12), pour le client, la boutique ou le livreur ; au-delà, refus `DISPUTE_WINDOW_CLOSED` (le support
+> reste joignable par « Aide ») ; commande remise avec un incident non résolu ouvert depuis la remise = « en litige »
+> (affiché aux deux parties, champ `dispute`), jusqu'à la décision du support ; aucun effet financier automatique.
+> Non réalisé : statut de commande « incident » distinct (l'état reste porté par les incidents), réattribution après prise en charge, nouvelle tentative convenue, pièces jointes
 > (stockage et conservation des preuves à décider) ; aucun effet financier automatique.
 
 Aucun frais d'annulation, remboursement ou pénalité automatique sans règle commerciale explicite (A8). Chaque incident

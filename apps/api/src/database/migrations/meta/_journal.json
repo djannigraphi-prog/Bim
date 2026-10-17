@@ -309,6 +309,13 @@
       "when": 1792238019785,
       "tag": "0043_app_min_version",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792238304989,
+      "tag": "0044_dispute_window",
+      "breakpoints": true
     }
   ]
 }

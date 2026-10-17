@@ -633,7 +633,16 @@ export class DeliveriesService {
     // Lot 8 : paiement en ligne (client seulement), proposé uniquement s'il est réellement ouvert pour cette commande.
     const online = party === 'customer' ? await this.online.customerView(o) : null;
     if (online?.available) extra.push('pay_online');
-    return { ...v, tracking, incidents: await this.incidents.summaryForOrder(orderId), ...(party === 'customer' ? { onlinePayment: online } : {}), actions: [...v.actions, ...extra] };
+    // 7-G : délai de contestation après la remise et commande « en litige » (incident non résolu ouvert depuis).
+    const dispute = await this.incidents.disputeState(o);
+    return {
+      ...v,
+      tracking,
+      incidents: await this.incidents.summaryForOrder(orderId),
+      dispute: { until: dispute.disputeUntil, open: dispute.disputeOpen ?? false, inDispute: dispute.inDispute },
+      ...(party === 'customer' ? { onlinePayment: online } : {}),
+      actions: [...v.actions, ...extra],
+    };
   }
 
   /** Évaluation de la livraison par le client, après la clôture ; une seule ; distincte de l'article et de la boutique. */

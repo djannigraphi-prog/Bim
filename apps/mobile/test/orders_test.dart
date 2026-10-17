@@ -22,7 +22,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online, DateTime? disputeUntil, bool disputeOpen = true, bool inDispute = false}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -43,6 +43,9 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       tracking: tracking,
       incidents: incidents,
       onlinePayment: online,
+      disputeUntil: disputeUntil,
+      disputeOpen: disputeOpen,
+      inDispute: inDispute,
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
@@ -493,5 +496,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-state'))).data, 'Ouvert : tes clients peuvent payer en ligne (Orange Money, Wave).');
     expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-fees'))).data, '1,95 % HT par paiement');
+  });
+
+  testWidgets('7-G client : contestation dans le délai, commande « en litige » ; délai dépassé : plus de signalement', (tester) async {
+    final api = _FakeOrders()
+      ..current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 24, 10), inDispute: true, incidents: const [IncidentSummary(id: 'i1', status: 'with_support', reason: 'item_damaged')]);
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('order-in-dispute')), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, startsWith('Un problème ? Tu peux le signaler jusqu’au'));
+    expect(find.byKey(const ValueKey('order-incident')), findsOneWidget);
+
+    final late = _FakeOrders()..current = _detail(status: 'completed', actions: const [], disputeUntil: DateTime(2026, 10, 1), disputeOpen: false);
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: late);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('order-incident')), findsNothing);
+    expect(find.byKey(const ValueKey('order-in-dispute')), findsNothing);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, 'Le délai pour signaler un problème est dépassé. Le support reste joignable depuis « Aide ».');
   });
 }

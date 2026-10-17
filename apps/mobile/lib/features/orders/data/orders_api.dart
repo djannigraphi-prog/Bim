@@ -356,6 +356,9 @@ class OrderDetail {
     this.tracking,
     this.incidents = const [],
     this.onlinePayment,
+    this.disputeUntil,
+    this.disputeOpen = true,
+    this.inDispute = false,
   });
 
   final String id;
@@ -387,6 +390,12 @@ class OrderDetail {
   final DeliveryTracking? tracking;
   final List<IncidentSummary> incidents;
   final OnlinePayment? onlinePayment;
+  /// 7-G : fin du délai de contestation après la remise (null avant la remise).
+  final DateTime? disputeUntil;
+  /// Faux une fois le délai dépassé : plus d'incident possible (le support reste joignable par « Aide »).
+  final bool disputeOpen;
+  /// Commande remise avec un incident non résolu ouvert depuis : « en litige ».
+  final bool inDispute;
   final List<OrderEvent> events;
   /// Actions possibles maintenant, calculées par le serveur.
   final List<String> actions;
@@ -426,6 +435,9 @@ class OrderDetail {
       tracking: j['tracking'] == null ? null : DeliveryTracking.fromJson(j['tracking'] as Map<String, dynamic>),
       incidents: [for (final i in (j['incidents'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) IncidentSummary.fromJson(i)],
       onlinePayment: j['onlinePayment'] == null ? null : OnlinePayment.fromJson(j['onlinePayment'] as Map<String, dynamic>),
+      disputeUntil: DateTime.tryParse((j['dispute'] as Map<String, dynamic>?)?['until'] as String? ?? '')?.toLocal(),
+      disputeOpen: ((j['dispute'] as Map<String, dynamic>?)?['until'] == null) || ((j['dispute'] as Map<String, dynamic>?)?['open'] == true),
+      inDispute: (j['dispute'] as Map<String, dynamic>?)?['inDispute'] == true,
       events: [for (final e in (j['events'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) OrderEvent.fromJson(e)],
       actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
     );

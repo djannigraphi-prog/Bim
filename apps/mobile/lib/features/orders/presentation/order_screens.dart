@@ -219,6 +219,21 @@ class _OrderBody extends StatelessWidget {
         ],
         const SizedBox(height: BimSpacing.lg),
         ...actions,
+        // 7-G : litige en cours, et délai de contestation après la remise.
+        if (o.inDispute)
+          Padding(
+            padding: const EdgeInsets.only(top: BimSpacing.sm),
+            child: Text('En litige : le problème signalé après la remise est en cours de traitement.', key: const ValueKey('order-in-dispute'), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        if (o.disputeUntil != null)
+          Padding(
+            padding: const EdgeInsets.only(top: BimSpacing.xs),
+            child: Text(
+              o.disputeOpen ? 'Un problème ? Tu peux le signaler jusqu’au ${formatDateTimeFr(o.disputeUntil!)}.' : 'Le délai pour signaler un problème est dépassé. Le support reste joignable depuis « Aide ».',
+              key: const ValueKey('order-dispute-window'),
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         if (o.incidents.isNotEmpty) ...[
           const SizedBox(height: BimSpacing.lg),
           Text('Incidents', style: theme.textTheme.titleMedium),
@@ -357,7 +372,8 @@ const _customerIncidentReasons = ['item_incorrect', 'item_damaged', 'item_incomp
 const _shopIncidentReasons = ['courier_absent', 'delay', 'payment', 'behaviour', 'other'];
 
 /// Un incident concerne une commande confirmée (revérifié par le serveur).
-bool _incidentPossible(OrderDetail o) => !const ['proposed', 'pending_shop', 'declined', 'expired'].contains(o.status);
+/// 7-G : après la remise, seulement dans le délai de contestation (le serveur le revérifie).
+bool _incidentPossible(OrderDetail o) => !const ['proposed', 'pending_shop', 'declined', 'expired'].contains(o.status) && o.disputeOpen;
 
 /// Refus de la remise après examen : motif obligatoire, précision pour « Autre ». Le champ appartient à la boîte.
 class _RefuseDialog extends StatefulWidget {

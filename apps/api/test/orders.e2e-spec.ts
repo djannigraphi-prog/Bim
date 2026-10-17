@@ -153,6 +153,36 @@ describe('Commandes (e2e)', () => {
     expect(notes[0].link).toBe(`/orders/${o.id}`);
   });
 
+  it('contestation après la remise : possible dans le délai, commande « en litige » tant que l’incident n’est pas résolu ; au-delà, refusée', async () => {
+    const s = await shop();
+    const p = await product(s, { price: 20000, stock: 3 });
+    const client = await person();
+    const o = (await order(client, { shopId: s.shopId, items: [{ productId: p.id, variantId: p.variant, quantity: 1 }], deliveryMode: 'pickup', paymentMethod: 'cash', expectedTotalFcfa: 20000, idempotencyKey: key() })).body;
+    for (const step of ['confirm', 'prepare', 'ready']) await h.http().post(`/v1/shop/orders/${o.id}/${step}`).set(s.auth).expect(200);
+    // Avant la remise : pas de délai de contestation.
+    expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.dispute).toEqual({ until: null, open: false, inDispute: false });
+    const code = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code }).expect(200);
+    let mine = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body;
+    expect(mine.dispute).toMatchObject({ open: true, inDispute: false });
+    const until = new Date(mine.dispute.until).getTime();
+    expect(Math.abs(until - (Date.now() + 7 * 86_400_000))).toBeLessThan(60_000);
+    const inc = (await h.http().post(`/v1/orders/${o.id}/incidents`).set(client.auth).send({ reason: 'item_damaged', description: 'Couture déchirée' }).expect(201)).body;
+    mine = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body;
+    expect(mine.dispute.inDispute).toBe(true);
+    expect((await h.http().get(`/v1/shop/orders/${o.id}`).set(s.auth)).body.dispute.inDispute).toBe(true);
+    // Le support décide (note, sans effet financier) : la commande n'est plus en litige.
+    const support = await adminSession(h, ['support']);
+    await h.http().post(`/admin/v1/incidents/${inc.id}/resolve`).set(support).send({ note: 'Échange accepté par la boutique' }).expect(200);
+    expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.dispute.inDispute).toBe(false);
+    // Délai dépassé (remise il y a 8 jours) : refus motivé, pour le client comme pour la boutique.
+    await h.pool.query("update orders set delivered_at = now() - interval '8 days' where id = $1", [o.id]);
+    const late = (await h.http().post(`/v1/orders/${o.id}/incidents`).set(client.auth).send({ reason: 'item_damaged', description: 'Encore un souci' }).expect(409)).body.error;
+    expect(late).toMatchObject({ code: 'DISPUTE_WINDOW_CLOSED', details: { days: 7 } });
+    expect((await h.http().post(`/v1/shop/orders/${o.id}/incidents`).set(s.auth).send({ reason: 'other', description: 'Client injoignable' }).expect(409)).body.error.code).toBe('DISPUTE_WINDOW_CLOSED');
+    expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.dispute.open).toBe(false);
+  });
+
   it('code de remise bloqué après 5 essais faux', async () => {
     const s = await shop();
     const p = await product(s, { stock: 1 });
