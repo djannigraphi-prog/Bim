@@ -10,7 +10,7 @@
             "description": ""
           }
         },
-        "summary": "Version minimale de l’app par plateforme (null : aucune exigence)",
+        "summary": "Versions de l’app par plateforme : recommandée (rappel non bloquant) et minimale (blocage, strict nécessaire) ; null : rien",
         "tags": [
           "Application"
         ]
