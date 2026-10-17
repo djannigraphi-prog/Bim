@@ -52,6 +52,8 @@ const RULES: Array<[RegExp, Rule]> = [
   ],
   [/^notifications\.reminder_grace_minutes$/, intIn(5, 180)],
   [/^maintenance\.account_purge_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
+  // 7-A : version minimale de l'app par plateforme (« x.y.z »), null : aucune exigence.
+  [/^app\.min_version_(android|ios)$/, (v) => (v === null || (typeof v === 'string' && /^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(v)) ? null : '« x.y.z » (ex. 1.2.0) ou null.')],
   [/^payments\.online_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
   // L8-02 (17/10/2026) : la boutique supporte les frais, décision définitive ; un autre modèle exige une nouvelle décision.
   [/^payments\.fee_bearer$/, (v) => (v === null || v === 'shop' ? null : '« shop » (décision L8-02) ou null.')],

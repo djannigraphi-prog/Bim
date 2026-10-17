@@ -594,7 +594,7 @@ consommation (contestation, remboursement) ; données de livraison (ARTCI).
 | Adresses de livraison | Absentes | À créer (7-B) avec commune obligatoire |
 | Ajout d'employés et permissions | Absents | À créer (7-A) |
 | Espace livreur, vérification | Espace prévu seulement | À créer (7-E), réutilise le chiffrement des pièces de 5-A |
-| Version minimale de l'app | Non imposée | À ajouter avant l'ouverture des commandes |
+| Version minimale de l'app | **Réalisée (17/10)** : en-têtes `X-Bim-App-Version` / `X-Bim-Platform`, réglages `app.min_version_android` / `app.min_version_ios` (null, en attente : aucune exigence), 426 `APP_UPDATE_REQUIRED`, écran « Mise à jour nécessaire » | Valeur à décider avant l'ouverture des commandes |
 
 ---
 

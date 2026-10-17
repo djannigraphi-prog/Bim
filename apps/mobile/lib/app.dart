@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/network/app_update.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -24,7 +25,8 @@ class BimApp extends ConsumerWidget {
       supportedLocales: const [Locale('fr')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       // Rappels programmés sur le téléphone (lot 2) : synchronisés avec l'API, ouverture de la journée depuis une notification.
-      builder: (context, child) => ReminderSync(child: child ?? const SizedBox.shrink()),
+      // 7-A : une app trop ancienne affiche « Mise à jour nécessaire » à la place des écrans.
+      builder: (context, child) => ref.watch(updateRequiredProvider) ? const UpdateRequiredScreen() : ReminderSync(child: child ?? const SizedBox.shrink()),
     );
   }
 }

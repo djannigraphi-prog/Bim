@@ -7,6 +7,7 @@ import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AgePolicyModule } from './modules/age-policy/age-policy.module';
+import { AppVersionModule } from './modules/app-version/app-version.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
@@ -61,6 +62,7 @@ import { CouriersModule } from './modules/couriers/couriers.module';
     }),
     DatabaseModule,
     SettingsModule,
+    AppVersionModule,
     AuditModule,
     DeliveryModule,
     AgePolicyModule,

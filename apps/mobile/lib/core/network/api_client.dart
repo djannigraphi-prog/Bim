@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/app_version.dart';
 import '../config/env.dart';
 import '../storage/token_storage.dart';
 import 'api_exception.dart';
@@ -8,13 +9,15 @@ import 'auth_interceptor.dart';
 
 /// Client HTTP unique de l'app. Les écrans n'appellent jamais Dio directement : ils passent par les *Api des fonctionnalités.
 class ApiClient {
-  ApiClient({required this.storage, required Future<void> Function() onSessionExpired, String? baseUrl}) {
+  ApiClient({required this.storage, required Future<void> Function() onSessionExpired, String? baseUrl, this.onUpdateRequired}) {
+    final platform = appPlatform();
     final options = BaseOptions(
       baseUrl: baseUrl ?? Env.apiUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 20),
       contentType: 'application/json',
-      headers: {'Accept': 'application/json'},
+      // 7-A : version et plateforme de l'app, pour la version minimale exigée par l'API.
+      headers: {'Accept': 'application/json', 'X-Bim-App-Version': kAppVersion, if (platform != null) 'X-Bim-Platform': platform},
     );
     final refreshDio = Dio(options);
     dio = Dio(options)
@@ -23,6 +26,9 @@ class ApiClient {
 
   final TokenStorage storage;
   late final Dio dio;
+
+  /// Appelé quand l'API exige une version plus récente de l'app (APP_UPDATE_REQUIRED).
+  final void Function()? onUpdateRequired;
 
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) =>
       _run(() => dio.get<dynamic>(path, queryParameters: query));
@@ -79,7 +85,9 @@ class ApiClient {
       final data = res.data;
       return data is Map<String, dynamic> ? data : <String, dynamic>{};
     } on DioException catch (e) {
-      throw _map(e);
+      final err = _map(e);
+      if (err.code == 'APP_UPDATE_REQUIRED') onUpdateRequired?.call();
+      throw err;
     }
   }
 

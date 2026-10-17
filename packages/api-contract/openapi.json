@@ -1,6 +1,21 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/v1/app/config": {
+      "get": {
+        "operationId": "AppVersionController_config",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Version minimale de l’app par plateforme (null : aucune exigence)",
+        "tags": [
+          "Application"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "HealthController_check",

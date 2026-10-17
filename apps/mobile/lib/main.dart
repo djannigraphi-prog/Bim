@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/network/api_client.dart';
+import 'core/network/app_update.dart';
 import 'features/auth/application/session_controller.dart';
 import 'features/notifications/application/local_notifier.dart';
 
@@ -21,6 +22,7 @@ void runBim({List<Override> overrides = const []}) {
           (ref) => ApiClient(
             storage: ref.read(tokenStorageProvider),
             onSessionExpired: () => ref.read(sessionProvider.notifier).onExpired(),
+            onUpdateRequired: () => ref.read(updateRequiredProvider.notifier).state = true,
           ),
         ),
         // Notifications programmées sur le téléphone : Android pour l'instant (iOS pas encore compilé).

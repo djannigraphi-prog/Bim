@@ -302,6 +302,13 @@
       "when": 1792237502330,
       "tag": "0042_lot8_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792238019785,
+      "tag": "0043_app_min_version",
+      "breakpoints": true
     }
   ]
 }
