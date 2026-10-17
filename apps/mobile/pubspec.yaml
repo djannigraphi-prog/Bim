@@ -28,6 +28,8 @@ dependencies:
   flutter_local_notifications: ^22.3.0
   # Heure des rappels (en UTC, fournie par l'API).
   timezone: ^0.11.0
+  # Lot 8 : page de paiement du prestataire ouverte dans le navigateur (paiement en ligne, désactivé par défaut).
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

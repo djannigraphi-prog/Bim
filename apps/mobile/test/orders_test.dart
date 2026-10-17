@@ -2,6 +2,7 @@ import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/network/api_exception.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/core/util/url_opener.dart';
 import 'package:bim/features/merchant/data/shop_api.dart' show formatFcfa;
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
@@ -20,7 +21,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const []}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -40,6 +41,7 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       reviews: reviews,
       tracking: tracking,
       incidents: incidents,
+      onlinePayment: online,
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
@@ -107,6 +109,20 @@ class _FakeOrders extends OrdersApi {
   }
 
   @override
+  Future<({String? redirectUrl, String status})> startOnlinePayment(String orderId) async {
+    calls.add('online start');
+    current = _detail(status: 'delivered', actions: const ['declare_payment'], online: const OnlinePayment(available: true, operators: ['orange', 'mtn', 'wave'], lastStatus: 'pending'));
+    return (redirectUrl: 'https://checkout.paystack.com/abc', status: 'pending');
+  }
+
+  @override
+  Future<({String status, String? failureReason})> checkOnlinePayment(String orderId) async {
+    calls.add('online check');
+    current = _detail(status: 'delivered', actions: const [], online: const OnlinePayment(available: false, lastStatus: 'succeeded'));
+    return (status: 'succeeded', failureReason: null);
+  }
+
+  @override
   Future<void> incidentToSupport(String incidentId) async {
     calls.add('support $incidentId');
     current = _detail(
@@ -170,7 +186,7 @@ class _FakeShopOrders extends ShopOrdersApi {
   }
 }
 
-Future<void> _pump(WidgetTester tester, Widget home, {_FakeOrders? orders, _FakeShopOrders? shop}) async {
+Future<void> _pump(WidgetTester tester, Widget home, {_FakeOrders? orders, _FakeShopOrders? shop, List<Uri>? opened}) async {
   tester.view.physicalSize = const Size(1170, 3600);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -183,6 +199,10 @@ Future<void> _pump(WidgetTester tester, Widget home, {_FakeOrders? orders, _Fake
       apiClientProvider.overrideWithValue(_client()),
       ordersApiProvider.overrideWithValue(orders ?? _FakeOrders()),
       shopOrdersApiProvider.overrideWithValue(shop ?? _FakeShopOrders()),
+      urlOpenerProvider.overrideWithValue((u) async {
+        opened?.add(u);
+        return true;
+      }),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);
@@ -405,5 +425,33 @@ void main() {
     expect(api.calls, ['review delivery 5']);
     expect(find.byKey(const ValueKey('delivery-review')), findsNothing);
     expect(find.text('Ton évaluation de la livraison : ★★★★★'), findsOneWidget);
+  });
+
+  testWidgets('lot 8 : paiement en ligne proposé seulement s’il est ouvert ; page du prestataire ouverte ; vérification', (tester) async {
+    // Fermé : rien n'est affiché (aucun moyen inactif).
+    final closed = _FakeOrders()..current = _detail(status: 'delivered', actions: const ['declare_payment'], payment: const OrderPayment(method: 'mobile_money', amountFcfa: 40000, status: 'not_paid'));
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: closed);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pay-online')), findsNothing);
+    expect(find.textContaining('Moov'), findsNothing);
+
+    final opened = <Uri>[];
+    final api = _FakeOrders()
+      ..current = _detail(status: 'delivered', actions: const ['declare_payment', 'pay_online'], online: const OnlinePayment(available: true, operators: ['orange', 'mtn', 'wave']));
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api, opened: opened);
+    await tester.pumpAndSettle();
+    expect(find.text('Moyens acceptés : Orange Money, MTN Mobile Money, Wave. L’argent va directement à la boutique.'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pay-online')));
+    await tester.pumpAndSettle();
+    expect(opened.single.toString(), 'https://checkout.paystack.com/abc');
+    expect(find.text('Paiement en ligne en attente de ta validation'), findsOneWidget);
+    ScaffoldMessenger.of(tester.element(find.byKey(const ValueKey('online-check')))).clearSnackBars();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('online-check')));
+    await tester.pumpAndSettle();
+    expect(api.calls.where((c) => c.startsWith('online')), ['online start', 'online check']);
+    expect(find.byKey(const ValueKey('online-status')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const ValueKey('online-status')), matching: find.text('Paiement vérifié par le prestataire')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pay-online')), findsNothing);
   });
 }

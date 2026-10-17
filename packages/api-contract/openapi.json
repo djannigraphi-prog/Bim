@@ -7898,6 +7898,196 @@
         ]
       }
     },
+    "/v1/orders/{id}/payment/online/check": {
+      "post": {
+        "operationId": "OnlinePaymentsController_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vérifier auprès du prestataire le dernier paiement en ligne (après validation sur le téléphone)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
+    "/admin/v1/online-payments": {
+      "get": {
+        "operationId": "OnlinePaymentsAdminController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "succeeded",
+                "failed",
+                "expired"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/online-payments/accounts": {
+      "get": {
+        "operationId": "OnlinePaymentsAdminController_accounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      },
+      "post": {
+        "operationId": "OnlinePaymentsAdminController_setAccount",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopPaymentAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/online-payments/accounts/{id}/disable": {
+      "post": {
+        "operationId": "OnlinePaymentsAdminController_disable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/online-payments/{id}/refund": {
+      "post": {
+        "operationId": "OnlinePaymentsAdminController_refund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/v1/courier-application": {
       "get": {
         "operationId": "CourierApplicationController_mine",
@@ -10758,6 +10948,45 @@
               "false_info",
               "other"
             ]
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "ShopPaymentAccountDto": {
+        "type": "object",
+        "properties": {
+          "shopSlug": {
+            "type": "string",
+            "example": "boutique-elegance"
+          },
+          "accountRef": {
+            "type": "string",
+            "example": "ACCT_xxxxxxxx",
+            "description": "Référence du compte de la boutique chez le prestataire (sous-compte)"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "shopSlug",
+          "accountRef"
+        ]
+      },
+      "RefundDto": {
+        "type": "object",
+        "properties": {
+          "amountFcfa": {
+            "type": "number",
+            "description": "Montant en F ; par défaut, le reste à rembourser"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
           }
         },
         "required": [

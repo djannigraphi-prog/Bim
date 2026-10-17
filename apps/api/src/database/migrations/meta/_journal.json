@@ -281,6 +281,13 @@
       "when": 1792226263363,
       "tag": "0039_online_payments_socle",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792231258996,
+      "tag": "0040_paystack",
+      "breakpoints": true
     }
   ]
 }

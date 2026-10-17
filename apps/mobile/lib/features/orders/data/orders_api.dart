@@ -294,6 +294,36 @@ class CourierCandidate {
 
 String courierCategoryLabel(String c) => const {'employee': 'Employé de la boutique', 'partner': 'Partenaire', 'independent': 'Indépendant'}[c] ?? c;
 
+/// Lot 8 — Paiement en ligne de l'article (prestataire) : proposé seulement s'il est réellement ouvert pour la commande.
+class OnlinePayment {
+  const OnlinePayment({required this.available, this.operators = const [], this.lastStatus, this.lastFailure});
+  final bool available;
+  /// Opérateurs que le prestataire prend réellement en charge (jamais un moyen inactif).
+  final List<String> operators;
+  /// pending · succeeded · failed · expired
+  final String? lastStatus;
+  final String? lastFailure;
+  factory OnlinePayment.fromJson(Map<String, dynamic> j) {
+    final last = j['last'] as Map<String, dynamic>?;
+    return OnlinePayment(
+      available: (j['available'] ?? false) as bool,
+      operators: ((j['operators'] ?? const <dynamic>[]) as List<dynamic>).cast<String>(),
+      lastStatus: last?['status'] as String?,
+      lastFailure: last?['failureReason'] as String?,
+    );
+  }
+}
+
+String operatorsLabel(List<String> ops) => ops.map((o) => const {'orange': 'Orange Money', 'mtn': 'MTN Mobile Money', 'wave': 'Wave', 'moov': 'Moov Money'}[o] ?? o).join(', ');
+
+String onlineStatusLabel(String s) => const {
+      'pending': 'Paiement en ligne en attente de ta validation',
+      'succeeded': 'Paiement vérifié par le prestataire',
+      'failed': 'Paiement en ligne échoué',
+      'expired': 'Paiement en ligne expiré',
+    }[s] ??
+    s;
+
 class OrderDetail {
   const OrderDetail({
     required this.id,
@@ -325,6 +355,7 @@ class OrderDetail {
     this.reviews,
     this.tracking,
     this.incidents = const [],
+    this.onlinePayment,
   });
 
   final String id;
@@ -355,6 +386,7 @@ class OrderDetail {
   final OrderReviews? reviews;
   final DeliveryTracking? tracking;
   final List<IncidentSummary> incidents;
+  final OnlinePayment? onlinePayment;
   final List<OrderEvent> events;
   /// Actions possibles maintenant, calculées par le serveur.
   final List<String> actions;
@@ -393,6 +425,7 @@ class OrderDetail {
       reviews: j['reviews'] == null ? null : OrderReviews.fromJson(j['reviews'] as Map<String, dynamic>),
       tracking: j['tracking'] == null ? null : DeliveryTracking.fromJson(j['tracking'] as Map<String, dynamic>),
       incidents: [for (final i in (j['incidents'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) IncidentSummary.fromJson(i)],
+      onlinePayment: j['onlinePayment'] == null ? null : OnlinePayment.fromJson(j['onlinePayment'] as Map<String, dynamic>),
       events: [for (final e in (j['events'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) OrderEvent.fromJson(e)],
       actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
     );
@@ -541,6 +574,18 @@ class OrdersApi {
       _api.post('/v1/orders/$orderId/incidents', body: {'reason': reason, if (description != null && description.isNotEmpty) 'description': description});
 
   Future<void> incidentToSupport(String incidentId) => _api.post('/v1/incidents/$incidentId/support');
+
+  /// Lot 8 : lancer le paiement en ligne ; renvoie la page du prestataire à ouvrir.
+  Future<({String? redirectUrl, String status})> startOnlinePayment(String orderId) async {
+    final r = await _api.post('/v1/orders/$orderId/payment/online');
+    return (redirectUrl: r['redirectUrl'] as String?, status: r['status'] as String);
+  }
+
+  /// Lot 8 : vérification auprès du prestataire après la validation sur le téléphone.
+  Future<({String status, String? failureReason})> checkOnlinePayment(String orderId) async {
+    final r = await _api.post('/v1/orders/$orderId/payment/online/check');
+    return (status: r['status'] as String, failureReason: r['failureReason'] as String?);
+  }
 
   Future<OrderDetail> cancel(String id, {String? reason}) async => OrderDetail.fromJson(await _api.post('/v1/orders/$id/cancel', body: {if (reason != null) 'reason': reason}));
 }

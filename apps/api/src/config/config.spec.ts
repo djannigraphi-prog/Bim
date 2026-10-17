@@ -50,4 +50,16 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...prod, WORKER_MODE: 'standalone', PUSH_PROVIDER: 'fcm', FCM_SERVICE_ACCOUNT_JSON: JSON.stringify({ project_id: 'p', client_email: 'x@p.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' }) }).WORKER_MODE).toBe('standalone');
     expect(() => loadConfig({ ...base, KYC_ENCRYPTION_KEY: base.ADMIN_TOTP_ENCRYPTION_KEY })).toThrow(/KYC_ENCRYPTION_KEY/);
   });
+
+  it('lot 8 : prestataire désactivé par défaut ; simulateur interdit en production ; Paystack en clé de test seulement', () => {
+    expect(loadConfig({ ...base }).PAYMENT_PROVIDER).toBe('none');
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', PAYMENT_PROVIDER: 'simulator', PAYMENT_SIMULATOR_SECRET: 's'.repeat(20) })).toThrow(/PAYMENT_PROVIDER/);
+    expect(() => loadConfig({ ...base, PAYMENT_PROVIDER: 'simulator' })).toThrow(/PAYMENT_SIMULATOR_SECRET/);
+    const paystack = { ...base, PAYMENT_PROVIDER: 'paystack', PAYMENT_CUSTOMER_EMAIL_DOMAIN: 'clients.bim.ci' };
+    expect(() => loadConfig({ ...paystack })).toThrow(/PAYSTACK_SECRET_KEY/);
+    expect(() => loadConfig({ ...paystack, PAYSTACK_SECRET_KEY: `sk_live_${'a'.repeat(32)}` })).toThrow(/PAYSTACK_SECRET_KEY/);
+    expect(loadConfig({ ...paystack, PAYSTACK_SECRET_KEY: `sk_test_${'a'.repeat(32)}` }).PAYMENT_PROVIDER).toBe('paystack');
+    expect(() => loadConfig({ ...paystack, PAYSTACK_SECRET_KEY: `sk_test_${'a'.repeat(32)}`, PAYMENT_CUSTOMER_EMAIL_DOMAIN: '' })).toThrow(/PAYMENT_CUSTOMER_EMAIL_DOMAIN/);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', PAYSTACK_API_BASE_URL: 'http://faux' })).toThrow(/PAYSTACK_API_BASE_URL/);
+  });
 });

@@ -83,9 +83,13 @@ export const paymentIntents = pgTable(
       .references(() => shops.id),
     provider: varchar('provider', { length: 20 }).notNull(),
     providerRef: varchar('provider_ref', { length: 100 }).notNull(),
+    /** Compte de la boutique chez le prestataire (sous-compte) : le paiement vérifié doit lui être attribué (F4). */
+    payeeAccountRef: varchar('payee_account_ref', { length: 60 }),
     amountFcfa: integer('amount_fcfa').notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('XOF'),
     status: varchar('status', { length: 10 }).notNull().default('pending'),
+    /** Motif technique d'un échec (montant, devise, bénéficiaire, refus du prestataire, expiration) ; jamais de donnée personnelle. */
+    failureReason: varchar('failure_reason', { length: 40 }),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
@@ -115,4 +119,57 @@ export const paymentProviderEvents = pgTable(
     receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('payment_provider_events_key_uq').on(t.provider, t.eventKey)],
+);
+
+/**
+ * Lot 8 — Compte d'une boutique chez un prestataire (sous-compte Paystack, par exemple). F4 : sans compte actif de la
+ * boutique, aucun paiement en ligne n'est lancé (l'argent n'irait jamais sur un compte de BIM). Saisi par l'équipe BIM
+ * après vérification auprès du prestataire ; seule la référence est gardée, jamais les coordonnées bancaires.
+ */
+export const shopPaymentAccounts = pgTable(
+  'shop_payment_accounts',
+  {
+    id: uuid('id').primaryKey(),
+    shopId: uuid('shop_id')
+      .notNull()
+      .references(() => shops.id),
+    provider: varchar('provider', { length: 20 }).notNull(),
+    accountRef: varchar('account_ref', { length: 60 }).notNull(),
+    status: varchar('status', { length: 10 }).notNull().default('active'),
+    note: varchar('note', { length: 300 }),
+    createdByAdmin: uuid('created_by_admin').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('shop_payment_accounts_active_uq').on(t.shopId, t.provider).where(sql`${t.status} = 'active'`),
+    check('shop_payment_accounts_status_ck', sql`${t.status} IN ('active', 'disabled')`),
+  ],
+);
+
+/**
+ * Lot 8 — Remboursement d'un paiement en ligne, demandé par l'équipe BIM (jamais automatique, A8), journalisé.
+ * Statuts : pending → processing → processed · failed.
+ */
+export const paymentRefunds = pgTable(
+  'payment_refunds',
+  {
+    id: uuid('id').primaryKey(),
+    intentId: uuid('intent_id')
+      .notNull()
+      .references(() => paymentIntents.id),
+    amountFcfa: integer('amount_fcfa').notNull(),
+    reason: varchar('reason', { length: 300 }).notNull(),
+    status: varchar('status', { length: 12 }).notNull().default('pending'),
+    providerRefundRef: varchar('provider_refund_ref', { length: 60 }),
+    requestedByAdmin: uuid('requested_by_admin').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    settledAt: timestamp('settled_at', { withTimezone: true }),
+  },
+  (t) => [
+    // Un seul remboursement en cours par paiement ; total remboursé contrôlé par le serveur.
+    uniqueIndex('payment_refunds_open_uq').on(t.intentId).where(sql`${t.status} IN ('pending', 'processing')`),
+    check('payment_refunds_status_ck', sql`${t.status} IN ('pending', 'processing', 'processed', 'failed')`),
+    check('payment_refunds_amount_ck', sql`${t.amountFcfa} > 0`),
+  ],
 );

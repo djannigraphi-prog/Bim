@@ -166,6 +166,16 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L8-01 — Intégration Paystack (17/10/2026, 09 h 56) · Fondateur (« développe directement », sans dépense) · **réalisée dans le code, désactivée** ; décisions en attente
+
+- Paystack intégré conformément à sa documentation officielle, testé contre un faux serveur ; aucune clé de production
+  (refusée par la configuration), aucun compte ouvert, aucun paiement réel.
+- **Choix techniques pris** (réversibles) : canal `mobile_money` seulement ; page de paiement Paystack ouverte dans le
+  navigateur ; adresse e-mail transmise = e-mail vérifié du client, sinon une adresse technique sans donnée personnelle ;
+  expiration après 30 minutes (provisoire) ; remboursement réservé à `payments.refund` (rôle principal, finance).
+- **En attente du fondateur** : (1) F4 en Côte d'Ivoire avec Paystack (sous-comptes non confirmés) ; (2) répartition des
+  frais (`payments.fee_bearer` : boutique ou BIM) ; (3) compte Paystack de test et autorisation de dépense.
+
 ### L8-00 — Paiements en ligne : étude et socle multi-prestataires désactivé (17/10/2026, 08 h 06) · Fondateur · **étude remise** ; socle **réalisé**, intégration réelle **non autorisée**
 
 - Étude demandée : Paystack (premier candidat) et CinetPay (alternative) — Mobile Money (Orange, Wave, MTN, Moov),

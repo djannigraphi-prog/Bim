@@ -24,6 +24,10 @@ export const ADMIN_PERMISSIONS = {
   'delivery_tariffs.write': ['super_admin'],
   /** 7-C : file « à vérifier » des paiements (lecture et note de vérification, journalisées). */
   'payments.review': ['super_admin', 'support', 'finance'],
+  /** Lot 8 : paiements en ligne (lecture journalisée) et comptes des boutiques chez le prestataire (proposé). */
+  'payments.online': ['super_admin', 'finance'],
+  /** Lot 8 : remboursement d'un paiement en ligne, jamais automatique (A8), motif obligatoire (proposé). */
+  'payments.refund': ['super_admin', 'finance'],
   /** 7-E : vérification des livreurs (pièces d'identité, lecture journalisée). */
   'couriers.review': ['super_admin', 'support'],
   /** 7-G : incidents transmis au support (lecture journalisée, décision notée). */

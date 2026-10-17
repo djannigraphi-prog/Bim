@@ -26,6 +26,7 @@ import { SettingsService } from '../settings/settings.service';
 import { TariffsService } from '../tariffs/tariffs.service';
 import { waitFee } from '../tariffs/pricing';
 import { IncidentsService } from './incidents.service';
+import { OnlinePaymentsService } from './online/online-payments.service';
 import { OrdersService } from './orders.service';
 
 type Delivery = typeof deliveries.$inferSelect;
@@ -70,6 +71,7 @@ export class DeliveriesService {
     private readonly tariffs: TariffsService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly online: OnlinePaymentsService,
   ) {}
 
   private async intSetting(key: string, fallback: number) {
@@ -589,7 +591,10 @@ export class DeliveriesService {
     const tracking = await this.view(o, party);
     // Une livraison ne s'évalue qu'une fois : l'action disparaît dès qu'une évaluation existe.
     const extra = DeliveriesService.partyActions(o, d, party).filter((x) => x !== 'review_delivery' || !tracking?.review);
-    return { ...v, tracking, incidents: await this.incidents.summaryForOrder(orderId), actions: [...v.actions, ...extra] };
+    // Lot 8 : paiement en ligne (client seulement), proposé uniquement s'il est réellement ouvert pour cette commande.
+    const online = party === 'customer' ? await this.online.customerView(o) : null;
+    if (online?.available) extra.push('pay_online');
+    return { ...v, tracking, incidents: await this.incidents.summaryForOrder(orderId), ...(party === 'customer' ? { onlinePayment: online } : {}), actions: [...v.actions, ...extra] };
   }
 
   /** Évaluation de la livraison par le client, après la clôture ; une seule ; distincte de l'article et de la boutique. */

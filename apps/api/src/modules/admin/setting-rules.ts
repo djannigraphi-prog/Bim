@@ -53,6 +53,8 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^notifications\.reminder_grace_minutes$/, intIn(5, 180)],
   [/^maintenance\.account_purge_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
   [/^payments\.online_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
+  [/^payments\.fee_bearer$/, (v) => (v === null || v === 'shop' || v === 'bim' ? null : '« shop », « bim » ou null (non décidé).')],
+  [/^payments\.intent_expiry_minutes$/, intIn(5, 1440)],
   [/^maintenance\.account_purge_mode$/, (v) => (v === 'simulation' || v === 'real' ? null : '« simulation » ou « real ».')],
   [/^maintenance\.account_purge_after_days$/, intIn(30, 3650)],
   [/^peni\.llm_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],

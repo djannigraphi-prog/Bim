@@ -262,6 +262,14 @@ test('incidents (7-G) : page accessible au support, aucune sanction automatique 
   await expect(page.getByText('Aucun incident.')).toBeVisible();
 });
 
+test('paiements en ligne (lot 8) : page accessible, aucun prestataire annoncé, aucun paiement', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Paiements en ligne' }).click();
+  await expect(page.getByRole('heading', { name: 'Paiements en ligne' })).toBeVisible();
+  await expect(page.getByText('aucun (paiement en ligne fermé)')).toBeVisible();
+  await expect(page.getByText('Aucun paiement en ligne.')).toBeVisible();
+});
+
 test('livreurs (7-E) : page de vérification accessible, aucune demande au départ', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Livreurs' }).click();

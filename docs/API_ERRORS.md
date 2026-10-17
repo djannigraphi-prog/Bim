@@ -48,6 +48,10 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INCIDENT_STATE_CHANGED` | 409 | 7-G : incident déjà transmis au support ou résolu |
 | `INCIDENT_RESOLVED` | 409 | 7-G : incident résolu, plus de précision possible |
 | `REQUEST_PENDING` | 409 | 6-C : réaction à une demande non acceptée (l'accepter d'abord) |
+| `SHOP_PAYMENT_ACCOUNT_MISSING` | 409 | Lot 8 : la boutique n'a pas de compte actif chez le prestataire (F4 : aucun paiement en ligne) |
+| `PAYMENT_PROVIDER_UNAVAILABLE` | 503 | Lot 8 : le prestataire ne répond pas ou refuse ; réessayer plus tard |
+| `REFUND_NOT_ALLOWED` | 409 | Lot 8 : remboursement impossible (paiement non vérifié, refus du prestataire) |
+| `REFUND_AMOUNT_INVALID` | 400 | Lot 8 : montant à rembourser invalide ; `details.maxFcfa` |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Lot 8 : notification d'un prestataire de paiement à la signature invalide (rien n'est écrit) |
 | `NOT_A_BIM` | 409 | 5-E : les produits et services utilisés s'ajoutent seulement à un « J'ai fait mon BIM » |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |

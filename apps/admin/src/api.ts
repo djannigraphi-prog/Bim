@@ -99,6 +99,8 @@ export type Permission =
   | 'delivery_tariffs.write'
   | 'payments.review'
   | 'incidents.review'
+  | 'payments.online'
+  | 'payments.refund'
   | 'couriers.review';
 
 export interface AdminProfile {

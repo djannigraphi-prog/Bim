@@ -108,9 +108,20 @@ const schema = z
      * tests seulement). Aucun prestataire réel (Paystack, CinetPay…) ne sera ajouté sans l'autorisation explicite du
      * fondateur, après examen de l'étude ; aucune clé de production dans le dépôt.
      */
-    PAYMENT_PROVIDER: z.enum(['none', 'simulator']).default('none'),
+    PAYMENT_PROVIDER: z.enum(['none', 'simulator', 'paystack']).default('none'),
     /** Secret de signature des notifications du simulateur (valeur de test, jamais une clé de prestataire). */
     PAYMENT_SIMULATOR_SECRET: z.string().default(''),
+    /**
+     * Lot 8 — Clé secrète Paystack : **clé de test seulement** (`sk_test_…`) ; une clé de production est refusée tant que
+     * le fondateur n'a pas autorisé les paiements réels. Secret : injecté depuis le coffre, jamais dans le dépôt.
+     */
+    PAYSTACK_SECRET_KEY: z.string().default(''),
+    /** Adresse de l'API Paystack remplacée par un faux serveur : développement et tests seulement. */
+    PAYSTACK_API_BASE_URL: z.string().default(''),
+    /** Page de retour après le paiement (facultative). */
+    PAYMENT_CALLBACK_URL: z.string().default(''),
+    /** Domaine des adresses techniques transmises au prestataire quand le client n'a pas d'e-mail vérifié. */
+    PAYMENT_CUSTOMER_EMAIL_DOMAIN: z.string().default(''),
     /**
      * Compte de service Firebase (JSON complet), obligatoire avec PUSH_PROVIDER=fcm. Secret : injecté depuis AWS
      * (Parameter Store chiffré ou Secrets Manager), jamais écrit dans le dépôt ni dans les journaux.
@@ -147,6 +158,17 @@ const schema = z
     }
     if (!devLike && cfg.PAYMENT_PROVIDER === 'simulator') {
       ctx.addIssue({ code: 'custom', path: ['PAYMENT_PROVIDER'], message: 'Le simulateur de paiement est interdit hors développement' });
+    }
+    if (cfg.PAYMENT_PROVIDER === 'paystack') {
+      if (!/^sk_test_[A-Za-z0-9]{16,}$/.test(cfg.PAYSTACK_SECRET_KEY)) {
+        ctx.addIssue({ code: 'custom', path: ['PAYSTACK_SECRET_KEY'], message: 'Clé Paystack de test (sk_test_…) obligatoire ; les clés de production sont refusées (paiements réels non autorisés)' });
+      }
+      if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(cfg.PAYMENT_CUSTOMER_EMAIL_DOMAIN)) {
+        ctx.addIssue({ code: 'custom', path: ['PAYMENT_CUSTOMER_EMAIL_DOMAIN'], message: 'Domaine des adresses techniques obligatoire avec Paystack' });
+      }
+    }
+    if (!devLike && cfg.PAYSTACK_API_BASE_URL) {
+      ctx.addIssue({ code: 'custom', path: ['PAYSTACK_API_BASE_URL'], message: "L'adresse Paystack de remplacement est interdite hors développement" });
     }
     if (cfg.PAYMENT_PROVIDER === 'simulator' && cfg.PAYMENT_SIMULATOR_SECRET.length < 16) {
       ctx.addIssue({ code: 'custom', path: ['PAYMENT_SIMULATOR_SECRET'], message: 'PAYMENT_SIMULATOR_SECRET (16 caractères au moins) est obligatoire avec le simulateur' });

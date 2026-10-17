@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/util/date_fr.dart';
+import '../../../core/util/url_opener.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
@@ -458,6 +459,38 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     }
   }
 
+  /// Lot 8 : paiement en ligne — la page du prestataire s'ouvre ; le client revient et demande la vérification.
+  Future<void> _payOnline(OrderDetail o) async {
+    setState(() => _busy = true);
+    try {
+      final r = await ref.read(ordersApiProvider).startOnlinePayment(o.id);
+      final url = r.redirectUrl == null ? null : Uri.tryParse(r.redirectUrl!);
+      if (url != null && url.scheme == 'https') await ref.read(urlOpenerProvider)(url);
+      if (mounted) showBimSnack(context, 'Valide le paiement, puis reviens ici et touche « Vérifier mon paiement ».');
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      ref.invalidate(_orderProvider(o.id));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _checkOnline(OrderDetail o) async {
+    setState(() => _busy = true);
+    try {
+      final r = await ref.read(ordersApiProvider).checkOnlinePayment(o.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        showBimSnack(context, onlineStatusLabel(r.status));
+      }
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      ref.invalidate(_orderProvider(o.id));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _refuse(OrderDetail o) async {
     final r = await showDialog<({String reason, String details})>(context: context, builder: (_) => const _RefuseDialog());
     if (r != null && mounted) await _call(o, (api) => api.refuseDelivery(o.id, r.reason, details: r.details), done: 'Remise refusée');
@@ -572,6 +605,18 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                   ),
                   const SizedBox(height: BimSpacing.sm),
                   BimButton(key: const ValueKey('declare-payment'), label: 'J’ai payé', loading: _busy, onPressed: _busy ? null : () => _declare(o)),
+                  const SizedBox(height: BimSpacing.sm),
+                ],
+                // Lot 8 : paiement en ligne, seulement s'il est réellement ouvert (opérateurs du prestataire).
+                if (o.onlinePayment != null) ...[
+                  if (o.onlinePayment!.lastStatus != null)
+                    Text(onlineStatusLabel(o.onlinePayment!.lastStatus!), key: const ValueKey('online-status'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (o.can('pay_online')) ...[
+                    BimButton(key: const ValueKey('pay-online'), label: 'Payer en ligne', loading: _busy, onPressed: _busy ? null : () => _payOnline(o)),
+                    Text('Moyens acceptés : ${operatorsLabel(o.onlinePayment!.operators)}. L’argent va directement à la boutique.', key: const ValueKey('online-operators'), style: theme.textTheme.bodySmall),
+                  ],
+                  if (o.onlinePayment!.lastStatus == 'pending')
+                    TextButton(key: const ValueKey('online-check'), onPressed: _busy ? null : () => _checkOnline(o), child: const Text('Vérifier mon paiement')),
                   const SizedBox(height: BimSpacing.sm),
                 ],
                 if (o.can('accept')) BimButton(key: const ValueKey('order-accept'), label: 'Accepter la proposition', onPressed: _busy ? null : () => _accept(o)),
