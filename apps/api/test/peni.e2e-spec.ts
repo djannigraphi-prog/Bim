@@ -35,6 +35,34 @@ describe('Peni (e2e)', () => {
     await h.http().post('/v1/peni/conversations').set(u.auth).send({ purpose: 'autre' }).expect(400);
   });
 
+  it('reprise d’une discussion interrompue : même objet et mêmes choix, déjà commencée, ouverte, récente ; jamais celle d’une autre personne', async () => {
+    const u = await user();
+    const resumable = async (q: Record<string, string>) => (await h.http().get('/v1/peni/conversations/resumable').query(q).set(u.auth).expect(200)).body.conversation;
+    expect(await resumable({ purpose: 'new_project' })).toBeNull();
+    const c = (await h.http().post('/v1/peni/conversations').set(u.auth).send({ purpose: 'new_project', mode: 'eco' }).expect(201)).body;
+    // Pas encore de réponse de la personne : rien à reprendre.
+    expect(await resumable({ purpose: 'new_project', mode: 'eco' })).toBeNull();
+    await say(u.auth, c.id, { choice: 'cat:sport' });
+    const r = await resumable({ purpose: 'new_project', mode: 'eco' });
+    expect(r).toEqual((await h.http().get(`/v1/peni/conversations/${c.id}`).set(u.auth)).body);
+    expect(r.messages.map((m: { role: string }) => m.role)).toEqual(['peni', 'user', 'peni']);
+    // Autres choix de départ ou autre objet : nouvelle discussion.
+    expect(await resumable({ purpose: 'new_project' })).toBeNull();
+    expect(await resumable({ purpose: 'new_project', mode: 'premium', budget: 'small' })).toBeNull();
+    expect(await resumable({ purpose: 'choose_goal', mode: 'eco' })).toBeNull();
+    await h.http().get('/v1/peni/conversations/resumable').query({ purpose: 'autre' }).set(u.auth).expect(400);
+    // Autre personne : rien.
+    const v = await user();
+    expect((await h.http().get('/v1/peni/conversations/resumable').query({ purpose: 'new_project', mode: 'eco' }).set(v.auth).expect(200)).body.conversation).toBeNull();
+    // Trop ancienne (plus de 7 jours) : rien.
+    await h.pool.query("update peni_conversations set updated_at = now() - interval '8 days' where id = $1", [c.id]);
+    expect(await resumable({ purpose: 'new_project', mode: 'eco' })).toBeNull();
+    await h.pool.query('update peni_conversations set updated_at = now() where id = $1', [c.id]);
+    // Terminée (brouillon prêt) : rien.
+    await h.pool.query("update peni_conversations set status = 'completed' where id = $1", [c.id]);
+    expect(await resumable({ purpose: 'new_project', mode: 'eco' })).toBeNull();
+  });
+
   it('conversation de la maquette 25 → brouillon accepté tel quel par POST /v1/projects (mêmes contrôles, R5)', async () => {
     const u = await user();
     const c = (await h.http().post('/v1/peni/conversations').set(u.auth).send({ purpose: 'new_project' }).expect(201)).body;

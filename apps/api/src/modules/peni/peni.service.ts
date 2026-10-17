@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, asc, count, eq, gt, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, sql } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
 import { uuidv7 } from '../../common/uuid';
@@ -29,6 +29,9 @@ type MessageRow = typeof peniMessages.$inferSelect;
  * (moteur `guided-v1`), sans modèle de langage : rien ne quitte la base de BIM. Peni propose un brouillon ; la personne
  * le vérifie et le confirme dans l'app, qui le crée avec `POST /v1/projects` (mêmes contrôles, règle R5).
  */
+/** Délai pendant lequel une discussion interrompue est proposée à la reprise (provisoire, sans effet sur la conservation). */
+export const PENI_RESUME_DAYS = 7;
+
 @Injectable()
 export class PeniService {
   private readonly logger = new Logger('Peni');
@@ -92,6 +95,37 @@ export class PeniService {
       await tx.insert(peniMessages).values(r.replies.map((reply, i) => this.peniRow(id, userId, i + 1, reply, now)));
     });
     return this.get(userId, id);
+  }
+
+  /**
+   * Discussion interrompue à reprendre : la plus récente encore ouverte, de même objet et commencée avec les mêmes
+   * choix (mode, budget, catégorie), où la personne a déjà répondu au moins une fois, touchée depuis moins de
+   * PENI_RESUME_DAYS jours et produite par la version actuelle du moteur. Sinon null (nouvelle discussion).
+   */
+  async resumable(userId: string, dto: StartPeniConversationDto) {
+    const since = new Date(this.clock.now().getTime() - PENI_RESUME_DAYS * 86_400_000);
+    const rows = await this.db
+      .select({ id: peniConversations.id, state: peniConversations.state })
+      .from(peniConversations)
+      .where(
+        and(
+          eq(peniConversations.userId, userId),
+          eq(peniConversations.purpose, dto.purpose),
+          eq(peniConversations.status, 'open'),
+          gt(peniConversations.updatedAt, since),
+          sql`exists (select 1 from ${peniMessages} m where m.conversation_id = ${peniConversations.id} and m.role = 'user')`,
+        ),
+      )
+      .orderBy(desc(peniConversations.updatedAt))
+      .limit(5);
+    const key = (k: { mode?: string; budget?: string; categoryCode?: string } | undefined) =>
+      JSON.stringify([k?.mode ?? null, k?.mode === 'premium' ? (k?.budget ?? null) : null, k?.categoryCode ?? null]);
+    const want = key(dto);
+    const hit = rows.find((r) => {
+      const st = r.state as PeniState;
+      return st.version === PENI_ENGINE_VERSION && key(st.known) === want;
+    });
+    return { conversation: hit ? await this.get(userId, hit.id) : null };
   }
 
   async get(userId: string, id: string) {

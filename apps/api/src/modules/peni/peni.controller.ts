@@ -18,6 +18,12 @@ export class PeniController {
     return this.peni.start(a.userId, dto);
   }
 
+  @Get('conversations/resumable')
+  @ApiOperation({ summary: 'Discussion interrompue à reprendre (même objet et mêmes choix de départ), ou null' })
+  resumable(@CurrentAuth() a: AuthContext, @Query() q: StartPeniConversationDto) {
+    return this.peni.resumable(a.userId, q);
+  }
+
   @Get('conversations/:id')
   @ApiOperation({ summary: 'Relire une discussion avec Peni' })
   get(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {

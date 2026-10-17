@@ -43,6 +43,14 @@ class _FakePeni extends PeniApi {
   int startFailures = 0;
 
   String purpose = 'new_project';
+  PeniTurn? previous;
+  final resumeQueries = <String>[];
+
+  @override
+  Future<PeniTurn?> resumable({String purpose = 'new_project', String? mode, String? budget, String? categoryCode}) async {
+    resumeQueries.add('$purpose ${mode ?? '-'} ${categoryCode ?? '-'}');
+    return previous;
+  }
 
   @override
   Future<PeniTurn> start({String purpose = 'new_project', String? mode, String? budget, String? categoryCode}) async {
@@ -203,6 +211,33 @@ void main() {
     expect(results, hasLength(1));
     expect(results.single!.toJson(), _draft.toJson());
     expect(find.text('Ouvrir Peni'), findsOneWidget);
+  });
+
+  testWidgets('discussion interrompue : reprise proposée, « Reprendre » sans nouvelle discussion ; « Recommencer » en ouvre une', (tester) async {
+    final turn = PeniTurn(conversationId: 'old', messages: [
+      _peni('o1', 'Coucou Awa ! 🥰 Raconte-moi : qu’est-ce que tu aimerais changer ?'),
+      _user('o2', 'Sport'),
+      _peni('o3', 'Super ! En sport, qu’est-ce que tu vises ?', replies: [('goal:sport_abdos', 'Abdos')]),
+    ], draft: null,);
+    final peni = _FakePeni()..previous = turn;
+    await _pump(tester, initial: '/peni/new-project', peni: peni);
+    await tester.pumpAndSettle();
+    expect(peni.resumeQueries, ['new_project - -']);
+    expect(find.byKey(const ValueKey('peni-resume-offer')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('peni-resume')));
+    await tester.pumpAndSettle();
+    expect(find.text('Super ! En sport, qu’est-ce que tu vises ?'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('qr-goal:sport_abdos')));
+    await tester.pumpAndSettle();
+    expect(peni.calls, ['choice goal:sport_abdos']);
+
+    final again = _FakePeni()..previous = turn;
+    await _pump(tester, initial: '/peni/new-project', peni: again);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('peni-restart')));
+    await tester.pumpAndSettle();
+    expect(again.calls, ['start - -']);
+    expect(find.byKey(const ValueKey('peni-resume-offer')), findsNothing);
   });
 
   testWidgets('erreur au démarrage : message et « Réessayer »', (tester) async {

@@ -130,6 +130,19 @@ class PeniApi {
     return PeniTurn(conversationId: j['id'] as String, messages: PeniTurn._messages(j), draft: PeniTurn._draft(j));
   }
 
+  /// Discussion interrompue à reprendre (même objet, mêmes choix de départ, déjà commencée, récente), ou null.
+  Future<PeniTurn?> resumable({String purpose = 'new_project', String? mode, String? budget, String? categoryCode}) async {
+    final r = await _api.get('/v1/peni/conversations/resumable', query: {
+      'purpose': purpose,
+      if (mode != null) 'mode': mode,
+      if (mode == 'premium' && budget != null) 'budget': budget,
+      if (categoryCode != null) 'categoryCode': categoryCode,
+    },);
+    final j = r['conversation'];
+    if (j is! Map<String, dynamic>) return null;
+    return PeniTurn(conversationId: j['id'] as String, messages: PeniTurn._messages(j), draft: PeniTurn._draft(j));
+  }
+
   Future<PeniTaskExplanation> explainTask(String projectId, String taskId) async =>
       PeniTaskExplanation.fromJson(await _api.get('/v1/peni/projects/$projectId/tasks/$taskId/explanation'));
 

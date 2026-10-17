@@ -3648,6 +3648,76 @@
         ]
       }
     },
+    "/v1/peni/conversations/resumable": {
+      "get": {
+        "operationId": "PeniController_resumable",
+        "parameters": [
+          {
+            "name": "purpose",
+            "required": true,
+            "in": "query",
+            "description": "new_project : construire tout le projet (écrans 19, 20, 25) ; choose_goal : seulement l’objectif (« Pas sûr ? », écran 21)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_project",
+                "choose_goal"
+              ]
+            }
+          },
+          {
+            "name": "categoryCode",
+            "required": false,
+            "in": "query",
+            "description": "Catégorie déjà choisie à l’écran 20 (choose_goal)",
+            "schema": {
+              "example": "sport",
+              "type": "string"
+            }
+          },
+          {
+            "name": "mode",
+            "required": false,
+            "in": "query",
+            "description": "Mode déjà choisi à l’écran 19 (Peni ne le redemande pas)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "eco",
+                "premium"
+              ]
+            }
+          },
+          {
+            "name": "budget",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "small",
+                "medium",
+                "boosted"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discussion interrompue à reprendre (même objet et mêmes choix de départ), ou null",
+        "tags": [
+          "Peni"
+        ]
+      }
+    },
     "/v1/peni/conversations/{id}": {
       "get": {
         "operationId": "PeniController_get",

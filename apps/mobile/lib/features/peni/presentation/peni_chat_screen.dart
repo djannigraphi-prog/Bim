@@ -42,11 +42,49 @@ class _PeniChatScreenState extends ConsumerState<PeniChatScreen> {
   bool _busy = true;
   Object? _startError;
 
+  /// Discussion interrompue proposée à la reprise (avant toute nouvelle discussion).
+  PeniTurn? _resumeOffer;
+
   PeniApi get _api => ref.read(peniApiProvider);
 
   @override
   void initState() {
     super.initState();
+    _open();
+  }
+
+  /// À l'ouverture : propose de reprendre une discussion interrompue ; sinon (ou si la vérification échoue) en commence une.
+  Future<void> _open() async {
+    PeniTurn? previous;
+    try {
+      previous = await _api.resumable(purpose: widget.purpose, mode: widget.mode, budget: widget.budget, categoryCode: widget.categoryCode);
+    } catch (_) {
+      previous = null;
+    }
+    if (!mounted) return;
+    if (previous == null) return _start();
+    setState(() {
+      _resumeOffer = previous;
+      _busy = false;
+    });
+  }
+
+  void _resume() {
+    final t = _resumeOffer;
+    if (t == null) return;
+    setState(() {
+      _resumeOffer = null;
+      _conversationId = t.conversationId;
+      _messages
+        ..clear()
+        ..addAll(t.messages);
+      _draft = t.draft;
+    });
+    _scrollToEnd();
+  }
+
+  void _restart() {
+    setState(() => _resumeOffer = null);
     _start();
   }
 
@@ -158,6 +196,18 @@ class _PeniChatScreenState extends ConsumerState<PeniChatScreen> {
   }
 
   Widget _body(BuildContext context) {
+    if (_resumeOffer != null) {
+      return ListView(
+        padding: const EdgeInsets.all(BimSpacing.screen),
+        children: [
+          const Text('On s’était arrêtées en chemin 🙂 Tu veux reprendre notre discussion ou recommencer ?', key: ValueKey('peni-resume-offer')),
+          const SizedBox(height: BimSpacing.md),
+          BimButton(key: const ValueKey('peni-resume'), label: 'Reprendre', onPressed: _resume),
+          const SizedBox(height: BimSpacing.sm),
+          BimButton(key: const ValueKey('peni-restart'), label: 'Recommencer', variant: BimButtonVariant.outline, onPressed: _restart),
+        ],
+      );
+    }
     final error = _startError;
     if (error != null) {
       return ListView(
