@@ -50,6 +50,13 @@ describe('Paystack — faux serveur (e2e)', () => {
         if (!t) return send(404, { status: false, message: 'Transaction reference not found' });
         return send(200, { status: true, data: { status: t.status, amount: t.amount, currency: t.currency, reference: decodeURIComponent(verify[1]), subaccount: { subaccount_code: t.subaccount } } });
       }
+      const sub = req.url!.match(/^\/subaccount\/(.+)$/);
+      if (req.method === 'GET' && sub) {
+        const code = decodeURIComponent(sub[1]);
+        if (code === 'ACCT_boutique01') return send(200, { status: true, data: { subaccount_code: code, active: true, percentage_charge: 0, currency: 'XOF' } });
+        if (code === 'ACCT_part') return send(200, { status: true, data: { subaccount_code: code, active: true, percentage_charge: 10, currency: 'XOF' } });
+        return send(404, { status: false, message: 'Subaccount not found' });
+      }
       if (req.method === 'POST' && req.url === '/refund') return send(200, { status: true, data: { id: 9001, status: 'pending' } });
       if (req.method === 'GET' && req.url === '/refund/9001') return send(200, { status: true, data: { status: 'processed' } });
       if (req.url === '/panne') return send(500, { status: false });
@@ -58,13 +65,13 @@ describe('Paystack — faux serveur (e2e)', () => {
     await new Promise<void>((r) => fake.listen(0, '127.0.0.1', () => r()));
     const port = (fake.address() as AddressInfo).port;
     h = await startHarness({ PAYMENT_PROVIDER: 'paystack', PAYSTACK_SECRET_KEY: KEY, PAYSTACK_API_BASE_URL: `http://127.0.0.1:${port}`, PAYMENT_CUSTOMER_EMAIL_DOMAIN: 'clients.bim.test' });
-    for (const [k, v] of [['age.min_other_payments', 18], ['payments.online_enabled', true], ['payments.fee_bearer', 'shop']] as const) {
+    for (const [k, v] of [['age.min_other_payments', 18], ['payments.online_enabled', true], ['payments.fee_bearer', 'shop'], ['payments.shop_fee_terms', 'Frais Paystack à la charge de la boutique (test).']] as const) {
       await h.pool.query("update app_settings set value = $1::jsonb, decision_status = 'decided' where key = $2", [JSON.stringify(v), k]);
     }
     h.settings.invalidate();
   });
   afterAll(async () => {
-    await h.pool.query("update app_settings set value = 'null'::jsonb, decision_status = 'pending' where key in ('age.min_other_payments', 'payments.fee_bearer')");
+    await h.pool.query("update app_settings set value = 'null'::jsonb, decision_status = 'pending' where key in ('age.min_other_payments', 'payments.shop_fee_terms')");
     await h.pool.query("update app_settings set value = 'false'::jsonb, decision_status = 'pending' where key = 'payments.online_enabled'");
     await h.close();
     await new Promise<void>((r) => fake.close(() => r()));
@@ -89,7 +96,11 @@ describe('Paystack — faux serveur (e2e)', () => {
     await h.http().post(`/v1/shop/products/${p.id}/photos`).set(s).attach('photos', await sharp({ create: { width: 200, height: 200, channels: 3, background: 'red' } }).jpeg().toBuffer(), 'a.jpg').expect(201);
     await h.http().put(`/v1/shop/products/${p.id}/variants/${p.variants[0].id}/stock`).set(s).send({ quantity: 5 }).expect(200);
     await h.http().post(`/v1/shop/products/${p.id}/publish`).set(s).expect(200);
+    // Compte vérifié chez Paystack : part du compte principal non nulle ou compte inconnu refusés.
+    expect((await h.http().post('/admin/v1/online-payments/accounts').set(finance).send({ shopSlug: slug, accountRef: 'ACCT_part' }).expect(422)).body.error.code).toBe('PAYEE_ACCOUNT_INVALID');
+    expect((await h.http().post('/admin/v1/online-payments/accounts').set(finance).send({ shopSlug: slug, accountRef: 'ACCT_inconnu' }).expect(422)).body.error.message).toMatch(/introuvable/);
     await h.http().post('/admin/v1/online-payments/accounts').set(finance).send({ shopSlug: slug, accountRef: 'ACCT_boutique01' }).expect(201);
+    expect(calls.some((c) => c.method === 'GET' && c.path === '/subaccount/ACCT_boutique01' && c.auth === `Bearer ${KEY}`)).toBe(true);
     const client = await person();
     const o = (
       await h

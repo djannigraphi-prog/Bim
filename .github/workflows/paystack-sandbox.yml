@@ -1,0 +1,24 @@
+name: Sonde Paystack (test)
+
+# Lot 8 — Lancement MANUEL uniquement. Interroge l'environnement de TEST de Paystack avec la clé de test enregistrée
+# par le fondateur dans les secrets du dépôt (PAYSTACK_TEST_SECRET_KEY). Aucune clé de production, aucun paiement validé,
+# aucune dépense. Le résultat (tableau) apparaît dans le résumé de l'exécution ; la clé n'est jamais affichée.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sonde (clé de test seulement)
+        env:
+          PAYSTACK_TEST_SECRET_KEY: ${{ secrets.PAYSTACK_TEST_SECRET_KEY }}
+        run: node apps/api/scripts/paystack-sandbox-probe.mjs

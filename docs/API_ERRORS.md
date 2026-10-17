@@ -49,6 +49,7 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INCIDENT_RESOLVED` | 409 | 7-G : incident résolu, plus de précision possible |
 | `REQUEST_PENDING` | 409 | 6-C : réaction à une demande non acceptée (l'accepter d'abord) |
 | `SHOP_PAYMENT_ACCOUNT_MISSING` | 409 | Lot 8 : la boutique n'a pas de compte actif chez le prestataire (F4 : aucun paiement en ligne) |
+| `PAYEE_ACCOUNT_INVALID` | 422 | Lot 8 : compte de boutique refusé après contrôle chez le prestataire (introuvable, inactif, autre devise que XOF, ou part prévue pour le compte principal de BIM : elle doit être de 0 %) ; `details.problems` |
 | `PAYMENT_PROVIDER_UNAVAILABLE` | 503 | Lot 8 : le prestataire ne répond pas ou refuse ; réessayer plus tard |
 | `REFUND_NOT_ALLOWED` | 409 | Lot 8 : remboursement impossible (paiement non vérifié, refus du prestataire) |
 | `REFUND_AMOUNT_INVALID` | 400 | Lot 8 : montant à rembourser invalide ; `details.maxFcfa` |

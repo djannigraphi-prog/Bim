@@ -8255,6 +8255,26 @@
         ]
       }
     },
+    "/v1/shop/online-payments": {
+      "get": {
+        "operationId": "ShopOnlinePaymentsController_terms",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Paiement en ligne vu par la boutique : ouvert ou non, frais à sa charge, aucune commission de BIM, état de son compte",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
     "/v1/courier-application": {
       "get": {
         "operationId": "CourierApplicationController_mine",

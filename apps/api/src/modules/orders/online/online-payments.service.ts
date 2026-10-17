@@ -20,12 +20,13 @@ type Order = typeof orders.$inferSelect;
 type Payment = typeof orderPayments.$inferSelect;
 
 /** Raison pour laquelle le paiement en ligne n'est pas proposé (jamais affichée comme une erreur au client). */
-export type OnlineUnavailable = 'NO_PROVIDER' | 'NOT_ENABLED' | 'FEE_BEARER_NOT_DECIDED' | 'SHOP_ACCOUNT_MISSING' | 'NOT_DUE' | 'ALREADY_CONFIRMED';
+export type OnlineUnavailable = 'NO_PROVIDER' | 'NOT_ENABLED' | 'FEE_BEARER_NOT_DECIDED' | 'SHOP_FEES_NOT_PUBLISHED' | 'SHOP_ACCOUNT_MISSING' | 'NOT_DUE' | 'ALREADY_CONFIRMED';
 
 const unavailableMessage: Record<OnlineUnavailable, string> = {
   NO_PROVIDER: 'Le paiement en ligne n’est pas encore disponible.',
   NOT_ENABLED: 'Le paiement en ligne n’est pas encore ouvert.',
   FEE_BEARER_NOT_DECIDED: 'Le paiement en ligne n’est pas encore ouvert.',
+  SHOP_FEES_NOT_PUBLISHED: 'Le paiement en ligne n’est pas encore ouvert.',
   SHOP_ACCOUNT_MISSING: 'Cette boutique ne reçoit pas encore de paiement en ligne.',
   NOT_DUE: 'Le paiement en ligne est possible après la remise, pour un paiement Mobile Money encore dû.',
   ALREADY_CONFIRMED: 'Ce paiement est déjà vérifié par le prestataire.',
@@ -34,7 +35,9 @@ const unavailableMessage: Record<OnlineUnavailable, string> = {
 /**
  * Lot 8 — Paiement en ligne de l'article (Mobile Money), au moment où il est dû (après la remise, comme « J'ai payé »).
  * Ouvert seulement si tout est réuni : prestataire configuré, réglage `payments.online_enabled` décidé à true, décision
- * sur les frais (`payments.fee_bearer`), compte actif de la boutique chez le prestataire (F4 : jamais sur un compte BIM).
+ * sur les frais (`payments.fee_bearer` = « shop », L8-02 : la boutique supporte les frais du prestataire, BIM ne prélève
+ * rien), frais publiés aux boutiques (`payments.shop_fee_terms`), compte actif de la boutique chez le prestataire, sans
+ * part pour le compte principal (F4 : jamais sur un compte BIM).
  * La confirmation du prestataire n'est jamais la décision de la boutique : la commande reste « livrée » jusqu'à elle.
  */
 @Injectable()
@@ -63,9 +66,13 @@ export class OnlinePaymentsService {
     if (!this.provider) return { ok: false, reason: 'NO_PROVIDER' };
     const enabled = await this.settings.get<boolean>('payments.online_enabled');
     if (enabled?.value !== true || enabled.decisionStatus !== 'decided') return { ok: false, reason: 'NOT_ENABLED' };
+    // L8-02 : la boutique supporte les frais du prestataire ; toute autre valeur garde le paiement fermé.
     const bearer = await this.settings.get<string | null>('payments.fee_bearer');
-    if ((bearer?.value !== 'shop' && bearer?.value !== 'bim') || bearer.decisionStatus !== 'decided') return { ok: false, reason: 'FEE_BEARER_NOT_DECIDED' };
-    return { ok: true, feeBearer: bearer.value };
+    if (bearer?.value !== 'shop' || bearer.decisionStatus !== 'decided') return { ok: false, reason: 'FEE_BEARER_NOT_DECIDED' };
+    // Les frais applicables sont communiqués aux boutiques avant toute activation.
+    const terms = await this.settings.get<string | null>('payments.shop_fee_terms');
+    if (typeof terms?.value !== 'string' || !terms.value.trim() || terms.decisionStatus !== 'decided') return { ok: false, reason: 'SHOP_FEES_NOT_PUBLISHED' };
+    return { ok: true, feeBearer: 'shop' };
   }
 
   private async shopAccount(shopId: string, tx: DbOrTx = this.db) {
@@ -76,6 +83,26 @@ export class OnlinePaymentsService {
       .where(and(eq(shopPaymentAccounts.shopId, shopId), eq(shopPaymentAccounts.provider, this.provider.name), eq(shopPaymentAccounts.status, 'active')))
       .limit(1);
     return a ?? null;
+  }
+
+  /**
+   * Ce que la boutique doit savoir avant de recevoir des paiements en ligne (L8-02) : la boutique supporte les frais du
+   * prestataire, BIM ne prélève aucune commission, le client paie le prix affiché ; frais publiés, état de son compte.
+   */
+  async shopTerms(shopId: string) {
+    const platform = await this.platformOpen();
+    const terms = await this.settings.get<string | null>('payments.shop_fee_terms');
+    const account = await this.shopAccount(shopId);
+    return {
+      open: platform.ok,
+      provider: this.provider?.name ?? null,
+      operators: this.provider && platform.ok ? this.provider.operators : [],
+      feesPaidBy: 'shop' as const,
+      bimCommissionPercent: 0,
+      customerPaysDisplayedPrice: true,
+      feeTerms: terms?.decisionStatus === 'decided' && typeof terms.value === 'string' ? terms.value : null,
+      accountActive: account !== null,
+    };
   }
 
   /** Disponibilité pour une commande (affichage de l'action « Payer en ligne » et contrôle au lancement). */
@@ -322,6 +349,19 @@ export class OnlinePaymentsService {
     if (!s || s.status !== 'active') throw Errors.notFound('Boutique');
     const ref = accountRef.trim();
     if (!/^[A-Za-z0-9_-]{4,60}$/.test(ref)) throw Errors.validation({ fields: { accountRef: ['Référence du compte invalide.'] } });
+    // F4 et L8-02 vérifiés chez le prestataire avant l'enregistrement : compte actif, en XOF, sans aucune part pour le
+    // compte principal (BIM ne prélève aucune commission).
+    const check = await provider.checkPayeeAccount(ref).catch((e: unknown) => {
+      if (e instanceof ProviderError) throw new AppError('PAYMENT_PROVIDER_UNAVAILABLE', 'Le prestataire ne répond pas. Réessaie plus tard.', HttpStatus.SERVICE_UNAVAILABLE);
+      throw e;
+    });
+    const problems = [
+      ...(check.exists ? [] : ['Compte introuvable chez le prestataire.']),
+      ...(check.exists && !check.active ? ['Compte inactif chez le prestataire.'] : []),
+      ...(check.exists && check.mainAccountPercent !== 0 ? ['Le compte prévoit une part pour BIM : elle doit être de 0 %.'] : []),
+      ...(check.exists && check.currency !== null && check.currency !== 'XOF' ? ['Le compte doit être réglé en XOF.'] : []),
+    ];
+    if (problems.length) throw new AppError('PAYEE_ACCOUNT_INVALID', problems.join(' '), HttpStatus.UNPROCESSABLE_ENTITY, { problems });
     await this.db.transaction(async (tx) => {
       await tx
         .update(shopPaymentAccounts)

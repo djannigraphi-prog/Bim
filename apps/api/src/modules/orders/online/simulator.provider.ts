@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { uuidv7 } from '../../../common/uuid';
-import type { InitiateInput, InitiateResult, Operator, PaymentProvider, RefundStatus, VerifyResult, WebhookEvent } from './provider';
+import type { InitiateInput, InitiateResult, Operator, PayeeAccountCheck, PaymentProvider, RefundStatus, VerifyResult, WebhookEvent } from './provider';
 
 export const SIMULATOR_SIGNATURE_HEADER = 'x-bim-simulator-signature';
 
@@ -51,6 +51,13 @@ export class SimulatorProvider implements PaymentProvider {
     const refundRef = `simr_${uuidv7()}`;
     this.refunds.set(refundRef, 'pending');
     return { refundRef, status: 'pending' };
+  }
+
+  /** Comptes simulés : par défaut valides (actifs, XOF, 0 % pour le compte principal) ; `setAccount` pour un autre cas. */
+  readonly accounts = new Map<string, PayeeAccountCheck>();
+
+  async checkPayeeAccount(accountRef: string): Promise<PayeeAccountCheck> {
+    return this.accounts.get(accountRef) ?? { exists: true, active: true, mainAccountPercent: 0, currency: 'XOF' };
   }
 
   async fetchRefund(refundRef: string) {

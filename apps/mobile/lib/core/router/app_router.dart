@@ -31,6 +31,7 @@ import '../../features/courier/presentation/courier_courses.dart';
 import '../../features/courier/presentation/courier_screens.dart';
 import '../../features/orders/presentation/checkout_screen.dart';
 import '../../features/orders/presentation/order_screens.dart';
+import '../../features/orders/presentation/shop_online_payments_screen.dart';
 import '../../features/bimshop/presentation/bimshop_view.dart';
 import '../../features/bimshop/presentation/product_screen.dart';
 import '../../features/bimshop/presentation/shop_profile_screen.dart';
@@ -142,6 +143,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/courier/history', builder: (_, __) => const CourierHistoryScreen()),
       GoRoute(path: '/courier/courses/:id', builder: (_, s) => CourseScreen(deliveryId: s.pathParameters['id']!)),
       GoRoute(path: '/shop/couriers', builder: (_, __) => const ShopCouriersScreen()),
+      GoRoute(path: '/shop/online-payments', builder: (_, __) => const ShopOnlinePaymentsScreen()),
       GoRoute(path: '/shop/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, asShop: true)),
       GoRoute(path: '/projects/:id/offers', builder: (_, s) => ProjectOffersScreen(projectId: s.pathParameters['id']!)),
       // Lot 5-C : BimShop (public, sauf « Mis de côté »).

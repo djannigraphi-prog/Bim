@@ -123,6 +123,9 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                 const SizedBox(height: BimSpacing.md),
                 // 7-B : commandes à traiter (compteurs réels), pour qui peut les consulter.
                 if (d.can('orders.read')) const _OrdersCard(),
+                // Lot 8 (L8-02) : frais du prestataire à la charge de la boutique, aucune commission de BIM.
+                if (d.can('orders.read'))
+                  TextButton(key: const ValueKey('action-online-payments'), onPressed: () => context.push('/shop/online-payments'), child: const Text('Paiement en ligne : frais et conditions')),
                 const SizedBox(height: BimSpacing.lg),
                 // 7-A : les actions suivent mes permissions (le serveur les contrôle de toute façon).
                 Row(

@@ -66,6 +66,16 @@ export interface PaymentProvider {
   parseWebhook(headers: Record<string, string | string[] | undefined>, rawBody: Buffer): WebhookEvent | null;
   refund(providerRef: string, amountFcfa: number, note: string): Promise<{ refundRef: string; status: RefundStatus }>;
   fetchRefund(refundRef: string): Promise<{ status: RefundStatus }>;
+  /** Compte bénéficiaire (boutique) chez le prestataire : existe, actif, devise, part du compte principal (doit être 0). */
+  checkPayeeAccount(accountRef: string): Promise<PayeeAccountCheck>;
+}
+
+export interface PayeeAccountCheck {
+  exists: boolean;
+  active: boolean;
+  /** Part de chaque paiement revenant au compte principal (BIM), en pourcentage ; null si inconnue. */
+  mainAccountPercent: number | null;
+  currency: string | null;
 }
 
 /** Erreur d'un prestataire (réseau, refus, réponse inattendue) : message technique, sans donnée personnelle. */

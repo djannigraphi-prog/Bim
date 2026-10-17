@@ -295,6 +295,13 @@
       "when": 1792232244180,
       "tag": "0041_retour_boutique",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792237502330,
+      "tag": "0042_lot8_decisions",
+      "breakpoints": true
     }
   ]
 }

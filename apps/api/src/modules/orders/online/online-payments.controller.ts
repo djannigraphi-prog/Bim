@@ -7,7 +7,7 @@ import { IsInt, IsOptional, IsString, Length, Min } from 'class-validator';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../../admin/admin.decorators';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../../common/request-meta';
-import { AuthContext, CurrentAuth, Public, RequireSpace } from '../../auth/auth.decorators';
+import { AuthContext, CurrentAuth, Public, RequireShopPermission, RequireSpace } from '../../auth/auth.decorators';
 import { OnlinePaymentsService } from './online-payments.service';
 
 /** Lot 8 (socle, désactivé) — Paiement en ligne de l'article par le client. Fermé : 503 NOT_CONFIGURED. */
@@ -32,6 +32,22 @@ export class OnlinePaymentsController {
   @ApiOperation({ summary: 'Vérifier auprès du prestataire le dernier paiement en ligne (après validation sur le téléphone)' })
   check(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
     return this.online.check(a.userId, id);
+  }
+}
+
+/** Lot 8 — Ce que la boutique doit savoir des paiements en ligne (frais à sa charge, aucune commission BIM). */
+@ApiTags('Espace marchand')
+@ApiBearerAuth()
+@RequireSpace('merchant')
+@Controller('v1/shop/online-payments')
+export class ShopOnlinePaymentsController {
+  constructor(private readonly online: OnlinePaymentsService) {}
+
+  @Get()
+  @RequireShopPermission('orders.read')
+  @ApiOperation({ summary: 'Paiement en ligne vu par la boutique : ouvert ou non, frais à sa charge, aucune commission de BIM, état de son compte' })
+  terms(@CurrentAuth() a: AuthContext) {
+    return this.online.shopTerms(a.space!.id);
   }
 }
 

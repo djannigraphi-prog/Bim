@@ -7,6 +7,7 @@ import 'package:bim/features/merchant/data/shop_api.dart' show formatFcfa;
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/orders/presentation/order_screens.dart';
+import 'package:bim/features/orders/presentation/shop_online_payments_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -151,6 +152,10 @@ class _FakeShopOrders extends ShopOrdersApi {
   _FakeShopOrders() : super(_client());
   final calls = <String>[];
   OrderDetail current = _detail(status: 'ready', actions: const ['handover', 'cancel'], customer: 'Awa Koné');
+  ShopOnlineTerms terms = const ShopOnlineTerms(open: false, operators: [], bimCommissionPercent: 0, accountActive: false);
+
+  @override
+  Future<ShopOnlineTerms> onlineTerms() async => terms;
 
   @override
   Future<OrderDetail> order(String id) async => current;
@@ -472,5 +477,21 @@ void main() {
     expect(api.calls.where((c) => c.startsWith('online')), ['online start', 'online check']);
     expect(tester.widget<Text>(find.byKey(const ValueKey('online-status'))).data, 'Paiement vérifié par le prestataire');
     expect(find.byKey(const ValueKey('pay-online')), findsNothing);
+  });
+
+  testWidgets('lot 8 (L8-02) boutique : frais à sa charge, aucune commission de BIM ; frais publiés avant l’ouverture', (tester) async {
+    final shop = _FakeShopOrders();
+    await _pump(tester, const ShopOnlinePaymentsScreen(), shop: shop);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Pas encore ouvert'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-commission'))).data, '• BIM ne prend aucune commission sur tes ventes (0 %).');
+    expect(find.text('• Les frais du prestataire de paiement sont à ta charge.'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-fees'))).data, 'Ils seront publiés ici avant l’ouverture du paiement en ligne.');
+
+    final opened = _FakeShopOrders()..terms = const ShopOnlineTerms(open: true, operators: ['orange', 'wave'], bimCommissionPercent: 0, feeTerms: '1,95 % HT par paiement', accountActive: true);
+    await _pump(tester, const ShopOnlinePaymentsScreen(), shop: opened);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-state'))).data, 'Ouvert : tes clients peuvent payer en ligne (Orange Money, Wave).');
+    expect(tester.widget<Text>(find.byKey(const ValueKey('online-terms-fees'))).data, '1,95 % HT par paiement');
   });
 }

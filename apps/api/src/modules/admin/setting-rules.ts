@@ -53,7 +53,9 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^notifications\.reminder_grace_minutes$/, intIn(5, 180)],
   [/^maintenance\.account_purge_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
   [/^payments\.online_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
-  [/^payments\.fee_bearer$/, (v) => (v === null || v === 'shop' || v === 'bim' ? null : '« shop », « bim » ou null (non décidé).')],
+  // L8-02 (17/10/2026) : la boutique supporte les frais, décision définitive ; un autre modèle exige une nouvelle décision.
+  [/^payments\.fee_bearer$/, (v) => (v === null || v === 'shop' ? null : '« shop » (décision L8-02) ou null.')],
+  [/^payments\.shop_fee_terms$/, (v) => (v === null || (typeof v === 'string' && v.trim().length >= 20 && v.length <= 1000) ? null : 'Texte de 20 à 1 000 caractères, ou null (non publié).')],
   [/^payments\.intent_expiry_minutes$/, intIn(5, 1440)],
   [/^maintenance\.account_purge_mode$/, (v) => (v === 'simulation' || v === 'real' ? null : '« simulation » ou « real ».')],
   [/^maintenance\.account_purge_after_days$/, intIn(30, 3650)],

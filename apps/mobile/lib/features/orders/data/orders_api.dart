@@ -592,9 +592,31 @@ class OrdersApi {
 }
 
 /// Commandes reçues par la boutique (espace boutique ; permissions contrôlées par le serveur).
+/// Lot 8 (L8-02) — Paiement en ligne vu par la boutique : frais du prestataire à sa charge, aucune commission de BIM.
+class ShopOnlineTerms {
+  const ShopOnlineTerms({required this.open, required this.operators, required this.bimCommissionPercent, this.feeTerms, required this.accountActive});
+
+  factory ShopOnlineTerms.fromJson(Map<String, dynamic> j) => ShopOnlineTerms(
+        open: j['open'] == true,
+        operators: [for (final o in (j['operators'] as List<dynamic>? ?? const [])) o as String],
+        bimCommissionPercent: (j['bimCommissionPercent'] as num?) ?? 0,
+        feeTerms: j['feeTerms'] as String?,
+        accountActive: j['accountActive'] == true,
+      );
+
+  final bool open;
+  final List<String> operators;
+  final num bimCommissionPercent;
+  /// Frais applicables publiés par BIM avant l'activation ; null tant qu'ils ne le sont pas.
+  final String? feeTerms;
+  final bool accountActive;
+}
+
 class ShopOrdersApi {
   ShopOrdersApi(this._api);
   final ApiClient _api;
+
+  Future<ShopOnlineTerms> onlineTerms() async => ShopOnlineTerms.fromJson(await _api.get('/v1/shop/online-payments'));
 
   Future<List<OrderSummary>> list(String box) async {
     final r = await _api.get('/v1/shop/orders', query: {'box': box});

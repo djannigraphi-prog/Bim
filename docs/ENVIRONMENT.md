@@ -42,6 +42,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `PAYMENT_PROVIDER` | none | paiement en ligne (lot 8) : `none` (fermé), `simulator` (tests) ou `paystack` (clé de test seulement) ; aucun prestataire réel sans autorisation du fondateur | `simulator` refusé hors development/test ; le réglage `payments.online_enabled` reste un second interrupteur |
 | `PAYMENT_SIMULATOR_SECRET` | (vide) | secret de signature des notifications du simulateur (valeur de test) | 16 caractères au moins avec `simulator` |
 | `PAYSTACK_SECRET_KEY` | (vide) | clé secrète Paystack — **secret**, **clé de test seulement** (`sk_test_…`) | obligatoire avec `PAYMENT_PROVIDER=paystack` ; une clé de production est refusée |
+| `PAYSTACK_TEST_SECRET_KEY` | (secret GitHub) | clé de test pour la sonde manuelle « Sonde Paystack (test) » (`apps/api/scripts/paystack-sandbox-probe.mjs`) — **secret du dépôt**, jamais dans Git | `sk_test_…` seulement ; la sonde refuse tout le reste |
 | `PAYSTACK_API_BASE_URL` | (vide) | adresse de l'API remplacée par un faux serveur (tests) | refusée hors development/test |
 | `PAYMENT_CALLBACK_URL` | (vide) | page de retour après le paiement | facultative |
 | `PAYMENT_CUSTOMER_EMAIL_DOMAIN` | (vide) | domaine des adresses techniques transmises au prestataire quand le client n'a pas d'e-mail vérifié | obligatoire avec Paystack |

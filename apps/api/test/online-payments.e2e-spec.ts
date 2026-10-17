@@ -27,6 +27,7 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
   async function open() {
     await setting('payments.online_enabled', true);
     await setting('payments.fee_bearer', 'shop');
+    await setting('payments.shop_fee_terms', 'Frais Paystack à la charge de la boutique : 1,95 % HT par paiement Mobile Money.');
   }
 
   beforeAll(async () => {
@@ -39,7 +40,9 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
   afterAll(async () => {
     await setting('age.min_other_payments', null, 'pending');
     await setting('payments.online_enabled', false, 'pending');
-    await setting('payments.fee_bearer', null, 'pending');
+    // État livré par la migration 0042 (décision L8-02) : la boutique supporte les frais ; conditions non publiées.
+    await setting('payments.fee_bearer', 'shop');
+    await setting('payments.shop_fee_terms', null, 'pending');
     await h.close();
     // L'environnement est partagé entre les suites d'un même processus : le simulateur ne déborde pas sur les autres.
     process.env.PAYMENT_PROVIDER = 'none';
@@ -104,7 +107,15 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     expect((await start(o, 503)).body.error.code).toBe('NOT_CONFIGURED');
     await setting('payments.fee_bearer', 'shop', 'provisional');
     expect((await start(o, 503)).body.error.code).toBe('NOT_CONFIGURED');
+    await setting('payments.fee_bearer', 'bim');
+    // L8-02 : seul « la boutique supporte les frais » ouvre le paiement.
+    expect((await start(o, 503)).body.error.code).toBe('NOT_CONFIGURED');
     await setting('payments.fee_bearer', 'shop');
+    // Frais pas encore communiqués aux boutiques : fermé.
+    expect((await start(o, 503)).body.error.code).toBe('NOT_CONFIGURED');
+    await setting('payments.shop_fee_terms', 'Frais Paystack à la charge de la boutique : 1,95 % HT par paiement Mobile Money.', 'provisional');
+    expect((await start(o, 503)).body.error.code).toBe('NOT_CONFIGURED');
+    await setting('payments.shop_fee_terms', 'Frais Paystack à la charge de la boutique : 1,95 % HT par paiement Mobile Money.');
     // Boutique sans compte chez le prestataire : jamais de paiement vers un compte de BIM.
     const noAccount = await deliveredOrder(null);
     mine = (await h.http().get(`/v1/orders/${noAccount.id}`).set(noAccount.client.auth)).body;
@@ -115,7 +126,34 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     expect(mine.actions).toContain('pay_online');
     expect(mine.onlinePayment).toMatchObject({ available: true, operators: ['orange', 'mtn', 'wave'], last: null });
     await setting('payments.online_enabled', false, 'pending');
-    await setting('payments.fee_bearer', null, 'pending');
+    await setting('payments.shop_fee_terms', null, 'pending');
+  });
+
+  it('L8-02 : la boutique voit les frais à sa charge, aucune commission de BIM ; compte refusé s’il prévoit une part pour BIM', async () => {
+    const o = await deliveredOrder();
+    const view = async () => (await h.http().get('/v1/shop/online-payments').set(o.shop).expect(200)).body;
+    expect(await view()).toEqual({ open: false, provider: 'simulator', operators: [], feesPaidBy: 'shop', bimCommissionPercent: 0, customerPaysDisplayedPrice: true, feeTerms: null, accountActive: true });
+    await open();
+    expect(await view()).toMatchObject({ open: true, operators: ['orange', 'mtn', 'wave'], feeTerms: 'Frais Paystack à la charge de la boutique : 1,95 % HT par paiement Mobile Money.' });
+    await h.http().get('/v1/shop/online-payments').set(o.client.auth).expect(403);
+    // Compte de boutique contrôlé chez le prestataire avant l'enregistrement.
+    const cases: [string, { exists: boolean; active: boolean; mainAccountPercent: number | null; currency: string | null }, RegExp][] = [
+      ['ACCT_part', { exists: true, active: true, mainAccountPercent: 10, currency: 'XOF' }, /0 %/],
+      ['ACCT_off', { exists: true, active: false, mainAccountPercent: 0, currency: 'XOF' }, /inactif/],
+      ['ACCT_ngn', { exists: true, active: true, mainAccountPercent: 0, currency: 'NGN' }, /XOF/],
+      ['ACCT_none', { exists: false, active: false, mainAccountPercent: null, currency: null }, /introuvable/],
+    ];
+    for (const [ref, check, msg] of cases) {
+      sim.accounts.set(ref, check);
+      const r = await h.http().post('/admin/v1/online-payments/accounts').set(finance).send({ shopSlug: o.slug, accountRef: ref }).expect(422);
+      expect(r.body.error.code).toBe('PAYEE_ACCOUNT_INVALID');
+      expect(r.body.error.message).toMatch(msg);
+    }
+    // Le compte valide reste actif.
+    const accounts = (await h.http().get('/admin/v1/online-payments/accounts').set(finance).expect(200)).body.items;
+    expect(accounts.filter((x: { slug: string; status: string }) => x.slug === o.slug && x.status === 'active').map((x: { accountRef: string }) => x.accountRef)).toEqual([o.account]);
+    await setting('payments.online_enabled', false, 'pending');
+    await setting('payments.shop_fee_terms', null, 'pending');
   });
 
   it('paiement vérifié : signature, vérification serveur, bénéficiaire, une seule fois ; la boutique décide toujours', async () => {

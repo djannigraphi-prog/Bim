@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Logger } from '@nestjs/common';
-import type { InitiateInput, InitiateResult, Operator, PaymentProvider, RefundStatus, VerifyResult, WebhookEvent } from './provider';
+import type { InitiateInput, InitiateResult, Operator, PayeeAccountCheck, PaymentProvider, RefundStatus, VerifyResult, WebhookEvent } from './provider';
 import { ProviderError } from './provider';
 
 export const PAYSTACK_SIGNATURE_HEADER = 'x-paystack-signature';
@@ -16,6 +16,8 @@ const TIMEOUT_MS = 15_000;
  * - Notifications : en-tête `x-paystack-signature` = HMAC SHA512 du corps brut avec la clé secrète. Paystack n'envoie
  *   une notification que pour les paiements réussis : les échecs se constatent par la vérification.
  * - Remboursements : `POST /refund`, `GET /refund/:id` ; notifications `refund.*`.
+ * - Compte de la boutique : `GET /subaccount/:code` (actif, devise, `percentage_charge` = part du compte principal,
+ *   qui doit être 0 : BIM ne prélève aucune commission). `bearer: subaccount` : la boutique supporte les frais (L8-02).
  * - Opérateurs en Côte d'Ivoire selon Paystack : MTN, Orange, Wave. **Moov Money n'est pas pris en charge.**
  */
 export class PaystackProvider implements PaymentProvider {
@@ -108,6 +110,21 @@ export class PaystackProvider implements PaymentProvider {
   async refund(providerRef: string, amountFcfa: number, note: string) {
     const d = await this.call<{ id: number | string; status: string }>('POST', '/refund', { transaction: providerRef, amount: String(amountFcfa * 100), currency: 'XOF', merchant_note: note.slice(0, 200) });
     return { refundRef: String(d.id), status: refundStatus(d.status) };
+  }
+
+  async checkPayeeAccount(accountRef: string): Promise<PayeeAccountCheck> {
+    try {
+      const d = await this.call<{ active?: boolean; is_verified?: boolean; percentage_charge?: number; currency?: string; subaccount_code?: string }>(
+        'GET',
+        `/subaccount/${encodeURIComponent(accountRef)}`,
+      );
+      if (d.subaccount_code !== undefined && d.subaccount_code !== accountRef) return { exists: false, active: false, mainAccountPercent: null, currency: null };
+      return { exists: true, active: d.active === true, mainAccountPercent: typeof d.percentage_charge === 'number' ? d.percentage_charge : null, currency: d.currency ?? null };
+    } catch (e) {
+      // 404 : compte inconnu ; toute autre erreur remonte (réessayer plus tard).
+      if (e instanceof ProviderError && e.message.includes('HTTP 404')) return { exists: false, active: false, mainAccountPercent: null, currency: null };
+      throw e;
+    }
   }
 
   async fetchRefund(refundRef: string) {

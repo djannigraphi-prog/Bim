@@ -166,6 +166,24 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### L8-02 — Décisions définitives sur le lot 8 (17/10/2026, 11 h 42) · Fondateur · **appliquées dans le code** ; paiement en ligne **toujours fermé**
+
+1. **Paiement direct à la boutique : exigence obligatoire.** Jamais de transit des fonds des boutiques par BIM, même
+   pour contourner une limite du prestataire. Vérification à poursuivre auprès de Paystack (sous-comptes et versements
+   directs en Côte d'Ivoire ; signaler si un compte bancaire professionnel est nécessaire par boutique). Tant que ce
+   n'est pas résolu : paiement en ligne fermé ; « J'ai payé » + décision de la boutique continue.
+2. **Frais : la boutique supporte les frais du prestataire** (définitif). BIM ne prélève aucune commission ; le client
+   paie le prix affiché, sans supplément. Les frais applicables sont communiqués aux boutiques **avant** l'activation.
+   Toute limite empêchant cette répartition est signalée avant de changer le modèle.
+   - Code : `payments.fee_bearer` = « shop », décidé (migration 0042), seule valeur acceptée ; `bearer: subaccount` ;
+     `transaction_charge: 0` ; compte de boutique refusé s'il prévoit une part (`percentage_charge`) pour le compte
+     principal ; nouveau réglage `payments.shop_fee_terms` (texte publié aux boutiques) : tant qu'il n'est pas décidé,
+     le paiement en ligne reste fermé ; page « Paiement en ligne : frais et conditions » dans l'espace boutique.
+3. **Compte Paystack de test** : intégration et tests en environnement de test autorisés, sans dépense ; identifiants
+   fournis par le fondateur ; en attendant, tests automatisés et faux serveur. Aucun abonnement, dépense, contrat ni
+   paiement réel. Ne jamais prétendre avoir testé chez Paystack sans test effectif.
+4. **Continuité** : poursuivre tous les travaux indépendants sans attendre une validation après chaque sous-lot.
+
 ### L8-01 — Intégration Paystack (17/10/2026, 09 h 56) · Fondateur (« développe directement », sans dépense) · **réalisée dans le code, désactivée** ; décisions en attente
 
 - Paystack intégré conformément à sa documentation officielle, testé contre un faux serveur ; aucune clé de production
@@ -175,6 +193,7 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
   expiration après 30 minutes (provisoire) ; remboursement réservé à `payments.refund` (rôle principal, finance).
 - **En attente du fondateur** : (1) F4 en Côte d'Ivoire avec Paystack (sous-comptes non confirmés) ; (2) répartition des
   frais (`payments.fee_bearer` : boutique ou BIM) ; (3) compte Paystack de test et autorisation de dépense.
+  → Réponses : voir L8-02.
 
 ### L8-00 — Paiements en ligne : étude et socle multi-prestataires désactivé (17/10/2026, 08 h 06) · Fondateur · **étude remise** ; socle **réalisé**, intégration réelle **non autorisée**
 
