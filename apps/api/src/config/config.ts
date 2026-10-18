@@ -46,7 +46,14 @@ const schema = z
      * Par défaut « none » : sans configuration explicite, aucun code n'est envoyé ni écrit dans les journaux.
      */
     SMS_PROVIDER: z.enum(['console', 'test', 'none']).default('none'),
-    EMAIL_PROVIDER: z.enum(['console', 'test', 'none']).default('none'),
+    EMAIL_PROVIDER: z.enum(['console', 'test', 'none', 'smtp']).default('none'),
+    /**
+     * V1 — Envoi des e-mails par SMTP (offre gratuite d'un fournisseur au lancement, payante plus tard : même prise).
+     * Secret : `smtps://utilisateur:motdepasse@hôte:465` (ou smtp://…:587 avec STARTTLS), injecté depuis le coffre.
+     */
+    SMTP_URL: z.string().default(''),
+    /** Adresse d'expédition des e-mails (ex. « BIM <codes@exemple.ci> »). */
+    EMAIL_FROM: z.string().default(''),
 
     /** Connexions sociales : préparées, désactivées tant que les identifiants ne sont pas fournis. */
     GOOGLE_CLIENT_IDS: z.string().default(''),
@@ -161,6 +168,13 @@ const schema = z
         path: ['EMAIL_PROVIDER'],
         message: "Le fournisseur d'e-mail « console » ou « test » est interdit hors développement",
       });
+    }
+    if (cfg.EMAIL_PROVIDER === 'smtp') {
+      if (!/^smtps?:\/\/.+/.test(cfg.SMTP_URL)) ctx.addIssue({ code: 'custom', path: ['SMTP_URL'], message: 'SMTP_URL (smtp:// ou smtps://) est obligatoire avec EMAIL_PROVIDER=smtp' });
+      if (!cfg.EMAIL_FROM.includes('@')) ctx.addIssue({ code: 'custom', path: ['EMAIL_FROM'], message: 'EMAIL_FROM est obligatoire avec EMAIL_PROVIDER=smtp' });
+      if (!devLike && cfg.SMTP_URL.startsWith('smtp://') && !cfg.SMTP_URL.includes('requireTLS=true')) {
+        ctx.addIssue({ code: 'custom', path: ['SMTP_URL'], message: 'Hors développement, le SMTP doit être chiffré (smtps:// ou ?requireTLS=true)' });
+      }
     }
     if (!devLike && !cfg.HTTP_THROTTLE_ENABLED) {
       ctx.addIssue({ code: 'custom', path: ['HTTP_THROTTLE_ENABLED'], message: 'La limitation de débit ne peut pas être désactivée hors développement' });

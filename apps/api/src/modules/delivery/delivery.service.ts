@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { createTransport, Transporter } from 'nodemailer';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 
@@ -20,7 +21,9 @@ export interface OutboundMessage {
  *  - console : écrit le message dans les journaux. Développement uniquement (refusé en staging/production par la config).
  *  - test    : conserve les messages en mémoire pour les tests automatisés.
  *  - none    : aucun envoi possible → l'API répond « non disponible ».
- * Les vrais fournisseurs (SMS ivoirien, Amazon SES) seront ajoutés derrière cette même interface (lot 2).
+ *  - smtp    : (e-mail, V1) envoi par SMTP chiffré, chez le fournisseur choisi par le fondateur (offre gratuite au
+ *              lancement, payante plus tard : seul le réglage change). Le code n'est jamais journalisé.
+ * Le SMS réel (fournisseur ivoirien ou Firebase) sera ajouté derrière cette même interface, après accord.
  */
 @Injectable()
 export class DeliveryService {
@@ -37,7 +40,11 @@ export class DeliveryService {
     return this.cfg.NODE_ENV === 'development' && this.cfg.DEMO_MODE;
   }
 
-  constructor(@Inject(APP_CONFIG) private readonly cfg: AppConfig) {}
+  constructor(@Inject(APP_CONFIG) private readonly cfg: AppConfig) {
+    this.mailer = cfg.EMAIL_PROVIDER === 'smtp' ? createTransport(cfg.SMTP_URL, { from: cfg.EMAIL_FROM }) : null;
+  }
+
+  private readonly mailer: Transporter | null;
 
   isAvailable(channel: Channel): boolean {
     return (channel === 'phone' ? this.cfg.SMS_PROVIDER : this.cfg.EMAIL_PROVIDER) !== 'none';
@@ -78,6 +85,15 @@ export class DeliveryService {
         if (this.demoPageEnabled) {
           this.demoOutbox.unshift({ channel: msg.channel, destination: msg.destination, subject: msg.subject, body: msg.body, sentAt: msg.sentAt });
           this.demoOutbox.length = Math.min(this.demoOutbox.length, 30);
+        }
+        return;
+      case 'smtp':
+        try {
+          await this.mailer!.sendMail({ to: msg.destination, subject: msg.subject ?? 'BIM', text: msg.body });
+        } catch (e) {
+          // Jamais le contenu (il porte le code) ni l'adresse complète dans les journaux.
+          this.logger.error(`E-mail non envoyé : ${e instanceof Error ? e.name : 'erreur'}`);
+          throw Errors.notConfigured("L'envoi d'e-mails");
         }
         return;
       case 'none':

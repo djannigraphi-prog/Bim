@@ -23,7 +23,9 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `OTP_RESEND_COOLDOWN_SECONDS` | 60 | délai entre deux envois | |
 | `OTP_MAX_SENDS_PER_DESTINATION_PER_HOUR` | 6 | codes envoyés au même téléphone ou e-mail par heure | anti-bombardement et anti force brute |
 | `SMS_PROVIDER` | none | console · test · none (fournisseur réel au lot 2) | console/test refusés hors development/test |
-| `EMAIL_PROVIDER` | none | idem | idem |
+| `EMAIL_PROVIDER` | none | idem ; V1 : `smtp` (envoi réel par SMTP chiffré, fournisseur choisi par le fondateur) | idem |
+| `SMTP_URL` | (vide) | V1 — **secret** : `smtps://utilisateur:motdepasse@hôte:465` | obligatoire avec `EMAIL_PROVIDER=smtp` ; chiffré hors développement |
+| `EMAIL_FROM` | (vide) | V1 — adresse d’expédition (« BIM <codes@…> ») | obligatoire avec `EMAIL_PROVIDER=smtp` |
 | `GOOGLE_CLIENT_IDS`, `APPLE_CLIENT_IDS`, `FACEBOOK_APP_ID` | (vide) | connexions sociales (pas encore intégrées) | |
 | `DEFAULT_PHONE_REGION` | CI | région pour lire un numéro sans indicatif | |
 | `MEDIA_STORAGE` | none | stockage des photos privées : `local` (développement/tests), `s3`, `none` (fonction fermée) | `local` refusé hors development/test |
