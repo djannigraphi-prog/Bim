@@ -5665,6 +5665,11 @@
                     "type": "string",
                     "format": "binary"
                   },
+                  "voice": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Message vocal M4A (AAC), 2 minutes au plus"
+                  },
                   "replyToId": {
                     "type": "string",
                     "format": "uuid"
@@ -5683,6 +5688,11 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "voice": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Message vocal M4A (AAC), 2 minutes au plus"
                   },
                   "replyToId": {
                     "type": "string",
@@ -5703,7 +5713,235 @@
             "bearer": []
           }
         ],
-        "summary": "Envoyer un texte ou une photo (ré-encodée sans métadonnées), en citant éventuellement un message",
+        "summary": "Envoyer un texte, une photo (ré-encodée sans métadonnées) ou un message vocal, en citant éventuellement un message",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/groups": {
+      "post": {
+        "operationId": "MessagingController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créer un groupe (18 ans et plus, 32 personnes au plus) ; renvoie les personnes non ajoutées, sans motif",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/members": {
+      "get": {
+        "operationId": "MessagingController_members",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Membres d’un groupe (actifs et invités)",
+        "tags": [
+          "Messages"
+        ]
+      },
+      "post": {
+        "operationId": "MessagingController_addMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGroupMembersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter des personnes à un groupe (administrateur)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/members/{username}": {
+      "delete": {
+        "operationId": "MessagingController_removeMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "username",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer une personne d’un groupe (administrateur)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}/leave": {
+      "post": {
+        "operationId": "MessagingController_leave",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quitter un groupe",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/v1/conversations/{id}": {
+      "patch": {
+        "operationId": "MessagingController_rename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renommer un groupe (administrateur)",
+        "tags": [
+          "Messages"
+        ]
+      },
+      "get": {
+        "operationId": "MessagingController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une conversation : la personne, le statut (demande ou non), les non-lus",
         "tags": [
           "Messages"
         ]
@@ -5791,35 +6029,6 @@
           }
         ],
         "summary": "Refuser une demande (l’autre personne n’est pas avertie)",
-        "tags": [
-          "Messages"
-        ]
-      }
-    },
-    "/v1/conversations/{id}": {
-      "get": {
-        "operationId": "MessagingController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Une conversation : la personne, le statut (demande ou non), les non-lus",
         "tags": [
           "Messages"
         ]
@@ -6248,6 +6457,11 @@
                     "type": "string",
                     "format": "binary"
                   },
+                  "voice": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Message vocal M4A (AAC), 2 minutes au plus"
+                  },
                   "replyToId": {
                     "type": "string",
                     "format": "uuid"
@@ -6266,6 +6480,11 @@
                   "photo": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "voice": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Message vocal M4A (AAC), 2 minutes au plus"
                   },
                   "replyToId": {
                     "type": "string",
@@ -6286,7 +6505,7 @@
             "bearer": []
           }
         ],
-        "summary": "Répondre au nom de la boutique (texte ou photo ré-encodée sans métadonnées)",
+        "summary": "Répondre au nom de la boutique (texte, photo ré-encodée sans métadonnées ou message vocal)",
         "tags": [
           "Messages de la boutique"
         ]
@@ -11887,6 +12106,56 @@
         },
         "required": [
           "shopSlug"
+        ]
+      },
+      "CreateGroupDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Team running Cocody",
+            "maxLength": 60
+          },
+          "usernames": {
+            "example": [
+              "awa.kone",
+              "koffi.yao"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "usernames"
+        ]
+      },
+      "AddGroupMembersDto": {
+        "type": "object",
+        "properties": {
+          "usernames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "usernames"
+        ]
+      },
+      "RenameGroupDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "title"
         ]
       },
       "ReactionDto": {
