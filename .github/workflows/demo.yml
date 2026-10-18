@@ -8,6 +8,8 @@ name: Démo gratuite
 on:
   push:
     branches: [main]
+  # Toute branche qui touche à la démo : vérification avant fusion.
+  pull_request:
   workflow_dispatch:
 
 permissions:
