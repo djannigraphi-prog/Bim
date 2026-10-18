@@ -74,9 +74,9 @@ class _DemoServerButtonState extends ConsumerState<DemoServerButton> {
     }
     api.setBaseUrl(normalized);
     await DemoServer.save(normalized);
-    if (!mounted) return;
+    if (!context.mounted) return;
     setState(() {});
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Serveur de démo : $normalized')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Serveur de démo : $normalized')));
   }
 
   @override

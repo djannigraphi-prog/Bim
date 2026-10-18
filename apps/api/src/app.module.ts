@@ -38,6 +38,15 @@ import { DemoModule } from './modules/demo/demo.module';
  * envoi des messages, politique d'âge, espaces) sont globaux ; les modules métier n'importent jamais un contrôleur d'un autre.
  * Les lots suivants ajouteront ici : reminders, peni, social, catalog, orders, deliveries, payments, wallet, live, messaging…
  */
+function hasPinoPretty(): boolean {
+  try {
+    require.resolve('pino-pretty');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 @Module({
   imports: [
     ConfigModule,
@@ -51,7 +60,8 @@ import { DemoModule } from './modules/demo/demo.module';
             paths: ['req.headers.authorization', 'req.headers["x-step-up-token"]', 'req.headers.cookie', 'req.body.password', 'req.body.newPassword', 'req.body.code', 'req.body.refreshToken', 'req.body.loginToken', 'req.body.secret'],
             censor: '[masqué]',
           },
-          transport: cfg.NODE_ENV === 'development' ? { target: 'pino-pretty', options: { singleLine: true } } : undefined,
+          // Journaux lisibles en développement, si pino-pretty est installé (absent de l'image de démonstration).
+          transport: cfg.NODE_ENV === 'development' && hasPinoPretty() ? { target: 'pino-pretty', options: { singleLine: true } } : undefined,
           autoLogging: cfg.NODE_ENV !== 'test',
         },
       }),
