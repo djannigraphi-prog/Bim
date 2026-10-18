@@ -7207,6 +7207,45 @@
         ]
       }
     },
+    "/v1/orders/{id}/delivery/retry": {
+      "post": {
+        "operationId": "OrdersController_retryDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Client absent : demander une nouvelle tentative (frais de livraison payés une deuxième fois, nouveau code)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/orders/{id}/delivery/review": {
       "post": {
         "operationId": "OrdersController_reviewDelivery",
@@ -7818,6 +7857,45 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
+    "/v1/shop/orders/{id}/delivery/reassign": {
+      "post": {
+        "operationId": "ShopOrdersController_reassign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Demander un autre livreur après la prise en charge (le livreur actuel doit accepter ; sinon le support tranche)",
         "tags": [
           "Espace marchand"
         ]
@@ -9082,6 +9160,45 @@
           }
         ],
         "summary": "Clôturer la livraison (code validé, paiement déclaré ou espèces constatées, aucun incident ouvert)",
+        "tags": [
+          "Livreurs"
+        ]
+      }
+    },
+    "/v1/courier/courses/{id}/reassign": {
+      "post": {
+        "operationId": "CourierDeliveriesController_answerReassign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignAnswerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Répondre à une demande de changement de livreur (accord : rapporter le colis ; refus : le support tranche)",
         "tags": [
           "Livreurs"
         ]
@@ -12362,6 +12479,18 @@
           "reason"
         ]
       },
+      "RetryDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "acceptFee": {
+            "type": "boolean",
+            "description": "Le client accepte les frais de la nouvelle tentative"
+          }
+        },
+        "required": [
+          "acceptFee"
+        ]
+      },
       "ReviewDto": {
         "type": "object",
         "properties": {
@@ -12583,6 +12712,17 @@
           "courierId"
         ]
       },
+      "ReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "ProposalLineDto": {
         "type": "object",
         "properties": {
@@ -12626,17 +12766,6 @@
           "conversationId",
           "items",
           "idempotencyKey"
-        ]
-      },
-      "ReasonDto": {
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "reason"
         ]
       },
       "HandoverDto": {
@@ -12694,6 +12823,17 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "ReassignAnswerDto": {
+        "type": "object",
+        "properties": {
+          "accept": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accept"
         ]
       },
       "CourierNoteDto": {
