@@ -2605,6 +2605,26 @@
         ]
       }
     },
+    "/v1/people/suggestions": {
+      "get": {
+        "operationId": "SocialController_suggestions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Personnes à suivre : abonnements en commun, mêmes objectifs, publications appréciées (jamais de mineurs)",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/v1/people/{username}": {
       "get": {
         "operationId": "SocialController_profile",

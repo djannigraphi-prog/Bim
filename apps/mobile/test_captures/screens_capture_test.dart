@@ -509,6 +509,9 @@ class _FakeShopInboxApi extends ShopInboxApi {
 class _FakeSocialApi extends SocialApi {
   _FakeSocialApi(super.api);
 
+  @override
+  Future<List<PersonSuggestion>> suggestions() async => const [];
+
   static const _edwige = PersonRef(id: 'u1', username: 'edwige.k', fullName: 'Edwige Koffi');
   static const _me = PersonRef(id: 'u0', username: 'yannick.doho', fullName: 'Doho Yannick');
   static final _bim = FeedPost(

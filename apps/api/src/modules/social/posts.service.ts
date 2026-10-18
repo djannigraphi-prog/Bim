@@ -1,6 +1,6 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
@@ -248,9 +248,8 @@ export class PostsService {
 
   /** Fil « Pour toi » (publications publiques de tous) ou « Abonnés » (personnes suivies). Pagination par curseur. */
   async feed(viewerId: string, tab: 'for_you' | 'following', cursor: string | undefined, apiBase: string) {
-    const conds = [postVisibleTo(viewerId)];
-    if (tab === 'for_you') conds.push(eq(posts.visibility, 'public'));
-    else conds.push(sql`EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${viewerId} AND f.followee_id = ${posts.userId})`);
+    if (tab === 'for_you') return this.forYou(viewerId, cursor, apiBase);
+    const conds = [postVisibleTo(viewerId), sql`EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${viewerId} AND f.followee_id = ${posts.userId})`];
     if (cursor) conds.push(lt(posts.id, cursor));
     const rows = await this.db
       .select({ post: posts, author: { id: users.id, username: users.username, fullName: users.fullName, avatarKey: users.avatarKey } })
@@ -261,6 +260,42 @@ export class PostsService {
       .limit(PAGE + 1);
     const page = rows.slice(0, PAGE);
     return { items: await this.views(viewerId, page, apiBase), nextCursor: rows.length > PAGE ? page[page.length - 1].post.id : null };
+  }
+
+  /**
+   * V1 — « Pour toi » classé (décision du 18/10/2026 : abonnements, catégories des projets, j'aime ; aucune publicité).
+   * Score = fraîcheur (heures) + 24 si je suis l'auteur, + 12 pour un « J'ai fait mon BIM » d'une catégorie de mes
+   * projets, + 6 si une personne que je suis l'a aimée, + 2 × ln(1 + j'aime). Pagination stable : instantané figé par
+   * la première page (curseur « r.<instant>.<décalage> »), aucune publication plus récente n'y entre.
+   */
+  private async forYou(viewerId: string, cursor: string | undefined, apiBase: string) {
+    let snapshot = new Date();
+    let offset = 0;
+    if (cursor) {
+      const m = /^r\.(\d{10,15})\.(\d{1,5})$/.exec(cursor);
+      if (!m) throw Errors.validation({ fields: { cursor: ['Curseur invalide.'] } });
+      snapshot = new Date(Number(m[1]));
+      offset = Number(m[2]);
+    }
+    const score = sql`(
+      extract(epoch from ${posts.createdAt}) / 3600.0
+      + CASE WHEN EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${viewerId} AND f.followee_id = ${posts.userId}) THEN 24 ELSE 0 END
+      + CASE WHEN ${posts.kind} = 'bim' AND EXISTS (SELECT 1 FROM projects pr WHERE pr.id = ${posts.projectId}
+               AND pr.category_code IN (SELECT category_code FROM projects mp WHERE mp.user_id = ${viewerId})) THEN 12 ELSE 0 END
+      + CASE WHEN EXISTS (SELECT 1 FROM post_likes l JOIN follows f2 ON f2.followee_id = l.user_id AND f2.follower_id = ${viewerId}
+               WHERE l.post_id = ${posts.id}) THEN 6 ELSE 0 END
+      + 2 * ln(1 + (SELECT count(*) FROM post_likes l2 WHERE l2.post_id = ${posts.id}))
+    )`;
+    const rows = await this.db
+      .select({ post: posts, author: { id: users.id, username: users.username, fullName: users.fullName, avatarKey: users.avatarKey } })
+      .from(posts)
+      .innerJoin(users, eq(users.id, posts.userId))
+      .where(and(postVisibleTo(viewerId), eq(posts.visibility, 'public'), lte(posts.createdAt, snapshot)))
+      .orderBy(desc(score), desc(posts.id))
+      .offset(offset)
+      .limit(PAGE + 1);
+    const page = rows.slice(0, PAGE);
+    return { items: await this.views(viewerId, page, apiBase), nextCursor: rows.length > PAGE ? `r.${snapshot.getTime()}.${offset + PAGE}` : null };
   }
 
   /**

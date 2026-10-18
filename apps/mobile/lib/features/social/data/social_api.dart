@@ -73,6 +73,10 @@ class SocialApi {
   Future<List<PersonResult>> search(String q) async =>
       ((await _api.get('/v1/people', query: {'q': q}))['items'] as List<dynamic>).map((e) => PersonResult.fromJson(e as Map<String, dynamic>)).toList();
 
+  /// V1 — Personnes à suivre (sans publicité).
+  Future<List<PersonSuggestion>> suggestions() async =>
+      ((await _api.get('/v1/people/suggestions'))['items'] as List<dynamic>).map((e) => PersonSuggestion.fromJson(e as Map<String, dynamic>)).toList();
+
   Future<void> follow(String username, {required bool on}) =>
       on ? _api.put('/v1/people/${Uri.encodeComponent(username)}/follow') : _api.delete('/v1/people/${Uri.encodeComponent(username)}/follow');
 

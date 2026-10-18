@@ -127,7 +127,9 @@ export class SocialController {
   @ApiQuery({ name: 'cursor', required: false })
   @ApiOperation({ summary: 'Fil « Pour toi » ou « Abonnés » (écran 10), 20 publications par page' })
   feed(@CurrentAuth() a: AuthContext, @Req() req: Request, @Query('tab') tab?: string, @Query('cursor') cursor?: string) {
-    return this.posts.feed(a.userId, tab === 'following' ? 'following' : 'for_you', this.cursor(cursor), apiBase(req));
+    const t = tab === 'following' ? 'following' : 'for_you';
+    // « Pour toi » est classé (V1) : son curseur est vérifié par le service.
+    return this.posts.feed(a.userId, t, t === 'for_you' ? cursor?.slice(0, 40) || undefined : this.cursor(cursor), apiBase(req));
   }
 
   @Post('posts')
@@ -224,6 +226,12 @@ export class SocialController {
   @ApiOperation({ summary: 'Rechercher une personne (nom d’utilisateur ou nom)' })
   search(@CurrentAuth() a: AuthContext, @Query('q') q: string | undefined, @Req() req: Request) {
     return this.people.search(a.userId, q ?? '', apiBase(req));
+  }
+
+  @Get('people/suggestions')
+  @ApiOperation({ summary: 'Personnes à suivre : abonnements en commun, mêmes objectifs, publications appréciées (jamais de mineurs)' })
+  suggestions(@CurrentAuth() a: AuthContext, @Req() req: Request) {
+    return this.people.suggestions(a.userId, apiBase(req));
   }
 
   @Get('people/:username')

@@ -6,11 +6,13 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
+import '../../../core/widgets/feedback.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../projects/application/projects_providers.dart';
 import '../../projects/presentation/my_projects_screen.dart';
 import '../application/social_providers.dart';
+import '../data/social_api.dart';
 import '../data/social_models.dart';
 import 'post_card.dart';
 import 'social_widgets.dart';
@@ -59,6 +61,7 @@ class _FeedViewState extends ConsumerState<FeedView> {
       const SizedBox(height: BimSpacing.sm),
       const _ComposerRow(),
       const _MyProjectsHeader(),
+      if (_tab == 'for_you') const _Suggestions(),
     ];
     return RefreshIndicator(
       onRefresh: () async {
@@ -107,6 +110,80 @@ class _FeedViewState extends ConsumerState<FeedView> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// V1 — « Personnes à suivre » : abonnements en commun, mêmes objectifs, publications appréciées ; masqué si vide.
+class _Suggestions extends ConsumerStatefulWidget {
+  const _Suggestions();
+
+  @override
+  ConsumerState<_Suggestions> createState() => _SuggestionsState();
+}
+
+class _SuggestionsState extends ConsumerState<_Suggestions> {
+  final _followed = <String>{};
+
+  Future<void> _follow(PersonSuggestion s) async {
+    setState(() => _followed.add(s.person.username));
+    try {
+      await ref.read(socialApiProvider).follow(s.person.username, on: true);
+      ref.invalidate(feedProvider('following'));
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _followed.remove(s.person.username));
+        showApiError(context, e);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = (ref.watch(suggestionsProvider).valueOrNull ?? const <PersonSuggestion>[]).where((s) => !_followed.contains(s.person.username)).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Column(
+      key: const ValueKey('suggestions'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.xs), child: Text('Personnes à suivre', style: theme.textTheme.titleMedium)),
+        SizedBox(
+          height: 172,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
+            children: [
+              for (final s in items)
+                Container(
+                  key: ValueKey('suggestion-${s.person.username}'),
+                  width: 140,
+                  margin: const EdgeInsets.only(right: BimSpacing.sm),
+                  padding: const EdgeInsets.all(BimSpacing.sm),
+                  decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outlineVariant), borderRadius: BorderRadius.circular(BimRadius.card)),
+                  child: Column(
+                    children: [
+                      InkWell(onTap: () => context.push('/people/${s.person.username}'), child: PersonAvatar(person: s.person, size: 48)),
+                      const SizedBox(height: BimSpacing.xs),
+                      Text(s.person.fullName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(s.reasonLabel, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                      const Spacer(),
+                      SizedBox(
+                        height: 32,
+                        child: FilledButton(
+                          key: ValueKey('suggestion-follow-${s.person.username}'),
+                          style: FilledButton.styleFrom(backgroundColor: BimColors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: BimSpacing.md)),
+                          onPressed: () => _follow(s),
+                          child: const Text('Suivre'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

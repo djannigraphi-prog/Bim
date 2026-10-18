@@ -95,6 +95,47 @@ export class PeopleService {
     return { items };
   }
 
+  /**
+   * V1 — Personnes à suivre (décision du 18/10/2026 : abonnements, catégories des projets, j'aime ; aucune publicité).
+   * Signaux publics seulement : personnes suivies par mes abonnements, auteurs de « J'ai fait mon BIM » publics dans
+   * les catégories de mes projets, publications publiques appréciées ces 30 derniers jours. Jamais une personne de
+   * moins de 18 ans (protection des mineurs), ni une personne bloquée, ni quelqu'un que je suis déjà.
+   */
+  async suggestions(viewerId: string, apiBase: string) {
+    const rows = await this.db.execute<{ id: string; username: string; full_name: string; avatar_key: string | null; mutual: number; same_goals: boolean; likes: number }>(sql`
+      WITH mine AS (SELECT followee_id FROM follows WHERE follower_id = ${viewerId}),
+           cats AS (SELECT DISTINCT category_code FROM projects WHERE user_id = ${viewerId}),
+           scored AS (
+             SELECT u.id, u.username, u.full_name, u.avatar_key,
+                    (SELECT count(*) FROM follows f WHERE f.followee_id = u.id AND f.follower_id IN (SELECT followee_id FROM mine))::int AS mutual,
+                    EXISTS (SELECT 1 FROM posts p JOIN projects pr ON pr.id = p.project_id
+                            WHERE p.user_id = u.id AND p.kind = 'bim' AND p.status = 'published' AND p.visibility = 'public'
+                              AND pr.category_code IN (SELECT category_code FROM cats)) AS same_goals,
+                    (SELECT count(*) FROM post_likes l JOIN posts p ON p.id = l.post_id
+                      WHERE p.user_id = u.id AND p.status = 'published' AND p.visibility = 'public' AND l.created_at > now() - interval '30 days')::int AS likes
+             FROM users u
+             WHERE u.status = 'active' AND u.id <> ${viewerId}
+               AND u.id NOT IN (SELECT followee_id FROM mine)
+               AND u.birth_date <= (current_date - interval '18 years')
+               AND ${notBlockedBetween(viewerId, sql.raw('u.id'))}
+           )
+      SELECT * FROM scored WHERE mutual > 0 OR same_goals OR likes > 0
+      ORDER BY mutual * 10 + (CASE WHEN same_goals THEN 5 ELSE 0 END) + ln(1 + likes) DESC, username
+      LIMIT 15`);
+    const items = [];
+    for (const r of rows.rows) {
+      items.push({
+        id: r.id,
+        username: r.username,
+        fullName: r.full_name,
+        avatarUrl: await this.posts.avatarUrl(r.avatar_key, apiBase),
+        reason: r.mutual > 0 ? 'followed_by_friends' : r.same_goals ? 'same_goals' : 'popular',
+        mutualCount: Number(r.mutual),
+      });
+    }
+    return { items };
+  }
+
   async follow(viewerId: string, username: string, on: boolean) {
     const u = await this.visiblePerson(viewerId, { username });
     if (u.id === viewerId) throw Errors.validation({ fields: { username: ['Tu ne peux pas t’abonner à toi-même.'] } });

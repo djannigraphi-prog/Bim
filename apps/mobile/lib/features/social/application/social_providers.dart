@@ -38,7 +38,9 @@ class FeedController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
     state = AsyncData(s.copyWith(loadingMore: true, pageError: false));
     try {
       final page = await ref.read(socialApiProvider).feed(tab: arg, cursor: s.nextCursor);
-      state = AsyncData(FeedState(items: [...s.items, ...page.items], nextCursor: page.nextCursor));
+      // « Pour toi » est classé (V1) : une publication déjà affichée n'est jamais répétée.
+      final known = {for (final p in s.items) p.id};
+      state = AsyncData(FeedState(items: [...s.items, ...page.items.where((p) => !known.contains(p.id))], nextCursor: page.nextCursor));
     } catch (_) {
       state = AsyncData(s.copyWith(loadingMore: false, pageError: true));
     }
@@ -98,3 +100,6 @@ class PersonPostsController extends AutoDisposeFamilyAsyncNotifier<FeedState, St
 }
 
 final personPostsProvider = AsyncNotifierProvider.autoDispose.family<PersonPostsController, FeedState, String>(PersonPostsController.new);
+
+/// V1 — Personnes à suivre, en tête du fil « Pour toi ».
+final suggestionsProvider = FutureProvider.autoDispose<List<PersonSuggestion>>((ref) => ref.watch(socialApiProvider).suggestions());

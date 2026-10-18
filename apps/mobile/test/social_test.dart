@@ -104,6 +104,13 @@ class _FakeSocial extends SocialApi {
   bool followed = false;
 
   @override
+  /// V1 : personnes à suivre (vide par défaut, pour ne pas décaler les autres écrans testés).
+  bool withSuggestions = false;
+
+  @override
+  Future<List<PersonSuggestion>> suggestions() async => !withSuggestions ? const [] : [const PersonSuggestion(person: PersonRef(id: 'u9', username: 'koffi.y', fullName: 'Koffi Yao'), reason: 'followed_by_friends', mutualCount: 3)];
+
+  @override
   Future<FeedPage> personPosts(String username, {String? cursor}) async => username != 'long.profil'
       ? FeedPage(items: [_post('g1', text: 'Juste du texte')])
       : cursor == null
@@ -321,6 +328,19 @@ void main() {
     s = container.read(personPostsProvider('long.profil')).value!;
     expect(s.items.map((p) => p.id), ['g1', 'g2']);
     expect(s.hasMore, isFalse);
+  });
+
+  testWidgets('V1 : « Personnes à suivre » en tête du fil, avec la raison ; « Suivre » la retire', (tester) async {
+    final social = _FakeSocial()..withSuggestions = true;
+    await _pump(tester, const Scaffold(body: FeedView()), social);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Personnes à suivre'), findsOneWidget);
+    expect(find.text('Suivie par 3 de tes abonnements'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('suggestion-follow-koffi.y')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(social.calls, contains('follow koffi.y true'));
+    expect(find.byKey(const ValueKey('suggestions')), findsNothing);
   });
 
   testWidgets('écran 06 : un visiteur voit le fil public ; réagir ouvre l’invitation à créer un compte, sans appel', (tester) async {

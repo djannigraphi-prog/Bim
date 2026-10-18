@@ -311,6 +311,25 @@ class PersonResult {
   factory PersonResult.fromJson(Map<String, dynamic> j) => PersonResult(person: PersonRef.fromJson(j), followedByMe: (j['followedByMe'] ?? false) as bool);
 }
 
+/// V1 — Personne suggérée (« Personnes à suivre ») : abonnements en commun, objectifs proches ou publications appréciées.
+class PersonSuggestion {
+  const PersonSuggestion({required this.person, required this.reason, this.mutualCount = 0});
+
+  final PersonRef person;
+  /// followed_by_friends · same_goals · popular
+  final String reason;
+  final int mutualCount;
+
+  String get reasonLabel => switch (reason) {
+        'followed_by_friends' => mutualCount > 1 ? 'Suivie par $mutualCount de tes abonnements' : 'Suivie par un de tes abonnements',
+        'same_goals' => 'Mêmes objectifs que toi',
+        _ => 'Appréciée sur BIM',
+      };
+
+  factory PersonSuggestion.fromJson(Map<String, dynamic> j) =>
+      PersonSuggestion(person: PersonRef.fromJson(j), reason: (j['reason'] ?? 'popular') as String, mutualCount: (j['mutualCount'] ?? 0) as int);
+}
+
 /// Motifs de signalement d'un contenu (identiques à l'API).
 const contentReportReasons = <(String, String)>[
   ('spam', 'Spam ou publicité'),
