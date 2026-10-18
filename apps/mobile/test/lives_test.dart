@@ -130,7 +130,7 @@ void main() {
     expect(find.byKey(const ValueKey('live-no-video')), findsOneWidget);
     expect(find.text('Maison Awa'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const ValueKey('live-viewers'))).data, '12');
-    expect(find.text('Bravo Awa !'), findsOneWidget);
+    expect(find.textContaining('Bravo Awa !', findRichText: true), findsOneWidget);
     expect(find.byKey(const ValueKey('live-gift-anim')), findsOneWidget);
     expect(find.text('Koffi Yao · 1 000 pièces'), findsOneWidget);
     expect(find.text('Robe de Live · 20 000 F'), findsOneWidget);
