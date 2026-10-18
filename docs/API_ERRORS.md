@@ -92,4 +92,5 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `ADMIN_EXISTS` · `SELF_LOCKOUT` · `LAST_SUPER_ADMIN` · `INVALID_STATUS` | 409 | gestion des comptes d'administration et des statuts de compte |
 | `NO_MEASURE` | 409 | l'objectif du projet ne se mesure pas en chiffres |
 | `REPORT_NOT_OPEN` · `CODE_TAKEN` | 409 | signalement déjà traité ; code de catégorie ou d'objectif déjà utilisé |
+| `INVITE_NOT_POSSIBLE` | 409 | invitation dans l’équipe d’une boutique impossible (motif volontairement non précisé, ex. âge) |
 | `INTERNAL_ERROR` | 500 | erreur inattendue (détail uniquement dans les journaux) |

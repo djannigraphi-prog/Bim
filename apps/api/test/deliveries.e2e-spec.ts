@@ -172,10 +172,15 @@ describe('Livraisons (e2e)', () => {
     await h.http().post(`/v1/courier/courses/${dId}/arrived`).set(employee.space).expect(200);
     course = (await h.http().post(`/v1/courier/courses/${dId}/code`).set(employee.space).send({ code }).expect(200)).body;
     expect(course.actions).toEqual(['cash_received', 'close', 'report_incident']);
-    // Pas de clôture avant les espèces ; montant exact exigé.
+    // Décision du 18/10 : l'employé encaisse aussi les frais de livraison (1 700 F) pour la boutique, une seule fois.
+    expect(course.payment).toMatchObject({ method: 'cash', amountToCollectFcfa: 21700 });
+    const view = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth).expect(200)).body.payment;
+    expect(view).toMatchObject({ amountFcfa: 21700, deliveryFeeIncludedFcfa: 1700 });
+    expect((await h.pool.query("select count(*)::int n from order_payments where order_id = $1 and kind = 'delivery_fee'", [o.id])).rows[0].n).toBe(0);
+    // Pas de clôture avant les espèces ; montant exact exigé (articles + frais).
     expect((await h.http().post(`/v1/courier/courses/${dId}/close`).set(employee.space).expect(409)).body.error.code).toBe('PAYMENT_CONDITION_MISSING');
-    expect((await h.http().post(`/v1/courier/courses/${dId}/cash`).set(employee.space).send({ amountFcfa: 19000 }).expect(400)).body.error.code).toBe('CASH_AMOUNT_MISMATCH');
-    await h.http().post(`/v1/courier/courses/${dId}/cash`).set(employee.space).send({ amountFcfa: 20000 }).expect(200);
+    expect((await h.http().post(`/v1/courier/courses/${dId}/cash`).set(employee.space).send({ amountFcfa: 20000 }).expect(400)).body.error.code).toBe('CASH_AMOUNT_MISMATCH');
+    await h.http().post(`/v1/courier/courses/${dId}/cash`).set(employee.space).send({ amountFcfa: 21700 }).expect(200);
     await h.http().post(`/v1/courier/courses/${dId}/close`).set(employee.space).expect(200);
     const so = (await h.http().get(`/v1/shop/orders/${o.id}`).set(s.auth).expect(200)).body;
     expect(so.status).toBe('delivered');

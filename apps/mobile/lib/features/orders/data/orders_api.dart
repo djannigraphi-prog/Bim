@@ -138,9 +138,11 @@ class OrderEvent {
 
 /// 7-C — Paiement de l'article : cinq informations distinctes ; le statut affiché est calculé par le serveur.
 class OrderPayment {
-  const OrderPayment({required this.method, required this.amountFcfa, required this.status, this.declaredReference, this.contestReason, this.payoutPhone, this.payoutOperator});
+  const OrderPayment({required this.method, required this.amountFcfa, required this.status, this.deliveryFeeIncludedFcfa = 0, this.declaredReference, this.contestReason, this.payoutPhone, this.payoutOperator});
   final String method;
   final int amountFcfa;
+  /// Frais d'un livreur employé encaissés avec l'article, pour la boutique (compris dans [amountFcfa]).
+  final int deliveryFeeIncludedFcfa;
   /// not_paid · declared_by_customer · cash_received_to_confirm · confirmed_by_shop · contested_by_shop · cancelled · failed
   final String status;
   final String? declaredReference;
@@ -154,6 +156,7 @@ class OrderPayment {
     return OrderPayment(
       method: j['method'] as String,
       amountFcfa: j['amountFcfa'] as int,
+      deliveryFeeIncludedFcfa: (j['deliveryFeeIncludedFcfa'] as int?) ?? 0,
       status: j['status'] as String,
       declaredReference: j['declaredReference'] as String?,
       contestReason: j['contestReason'] as String?,

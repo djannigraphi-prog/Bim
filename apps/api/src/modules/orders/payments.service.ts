@@ -87,6 +87,8 @@ export class PaymentsService {
       kind: p.kind,
       method: p.method,
       amountFcfa: p.amountFcfa,
+      /** Frais d'un livreur employé encaissés avec l'article, pour la boutique (décision du 18/10/2026). */
+      deliveryFeeIncludedFcfa: Math.max(0, p.amountFcfa - o.itemsTotalFcfa),
       status: paymentStatus(p),
       declaredAt: p.declaredAt,
       declaredReference: p.declaredReference,

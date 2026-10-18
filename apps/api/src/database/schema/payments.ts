@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, jsonb, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { shops } from './spaces';
 import { users } from './identity';
 import { orders } from './orders';
@@ -87,7 +87,10 @@ export const paymentIntents = pgTable(
     payeeAccountRef: varchar('payee_account_ref', { length: 60 }),
     amountFcfa: integer('amount_fcfa').notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('XOF'),
+    /** pending · succeeded · failed · expired · late_paid (argent reçu mais non retenu : remboursé automatiquement). */
     status: varchar('status', { length: 10 }).notNull().default('pending'),
+    /** Montant réellement reçu, vérifié auprès du prestataire, quand il diffère de l'attendu ou arrive en retard. */
+    paidAmountFcfa: integer('paid_amount_fcfa'),
     /** Motif technique d'un échec (montant, devise, bénéficiaire, refus du prestataire, expiration) ; jamais de donnée personnelle. */
     failureReason: varchar('failure_reason', { length: 40 }),
     createdBy: uuid('created_by')
@@ -100,7 +103,7 @@ export const paymentIntents = pgTable(
     uniqueIndex('payment_intents_ref_uq').on(t.provider, t.providerRef),
     // Un seul paiement en ligne en cours par paiement du registre.
     uniqueIndex('payment_intents_open_uq').on(t.orderPaymentId).where(sql`${t.status} = 'pending'`),
-    check('payment_intents_status_ck', sql`${t.status} IN ('pending', 'succeeded', 'failed', 'expired')`),
+    check('payment_intents_status_ck', sql`${t.status} IN ('pending', 'succeeded', 'failed', 'expired', 'late_paid')`),
     check('payment_intents_amount_ck', sql`${t.amountFcfa} > 0`),
     check('payment_intents_currency_ck', sql`${t.currency} = 'XOF'`),
   ],
@@ -162,7 +165,9 @@ export const paymentRefunds = pgTable(
     reason: varchar('reason', { length: 300 }).notNull(),
     status: varchar('status', { length: 12 }).notNull().default('pending'),
     providerRefundRef: varchar('provider_refund_ref', { length: 60 }),
-    requestedByAdmin: uuid('requested_by_admin').notNull(),
+    /** Équipe BIM ; null pour un remboursement automatique (paiement reçu en retard ou non conforme). */
+    requestedByAdmin: uuid('requested_by_admin'),
+    automatic: boolean('automatic').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     settledAt: timestamp('settled_at', { withTimezone: true }),
   },
@@ -171,5 +176,6 @@ export const paymentRefunds = pgTable(
     uniqueIndex('payment_refunds_open_uq').on(t.intentId).where(sql`${t.status} IN ('pending', 'processing')`),
     check('payment_refunds_status_ck', sql`${t.status} IN ('pending', 'processing', 'processed', 'failed')`),
     check('payment_refunds_amount_ck', sql`${t.amountFcfa} > 0`),
+    check('payment_refunds_origin_ck', sql`${t.automatic} OR ${t.requestedByAdmin} IS NOT NULL`),
   ],
 );

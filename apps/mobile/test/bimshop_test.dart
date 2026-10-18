@@ -72,7 +72,9 @@ class _FakeBimShop extends BimShopApi {
   Future<void> setFavorite(String id, bool on) async => calls.add('favorite $id $on');
 
   @override
-  Future<PublicShop> shop(String slug) async => PublicShop(shop: _shop, description: 'Robes de soirée', followers: 1, productCount: 2, items: [_card('p1', 'Robe Plumes', 45000)]);
+  Future<PublicShop> shop(String slug, {String? cursor}) async => cursor == null
+      ? PublicShop(shop: _shop, description: 'Robes de soirée', followers: 1, productCount: 2, items: [_card('p1', 'Robe Plumes', 45000)], nextCursor: 'c2')
+      : PublicShop(shop: _shop, followers: 1, productCount: 2, items: [_card('p9', 'Robe Lumière', 52000)]);
 
   @override
   Future<({bool following, bool own})> shopState(String slug) async => (following: false, own: false);
@@ -233,6 +235,12 @@ void main() {
     expect(api.calls, ['follow maison-plumes true']);
     expect(tester.widget<Text>(find.byKey(const ValueKey('shop-counts'))).data, '2 articles · 2 abonnés');
     expect(find.text('Abonné'), findsOneWidget);
+    // « Voir plus » : page suivante des articles, puis plus de bouton (audit du 18/10).
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('shop-more')), 200);
+    await tester.tap(find.byKey(const ValueKey('shop-more')));
+    await tester.pumpAndSettle();
+    expect(find.text('Robe Lumière'), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-more')), findsNothing);
   });
 
   testWidgets('6-B : « Discuter » sur la fiche article et « Écrire » sur le profil ouvrent la conversation avec la boutique', (tester) async {

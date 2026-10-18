@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
@@ -20,7 +20,7 @@ const notAllowed = (m: string) => new AppError('PAYMENT_NOT_ALLOWED', m, HttpSta
  * aucun fonds. Comme pour l'article : déclaration du client (jamais une confirmation), puis décision du bénéficiaire
  * (le livreur confirme la réception ou la conteste). Le paiement n'est attendu qu'après une remise réussie (code
  * validé) ; refus du client, absence et annulation ne créent aucun frais (politique financière A8 non définie).
- * Décision du 17/10/2026 (20 h 10) : un **partenaire** est payé de la même façon. Employés : frais à la boutique.
+ * Décision du 17/10/2026 (20 h 10) : un **partenaire** est payé de la même façon. Employés : frais encaissés avec l'article, pour la boutique (décision du 18/10/2026).
  */
 @Injectable()
 export class DeliveryFeesService {
@@ -32,7 +32,19 @@ export class DeliveryFeesService {
 
   /** À la validation du code : frais attendus si le livreur est indépendant ou partenaire et que la livraison est payante. */
   async openInTx(tx: DbOrTx, d: Delivery, o: Order) {
-    if ((d.courierCategory !== 'independent' && d.courierCategory !== 'partner') || !o.deliveryFeeFcfa || o.deliveryFeeFcfa <= 0) return;
+    if (!o.deliveryFeeFcfa || o.deliveryFeeFcfa <= 0) return;
+    if (d.courierCategory === 'employee') {
+      // Décision du 18/10/2026 (audit) : le livreur employé encaisse aussi les frais, pour la boutique. Ils rejoignent
+      // le paiement de l'article (même bénéficiaire, même moyen, même décision de la boutique) ; une seule fois.
+      const [p] = await tx
+        .update(orderPayments)
+        .set({ amountFcfa: sql`${orderPayments.amountFcfa} + ${o.deliveryFeeFcfa}` })
+        .where(and(eq(orderPayments.orderId, o.id), eq(orderPayments.kind, 'article'), eq(orderPayments.amountFcfa, o.itemsTotalFcfa), eq(orderPayments.decision, 'pending'), eq(orderPayments.failure, 'none'), isNull(orderPayments.declaredAt), isNull(orderPayments.cashObservedAt)))
+        .returning({ id: orderPayments.id });
+      if (p) await this.orders.event(tx, o.id, 'delivery_fee_added_to_payment', 'system', null, null, null, { deliveryFeeFcfa: o.deliveryFeeFcfa });
+      return;
+    }
+    if (d.courierCategory !== 'independent' && d.courierCategory !== 'partner') return;
     await tx.insert(orderPayments).values({ id: uuidv7(), orderId: o.id, kind: 'delivery_fee', method: 'mobile_money', amountFcfa: o.deliveryFeeFcfa }).onConflictDoNothing();
   }
 

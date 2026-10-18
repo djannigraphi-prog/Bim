@@ -30,6 +30,26 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
   bool? _following;
   int _delta = 0;
   bool _busy = false;
+  // « Voir plus » (audit du 18/10) : pages suivantes des articles.
+  final List<ShopCard> _more = [];
+  String? _cursor;
+  bool _loadingMore = false;
+
+  Future<void> _loadMore(String cursor) async {
+    setState(() => _loadingMore = true);
+    try {
+      final page = await ref.read(bimShopApiProvider).shop(widget.slug, cursor: cursor);
+      if (!mounted) return;
+      setState(() {
+        _more.addAll(page.items);
+        _cursor = page.nextCursor ?? '';
+      });
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
 
   bool get _merchantSpace => switch (ref.read(sessionProvider)) {
         SessionSignedIn(:final me) => me.activeSpaceType == 'merchant',
@@ -152,7 +172,13 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
               const SizedBox(height: BimSpacing.xl),
               Text('Articles', style: theme.textTheme.titleLarge),
               const SizedBox(height: BimSpacing.md),
-              if (s.items.isEmpty) const Text('Aucun article en ligne pour l’instant.') else ShopCardGrid(cards: s.items, showShop: false),
+              if (s.items.isEmpty) const Text('Aucun article en ligne pour l’instant.') else ShopCardGrid(cards: [...s.items, ..._more], showShop: false),
+              if ((_cursor ?? s.nextCursor ?? '').isNotEmpty)
+                Center(
+                  child: _loadingMore
+                      ? const Padding(padding: EdgeInsets.all(BimSpacing.md), child: CircularProgressIndicator())
+                      : TextButton(key: const ValueKey('shop-more'), onPressed: () => _loadMore(_cursor ?? s.nextCursor!), child: const Text('Voir plus')),
+                ),
             ],
           ),
         ),

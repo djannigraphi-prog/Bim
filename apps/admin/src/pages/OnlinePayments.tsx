@@ -13,7 +13,7 @@ interface Item {
   shop: string;
   provider: string;
   amountFcfa: number;
-  status: 'pending' | 'succeeded' | 'failed' | 'expired';
+  status: 'pending' | 'succeeded' | 'failed' | 'expired' | 'late_paid';
   failureReason: string | null;
   createdAt: string;
   refunds: Refund[];
@@ -27,7 +27,7 @@ interface Account {
   status: string;
 }
 
-const STATUS: Record<Item['status'], string> = { pending: 'En attente du client', succeeded: 'Vérifié par le prestataire', failed: 'Échoué', expired: 'Expiré' };
+const STATUS: Record<Item['status'], string> = { pending: 'En attente du client', succeeded: 'Vérifié par le prestataire', failed: 'Échoué', expired: 'Expiré', late_paid: 'Reçu mais non retenu — remboursé automatiquement' };
 const REASON: Record<string, string> = {
   provider_failed: 'refusé par le prestataire',
   amount_mismatch: 'montant différent',
@@ -36,12 +36,15 @@ const REASON: Record<string, string> = {
   payment_closed: 'paiement déjà clos',
   replaced: 'remplacé par un nouveau lancement',
   expired: 'non validé dans le délai',
+  late_expired: 'payé après le délai',
+  late_replaced: 'payé après un nouveau lancement',
+  late_failed: 'payé après un échec',
 };
 const OPERATORS: Record<string, string> = { orange: 'Orange Money', mtn: 'MTN Mobile Money', wave: 'Wave', moov: 'Moov Money' };
 
 /**
  * Lot 8 — Paiements en ligne : suivi (consultation journalisée), comptes des boutiques chez le prestataire (F4 : sans
- * compte de la boutique, aucun paiement en ligne), remboursements demandés par l'équipe (jamais automatiques).
+ * compte de la boutique, aucun paiement en ligne), remboursements demandés par l'équipe ; un paiement reçu en retard ou non conforme est remboursé automatiquement.
  */
 export function OnlinePayments() {
   const [provider, setProvider] = useState('none');
@@ -157,7 +160,7 @@ export function OnlinePayments() {
               Remboursement de {r.amountFcfa} F : {r.status} — {r.reason}
             </p>
           ))}
-          {i.status === 'succeeded' && (
+          {(i.status === 'succeeded' || i.status === 'late_paid') && (
             <form onSubmit={(e) => doRefund(e, i.id)}>
               <label>
                 Montant à rembourser (vide : le reste)

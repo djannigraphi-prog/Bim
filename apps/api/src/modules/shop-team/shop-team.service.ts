@@ -72,7 +72,10 @@ export class ShopTeamService {
     const [u] = await this.db.select().from(users).where(eq(users.username, username.trim().toLowerCase()));
     if (!u || u.status !== 'active') throw Errors.notFound('Personne');
     if (u.id === ownerId) throw Errors.conflict('ALREADY_MEMBER', 'Tu es déjà le propriétaire de cette boutique.');
-    await this.ages.assert('merchant', u.birthDate);
+    // Âge de la personne invitée : jamais annoncé au propriétaire (audit du 18/10, décision du fondateur).
+    if (!(await this.ages.status('merchant', u.birthDate)).allowed) {
+      throw new AppError('INVITE_NOT_POSSIBLE', 'Cette personne ne peut pas rejoindre l’équipe pour le moment.', HttpStatus.CONFLICT);
+    }
     await this.db.transaction(async (tx) => {
       // Verrou de la boutique : deux invitations simultanées ne dépassent pas la limite.
       await tx.select({ id: shops.id }).from(shops).where(eq(shops.id, shopId)).for('update');

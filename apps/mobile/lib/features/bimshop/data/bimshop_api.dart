@@ -189,7 +189,8 @@ class BimShopApi {
   }
 
   Future<ShopProduct> product(String id) async => ShopProduct.fromJson(await _api.get('/v1/bimshop/products/$id'));
-  Future<PublicShop> shop(String slug) async => PublicShop.fromJson(await _api.get('/v1/bimshop/shops/$slug'));
+  Future<PublicShop> shop(String slug, {String? cursor}) async =>
+      PublicShop.fromJson(await _api.get('/v1/bimshop/shops/$slug', query: {if (cursor != null) 'cursor': cursor}));
 
   Future<({bool favorite, bool followingShop})> productState(String id) async {
     final r = await _api.get('/v1/bimshop/products/$id/me');

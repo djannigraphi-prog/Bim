@@ -92,6 +92,7 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
       .send(raw);
   };
   const intent = async (id: string) => (await h.pool.query('select provider_ref, status, failure_reason, payee_account_ref from payment_intents where id = $1', [id])).rows[0];
+  const refunds = async (id: string) => (await h.pool.query('select amount_fcfa, status, automatic, requested_by_admin from payment_refunds where intent_id = $1 order by created_at', [id])).rows;
   const payment = async (orderId: string) => (await h.pool.query("select provider_status, provider_confirmed_at, decision from order_payments where order_id = $1 and kind = 'article'", [orderId])).rows[0];
   const start = (o: { id: string; client: { auth: Auth } }, status = 200) => h.http().post(`/v1/orders/${o.id}/payment/online`).set(o.client.auth).expect(status);
 
@@ -198,20 +199,27 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     const first = (await start(o)).body;
     const second = (await start(o)).body;
     expect(await intent(first.intentId)).toMatchObject({ status: 'expired', failure_reason: 'replaced' });
-    // Le premier, remplacé, ne confirme plus rien même payé.
+    // Le premier, remplacé, ne confirme plus rien même payé : enregistré et remboursé automatiquement (décision du 18/10).
     const r1 = (await intent(first.intentId)).provider_ref;
     sim.settle(r1, 'succeeded');
     await notify({ id: `ev-${uuidv7()}`, reference: r1 }).expect(200);
     expect((await payment(o.id)).provider_status).toBe('unavailable');
-    // Montant différent : refusé.
+    expect(await intent(first.intentId)).toMatchObject({ status: 'late_paid', failure_reason: 'late_replaced' });
+    expect(await refunds(first.intentId)).toEqual([{ amount_fcfa: 20000, status: 'pending', automatic: true, requested_by_admin: null }]);
+    // Montant différent : refusé, et le montant reçu est rendu.
     const r2 = (await intent(second.intentId)).provider_ref;
     sim.settle(r2, 'succeeded', { amountFcfa: 19000 });
     await notify({ id: `ev-${uuidv7()}`, reference: r2 }).expect(200);
-    expect(await intent(second.intentId)).toMatchObject({ status: 'failed', failure_reason: 'amount_mismatch' });
-    // Payé sur un autre compte que celui de la boutique : refusé (F4).
+    expect(await intent(second.intentId)).toMatchObject({ status: 'late_paid', failure_reason: 'amount_mismatch' });
+    expect((await refunds(second.intentId)).map((r: { amount_fcfa: number }) => r.amount_fcfa)).toEqual([19000]);
+    // Payé sur un autre compte que celui de la boutique : refusé (F4), remboursé.
     const third = (await start(o)).body;
     sim.settle((await intent(third.intentId)).provider_ref, 'succeeded', { payee: 'ACCT_autre' });
-    expect((await h.http().post(`/v1/orders/${o.id}/payment/online/check`).set(o.client.auth).expect(200)).body).toMatchObject({ status: 'failed', failureReason: 'payee_mismatch' });
+    expect((await h.http().post(`/v1/orders/${o.id}/payment/online/check`).set(o.client.auth).expect(200)).body).toMatchObject({ status: 'late_paid', failureReason: 'payee_mismatch' });
+    expect(await refunds(third.intentId)).toHaveLength(1);
+    // Notification répétée : aucun second remboursement.
+    await notify({ id: `ev-${uuidv7()}`, reference: r1 }).expect(200);
+    expect(await refunds(first.intentId)).toHaveLength(1);
     // Échec chez le prestataire, constaté par la vérification du client (pas de notification pour un échec).
     const fourth = (await start(o)).body;
     sim.settle((await intent(fourth.intentId)).provider_ref, 'failed');
@@ -233,6 +241,33 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     expect(await intent(ia)).toMatchObject({ status: 'expired', failure_reason: 'expired' });
     expect((await intent(ib)).status).toBe('succeeded');
     expect((await payment(b.id)).provider_status).toBe('confirmed');
+  });
+
+  it('paiement arrivé après l’expiration : enregistré, jamais retenu, remboursé automatiquement ; le worker relance un remboursement refusé', async () => {
+    await open();
+    const a = await deliveredOrder();
+    const ia = (await start(a)).body.intentId;
+    await h.pool.query("update payment_intents set created_at = now() - interval '2 hours' where id = $1", [ia]);
+    await online.expirePending(new Date());
+    expect((await intent(ia)).status).toBe('expired');
+    // Le client paie quand même, en retard : enregistré, pas retenu.
+    const ref = (await intent(ia)).provider_ref;
+    sim.settle(ref, 'succeeded');
+    // Le prestataire refuse d'abord le remboursement : le worker réessaie.
+    const realRefund = sim.refund.bind(sim);
+    sim.refund = async () => {
+      throw new Error('indisponible');
+    };
+    await notify({ id: `ev-${uuidv7()}`, reference: ref }).expect(200);
+    expect(await intent(ia)).toMatchObject({ status: 'late_paid', failure_reason: 'late_expired' });
+    expect((await payment(a.id)).provider_status).toBe('unavailable');
+    expect((await refunds(ia)).map((r: { status: string }) => r.status)).toEqual(['failed']);
+    sim.refund = realRefund;
+    expect(await online.refundLatePayments()).toBe(1);
+    expect((await refunds(ia)).map((r: { status: string }) => r.status)).toEqual(['failed', 'pending']);
+    expect(await online.refundLatePayments()).toBe(0);
+    // Le client peut toujours payer normalement ou déclarer.
+    expect((await h.http().get(`/v1/orders/${a.id}`).set(a.client.auth)).body.actions).toEqual(expect.arrayContaining(['declare_payment', 'pay_online']));
   });
 
   it('remboursement : équipe BIM avec la permission, motif, montant borné, suivi par notification signée ; administration journalisée', async () => {

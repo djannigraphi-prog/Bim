@@ -645,6 +645,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Montant à payer : ${formatFcfa(o.payment!.amountFcfa)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        if (o.payment!.deliveryFeeIncludedFcfa > 0) Text('dont frais de livraison : ${formatFcfa(o.payment!.deliveryFeeIncludedFcfa)}'),
                         if (o.payment!.payoutPhone != null)
                           Text('${operatorLabel(o.payment!.payoutOperator)} de la boutique : ${o.payment!.payoutPhone}', key: const ValueKey('shop-payout')),
                         Text('Paie depuis ton application Mobile Money, puis indique-le ici. BIM ne fait aucun transfert et ne confirme rien à la place de la boutique.', style: theme.textTheme.bodySmall),

@@ -252,7 +252,9 @@ class _PostsGrid extends ConsumerWidget {
               padding: const EdgeInsets.all(BimSpacing.xl),
               child: Text('Aucune publication pour l’instant.', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
             )
-          : GridView.count(
+          : Column(
+              children: [
+                GridView.count(
               crossAxisCount: 3,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -280,6 +282,19 @@ class _PostsGrid extends ConsumerWidget {
                         if (post.isBim) const Positioned(left: 6, top: 6, child: PhotoTag(text: 'BIM')),
                       ],
                     ),
+                  ),
+              ],
+                ),
+                if (page.hasMore)
+                  Padding(
+                    padding: const EdgeInsets.all(BimSpacing.md),
+                    child: page.loadingMore
+                        ? const CircularProgressIndicator()
+                        : TextButton(
+                            key: const ValueKey('posts-more'),
+                            onPressed: () => ref.read(personPostsProvider(username).notifier).loadMore(),
+                            child: Text(page.pageError ? 'Réessayer' : 'Voir plus'),
+                          ),
                   ),
               ],
             ),

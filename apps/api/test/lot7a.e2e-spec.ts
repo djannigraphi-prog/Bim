@@ -263,7 +263,10 @@ describe('Lot 7-A : références, réputation, équipe (e2e)', () => {
     let team = (await h.http().post('/v1/shop/team').set(s.auth).send({ username: awa.username }).expect(201)).body;
     expect(team.items.find((m: { userId: string }) => m.userId === awa.userId)).toMatchObject({ role: 'staff', status: 'invited', permissions: [] });
     expect((await h.http().post('/v1/shop/team').set(s.auth).send({ username: awa.username }).expect(409)).body.error.code).toBe('ALREADY_MEMBER');
-    expect((await h.http().post('/v1/shop/team').set(s.auth).send({ username: minor.body.username }).expect(403)).body.error.code).toBe('AGE_REQUIREMENT_NOT_MET');
+    // Refus neutre : l'âge de la personne n'est jamais annoncé au propriétaire (audit du 18/10).
+    const refused = (await h.http().post('/v1/shop/team').set(s.auth).send({ username: minor.body.username }).expect(409)).body.error;
+    expect(refused.code).toBe('INVITE_NOT_POSSIBLE');
+    expect(JSON.stringify(refused)).not.toMatch(/\bans\b|minAge|capability|âge/i);
     await h.http().post('/v1/auth/switch-space').set(awa.auth).send({ type: 'merchant', id: s.shopId }).expect(403);
     const spacesBefore = (await h.http().get('/v1/me/spaces').set(awa.auth).expect(200)).body;
     expect(JSON.stringify(spacesBefore)).not.toContain(s.shopId);

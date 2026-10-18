@@ -75,4 +75,26 @@ final postProvider = FutureProvider.autoDispose.family<FeedPost, String>((ref, i
 
 final profileProvider = FutureProvider.autoDispose.family<PublicProfile, String>((ref, username) => ref.watch(socialApiProvider).profile(username));
 
-final personPostsProvider = FutureProvider.autoDispose.family<FeedPage, String>((ref, username) => ref.watch(socialApiProvider).personPosts(username));
+/// Publications d'un profil, page par page (« Voir plus », audit du 18/10).
+class PersonPostsController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
+  @override
+  Future<FeedState> build(String username) async {
+    final page = await ref.watch(socialApiProvider).personPosts(username);
+    return FeedState(items: page.items, nextCursor: page.nextCursor);
+  }
+
+  Future<void> loadMore() async {
+    final s = state.valueOrNull;
+    if (s == null || !s.hasMore || s.loadingMore) return;
+    state = AsyncData(s.copyWith(loadingMore: true, pageError: false));
+    try {
+      final page = await ref.read(socialApiProvider).personPosts(arg, cursor: s.nextCursor);
+      final known = {for (final p in s.items) p.id};
+      state = AsyncData(FeedState(items: [...s.items, ...page.items.where((p) => !known.contains(p.id))], nextCursor: page.nextCursor));
+    } catch (_) {
+      state = AsyncData(s.copyWith(loadingMore: false, pageError: true));
+    }
+  }
+}
+
+final personPostsProvider = AsyncNotifierProvider.autoDispose.family<PersonPostsController, FeedState, String>(PersonPostsController.new);

@@ -4,6 +4,7 @@ import 'package:bim/core/theme/app_theme.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/projects/data/projects_api.dart';
 import 'package:bim/features/projects/data/projects_models.dart';
+import 'package:bim/features/social/application/social_providers.dart';
 import 'package:bim/features/social/data/social_api.dart';
 import 'package:bim/features/social/data/social_models.dart';
 import 'package:bim/features/social/presentation/composer_screen.dart';
@@ -103,7 +104,11 @@ class _FakeSocial extends SocialApi {
   bool followed = false;
 
   @override
-  Future<FeedPage> personPosts(String username, {String? cursor}) async => FeedPage(items: [_post('g1', text: 'Juste du texte')]);
+  Future<FeedPage> personPosts(String username, {String? cursor}) async => username != 'long.profil'
+      ? FeedPage(items: [_post('g1', text: 'Juste du texte')])
+      : cursor == null
+          ? FeedPage(items: [_post('g1', text: 'Première page')], nextCursor: 'n2')
+          : FeedPage(items: [_post('g1', text: 'Première page'), _post('g2', text: 'Deuxième page')]);
 
   @override
   Future<void> follow(String username, {required bool on}) async {
@@ -303,6 +308,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(social.calls, ['follow awa.k true']);
     expect(find.text('Abonné·e'), findsOneWidget);
+  });
+
+  test('profil : « Voir plus » charge la page suivante, sans doublon (audit du 18/10)', () async {
+    final container = ProviderContainer(overrides: [apiClientProvider.overrideWithValue(_client()), socialApiProvider.overrideWithValue(_FakeSocial())]);
+    addTearDown(container.dispose);
+    final sub = container.listen(personPostsProvider('long.profil'), (_, __) {});
+    addTearDown(sub.close);
+    var s = await container.read(personPostsProvider('long.profil').future);
+    expect(s.hasMore, isTrue);
+    await container.read(personPostsProvider('long.profil').notifier).loadMore();
+    s = container.read(personPostsProvider('long.profil')).value!;
+    expect(s.items.map((p) => p.id), ['g1', 'g2']);
+    expect(s.hasMore, isFalse);
   });
 
   testWidgets('écran 06 : un visiteur voit le fil public ; réagir ouvre l’invitation à créer un compte, sans appel', (tester) async {
