@@ -7,6 +7,8 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../account/data/account_api.dart' show StepUpScope;
+import '../../account/presentation/code_sheets.dart' show requestStepUp;
 import '../../orders/data/orders_api.dart' show newIdempotencyKey;
 import '../data/wallet_api.dart';
 import 'gift_sheet.dart';
@@ -187,9 +189,12 @@ class _WithdrawSheetState extends ConsumerState<WithdrawSheet> {
 
   Future<void> _submit() async {
     final coins = int.tryParse(_amount.text.replaceAll(' ', '')) ?? 0;
+    // Opération sensible : mot de passe puis code, comme pour changer de mot de passe.
+    final token = await requestStepUp(context, ref, StepUpScope.withdrawal);
+    if (token == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final r = await ref.read(walletApiProvider).withdraw(coins, operator: _operator, idempotencyKey: _key);
+      final r = await ref.read(walletApiProvider).withdraw(coins, operator: _operator, idempotencyKey: _key, stepUpToken: token);
       ref.invalidate(walletProvider);
       if (!mounted) return;
       showBimSnack(context, r.status == 'review' ? 'Demande envoyée : l’équipe BIM la vérifie.' : 'Retrait enregistré (démo : rien n’est versé).');

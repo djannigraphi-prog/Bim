@@ -213,8 +213,13 @@ class WalletApi {
     return GiftResult(targetCoinCount: _int(r['targetCoinCount']), balance: WalletBalance.fromJson(r['balance'] as Map<String, dynamic>));
   }
 
-  Future<WithdrawalItem> withdraw(int coins, {required String operator, required String idempotencyKey}) async {
-    final r = await _api.post('/v1/wallet/withdrawals', body: {'coins': coins, 'operator': operator, 'idempotencyKey': idempotencyKey});
+  /// Retrait : confirmation d'identité (mot de passe + code) à usage unique, portée « withdrawal ».
+  Future<WithdrawalItem> withdraw(int coins, {required String operator, required String idempotencyKey, required String stepUpToken}) async {
+    final r = await _api.post(
+      '/v1/wallet/withdrawals',
+      body: {'coins': coins, 'operator': operator, 'idempotencyKey': idempotencyKey},
+      headers: {'X-Step-Up-Token': stepUpToken},
+    );
     return WithdrawalItem.fromJson(r['withdrawal'] as Map<String, dynamic>);
   }
 

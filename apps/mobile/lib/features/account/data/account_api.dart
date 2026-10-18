@@ -5,12 +5,13 @@ import '../../auth/data/models.dart';
 
 /// Opérations sensibles du compte (F16) : chacune exige une autorisation « step-up »
 /// (mot de passe + code reçu sur une coordonnée vérifiée), valable une seule fois.
-enum StepUpScope { contactChange, passwordChange }
+enum StepUpScope { contactChange, passwordChange, withdrawal }
 
 extension on StepUpScope {
   String get api => switch (this) {
         StepUpScope.contactChange => 'contact_change',
         StepUpScope.passwordChange => 'password_change',
+        StepUpScope.withdrawal => 'withdrawal',
       };
 }
 

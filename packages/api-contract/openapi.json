@@ -3815,7 +3815,17 @@
     "/v1/wallet/withdrawals": {
       "post": {
         "operationId": "WalletController_withdraw",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Confirmation d’identité (mot de passe + code), portée « withdrawal »",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3836,7 +3846,7 @@
             "bearer": []
           }
         ],
-        "summary": "Retirer des pièces reçues vers mon Mobile Money (prototype : versement simulé)",
+        "summary": "Retirer des pièces reçues vers mon Mobile Money (prototype : versement simulé ; confirmation d’identité exigée)",
         "tags": [
           "Pièces et Premium"
         ]

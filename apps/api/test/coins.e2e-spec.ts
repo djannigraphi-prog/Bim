@@ -17,7 +17,9 @@ describe('Pièces et Premium : mode démonstration fermé (e2e)', () => {
     expect((await h.http().get('/v1/premium').set(auth).expect(200)).body).toMatchObject({ available: false, active: false });
     expect((await h.http().post('/v1/premium/subscribe').set(auth).send({ channel: 'demo' }).expect(503)).body.error.code).toBe('NOT_CONFIGURED');
     expect((await h.http().post('/v1/wallet/purchases').set(auth).send({ coins: 1000, channel: 'demo', idempotencyKey: 'buy-off-0001' }).expect(503)).body.error.code).toBe('NOT_CONFIGURED');
-    await h.http().post('/v1/wallet/withdrawals').set(auth).send({ coins: 5000, operator: 'wave', idempotencyKey: 'wd-off-00001' }).expect(503);
+    const su = await h.http().post('/v1/auth/step-up').set(auth).send({ scope: 'withdrawal', password: u.body.password }).expect(201);
+    const g = await h.http().post('/v1/auth/step-up/verify').set(auth).send({ challengeId: su.body.challengeId, code: h.lastCodeFor(u.destination) }).expect(200);
+    await h.http().post('/v1/wallet/withdrawals').set(auth).set('X-Step-Up-Token', g.body.stepUpToken).send({ coins: 5000, operator: 'wave', idempotencyKey: 'wd-off-00001' }).expect(503);
     // Aucun circuit réel n'existe : seul « demo » est accepté.
     await h.http().post('/v1/wallet/purchases').set(auth).send({ coins: 1000, channel: 'apple', idempotencyKey: 'buy-off-0002' }).expect(400);
   });
@@ -28,7 +30,7 @@ describe('Pièces et Premium : prototype (e2e)', () => {
   const saved: Record<string, unknown> = {};
   const KEYS = ['coins.withdraw_min', 'coins.withdraw_instant_max', 'coins.withdraw_daily_cap'];
   beforeAll(async () => {
-    h = await startHarness({ DEMO_MODE: 'true' });
+    h = await startHarness({ DEMO_MODE: 'true', OTP_MAX_SENDS_PER_DESTINATION_PER_HOUR: '50' });
     for (const k of KEYS) saved[k] = (await h.pool.query('select value from app_settings where key = $1', [k])).rows[0].value;
   });
   afterAll(async () => {
@@ -43,6 +45,12 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     const u = await registerAndActivate(h, overrides);
     return { ...u, auth: bearer(u.tokens.accessToken) };
   }
+  /** Confirmation d'identité (mot de passe + code), à usage unique, exigée pour chaque retrait. */
+  const stepUp = async (u: { auth: Record<string, string>; body: { password: string }; destination: string }) => {
+    const su = await h.http().post('/v1/auth/step-up').set(u.auth).send({ scope: 'withdrawal', password: u.body.password }).expect(201);
+    const g = await h.http().post('/v1/auth/step-up/verify').set(u.auth).send({ challengeId: su.body.challengeId, code: h.lastCodeFor(u.destination) }).expect(200);
+    return g.body.stepUpToken as string;
+  };
   const wallet = async (auth: Record<string, string>) => (await h.http().get('/v1/wallet').set(auth).expect(200)).body;
   let k = 0;
   const key = () => `k-${Date.now()}-${(k += 1)}`;
@@ -132,12 +140,17 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     expect(wa.stats).toEqual({ receivedTotal: 255, sentTotal: 0 });
 
     // Retraits : minimum, pièces achetées jamais retirables, premier retrait vérifié par l'équipe.
-    const wd = (body: Record<string, unknown>) => h.http().post('/v1/wallet/withdrawals').set(a.auth).send({ operator: 'wave', idempotencyKey: key(), ...body });
-    expect((await wd({ coins: 100 }).expect(400)).body.error.details).toMatchObject({ min: 5000 });
+    // Sans confirmation d'identité : refusé.
+    await h.http().post('/v1/wallet/withdrawals').set(a.auth).send({ operator: 'wave', idempotencyKey: key(), coins: 100 }).expect(403);
+    const wd = async (body: Record<string, unknown>, status: number) => {
+      const token = await stepUp(a);
+      return h.http().post('/v1/wallet/withdrawals').set(a.auth).set('X-Step-Up-Token', token).send({ operator: 'wave', idempotencyKey: key(), ...body }).expect(status);
+    };
+    expect((await wd({ coins: 100 }, 400)).body.error.details).toMatchObject({ min: 5000 });
     await set('coins.withdraw_min', 50);
     await h.http().post('/v1/wallet/purchases').set(a.auth).send({ coins: 500, channel: 'demo', idempotencyKey: key() }).expect(201);
-    expect((await wd({ coins: 400 }).expect(409)).body.error.code).toBe('INSUFFICIENT_COINS');
-    const first = (await wd({ coins: 100 }).expect(201)).body;
+    expect((await wd({ coins: 400 }, 409)).body.error.code).toBe('INSUFFICIENT_COINS');
+    const first = (await wd({ coins: 100 }, 201)).body;
     expect(first.withdrawal).toMatchObject({ coins: 100, feeFcfa: 1, netFcfa: 99, status: 'review', reviewReason: 'first', channel: 'demo', operator: 'wave' });
     expect(first.balance).toMatchObject({ purchased: 500, received: 155 });
 
@@ -152,9 +165,9 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     expect((await h.http().post(`/admin/v1/withdrawals/${first.withdrawal.id}/decision`).set(finance).send({ decision: 'reject', reason: 'x' }).expect(409)).body.error.code).toBe('WITHDRAWAL_ALREADY_DECIDED');
 
     // Ensuite : immédiat sous le seuil, vérifié au-delà ; un refus rend les pièces.
-    expect((await wd({ coins: 100 }).expect(201)).body.withdrawal).toMatchObject({ status: 'paid', reviewReason: null });
+    expect((await wd({ coins: 100 }, 201)).body.withdrawal).toMatchObject({ status: 'paid', reviewReason: null });
     await set('coins.withdraw_instant_max', 10);
-    const big = (await wd({ coins: 50 }).expect(201)).body.withdrawal;
+    const big = (await wd({ coins: 50 }, 201)).body.withdrawal;
     expect(big).toMatchObject({ status: 'review', reviewReason: 'amount' });
     await h.http().post(`/admin/v1/withdrawals/${big.id}/decision`).set(finance).send({ decision: 'reject' }).expect(400);
     expect((await h.http().post(`/admin/v1/withdrawals/${big.id}/decision`).set(finance).send({ decision: 'reject', reason: 'Numéro à vérifier' }).expect(200)).body).toMatchObject({ status: 'rejected', rejectReason: 'Numéro à vérifier' });
@@ -164,7 +177,7 @@ describe('Pièces et Premium : prototype (e2e)', () => {
 
     // Plafond sur 24 heures (retraits refusés non comptés).
     await set('coins.withdraw_daily_cap', 250);
-    expect((await wd({ coins: 55 }).expect(409)).body.error.code).toBe('WITHDRAWAL_DAILY_CAP');
+    expect((await wd({ coins: 55 }, 409)).body.error.code).toBe('WITHDRAWAL_DAILY_CAP');
 
     // F11 : après la fin de Premium, les pièces reçues restent retirables ; plus aucune n'arrive.
     await h.http().post('/v1/premium/cancel').set(a.auth).expect(200);
@@ -173,7 +186,7 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     expect((await gift({ targetType: 'post', targetId: post.id, giftCode: 'coin1' }).expect(409)).body.error.code).toBe('RECIPIENT_NOT_PREMIUM');
     await set('coins.withdraw_daily_cap', 5000000);
     await set('coins.withdraw_instant_max', 100000);
-    expect((await wd({ coins: 55 }).expect(201)).body.withdrawal.status).toBe('paid');
+    expect((await wd({ coins: 55 }, 201)).body.withdrawal.status).toBe('paid');
 
     // Le grand livre et les soldes concordent pour tout le monde.
     const diff = await h.pool.query(`

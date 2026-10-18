@@ -1,9 +1,9 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
-import { AuthContext, CurrentAuth } from '../auth/auth.decorators';
+import { AuthContext, CurrentAuth, RequireStepUp } from '../auth/auth.decorators';
 import { BuyCoinsDto, DecideWithdrawalDto, SendCoinsDto, SubscribePremiumDto, WithdrawCoinsDto } from './dto';
 import { WalletService } from './wallet.service';
 
@@ -62,7 +62,9 @@ export class WalletController {
 
   @Post('wallet/withdrawals')
   @Throttle({ default: { limit: 10, ttl: 600_000 } })
-  @ApiOperation({ summary: 'Retirer des pièces reçues vers mon Mobile Money (prototype : versement simulé)' })
+  @RequireStepUp('withdrawal')
+  @ApiHeader({ name: 'X-Step-Up-Token', required: true, description: 'Confirmation d’identité (mot de passe + code), portée « withdrawal »' })
+  @ApiOperation({ summary: 'Retirer des pièces reçues vers mon Mobile Money (prototype : versement simulé ; confirmation d’identité exigée)' })
   withdraw(@CurrentAuth() a: AuthContext, @Body() dto: WithdrawCoinsDto, @ReqMeta() meta: RequestMeta) {
     return this.wallet.withdraw(a.userId, dto, meta);
   }
