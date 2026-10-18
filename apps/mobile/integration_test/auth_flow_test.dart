@@ -45,7 +45,13 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 /// Fait défiler l'écran jusqu'à l'élément (les listes ne construisent que la partie visible), puis le touche.
+/// Lot 9 : l'écran du compte est plus long (Pièces et Premium) ; l'élément cherché peut se trouver plus haut.
 Future<void> _scrollTap(WidgetTester tester, Finder finder) async {
+  // Au retour d'un écran, l'élément peut être au-dessus de la partie affichée : on remonte d'abord en haut.
+  if (finder.evaluate().isEmpty) {
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+    await tester.pump(const Duration(milliseconds: 500));
+  }
   await tester.scrollUntilVisible(finder, 150, scrollable: find.byType(Scrollable).first);
   await _tap(tester, finder);
 }
