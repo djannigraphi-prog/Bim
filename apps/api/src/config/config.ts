@@ -110,6 +110,8 @@ const schema = z
      * argent réel ni service payant. Interdit en production ; à couper avant l'ouverture au public.
      */
     DEMO_MODE: boolish.default(false),
+    /** Démonstration sur un ordinateur : adresse à saisir dans l'app (ex. http://192.168.1.20:3000), affichée sur /demo. */
+    DEMO_PUBLIC_URL: z.string().default(''),
     /**
      * Lot 8 — Prestataire de paiement en ligne : « none » (aucun paiement en ligne) ou « simulator » (développement et
      * tests seulement). Aucun prestataire réel (Paystack, CinetPay…) ne sera ajouté sans l'autorisation explicite du

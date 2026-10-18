@@ -31,6 +31,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { CouriersModule } from './modules/couriers/couriers.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { LivesModule } from './modules/lives/lives.module';
+import { DemoModule } from './modules/demo/demo.module';
 
 /**
  * Monolithe modulaire : un module par domaine. Les modules transverses (configuration, base, réglages, audit,
@@ -80,6 +81,7 @@ import { LivesModule } from './modules/lives/lives.module';
     SocialModule,
     WalletModule,
     LivesModule,
+    DemoModule,
     MerchantsModule,
     CatalogModule,
     OffersModule,

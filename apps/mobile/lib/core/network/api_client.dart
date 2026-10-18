@@ -19,9 +19,9 @@ class ApiClient {
       // 7-A : version et plateforme de l'app, pour la version minimale exigée par l'API.
       headers: {'Accept': 'application/json', 'X-Bim-App-Version': kAppVersion, if (platform != null) 'X-Bim-Platform': platform},
     );
-    final refreshDio = Dio(options);
+    _refreshDio = Dio(options);
     dio = Dio(options)
-      ..interceptors.add(AuthInterceptor(storage: storage, refreshDio: refreshDio, onSessionExpired: onSessionExpired))
+      ..interceptors.add(AuthInterceptor(storage: storage, refreshDio: _refreshDio, onSessionExpired: onSessionExpired))
       // L7-09 : version recommandée annoncée par l'API → rappel non bloquant.
       ..interceptors.add(InterceptorsWrapper(onResponse: (res, h) {
         final v = res.headers.value('x-bim-update-available');
@@ -32,6 +32,15 @@ class ApiClient {
 
   final TokenStorage storage;
   late final Dio dio;
+  late final Dio _refreshDio;
+
+  String get baseUrl => dio.options.baseUrl;
+
+  /// Version de démonstration : nouvelle adresse du serveur (ordinateur sur le même Wi-Fi).
+  void setBaseUrl(String url) {
+    dio.options.baseUrl = url;
+    _refreshDio.options.baseUrl = url;
+  }
 
   /// Appelé quand l'API exige une version plus récente de l'app (APP_UPDATE_REQUIRED).
   final void Function()? onUpdateRequired;

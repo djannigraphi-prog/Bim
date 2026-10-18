@@ -40,6 +40,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `WORKER_HEALTH_PORT` | 3100 | port du contrôle de santé `/health` du worker séparé (200 = ok/dégradé/désactivé, 503 = arrêté) | |
 | `PUSH_PROVIDER` | none | envoi des notifications : `none`, `fcm` (Firebase), `test` (mémoire) | `test` refusé hors development/test |
 | `MEDIA_MAX_VIDEO_MB` | 30 | taille maximale d'un Reel (MP4), en Mo (1 à 100) | |
+| `DEMO_PUBLIC_URL` | (vide) | démonstration sur un ordinateur : adresse affichée sur la page `/demo` (page active seulement avec `NODE_ENV=development` et `DEMO_MODE`) | |
 | `DEMO_MODE` | false | prototype (P-0018) : Premium, pièces, retraits et Lives **simulés**, aucun argent réel ni service payant | refusé en production ; à couper avant l'ouverture au public |
 | `PAYMENT_PROVIDER` | none | paiement en ligne (lot 8) : `none` (fermé), `simulator` (tests) ou `paystack` (clé de test seulement) ; aucun prestataire réel sans autorisation du fondateur | `simulator` refusé hors development/test ; le réglage `payments.online_enabled` reste un second interrupteur |
 | `PAYMENT_SIMULATOR_SECRET` | (vide) | secret de signature des notifications du simulateur (valeur de test) | 16 caractères au moins avec `simulator` |

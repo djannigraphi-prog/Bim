@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val bimDemo = System.getenv("BIM_DEMO") == "true"
+
 android {
     namespace = "ci.bim.app"
     compileSdk = flutter.compileSdkVersion
@@ -29,6 +31,11 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Version de démonstration (BIM_DEMO=true, construite par la CI « demo-apk ») : http:// autorisé pour joindre
+        // le serveur de démo sur le Wi-Fi local, identifiant distinct pour ne jamais remplacer l'app publiée.
+        // Toute autre version publiée n'accepte que https.
+        manifestPlaceholders["bimCleartext"] = if (bimDemo) "true" else "false"
+        if (bimDemo) applicationIdSuffix = ".demo"
     }
 
     buildTypes {

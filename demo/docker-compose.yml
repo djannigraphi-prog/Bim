@@ -1,0 +1,41 @@
+# Démonstration gratuite de BIM sur un ordinateur (guide : docs/DEMO_TELEPHONE.md).
+# Les téléphones Android du même Wi-Fi joignent l'API sur le port 3000 de cet ordinateur.
+# Aucun service payant : codes affichés sur http://localhost:3000/demo, achats et retraits simulés.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bim
+      POSTGRES_PASSWORD: bim-demo        # base locale de démonstration, jamais exposée au réseau
+      POSTGRES_DB: bim_demo
+    volumes:
+      - bim-demo-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bim -d bim_demo"]
+      interval: 3s
+      retries: 20
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile.demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"   # ouvert au Wi-Fi local pour les téléphones de la démo
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: postgres://bim:bim-demo@postgres:5432/bim_demo
+      DEMO_MODE: "true"
+      DEMO_PUBLIC_URL: ${DEMO_PUBLIC_URL:-}
+      SMS_PROVIDER: console
+      EMAIL_PROVIDER: console
+      MEDIA_STORAGE: local
+      MEDIA_LOCAL_DIR: /data/media
+      LOG_LEVEL: warn
+    volumes:
+      - bim-demo-data:/data
+volumes:
+  bim-demo-db:
+  bim-demo-data:

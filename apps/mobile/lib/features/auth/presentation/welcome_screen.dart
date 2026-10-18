@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
+import '../../demo/demo_server.dart';
 import '../application/session_controller.dart';
 
 /// Écran 02 — Bienvenue : « Fais ton BIM. », créer un compte, se connecter, ou visiter sans compte (Q14).
@@ -47,6 +48,8 @@ class WelcomeScreen extends ConsumerWidget {
                 label: const Text('Voir des articles'),
                 style: TextButton.styleFrom(foregroundColor: theme.colorScheme.onSurface, minimumSize: const Size(0, kBimMinTouch)),
               ),
+              // Version de démonstration seulement : adresse du serveur (ordinateur sur le même Wi-Fi).
+              const DemoServerButton(),
               const SizedBox(height: BimSpacing.sm),
             ],
           ),

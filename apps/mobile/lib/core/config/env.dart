@@ -4,4 +4,7 @@ abstract final class Env {
   static const apiUrl = String.fromEnvironment('BIM_API_URL', defaultValue: 'http://10.0.2.2:3000');
   static const name = String.fromEnvironment('BIM_ENV', defaultValue: 'dev');
   static bool get isProduction => name == 'production';
+
+  /// Version de démonstration (option gratuite) : l'adresse du serveur de démo se règle dans l'app.
+  static bool get isDemo => name == 'demo';
 }

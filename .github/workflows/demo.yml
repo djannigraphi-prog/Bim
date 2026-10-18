@@ -1,0 +1,87 @@
+name: Démo gratuite
+
+# Démonstration gratuite sur un ordinateur (docs/DEMO_TELEPHONE.md) :
+#  - vérifie que le serveur de démo (Docker) démarre, se remplit et répond ;
+#  - construit l'app Android de démonstration (APK « BIM démo », http:// autorisé pour le Wi-Fi local), téléchargeable
+#    pendant 30 jours dans les « Artifacts » de l'exécution.
+# Aucun service payant, aucun secret : les clés de la démo sont créées sur l'ordinateur au premier démarrage.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Démarrage du serveur de démo
+        working-directory: demo
+        run: DEMO_PUBLIC_URL=http://192.168.1.20:3000 docker compose up -d --build
+      - name: Le serveur répond, les données de démo sont là
+        run: |
+          for i in $(seq 1 90); do curl -fsS http://localhost:3000/health >/dev/null 2>&1 && break; sleep 2; done
+          curl -fsS http://localhost:3000/health
+          curl -fsS http://localhost:3000/demo | grep -q 'awa.demo'
+          curl -fsS http://localhost:3000/demo | grep -q 'http://192.168.1.20:3000'
+          curl -fsS -X POST http://localhost:3000/v1/auth/login -H 'content-type: application/json' \
+            -d '{"identifier":"awa.demo","password":"Demo-BIM-2026!"}' | grep -q accessToken
+          curl -fsS http://localhost:3000/v1/bimshop/products | grep -q 'Robe de soirée Lagune'
+      - name: Redémarrage sans doublon des données
+        working-directory: demo
+        run: |
+          docker compose restart api
+          for i in $(seq 1 60); do curl -fsS http://localhost:3000/health >/dev/null 2>&1 && break; sleep 2; done
+          docker compose logs api | grep -q 'déjà présentes'
+      - name: Journaux (en cas d'échec)
+        if: failure()
+        working-directory: demo
+        run: docker compose logs --tail 80 | cut -c1-200 | while read -r l; do echo "::error title=serveur de démo::$l"; done
+      - working-directory: demo
+        if: always()
+        run: docker compose down -v
+
+  demo-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Paquets Android lourds (versions et clés du cache)
+        id: android-pkgs
+        run: bash ../../.github/scripts/android-sdk-packages.sh
+      - name: Cache du NDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.android-pkgs.outputs.ndk_path }}
+          key: ${{ steps.android-pkgs.outputs.ndk_key }}
+      - name: Compilation de l'app de démonstration
+        env:
+          BIM_DEMO: "true"
+        run: |
+          set -o pipefail
+          flutter build apk --release --dart-define=BIM_ENV=demo --dart-define=BIM_API_URL=http://192.168.1.20:3000 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            tail -n 60 "$RUNNER_TEMP/build.log" | cut -c1-200 > "$RUNNER_TEMP/build.short"
+            python3 ../../.github/scripts/annotate-chunks.py "compilation démo" "$RUNNER_TEMP/build.short" 3
+            exit 1
+          }
+          cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/BIM-demo.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BIM-demo-apk
+          path: ${{ runner.temp }}/BIM-demo.apk
+          retention-days: 30

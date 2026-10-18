@@ -55,6 +55,10 @@ describe('Pièces et Premium : prototype (e2e)', () => {
   let k = 0;
   const key = () => `k-${Date.now()}-${(k += 1)}`;
 
+  it('page /demo (codes factices) : seulement sur l’ordinateur de démonstration (NODE_ENV=development), jamais ici', async () => {
+    await h.http().get('/demo').expect(404);
+  });
+
   it('valeurs provisoires : 6 packs, 8 cadeaux de 1 à 100 000, commission 0, frais opérateur 1 %', async () => {
     const u = await user();
     const w = await wallet(u.auth);

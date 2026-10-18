@@ -7,13 +7,18 @@ import 'app.dart';
 import 'core/network/api_client.dart';
 import 'core/network/app_update.dart';
 import 'features/auth/application/session_controller.dart';
+import 'features/demo/demo_server.dart';
 import 'features/notifications/application/local_notifier.dart';
 
-void main() => runBim();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Version de démonstration : adresse du serveur enregistrée sur le téléphone (null ailleurs).
+  runBim(baseUrl: await DemoServer.load());
+}
 
 /// Démarre l'app. [overrides] sert uniquement aux tests de bout en bout (ex. source de photos simulée,
 /// car le sélecteur de photos du système ne peut pas être piloté par un test automatique).
-void runBim({List<Override> overrides = const []}) {
+void runBim({List<Override> overrides = const [], String? baseUrl}) {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
     ProviderScope(
@@ -21,6 +26,7 @@ void runBim({List<Override> overrides = const []}) {
         apiClientProvider.overrideWith(
           (ref) => ApiClient(
             storage: ref.read(tokenStorageProvider),
+            baseUrl: baseUrl,
             onSessionExpired: () => ref.read(sessionProvider.notifier).onExpired(),
             onUpdateRequired: () => ref.read(updateRequiredProvider.notifier).state = true,
             onUpdateAvailable: (v) => ref.read(updateAvailableProvider.notifier).state = v,

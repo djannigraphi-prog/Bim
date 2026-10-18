@@ -27,6 +27,15 @@ export class DeliveryService {
   private readonly logger = new Logger('Delivery');
   /** Boîte d'envoi des tests (fournisseur « test » uniquement). */
   readonly testOutbox: OutboundMessage[] = [];
+  /**
+   * Démonstration sur un ordinateur (NODE_ENV=development et DEMO_MODE) : derniers messages factices, en mémoire
+   * seulement, affichés sur la page /demo de l'ordinateur pour que la personne qui présente lise les codes.
+   */
+  readonly demoOutbox: Array<Omit<OutboundMessage, 'code'>> = [];
+
+  get demoPageEnabled(): boolean {
+    return this.cfg.NODE_ENV === 'development' && this.cfg.DEMO_MODE;
+  }
 
   constructor(@Inject(APP_CONFIG) private readonly cfg: AppConfig) {}
 
@@ -66,6 +75,10 @@ export class DeliveryService {
         return;
       case 'console':
         this.logger.warn(`[ENVOI FACTICE ${msg.channel}] → ${msg.destination} : ${msg.body}`);
+        if (this.demoPageEnabled) {
+          this.demoOutbox.unshift({ channel: msg.channel, destination: msg.destination, subject: msg.subject, body: msg.body, sentAt: msg.sentAt });
+          this.demoOutbox.length = Math.min(this.demoOutbox.length, 30);
+        }
         return;
       case 'none':
         throw Errors.notConfigured(msg.channel === 'phone' ? "L'envoi de SMS" : "L'envoi d'e-mails");
