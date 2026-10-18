@@ -64,7 +64,7 @@ export class OrdersController {
 
   @Post(':id/incidents')
   @Throttle({ default: { limit: 10, ttl: 600_000 } })
-  @ApiOperation({ summary: 'Signaler un incident (motif, description) ; aucune pénalité ni remboursement automatique' })
+  @ApiOperation({ summary: 'Signaler un incident (motif, description) ; aucune pénalité, aucun remboursement (BIM ne rembourse pas)' })
   openIncident(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: IncidentDto, @ReqMeta() meta: RequestMeta) {
     return this.incidents.open(a.userId, 'customer', id, dto.reason, dto.description, meta);
   }

@@ -84,7 +84,7 @@ describe('Paystack — faux serveur (e2e)', () => {
     return { ...u, auth: bearer(u.tokens.accessToken) as Auth };
   }
 
-  it('initialisation, notification signée, vérification, sous-compte de la boutique, remboursement : appels conformes à la documentation', async () => {
+  it('initialisation, notification signée, vérification, sous-compte de la boutique, aucun remboursement : appels conformes à la documentation', async () => {
     const finance = await adminSession(h, ['finance']);
     const owner = await person();
     const shopId = uuidv7();
@@ -138,12 +138,13 @@ describe('Paystack — faux serveur (e2e)', () => {
     expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body).toMatchObject({ status: 'delivered', payment: { status: 'confirmed_by_provider' } });
     expect(calls.every((c) => c.auth === `Bearer ${KEY}`)).toBe(true);
 
-    // Remboursement partiel : POST /refund (montant × 100), statut relu par GET /refund/:id après notification signée.
-    const rf = (await h.http().post(`/admin/v1/online-payments/${started.intentId}/refund`).set(finance).send({ amountFcfa: 5000, reason: 'Article retourné en partie' }).expect(201)).body;
-    expect(calls.find((c) => c.path === '/refund')!.body).toMatchObject({ transaction: started.intentId, amount: '500000', currency: 'XOF' });
+    // Aucun remboursement dans BIM (règle du fondateur, 18/10/2026) : pas de route, l'API /refund de Paystack n'est
+    // jamais appelée ; une notification `refund.*` signée est enregistrée sans aucun effet.
+    await h.http().post(`/admin/v1/online-payments/${started.intentId}/refund`).set(finance).send({ amountFcfa: 5000, reason: 'Article retourné en partie' }).expect(404);
     const rp = JSON.stringify({ event: 'refund.processed', data: { id: 9001, transaction_reference: started.intentId, status: 'processed' } });
     await h.http().post('/v1/payments/webhooks/paystack').set('content-type', 'application/json').set(PAYSTACK_SIGNATURE_HEADER, createHmac('sha512', KEY).update(rp).digest('hex')).send(rp).expect(200);
-    expect((await h.pool.query('select status from payment_refunds where id = $1', [rf.id])).rows[0].status).toBe('processed');
+    expect(calls.some((c) => c.path.startsWith('/refund'))).toBe(false);
+    expect((await h.pool.query('select count(*)::int n from payment_refunds r join payment_intents i on i.id = r.intent_id where i.provider_ref = $1', [started.intentId])).rows[0].n).toBe(0);
     // Journal technique sans donnée personnelle.
     const logs = (await h.pool.query("select metadata from audit_logs where action in ('payments.provider_confirmed', 'payments.online_started') order by created_at desc limit 5")).rows;
     expect(JSON.stringify(logs)).not.toMatch(/@|\+225/);

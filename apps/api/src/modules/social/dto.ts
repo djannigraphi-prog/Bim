@@ -42,12 +42,12 @@ export class CreateCommentDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Réponse à un commentaire (un seul niveau)' }) @IsOptional() @IsUUID() parentId?: string;
 }
 
-export const CONTENT_REASONS = ['spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'other'] as const;
+export const CONTENT_REASONS = ['spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'fraud', 'other'] as const;
 
 export class ReportContentDto {
-  @ApiProperty({ enum: ['post', 'comment', 'user', 'story', 'message', 'review', 'reel'] })
-  @IsIn(['post', 'comment', 'user', 'story', 'message', 'review', 'reel'])
-  targetType!: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review' | 'reel';
+  @ApiProperty({ enum: ['post', 'comment', 'user', 'story', 'message', 'review', 'reel', 'shop'], description: 'shop : signaler une boutique (le marchand) à BIM, par exemple après un problème de commande' })
+  @IsIn(['post', 'comment', 'user', 'story', 'message', 'review', 'reel', 'shop'])
+  targetType!: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review' | 'reel' | 'shop';
   @ApiProperty({ format: 'uuid' }) @IsUUID() targetId!: string;
   @ApiProperty({ enum: CONTENT_REASONS }) @IsIn(CONTENT_REASONS) reason!: (typeof CONTENT_REASONS)[number];
   @ApiPropertyOptional({ maxLength: 500 }) @IsOptional() @IsString() @MaxLength(500) message?: string;

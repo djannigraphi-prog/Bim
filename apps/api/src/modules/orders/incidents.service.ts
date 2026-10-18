@@ -31,7 +31,7 @@ const REASONS_FOR: Record<IncidentActor, IncidentReason[]> = {
  * Lot 7-G — Incidents d'une commande ou de sa livraison. Ouverts par le client, la boutique (permission « préparer les
  * commandes ») ou le livreur attribué ; motif dans une liste, description libre ; suivi (ouvert → au support → résolu) ;
  * historique en écriture seule ; consultation et décision du support journalisées. **Aucune pénalité, aucun frais,
- * aucun remboursement automatique** : la décision du support est une note, sans effet financier.
+ * aucun remboursement** (BIM ne rembourse pas, règle du 18/10/2026) : la décision du support est une note, sans effet financier.
  * Pièces jointes (photos) : non prévues dans l'architecture actuelle (stockage des preuves à décider).
  */
 @Injectable()
@@ -311,7 +311,7 @@ export class IncidentsService {
     return { items: await Promise.all(rows.map(async (r) => ({ ...(await this.view(r.i.id, 'admin', apiBase)), orderNumber: r.number, shop: r.shop, customer: r.customer }))) };
   }
 
-  /** Décision du support : une note, sans pénalité ni remboursement automatique ; journalisée. */
+  /** Décision du support : une note, sans pénalité ni remboursement ; journalisée. */
   async resolve(a: AdminContext, incidentId: string, resolution: string, meta: RequestMeta) {
     await this.db.transaction(async (tx) => {
       const [u] = await tx

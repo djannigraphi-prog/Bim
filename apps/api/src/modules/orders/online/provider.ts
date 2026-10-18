@@ -47,14 +47,11 @@ export interface VerifyResult {
 export interface WebhookEvent {
   /** Clé unique de l'événement (anti-doublon et anti-rejeu). */
   eventKey: string;
-  kind: 'charge' | 'refund' | 'other';
-  /** Référence du paiement (charge) ou de la transaction remboursée (refund). */
+  /** BIM ne rembourse pas (règle du fondateur, 18/10/2026) : toute autre notification est enregistrée sans effet. */
+  kind: 'charge' | 'other';
+  /** Référence du paiement (charge). */
   providerRef: string | null;
-  /** Identifiant du remboursement chez le prestataire (refund). */
-  refundRef: string | null;
 }
-
-export type RefundStatus = 'pending' | 'processing' | 'processed' | 'failed';
 
 export interface PaymentProvider {
   readonly name: ProviderName;
@@ -64,8 +61,6 @@ export interface PaymentProvider {
   verify(providerRef: string): Promise<VerifyResult>;
   /** Signature valide → l'événement ; sinon `null` (la notification est refusée). */
   parseWebhook(headers: Record<string, string | string[] | undefined>, rawBody: Buffer): WebhookEvent | null;
-  refund(providerRef: string, amountFcfa: number, note: string): Promise<{ refundRef: string; status: RefundStatus }>;
-  fetchRefund(refundRef: string): Promise<{ status: RefundStatus }>;
   /** Compte bénéficiaire (boutique) chez le prestataire : existe, actif, devise, part du compte principal (doit être 0). */
   checkPayeeAccount(accountRef: string): Promise<PayeeAccountCheck>;
 }

@@ -47,7 +47,6 @@ export class OrdersRunner implements OnApplicationBootstrap, OnModuleDestroy {
       await this.payments.queueOverdue(now);
       await this.deliveries.expireOffers(now);
       await this.online.expirePending(now);
-      await this.online.refundLatePayments();
       // Photos des problèmes : supprimées 30 jours après la clôture (une fois par heure suffit).
       if (now.getTime() - this.lastPhotoPurge >= 3_600_000) {
         this.lastPhotoPurge = now.getTime();

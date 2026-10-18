@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Logger } from '@nestjs/common';
-import type { InitiateInput, InitiateResult, Operator, PayeeAccountCheck, PaymentProvider, RefundStatus, VerifyResult, WebhookEvent } from './provider';
+import type { InitiateInput, InitiateResult, Operator, PayeeAccountCheck, PaymentProvider, VerifyResult, WebhookEvent } from './provider';
 import { ProviderError } from './provider';
 
 export const PAYSTACK_SIGNATURE_HEADER = 'x-paystack-signature';
@@ -15,7 +15,7 @@ const TIMEOUT_MS = 15_000;
  * - Vérification : `GET /transaction/verify/:reference` (statut, montant, devise, sous-compte).
  * - Notifications : en-tête `x-paystack-signature` = HMAC SHA512 du corps brut avec la clé secrète. Paystack n'envoie
  *   une notification que pour les paiements réussis : les échecs se constatent par la vérification.
- * - Remboursements : `POST /refund`, `GET /refund/:id` ; notifications `refund.*`.
+ * - Aucun remboursement par BIM (règle du fondateur, 18/10/2026) : l'API de remboursement n'est jamais appelée.
  * - Compte de la boutique : `GET /subaccount/:code` (actif, devise, `percentage_charge` = part du compte principal,
  *   qui doit être 0 : BIM ne prélève aucune commission). `bearer: subaccount` : la boutique supporte les frais (L8-02).
  * - Opérateurs en Côte d'Ivoire selon Paystack : MTN, Orange, Wave. **Moov Money n'est pas pris en charge.**
@@ -97,19 +97,9 @@ export class PaystackProvider implements PaymentProvider {
     const data = body.data ?? {};
     if (event.startsWith('charge.success')) {
       const ref = typeof data.reference === 'string' ? data.reference : null;
-      return { eventKey: `${event}:${String(data.id ?? ref)}`, kind: 'charge', providerRef: ref, refundRef: null };
+      return { eventKey: `${event}:${String(data.id ?? ref)}`, kind: 'charge', providerRef: ref };
     }
-    if (event.startsWith('refund.')) {
-      const id = data.id ?? data.refund_reference;
-      const tx = (data as { transaction_reference?: unknown; transaction?: { reference?: unknown } }).transaction_reference ?? (data as { transaction?: { reference?: unknown } }).transaction?.reference;
-      return { eventKey: `${event}:${String(id)}`, kind: 'refund', providerRef: typeof tx === 'string' ? tx : null, refundRef: id === undefined ? null : String(id) };
-    }
-    return { eventKey: `${event}:${String(data.id ?? '')}`, kind: 'other', providerRef: null, refundRef: null };
-  }
-
-  async refund(providerRef: string, amountFcfa: number, note: string) {
-    const d = await this.call<{ id: number | string; status: string }>('POST', '/refund', { transaction: providerRef, amount: String(amountFcfa * 100), currency: 'XOF', merchant_note: note.slice(0, 200) });
-    return { refundRef: String(d.id), status: refundStatus(d.status) };
+    return { eventKey: `${event}:${String(data.id ?? '')}`, kind: 'other', providerRef: null };
   }
 
   async checkPayeeAccount(accountRef: string): Promise<PayeeAccountCheck> {
@@ -126,16 +116,4 @@ export class PaystackProvider implements PaymentProvider {
       throw e;
     }
   }
-
-  async fetchRefund(refundRef: string) {
-    const d = await this.call<{ status: string }>('GET', `/refund/${encodeURIComponent(refundRef)}`);
-    return { status: refundStatus(d.status) };
-  }
-}
-
-export function refundStatus(s: string): RefundStatus {
-  if (s === 'processed') return 'processed';
-  if (s === 'failed') return 'failed';
-  if (s === 'processing') return 'processing';
-  return 'pending';
 }

@@ -145,4 +145,27 @@ describe('Évaluations (e2e)', () => {
     await h.http().post(`/admin/v1/content/review/${id}/restore`).set(moderator).expect(200);
     expect((await h.http().get(`/v1/bimshop/products/${p.id}/reviews`).expect(200)).body.items).toHaveLength(1);
   });
+
+  it('aucun remboursement dans BIM : le client signale la boutique (le marchand) ; la modération la voit, sans masquage', async () => {
+    const s = await shop();
+    const p = await product(s);
+    const client = await person();
+    const o = await handedOver(s, client, p);
+    await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code: o.code }).expect(200);
+    const send = (auth: Auth, body: Record<string, unknown>) => h.http().post('/v1/content-reports').set(auth).send({ targetType: 'shop', targetId: s.shopId, reason: 'fraud', ...body });
+    await send(client.auth, { message: 'Article différent de la photo, la boutique ne répond plus.' }).expect((r) => expect([200, 201]).toContain(r.status));
+    // Doublon tant que le signalement est ouvert : même réponse, une seule ligne.
+    await send(client.auth, {}).expect((r) => expect([200, 201]).toContain(r.status));
+    expect((await h.pool.query("select count(*)::int n from content_reports where target_type = 'shop' and target_id = $1", [s.shopId])).rows[0].n).toBe(1);
+    // L'équipe de la boutique ne signale pas sa propre boutique ; boutique inconnue : 404.
+    await send(s.auth, {}).expect(400);
+    await h.http().post('/v1/content-reports').set(client.auth).send({ targetType: 'shop', targetId: uuidv7(), reason: 'fraud' }).expect(404);
+    const moderator = await adminSession(h, ['moderator']);
+    const open = (await h.http().get('/admin/v1/content-reports?status=open').set(moderator).expect(200)).body.items.find((x: { targetId: string }) => x.targetId === s.shopId);
+    expect(open).toMatchObject({ targetType: 'shop', reason: 'fraud', content: { kind: 'shop', status: 'active' } });
+    expect(open.content.text).toContain('Boutique Élégance');
+    // Pas de « masquer » pour une boutique : la mesure est la suspension (écran Boutiques).
+    await h.http().post(`/admin/v1/content-reports/${open.id}/resolve`).set(moderator).send({ action: 'hidden', resolution: 'Essai' }).expect(400);
+    await h.http().post(`/admin/v1/content-reports/${open.id}/resolve`).set(moderator).send({ action: 'none', resolution: 'Boutique contactée' }).expect((r) => expect([200, 201]).toContain(r.status));
+  });
 });

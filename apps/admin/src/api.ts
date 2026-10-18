@@ -100,7 +100,6 @@ export type Permission =
   | 'payments.review'
   | 'incidents.review'
   | 'payments.online'
-  | 'payments.refund'
   | 'couriers.review'
   | 'coins.payouts';
 

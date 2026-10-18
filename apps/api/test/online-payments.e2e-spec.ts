@@ -199,27 +199,30 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     const first = (await start(o)).body;
     const second = (await start(o)).body;
     expect(await intent(first.intentId)).toMatchObject({ status: 'expired', failure_reason: 'replaced' });
-    // Le premier, remplacé, ne confirme plus rien même payé : enregistré et remboursé automatiquement (décision du 18/10).
+    // Le premier, remplacé, ne confirme plus rien même payé : enregistré, jamais remboursé par BIM (règle du 18/10).
     const r1 = (await intent(first.intentId)).provider_ref;
     sim.settle(r1, 'succeeded');
     await notify({ id: `ev-${uuidv7()}`, reference: r1 }).expect(200);
     expect((await payment(o.id)).provider_status).toBe('unavailable');
     expect(await intent(first.intentId)).toMatchObject({ status: 'late_paid', failure_reason: 'late_replaced' });
-    expect(await refunds(first.intentId)).toEqual([{ amount_fcfa: 20000, status: 'pending', automatic: true, requested_by_admin: null }]);
-    // Montant différent : refusé, et le montant reçu est rendu.
+    expect((await h.pool.query('select paid_amount_fcfa from payment_intents where id = $1', [first.intentId])).rows[0].paid_amount_fcfa).toBe(20000);
+    expect(await refunds(first.intentId)).toEqual([]);
+    // Montant différent : refusé, montant reçu enregistré pour le support, aucun remboursement.
     const r2 = (await intent(second.intentId)).provider_ref;
     sim.settle(r2, 'succeeded', { amountFcfa: 19000 });
     await notify({ id: `ev-${uuidv7()}`, reference: r2 }).expect(200);
     expect(await intent(second.intentId)).toMatchObject({ status: 'late_paid', failure_reason: 'amount_mismatch' });
-    expect((await refunds(second.intentId)).map((r: { amount_fcfa: number }) => r.amount_fcfa)).toEqual([19000]);
-    // Payé sur un autre compte que celui de la boutique : refusé (F4), remboursé.
+    expect((await h.pool.query('select paid_amount_fcfa from payment_intents where id = $1', [second.intentId])).rows[0].paid_amount_fcfa).toBe(19000);
+    expect(await refunds(second.intentId)).toEqual([]);
+    // Payé sur un autre compte que celui de la boutique : refusé (F4), aucun remboursement.
     const third = (await start(o)).body;
     sim.settle((await intent(third.intentId)).provider_ref, 'succeeded', { payee: 'ACCT_autre' });
     expect((await h.http().post(`/v1/orders/${o.id}/payment/online/check`).set(o.client.auth).expect(200)).body).toMatchObject({ status: 'late_paid', failureReason: 'payee_mismatch' });
-    expect(await refunds(third.intentId)).toHaveLength(1);
-    // Notification répétée : aucun second remboursement.
+    expect(await refunds(third.intentId)).toEqual([]);
+    // Notification répétée : rien ne change, toujours aucun remboursement.
     await notify({ id: `ev-${uuidv7()}`, reference: r1 }).expect(200);
-    expect(await refunds(first.intentId)).toHaveLength(1);
+    expect(await intent(first.intentId)).toMatchObject({ status: 'late_paid', failure_reason: 'late_replaced' });
+    expect(await refunds(first.intentId)).toEqual([]);
     // Échec chez le prestataire, constaté par la vérification du client (pas de notification pour un échec).
     const fourth = (await start(o)).body;
     sim.settle((await intent(fourth.intentId)).provider_ref, 'failed');
@@ -243,7 +246,7 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     expect((await payment(b.id)).provider_status).toBe('confirmed');
   });
 
-  it('paiement arrivé après l’expiration : enregistré, jamais retenu, remboursé automatiquement ; le worker relance un remboursement refusé', async () => {
+  it('paiement arrivé après l’expiration : enregistré, jamais retenu, jamais remboursé par BIM ; le worker ne rembourse rien', async () => {
     await open();
     const a = await deliveredOrder();
     const ia = (await start(a)).body.intentId;
@@ -253,53 +256,39 @@ describe('Paiement en ligne — simulateur (e2e)', () => {
     // Le client paie quand même, en retard : enregistré, pas retenu.
     const ref = (await intent(ia)).provider_ref;
     sim.settle(ref, 'succeeded');
-    // Le prestataire refuse d'abord le remboursement : le worker réessaie.
-    const realRefund = sim.refund.bind(sim);
-    sim.refund = async () => {
-      throw new Error('indisponible');
-    };
     await notify({ id: `ev-${uuidv7()}`, reference: ref }).expect(200);
     expect(await intent(ia)).toMatchObject({ status: 'late_paid', failure_reason: 'late_expired' });
     expect((await payment(a.id)).provider_status).toBe('unavailable');
-    expect((await refunds(ia)).map((r: { status: string }) => r.status)).toEqual(['failed']);
-    sim.refund = realRefund;
-    expect(await online.refundLatePayments()).toBe(1);
-    expect((await refunds(ia)).map((r: { status: string }) => r.status)).toEqual(['failed', 'pending']);
-    expect(await online.refundLatePayments()).toBe(0);
+    expect(await refunds(ia)).toEqual([]);
+    // Passage du worker : toujours aucun remboursement ; le paiement reste visible du support.
+    await online.expirePending(new Date());
+    expect(await refunds(ia)).toEqual([]);
+    const late = (await h.http().get('/admin/v1/online-payments?status=late_paid').set(finance).expect(200)).body.items;
+    expect(late.find((x: { id: string }) => x.id === ia)).toMatchObject({ status: 'late_paid', paidAmountFcfa: 20000 });
     // Le client peut toujours payer normalement ou déclarer.
     expect((await h.http().get(`/v1/orders/${a.id}`).set(a.client.auth)).body.actions).toEqual(expect.arrayContaining(['declare_payment', 'pay_online']));
   });
 
-  it('remboursement : équipe BIM avec la permission, motif, montant borné, suivi par notification signée ; administration journalisée', async () => {
+  it('aucun remboursement dans BIM (règle du fondateur) : pas de route, notification de remboursement sans effet ; administration journalisée', async () => {
     await open();
     const o = await deliveredOrder();
     const id = (await start(o)).body.intentId;
     const ref = (await intent(id)).provider_ref;
-    // Pas de remboursement d'un paiement non vérifié.
-    expect((await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ reason: 'Article retourné' }).expect(409)).body.error.code).toBe('REFUND_NOT_ALLOWED');
     sim.settle(ref, 'succeeded');
     await h.http().post(`/v1/orders/${o.id}/payment/online/check`).set(o.client.auth).expect(200);
-    // Permissions : le support ne rembourse pas ; motif obligatoire ; montant borné.
+    // Ni l'équipe finance, ni le support, ni personne ne peut lancer un remboursement : la route n'existe pas.
     const support = await adminSession(h, ['support']);
-    await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(support).send({ reason: 'Article retourné' }).expect(403);
+    await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ reason: 'Article retourné' }).expect(404);
+    await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(support).send({ reason: 'Article retourné' }).expect(404);
     await h.http().get('/admin/v1/online-payments').set(support).expect(403);
-    await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ reason: 'x' }).expect(400);
-    expect((await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ amountFcfa: 25000, reason: 'Article retourné' }).expect(400)).body.error.code).toBe('REFUND_AMOUNT_INVALID');
-    const rf = (await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ amountFcfa: 5000, reason: 'Article retourné en partie' }).expect(201)).body;
-    expect(rf).toMatchObject({ status: 'pending', amountFcfa: 5000 });
-    // Un seul remboursement en cours à la fois.
-    await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ reason: 'Second remboursement' }).expect((r) => expect(r.status).toBeGreaterThanOrEqual(400));
-    // Notification signée du prestataire : statut relu auprès de lui.
-    const refundRef = (await h.pool.query('select provider_refund_ref from payment_refunds where id = $1', [rf.id])).rows[0].provider_refund_ref;
-    sim.settleRefund(refundRef, 'processed');
-    await notify({ id: `ev-${uuidv7()}`, reference: ref, refund: refundRef }).expect(200);
-    expect((await h.pool.query('select status from payment_refunds where id = $1', [rf.id])).rows[0].status).toBe('processed');
-    // Reste à rembourser : 15 000 F au plus.
-    expect((await h.http().post(`/admin/v1/online-payments/${id}/refund`).set(finance).send({ amountFcfa: 15001, reason: 'Le reste' }).expect(400)).body.error.details).toEqual({ maxFcfa: 15000 });
+    // Une notification signée qui parle de remboursement est enregistrée une fois, sans aucun effet.
+    await notify({ id: `ev-${uuidv7()}`, reference: ref, refund: 'simr_x' }).expect(200);
+    expect(await refunds(id)).toEqual([]);
+    expect(await intent(id)).toMatchObject({ status: 'succeeded' });
     // Liste journalisée ; comptes des boutiques.
     const list = (await h.http().get('/admin/v1/online-payments?status=succeeded').set(finance).expect(200)).body;
     expect(list).toMatchObject({ provider: 'simulator', operators: ['orange', 'mtn', 'wave'] });
-    expect(list.items.find((x: { id: string }) => x.id === id).refunds).toEqual([expect.objectContaining({ amountFcfa: 5000, status: 'processed' })]);
+    expect(list.items.find((x: { id: string }) => x.id === id)).not.toHaveProperty('refunds');
     expect((await h.pool.query("select count(*)::int n from audit_logs where action = 'admin.online_payments_viewed'")).rows[0].n).toBeGreaterThan(0);
     const accounts = (await h.http().get('/admin/v1/online-payments/accounts').set(finance).expect(200)).body.items;
     const acc = accounts.find((x: { slug: string }) => x.slug === o.slug);

@@ -10,6 +10,7 @@ import '../../../core/widgets/step_header.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
+import '../../social/presentation/moderation_sheets.dart' show showReportContentSheet;
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
@@ -102,7 +103,20 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
           data: (s) => ListView(
             padding: const EdgeInsets.all(BimSpacing.screen),
             children: [
-              const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
+              Row(
+                children: [
+                  const BimBackButton(),
+                  const Spacer(),
+                  // Règle du fondateur (18/10/2026) : aucun remboursement, mais toujours la possibilité de signaler le marchand.
+                  if (state?.own != true)
+                    PopupMenuButton<String>(
+                      key: const ValueKey('shop-menu'),
+                      tooltip: 'Plus',
+                      onSelected: (_) => signedIn ? showReportContentSheet(context, ref, targetType: 'shop', targetId: s.shop.id) : showVisitorGate(context, ref),
+                      itemBuilder: (_) => const [PopupMenuItem(value: 'report', key: ValueKey('shop-report'), child: Text('Signaler la boutique'))],
+                    ),
+                ],
+              ),
               const SizedBox(height: BimSpacing.md),
               Row(
                 children: [

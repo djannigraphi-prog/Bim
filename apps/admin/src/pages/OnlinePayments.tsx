@@ -1,12 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api, errorText } from '../api';
 
-interface Refund {
-  id: string;
-  amountFcfa: number;
-  status: string;
-  reason: string;
-}
 interface Item {
   id: string;
   orderNumber: string;
@@ -16,7 +10,7 @@ interface Item {
   status: 'pending' | 'succeeded' | 'failed' | 'expired' | 'late_paid';
   failureReason: string | null;
   createdAt: string;
-  refunds: Refund[];
+  paidAmountFcfa: number | null;
 }
 interface Account {
   id: string;
@@ -27,7 +21,7 @@ interface Account {
   status: string;
 }
 
-const STATUS: Record<Item['status'], string> = { pending: 'En attente du client', succeeded: 'Vérifié par le prestataire', failed: 'Échoué', expired: 'Expiré', late_paid: 'Reçu mais non retenu — remboursé automatiquement' };
+const STATUS: Record<Item['status'], string> = { pending: 'En attente du client', succeeded: 'Vérifié par le prestataire', failed: 'Échoué', expired: 'Expiré', late_paid: 'Reçu mais non retenu pour la commande — à examiner par le support (aucun remboursement)' };
 const REASON: Record<string, string> = {
   provider_failed: 'refusé par le prestataire',
   amount_mismatch: 'montant différent',
@@ -44,7 +38,8 @@ const OPERATORS: Record<string, string> = { orange: 'Orange Money', mtn: 'MTN Mo
 
 /**
  * Lot 8 — Paiements en ligne : suivi (consultation journalisée), comptes des boutiques chez le prestataire (F4 : sans
- * compte de la boutique, aucun paiement en ligne), remboursements demandés par l'équipe ; un paiement reçu en retard ou non conforme est remboursé automatiquement.
+ * compte de la boutique, aucun paiement en ligne). Aucun remboursement dans BIM (règle du fondateur, 18/10/2026) : un
+ * paiement reçu en retard ou non conforme est seulement signalé au support.
  */
 export function OnlinePayments() {
   const [provider, setProvider] = useState('none');
@@ -53,7 +48,6 @@ export function OnlinePayments() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [slug, setSlug] = useState('');
   const [ref, setRef] = useState('');
-  const [refund, setRefund] = useState<Record<string, { amount: string; reason: string }>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -94,23 +88,12 @@ export function OnlinePayments() {
     }
   }
 
-  async function doRefund(e: FormEvent, id: string) {
-    e.preventDefault();
-    const r = refund[id] ?? { amount: '', reason: '' };
-    try {
-      await api(`/admin/v1/online-payments/${id}/refund`, { method: 'POST', body: { reason: r.reason, ...(r.amount ? { amountFcfa: Number(r.amount) } : {}) } });
-      await load();
-    } catch (err) {
-      setError(errorText(err));
-    }
-  }
-
   return (
     <section>
       <h2>Paiements en ligne</h2>
       <p className="muted">
         Prestataire : {provider === 'none' ? 'aucun (paiement en ligne fermé)' : provider}. Opérateurs pris en charge : {operators.length ? operators.map((o) => OPERATORS[o] ?? o).join(', ') : 'aucun'}. L'argent va directement à
-        la boutique ; aucun remboursement n'est automatique.
+        la boutique. BIM ne fait aucun remboursement : en cas de problème, le client signale la boutique.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -155,23 +138,10 @@ export function OnlinePayments() {
           <p>
             {i.shop} — {new Date(i.createdAt).toLocaleString('fr-FR')}
           </p>
-          {i.refunds.map((r) => (
-            <p key={r.id}>
-              Remboursement de {r.amountFcfa} F : {r.status} — {r.reason}
+          {i.status === 'late_paid' && (
+            <p>
+              Montant reçu : {i.paidAmountFcfa ?? i.amountFcfa} F. Il ne vaut pas pour la commande ; aucun remboursement n'est fait par BIM. Le support contacte le client et la boutique.
             </p>
-          ))}
-          {(i.status === 'succeeded' || i.status === 'late_paid') && (
-            <form onSubmit={(e) => doRefund(e, i.id)}>
-              <label>
-                Montant à rembourser (vide : le reste)
-                <input inputMode="numeric" value={refund[i.id]?.amount ?? ''} onChange={(e) => setRefund({ ...refund, [i.id]: { amount: e.target.value, reason: refund[i.id]?.reason ?? '' } })} />
-              </label>
-              <label>
-                Motif
-                <input value={refund[i.id]?.reason ?? ''} onChange={(e) => setRefund({ ...refund, [i.id]: { amount: refund[i.id]?.amount ?? '', reason: e.target.value } })} required minLength={5} />
-              </label>
-              <button type="submit">Rembourser</button>
-            </form>
           )}
         </div>
       ))}

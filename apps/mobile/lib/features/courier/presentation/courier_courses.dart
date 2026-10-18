@@ -380,7 +380,7 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
 }
 
 /// Signaler un incident : motif dans la liste, description (obligatoire pour « Autre »). Le champ appartient à la
-/// boîte de dialogue. Aucune pénalité ni remboursement automatique : le dossier peut être transmis au support.
+/// boîte de dialogue. Aucune pénalité ni remboursement (BIM ne rembourse pas) : le dossier peut être transmis au support.
 /// Motif du désistement (3 à 300 caractères, comme côté serveur).
 class ReleaseDialog extends StatefulWidget {
   const ReleaseDialog({

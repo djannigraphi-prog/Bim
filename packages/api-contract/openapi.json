@@ -7433,7 +7433,7 @@
             "bearer": []
           }
         ],
-        "summary": "Signaler un incident (motif, description) ; aucune pénalité ni remboursement automatique",
+        "summary": "Signaler un incident (motif, description) ; aucune pénalité, aucun remboursement (BIM ne rembourse pas)",
         "tags": [
           "Commandes"
         ]
@@ -9645,7 +9645,8 @@
                 "pending",
                 "succeeded",
                 "failed",
-                "expired"
+                "expired",
+                "late_paid"
               ],
               "type": "string"
             }
@@ -9736,47 +9737,6 @@
         ],
         "responses": {
           "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Administration"
-        ]
-      }
-    },
-    "/admin/v1/online-payments/{id}/refund": {
-      "post": {
-        "operationId": "OnlinePaymentsAdminController_refund",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefundDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
             "description": ""
           }
         },
@@ -11717,8 +11677,10 @@
               "story",
               "message",
               "review",
-              "reel"
-            ]
+              "reel",
+              "shop"
+            ],
+            "description": "shop : signaler une boutique (le marchand) à BIM, par exemple après un problème de commande"
           },
           "targetId": {
             "type": "string",
@@ -11734,6 +11696,7 @@
               "hate",
               "self_harm",
               "false_info",
+              "fraud",
               "other"
             ]
           },
@@ -13015,23 +12978,6 @@
         "required": [
           "shopSlug",
           "accountRef"
-        ]
-      },
-      "RefundDto": {
-        "type": "object",
-        "properties": {
-          "amountFcfa": {
-            "type": "number",
-            "description": "Montant en F ; par défaut, le reste à rembourser"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 5,
-            "maxLength": 300
-          }
-        },
-        "required": [
-          "reason"
         ]
       },
       "CourierApplicationDto": {

@@ -399,6 +399,7 @@ class OrderDetail {
     required this.events,
     required this.actions,
     this.shopSlug,
+    this.shopId,
     this.customerName,
     this.conversationId,
     this.deliveryMode,
@@ -431,6 +432,8 @@ class OrderDetail {
   final String source;
   final String shopName;
   final String? shopSlug;
+  /// Pour « Signaler la boutique » (aucun remboursement dans BIM : le client signale le marchand en cas de problème).
+  final String? shopId;
   final String? customerName;
   final String? conversationId;
   final List<OrderItem> items;
@@ -481,6 +484,7 @@ class OrderDetail {
       source: j['source'] as String,
       shopName: shop['name'] as String,
       shopSlug: shop['slug'] as String?,
+      shopId: shop['id'] as String?,
       customerName: (j['customer'] as Map<String, dynamic>?)?['fullName'] as String?,
       conversationId: j['conversationId'] as String?,
       items: [for (final i in (j['items'] as List<dynamic>).cast<Map<String, dynamic>>()) OrderItem.fromJson(i)],

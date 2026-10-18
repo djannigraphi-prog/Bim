@@ -14,8 +14,8 @@ défaut (`PAYMENT_PROVIDER=none`), réglage `payments.online_enabled` = false, a
 | Ouverture : prestataire configuré + `payments.online_enabled` décidé + décision sur les frais (`payments.fee_bearer`) + compte actif de la boutique (F4) | Fait |
 | Contrôles : signature, revérification serveur, montant, devise, compte bénéficiaire, anti-rejeu, expiration (`payments.intent_expiry_minutes`, 30 min, provisoire) | Fait |
 | La confirmation du prestataire n'est jamais la décision de la boutique (commande « terminée » seulement après elle) | Fait |
-| Remboursement par l'équipe BIM (permission `payments.refund`), motif, montant borné, suivi par notification signée ; jamais automatique (A8) | Fait |
-| Administration « Paiements en ligne » : suivi journalisé, comptes des boutiques, remboursements | Fait |
+| Remboursement | **Supprimé** le 18/10/2026 : aucun remboursement dans BIM (V1-1810-R) ; le client signale la boutique |
+| Administration « Paiements en ligne » : suivi journalisé, comptes des boutiques, paiements reçus en retard signalés au support | Fait |
 | App : « Payer en ligne » (page du prestataire), « Vérifier mon paiement », opérateurs réellement pris en charge | Fait |
 
 ## Types de tests

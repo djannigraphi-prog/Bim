@@ -4,7 +4,7 @@ import { Errors } from '../../common/errors';
 import { recountComments } from './access';
 import type { RequestMeta } from '../../common/request-meta';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, messages, postComments, postMedia, posts, reels, reviews, stories, users } from '../../database/schema';
+import { contentReports, messages, postComments, postMedia, posts, reels, reviews, shops, stories, users } from '../../database/schema';
 import { AdminContext } from '../admin/admin.decorators';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../media/storage';
@@ -44,6 +44,9 @@ export class ModerationService {
     // Lot 7-H : évaluations d'articles et de boutiques signalées.
     const reviewIds = rows.filter((x) => x.r.targetType === 'review').map((x) => x.r.targetId);
     const rs = reviewIds.length ? await this.db.select().from(reviews).where(inArray(reviews.id, reviewIds)) : [];
+    // Boutiques signalées (le marchand) : nom, adresse du profil et statut.
+    const shopIds = [...new Set(rows.filter((x) => x.r.targetType === 'shop').map((x) => x.r.targetId))];
+    const sh = shopIds.length ? await this.db.select({ id: shops.id, name: shops.name, slug: shops.slug, status: shops.status }).from(shops).where(inArray(shops.id, shopIds)) : [];
     const userIds = [...new Set(rows.map((x) => x.r.targetUserId).filter((x): x is string => !!x))];
     const ss = storyIds.length ? await this.db.select().from(stories).where(inArray(stories.id, storyIds)) : [];
     const [ps, cs, us, media] = await Promise.all([
@@ -60,6 +63,7 @@ export class ModerationService {
       const msg = r.targetType === 'message' ? ms.find((x) => x.id === r.targetId) : undefined;
       const rv = r.targetType === 'review' ? rs.find((x) => x.id === r.targetId) : undefined;
       const reel = r.targetType === 'reel' ? rl.find((x) => x.id === r.targetId) : undefined;
+      const shop = r.targetType === 'shop' ? sh.find((x) => x.id === r.targetId) : undefined;
       const images: string[] = [];
       if (msg?.kind === 'photo' && msg.mediaKey && this.storage.available) images.push((await this.storage.temporaryUrl(msg.mediaKey, apiBase)).url);
       if (st && st.status !== 'deleted' && this.storage.available) images.push((await this.storage.temporaryUrl(st.storageKey, apiBase)).url);
@@ -90,6 +94,8 @@ export class ModerationService {
                       images: [],
                       videoUrl: reel.status !== 'deleted' && this.storage.available ? (await this.storage.temporaryUrl(reel.storageKey, apiBase)).url : null,
                     }
+                  : shop
+                  ? { kind: 'shop', text: `${shop.name} (@${shop.slug})`, status: shop.status, images: [] }
                   : rv
                   ? { kind: 'review', text: `${rv.rating}/5${rv.productReference ? ` · ${rv.productReference}` : ' · boutique'}${rv.comment ? ` — ${rv.comment}` : ''}`, status: rv.status, images: [] }
                   : { kind: 'user', text: null, status: null, images: [] },
@@ -108,6 +114,9 @@ export class ModerationService {
     if (!r) throw Errors.conflict('REPORT_NOT_OPEN', 'Ce signalement est introuvable ou déjà traité.');
     if (action === 'hidden' && r.targetType === 'user') {
       throw Errors.validation({ fields: { action: ['Pour une personne, suspends son compte depuis l’écran Utilisateurs.'] } });
+    }
+    if (action === 'hidden' && r.targetType === 'shop') {
+      throw Errors.validation({ fields: { action: ['Pour une boutique, suspends-la depuis l’écran Boutiques.'] } });
     }
     await this.db.transaction(async (tx) => {
       if (action === 'hidden') await this.setVisibility(tx, r.targetType as 'post' | 'comment' | 'story' | 'message' | 'review' | 'reel', r.targetId, 'hidden', resolution);

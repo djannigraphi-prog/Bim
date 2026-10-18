@@ -87,7 +87,7 @@ export const paymentIntents = pgTable(
     payeeAccountRef: varchar('payee_account_ref', { length: 60 }),
     amountFcfa: integer('amount_fcfa').notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('XOF'),
-    /** pending · succeeded · failed · expired · late_paid (argent reçu mais non retenu : remboursé automatiquement). */
+    /** pending · succeeded · failed · expired · late_paid (argent reçu mais non retenu pour la commande ; BIM ne rembourse pas, le support examine). */
     status: varchar('status', { length: 10 }).notNull().default('pending'),
     /** Montant réellement reçu, vérifié auprès du prestataire, quand il diffère de l'attendu ou arrive en retard. */
     paidAmountFcfa: integer('paid_amount_fcfa'),
@@ -151,7 +151,8 @@ export const shopPaymentAccounts = pgTable(
 );
 
 /**
- * Lot 8 — Remboursement d'un paiement en ligne, demandé par l'équipe BIM (jamais automatique, A8), journalisé.
+ * Lot 8 — Remboursement d'un paiement en ligne. Table gardée pour l'historique seulement : depuis la règle du
+ * fondateur (18/10/2026), BIM ne rembourse plus rien et aucun code n'y écrit.
  * Statuts : pending → processing → processed · failed.
  */
 export const paymentRefunds = pgTable(
@@ -165,7 +166,7 @@ export const paymentRefunds = pgTable(
     reason: varchar('reason', { length: 300 }).notNull(),
     status: varchar('status', { length: 12 }).notNull().default('pending'),
     providerRefundRef: varchar('provider_refund_ref', { length: 60 }),
-    /** Équipe BIM ; null pour un remboursement automatique (paiement reçu en retard ou non conforme). */
+    /** Historique : équipe BIM, ou null pour un ancien remboursement automatique. */
     requestedByAdmin: uuid('requested_by_admin'),
     automatic: boolean('automatic').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

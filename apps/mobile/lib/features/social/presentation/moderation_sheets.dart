@@ -8,7 +8,7 @@ import '../../../core/widgets/feedback.dart';
 import '../data/social_api.dart';
 import '../data/social_models.dart';
 
-/// Signaler un contenu (publication, commentaire, profil) à la modération de BIM. Renvoie vrai si c'est envoyé.
+/// Signaler un contenu (publication, commentaire, profil) ou une boutique à la modération de BIM. Renvoie vrai si c'est envoyé.
 Future<bool> showReportContentSheet(BuildContext context, WidgetRef ref, {required String targetType, required String targetId}) async {
   final sent = await showModalBottomSheet<bool>(
     context: context,
@@ -57,7 +57,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final what = switch (widget.targetType) { 'comment' => 'ce commentaire', 'user' => 'ce profil', 'message' => 'ce message', _ => 'cette publication' };
+    final what = switch (widget.targetType) { 'comment' => 'ce commentaire', 'user' => 'ce profil', 'message' => 'ce message', 'shop' => 'cette boutique', _ => 'cette publication' };
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.lg + MediaQuery.viewInsetsOf(context).bottom),
@@ -68,9 +68,14 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
             children: [
               Text('Signaler $what', style: theme.textTheme.titleLarge),
               const SizedBox(height: BimSpacing.xs),
-              Text('Ton signalement est anonyme pour la personne concernée.', style: theme.textTheme.bodyMedium),
+              Text(
+                widget.targetType == 'shop'
+                    ? 'Ton signalement est anonyme pour la boutique. BIM ne fait pas de remboursement : l’équipe examine et peut suspendre la boutique.'
+                    : 'Ton signalement est anonyme pour la personne concernée.',
+                style: theme.textTheme.bodyMedium,
+              ),
               const SizedBox(height: BimSpacing.sm),
-              for (final (code, label) in contentReportReasons)
+              for (final (code, label) in widget.targetType == 'shop' ? shopReportReasons : contentReportReasons)
                 ListTile(
                   key: ValueKey('report-$code'),
                   dense: true,

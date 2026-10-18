@@ -13,6 +13,7 @@ import '../../courier/data/courier_api.dart' show vehicleLabel;
 import '../../courier/presentation/courier_courses.dart' show IncidentDialog;
 import '../../merchant/data/shop_api.dart' show formatFcfa;
 import '../../projects/application/photo_source.dart';
+import '../../social/presentation/moderation_sheets.dart' show showReportContentSheet;
 import '../data/orders_api.dart';
 import 'checkout_screen.dart';
 
@@ -274,7 +275,7 @@ class _OrderBody extends StatelessWidget {
                 ],
               ),
             ),
-          Text('Aucune pénalité ni remboursement automatique. Photos privées, supprimées 30 jours après la clôture.', style: theme.textTheme.bodySmall),
+          Text('Aucune pénalité, aucun remboursement dans BIM. Photos privées, supprimées 30 jours après la clôture.', style: theme.textTheme.bodySmall),
         ],
         const SizedBox(height: BimSpacing.lg),
         Text('Historique', style: theme.textTheme.titleMedium),
@@ -433,7 +434,7 @@ class _RefuseDialogState extends State<_RefuseDialog> {
                 ],
               ),
               TextField(key: const ValueKey('refuse-details'), controller: _c, maxLength: 300, decoration: const InputDecoration(hintText: 'Précision'), onChanged: (_) => setState(() {})),
-              const Text('Ne donne pas ton code. Un incident est ouvert ; aucun remboursement automatique.'),
+              const Text('Ne donne pas ton code. Un incident est ouvert ; BIM ne fait aucun remboursement.'),
             ],
           ),
         ),
@@ -747,6 +748,13 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 ],
                 if (o.tracking?.reviewRating != null) Text('Ton évaluation de la livraison : ${stars(o.tracking!.reviewRating!)}', key: const ValueKey('delivery-review-done')),
                 if (_incidentPossible(o)) TextButton(key: const ValueKey('order-incident'), onPressed: _busy ? null : () => _incident(o), child: const Text('Signaler un problème')),
+                // Règle du fondateur (18/10/2026) : aucun remboursement dans BIM ; le client peut toujours signaler le marchand.
+                if (o.shopId != null && !const ['proposed', 'pending_shop'].contains(o.status))
+                  TextButton(
+                    key: const ValueKey('order-report-shop'),
+                    onPressed: _busy ? null : () => showReportContentSheet(context, ref, targetType: 'shop', targetId: o.shopId!),
+                    child: const Text('Signaler la boutique à BIM'),
+                  ),
                 if (o.conversationId != null) TextButton(onPressed: () => context.push('/messages/${o.conversationId}'), child: const Text('Voir la conversation')),
                 // 7-H : évaluer chaque article et la boutique, une fois, après la remise.
                 if (o.reviews != null && (o.reviews!.open || o.reviews!.itemRatings.any((r) => r != null) || o.reviews!.shopRating != null)) ...[
@@ -807,7 +815,7 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Colis revenu en boutique ?'),
-        content: const Text('Confirme seulement si tu as récupéré le colis. La commande sera annulée et le stock remis. Un paiement déjà reçu se rembourse avec le support.'),
+        content: const Text('Confirme seulement si tu as récupéré le colis. La commande sera annulée et le stock remis. BIM ne fait aucun remboursement : le client paie après avoir reçu l’article.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
           TextButton(key: const ValueKey('returned-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmer')),

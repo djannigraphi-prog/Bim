@@ -3,7 +3,7 @@ import { api, errorText } from '../api';
 
 interface ContentReport {
   id: string;
-  targetType: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review' | 'reel';
+  targetType: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review' | 'reel' | 'shop';
   targetId: string;
   reason: string;
   message: string | null;
@@ -25,10 +25,11 @@ const REASONS: Record<string, string> = {
   hate: 'Propos haineux',
   self_harm: 'Automutilation ou suicide',
   false_info: 'Fausse information',
+  fraud: 'Arnaque ou fraude',
   other: 'Autre',
 };
 // Lot 6-A : un message privé n'apparaît ici que s'il a été signalé ; chaque affichage est journalisé par l'API.
-const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé', review: 'Évaluation', reel: 'Reel' };
+const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé', review: 'Évaluation', reel: 'Reel', shop: 'Boutique' };
 const STATUS: Record<string, string> = { published: 'en ligne', hidden: 'masqué', deleted: 'supprimé par son auteur' };
 
 /**
@@ -70,7 +71,7 @@ export function Moderation({ canModerate }: { canModerate: boolean }) {
     <section>
       <h2>Modération</h2>
       <p className="muted">
-        Contenus signalés par les personnes. Masquer retire le contenu pour tout le monde, y compris son auteur ; c’est réversible. Pour une personne, suspends son compte depuis la page Utilisateurs.
+        Contenus signalés par les personnes. Masquer retire le contenu pour tout le monde, y compris son auteur ; c’est réversible. Pour une personne, suspends son compte depuis la page Utilisateurs ; pour une boutique signalée, suspends-la depuis la page Boutiques.
         Automutilation ou suicide : traiter en priorité.
       </p>
       <div className="actions">
@@ -100,7 +101,7 @@ export function Moderation({ canModerate }: { canModerate: boolean }) {
                 <p>
                   Décision : {r.action === 'hidden' ? 'contenu masqué' : 'rien à reprocher'} — {r.resolution}
                 </p>
-                {canModerate && r.content.status === 'hidden' && r.targetType !== 'user' && (
+                {canModerate && r.content.status === 'hidden' && r.targetType !== 'user' && r.targetType !== 'shop' && (
                   <button className="secondary" onClick={() => act(`/admin/v1/content/${r.targetType}/${r.targetId}/restore`)}>
                     Rétablir le contenu
                   </button>
@@ -114,7 +115,7 @@ export function Moderation({ canModerate }: { canModerate: boolean }) {
                     <textarea rows={2} value={notes[r.id] ?? ''} onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
                   </label>
                   <div className="actions">
-                    {r.targetType !== 'user' && (
+                    {r.targetType !== 'user' && r.targetType !== 'shop' && (
                       <button disabled={busy || note.length < 3} onClick={() => act(`/admin/v1/content-reports/${r.id}/resolve`, { action: 'hidden', resolution: note })}>
                         Masquer le contenu
                       </button>

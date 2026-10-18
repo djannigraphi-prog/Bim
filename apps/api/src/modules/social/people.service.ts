@@ -6,7 +6,7 @@ import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers, conversations, shopMembers, reviews } from '../../database/schema';
+import { contentReports, follows, postComments, posts, privacySettings, projects, userBlocks, users, messages, conversationMembers, conversations, shopMembers, reviews, shops } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
@@ -255,6 +255,17 @@ export class PeopleService {
       const [r] = await this.db.select({ authorId: reviews.authorId }).from(reviews).where(and(eq(reviews.id, dto.targetId), eq(reviews.status, 'published')));
       if (!r) throw Errors.notFound('Évaluation');
       targetUserId = r.authorId;
+    } else if (dto.targetType === 'shop') {
+      // Règle du fondateur (18/10/2026) : pas de remboursement, mais toujours la possibilité de signaler le marchand.
+      const [s] = await this.db.select({ ownerId: shops.ownerUserId }).from(shops).where(and(eq(shops.id, dto.targetId), inArray(shops.status, ['active', 'suspended', 'closed'])));
+      if (!s) throw Errors.notFound('Boutique');
+      // Une personne de l'équipe ne signale pas sa propre boutique.
+      const [member] = await this.db
+        .select({ userId: shopMembers.userId })
+        .from(shopMembers)
+        .where(and(eq(shopMembers.shopId, dto.targetId), eq(shopMembers.userId, viewerId), isNull(shopMembers.revokedAt)));
+      if (member) throw Errors.validation({ fields: { targetId: ['Tu ne peux pas signaler ta propre boutique.'] } });
+      targetUserId = s.ownerId;
     } else {
       targetUserId = (await this.visiblePerson(viewerId, { id: dto.targetId })).id;
     }

@@ -342,6 +342,15 @@ const contentReportReasons = <(String, String)>[
   ('other', 'Autre chose'),
 ];
 
+/// Signaler une boutique (le marchand) : BIM ne rembourse pas, l'équipe examine et peut suspendre la boutique.
+const shopReportReasons = <(String, String)>[
+  ('fraud', 'Arnaque ou fraude'),
+  ('false_info', 'Article différent de l’annonce'),
+  ('harassment', 'Comportement irrespectueux'),
+  ('spam', 'Spam ou publicité'),
+  ('other', 'Autre problème'),
+];
+
 /// Visibilité d'une publication (écran 16).
 const postVisibilities = <(String, String, String)>[
   ('public', 'Tout le monde', 'Visible par toutes les personnes de BIM'),

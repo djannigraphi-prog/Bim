@@ -48,7 +48,7 @@ const TABS: { value: Item['status']; label: string }[] = [
 
 /**
  * Lot 7-G — Incidents de commande et de livraison. Le support lit le dossier et note sa décision ; aucune pénalité,
- * aucun frais, aucun remboursement automatique. Chaque consultation et chaque décision sont journalisées.
+ * aucun frais, aucun remboursement (BIM ne rembourse pas). Chaque consultation et chaque décision sont journalisées.
  */
 export function Incidents() {
   const [status, setStatus] = useState<Item['status']>('with_support');
@@ -81,7 +81,7 @@ export function Incidents() {
   return (
     <section>
       <h2>Incidents</h2>
-      <p className="muted">Aucune pénalité, aucun frais ni remboursement automatique : la décision du support est une note, sans effet financier.</p>
+      <p className="muted">Aucune pénalité, aucun frais, aucun remboursement (BIM ne rembourse pas) : la décision du support est une note, sans effet financier.</p>
       <div role="tablist" aria-label="État des incidents">
         {TABS.map((t) => (
           <button key={t.value} type="button" role="tab" aria-selected={status === t.value} className={status === t.value ? 'active' : ''} onClick={() => setStatus(t.value)}>

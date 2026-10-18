@@ -166,6 +166,23 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1810-R — Aucun remboursement dans BIM ; signaler la boutique (18/10/2026, 18 h 30) · Fondateur · **décidé** et **appliqué**
+
+Règle du fondateur : « dans l'application même, il n'y a pas de remboursement […] on met tout à disposition pour que
+les clients soient satisfaits avant de payer le produit. […] Mais par contre, la possibilité de signaler le marchand en
+cas de problème. »
+
+- Plus aucun remboursement dans BIM, ni automatique ni par l'équipe : route `POST /admin/v1/online-payments/:id/refund`,
+  permission `payments.refund`, worker de remboursement et appels « remboursement » aux prestataires **supprimés**.
+  La table `payment_refunds` reste pour l'historique ; aucun code n'y écrit.
+- Un paiement en ligne reçu en retard ou non conforme reste **enregistré** (`late_paid`, montant reçu), ne vaut jamais
+  pour la commande et est **signalé au support** dans l'administration. Le paiement en ligne reste fermé.
+- **Signaler la boutique** : nouveau type de signalement `shop` (motif « Arnaque ou fraude » ajouté), depuis le profil de
+  la boutique et depuis la commande (même après la fin du délai pour signaler un problème). La modération le voit ; la
+  mesure possible est la suspension de la boutique (pas de « masquer »). Migration 0060.
+- Remplace, pour le remboursement, la ligne « remboursé automatiquement » de V1-1810 et le remboursement réservé à
+  `payments.refund` de L8-01.
+
 ### V1-1810 — Finir la version 1 sans dépense (18/10/2026, 15 h 10) · Fondateur · **appliquée**
 
 Demande : « trouve des solutions pour coder et finaliser sans dépense, en gardant à l'idée qu'il y aura des
@@ -173,7 +190,7 @@ améliorations après le lancement, qui consisteront à payer ce qui était à l
 « OK » pour toutes les propositions.
 
 - Audit : le livreur **employé** encaisse aussi les frais de livraison pour la boutique ; un paiement en ligne **reçu en
-  retard** (ou non conforme) est enregistré et **remboursé automatiquement** ; « Voir plus » ; invitation dans l'équipe
+  retard** (ou non conforme) est enregistré et **remboursé automatiquement** (remplacé par V1-1810-R : aucun remboursement) ; « Voir plus » ; invitation dans l'équipe
   sans révéler l'âge.
 - Messagerie : vocaux de **2 minutes** au plus ; groupes de **32** personnes au plus, créés **dès 18 ans** ; une
   personne de 16-17 ans n'est ajoutée que si elle suit la personne qui l'ajoute.
@@ -269,7 +286,7 @@ magasins d'applications ; les éléments payants seront faits après la levée d
   (refusée par la configuration), aucun compte ouvert, aucun paiement réel.
 - **Choix techniques pris** (réversibles) : canal `mobile_money` seulement ; page de paiement Paystack ouverte dans le
   navigateur ; adresse e-mail transmise = e-mail vérifié du client, sinon une adresse technique sans donnée personnelle ;
-  expiration après 30 minutes (provisoire) ; remboursement réservé à `payments.refund` (rôle principal, finance).
+  expiration après 30 minutes (provisoire) ; remboursement réservé à `payments.refund` (rôle principal, finance) — **supprimé le 18/10/2026 (V1-1810-R : aucun remboursement dans BIM)**.
 - **En attente du fondateur** : (1) F4 en Côte d'Ivoire avec Paystack (sous-comptes non confirmés) ; (2) répartition des
   frais (`payments.fee_bearer` : boutique ou BIM) ; (3) compte Paystack de test et autorisation de dépense.
   → Réponses : voir L8-02.

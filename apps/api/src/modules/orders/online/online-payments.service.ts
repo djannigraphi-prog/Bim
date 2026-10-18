@@ -6,7 +6,7 @@ import { AppError, Errors } from '../../../common/errors';
 import type { RequestMeta } from '../../../common/request-meta';
 import { uuidv7 } from '../../../common/uuid';
 import { DB, Database, DbOrTx } from '../../../database/database.module';
-import { orderEvents, orderPayments, orders, paymentIntents, paymentProviderEvents, paymentRefunds, shopPaymentAccounts, shops, userContacts } from '../../../database/schema';
+import { orderEvents, orderPayments, orders, paymentIntents, paymentProviderEvents, shopPaymentAccounts, shops, userContacts } from '../../../database/schema';
 import type { AdminContext } from '../../admin/admin.decorators';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/settings.service';
@@ -203,15 +203,16 @@ export class OnlinePaymentsService {
    */
   private async settle(intent: Intent, v: VerifyResult, source: 'webhook' | 'check' | 'expiry') {
     if (v.status === 'pending') return;
-    const late = await this.db.transaction(async (tx) => {
+    await this.db.transaction(async (tx) => {
       const [i] = await tx.select().from(paymentIntents).where(eq(paymentIntents.id, intent.id)).for('update').limit(1);
       if (i.status !== 'pending') {
-        // Décision du 18/10/2026 : un paiement réussi qui arrive après l'expiration (ou après un échec) est enregistré
-        // et remboursé automatiquement au client ; il ne vaut jamais pour la commande. Une seule fois.
-        if (v.status !== 'succeeded' || (i.status !== 'expired' && i.status !== 'failed')) return false;
+        // Décision du 18/10/2026 : un paiement réussi qui arrive après l'expiration (ou après un échec) est enregistré,
+        // une seule fois ; il ne vaut jamais pour la commande. Règle du fondateur (18/10/2026) : BIM ne rembourse pas ;
+        // le support voit ce paiement et le client peut signaler la boutique.
+        if (v.status !== 'succeeded' || (i.status !== 'expired' && i.status !== 'failed')) return;
         await tx.update(paymentIntents).set({ status: 'late_paid', paidAmountFcfa: v.amountFcfa, failureReason: `late_${i.failureReason ?? i.status}`.slice(0, 40), settledAt: new Date() }).where(eq(paymentIntents.id, i.id));
         await this.audit.log({ actorType: 'system', actorId: null, action: 'payments.provider_late_paid', targetType: 'payment_intent', targetId: i.id, metadata: { provider: i.provider, source, verified: v.raw } }, tx);
-        return true;
+        return;
       }
       const [p] = await tx.select().from(orderPayments).where(eq(orderPayments.id, i.orderPaymentId)).for('update').limit(1);
       let failure: string | null = null;
@@ -221,7 +222,7 @@ export class OnlinePaymentsService {
       else if (i.payeeAccountRef && v.payeeAccountRef !== i.payeeAccountRef) failure = 'payee_mismatch';
       else if (p.failure !== 'none' || p.method !== 'mobile_money' || p.decision !== 'pending') failure = 'payment_closed';
       const now = new Date();
-      // Argent bien reçu, mais pas comme attendu (montant, bénéficiaire, commande close) : jamais retenu, remboursé.
+      // Argent bien reçu, mais pas comme attendu (montant, bénéficiaire, commande close) : jamais retenu pour la commande.
       const received = !!failure && v.status === 'succeeded';
       await tx
         .update(paymentIntents)
@@ -231,8 +232,8 @@ export class OnlinePaymentsService {
         await tx.update(orderPayments).set({ providerStatus: 'confirmed', providerConfirmedAt: now }).where(eq(orderPayments.id, p.id));
         await tx.insert(orderEvents).values({ id: uuidv7(), orderId: p.orderId, type: 'payment_provider_confirmed', actorType: 'system', actorId: null, data: { provider: i.provider, amountFcfa: i.amountFcfa } });
       } else if (received) {
-        // Payé, mais pas comme attendu : jamais confirmé ; remboursé automatiquement (le support voit tout).
-        this.log.warn(`Paiement en ligne ${i.id} : ${failure} — remboursement automatique`);
+        // Payé, mais pas comme attendu : jamais confirmé ; aucun remboursement par BIM, le support voit tout.
+        this.log.warn(`Paiement en ligne ${i.id} : ${failure} — reçu mais non retenu, à examiner par le support`);
       }
       await this.audit.log(
         {
@@ -245,43 +246,7 @@ export class OnlinePaymentsService {
         },
         tx,
       );
-      return received;
     });
-    if (late) await this.autoRefund(intent.id);
-  }
-
-  /**
-   * Remboursement automatique d'un paiement reçu mais non retenu (en retard ou non conforme) : tout le montant reçu.
-   * Prestataire injoignable → réessayé par le worker ; jamais deux remboursements (réservation sous verrou).
-   */
-  async autoRefund(intentId: string) {
-    if (!this.provider) return;
-    try {
-      await this.startRefund(intentId, undefined, 'Paiement reçu en retard ou non conforme : remboursement automatique', null);
-    } catch (e) {
-      if (e instanceof AppError) this.log.warn(`Remboursement automatique ${intentId} : ${e.code}`);
-      else throw e;
-    }
-  }
-
-  /** Worker : paiements reçus mais non retenus, sans remboursement en cours ou fait → remboursement relancé. */
-  async refundLatePayments() {
-    if (!this.provider) return 0;
-    const due = await this.db
-      .select({ id: paymentIntents.id })
-      .from(paymentIntents)
-      .where(
-        and(
-          eq(paymentIntents.status, 'late_paid'),
-          eq(paymentIntents.provider, this.provider.name),
-          sql`NOT EXISTS (SELECT 1 FROM ${paymentRefunds} r WHERE r.intent_id = ${paymentIntents.id} AND r.status IN ('pending', 'processing', 'processed'))`,
-          // Au plus 5 essais refusés : ensuite, le support s'en charge (visible dans l'administration).
-          sql`(SELECT count(*) FROM ${paymentRefunds} r WHERE r.intent_id = ${paymentIntents.id} AND r.status = 'failed') < 5`,
-        ),
-      )
-      .limit(50);
-    for (const d of due) await this.autoRefund(d.id);
-    return due.length;
   }
 
   /**
@@ -302,7 +267,6 @@ export class OnlinePaymentsService {
     if (!inserted.length || !intent) return { received: true };
     try {
       if (ev.kind === 'charge' && ['pending', 'expired', 'failed'].includes(intent.status)) await this.settle(intent, await provider.verify(intent.providerRef), 'webhook');
-      if (ev.kind === 'refund') await this.refreshRefunds(intent.id);
     } catch (e) {
       // Prestataire injoignable : la notification est gardée ; le paiement sera revérifié (expiration ou vérification).
       if (!(e instanceof ProviderError)) throw e;
@@ -360,7 +324,6 @@ export class OnlinePaymentsService {
       .where(status && ['pending', 'succeeded', 'failed', 'expired', 'late_paid'].includes(status) ? eq(paymentIntents.status, status) : undefined)
       .orderBy(desc(paymentIntents.createdAt))
       .limit(100);
-    const refunds = rows.length ? await this.db.select().from(paymentRefunds).where(inArray(paymentRefunds.intentId, rows.map((r) => r.i.id))) : [];
     await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.online_payments_viewed', targetType: 'payment_intent', ip: meta.ip, userAgent: meta.userAgent, metadata: { status: status ?? 'all', count: rows.length } });
     return {
       provider: this.provider?.name ?? 'none',
@@ -375,7 +338,7 @@ export class OnlinePaymentsService {
         failureReason: r.i.failureReason,
         createdAt: r.i.createdAt,
         settledAt: r.i.settledAt,
-        refunds: refunds.filter((x) => x.intentId === r.i.id).map((x) => ({ id: x.id, amountFcfa: x.amountFcfa, status: x.status, reason: x.reason, createdAt: x.createdAt })),
+        paidAmountFcfa: r.i.paidAmountFcfa,
       })),
     };
   }
@@ -426,77 +389,5 @@ export class OnlinePaymentsService {
     if (!u) throw Errors.notFound('Compte');
     await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.shop_payment_account_disabled', targetType: 'shop', targetId: u.shopId, ip: meta.ip, userAgent: meta.userAgent });
     return this.adminAccounts();
-  }
-
-  /**
-   * Remboursement demandé par l'équipe BIM (A8 : jamais automatique pour un paiement retenu), motif obligatoire, au plus le montant payé moins ce
-   * qui est déjà remboursé ou en cours. Le prestataire rend l'argent depuis le compte qui l'a reçu (la boutique, F4).
-   */
-  async refund(a: AdminContext, intentId: string, amountFcfa: number | undefined, reason: string, meta: RequestMeta) {
-    const r = await this.startRefund(intentId, amountFcfa, reason.trim(), a.adminId);
-    await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.payment_refund_requested', targetType: 'payment_intent', targetId: intentId, ip: meta.ip, userAgent: meta.userAgent, metadata: { amountFcfa: r.amountFcfa } });
-    return r;
-  }
-
-  /** Réservation sous verrou puis appel au prestataire ; `adminId` null : remboursement automatique. */
-  private async startRefund(intentId: string, amountFcfa: number | undefined, reason: string, adminId: string | null) {
-    const provider = this.requireProvider();
-    const [i] = await this.db.select().from(paymentIntents).where(eq(paymentIntents.id, intentId)).limit(1);
-    if (!i || i.provider !== provider.name) throw Errors.notFound('Paiement en ligne');
-    if (i.status !== 'succeeded' && i.status !== 'late_paid') throw new AppError('REFUND_NOT_ALLOWED', 'Seul un paiement vérifié se rembourse.', HttpStatus.CONFLICT);
-    const paid = i.paidAmountFcfa ?? i.amountFcfa;
-    // Réservation sous verrou AVANT d'appeler le prestataire : deux demandes simultanées ne dépassent jamais le montant
-    // payé (la seconde voit la première, ou se heurte à l'index « un seul remboursement en cours »).
-    const id = uuidv7();
-    let amount = 0;
-    try {
-      await this.db.transaction(async (tx) => {
-        await tx.select({ id: paymentIntents.id }).from(paymentIntents).where(eq(paymentIntents.id, i.id)).for('update');
-        const [{ used }] = await tx
-          .select({ used: sql<number>`coalesce(sum(${paymentRefunds.amountFcfa}), 0)::int` })
-          .from(paymentRefunds)
-          .where(and(eq(paymentRefunds.intentId, i.id), inArray(paymentRefunds.status, ['pending', 'processing', 'processed'])));
-        amount = amountFcfa ?? paid - used;
-        if (!Number.isInteger(amount) || amount < 1 || amount + used > paid) {
-          throw new AppError('REFUND_AMOUNT_INVALID', `Au plus ${paid - used} F à rembourser.`, HttpStatus.BAD_REQUEST, { maxFcfa: paid - used });
-        }
-        await tx.insert(paymentRefunds).values({ id, intentId: i.id, amountFcfa: amount, reason, status: 'pending', requestedByAdmin: adminId, automatic: adminId === null });
-      });
-    } catch (e) {
-      if ((e as { code?: string }).code === '23505') throw new AppError('REFUND_NOT_ALLOWED', 'Un remboursement est déjà en cours pour ce paiement.', HttpStatus.CONFLICT);
-      throw e;
-    }
-    let r;
-    try {
-      r = await provider.refund(i.providerRef, amount, reason);
-    } catch (e) {
-      await this.db.update(paymentRefunds).set({ status: 'failed', settledAt: new Date() }).where(eq(paymentRefunds.id, id));
-      if (e instanceof ProviderError) throw new AppError('PAYMENT_PROVIDER_UNAVAILABLE', 'Le prestataire a refusé ou ne répond pas.', HttpStatus.SERVICE_UNAVAILABLE);
-      throw new AppError('REFUND_NOT_ALLOWED', 'Le prestataire a refusé ce remboursement.', HttpStatus.CONFLICT);
-    }
-    await this.db.transaction(async (tx) => {
-      await tx
-        .update(paymentRefunds)
-        .set({ status: r.status, providerRefundRef: r.refundRef, settledAt: r.status === 'processed' || r.status === 'failed' ? new Date() : null })
-        .where(eq(paymentRefunds.id, id));
-      if (!adminId) await this.audit.log({ actorType: 'system', actorId: null, action: 'payments.refund_automatic', targetType: 'payment_intent', targetId: i.id, metadata: { amountFcfa: amount, status: r.status } }, tx);
-    });
-    return { id, status: r.status, amountFcfa: amount };
-  }
-
-  /** Statut des remboursements en cours, relu auprès du prestataire (après une notification signée). */
-  private async refreshRefunds(intentId: string) {
-    const provider = this.requireProvider();
-    const open = await this.db.select().from(paymentRefunds).where(and(eq(paymentRefunds.intentId, intentId), inArray(paymentRefunds.status, ['pending', 'processing'])));
-    for (const r of open) {
-      if (!r.providerRefundRef) continue;
-      const { status } = await provider.fetchRefund(r.providerRefundRef);
-      if (status === r.status) continue;
-      await this.db
-        .update(paymentRefunds)
-        .set({ status, settledAt: status === 'processed' || status === 'failed' ? new Date() : null })
-        .where(and(eq(paymentRefunds.id, r.id), inArray(paymentRefunds.status, ['pending', 'processing'])));
-      await this.audit.log({ actorType: 'system', actorId: null, action: `payments.refund_${status}`, targetType: 'payment_intent', targetId: intentId, metadata: { refundId: r.id } });
-    }
   }
 }

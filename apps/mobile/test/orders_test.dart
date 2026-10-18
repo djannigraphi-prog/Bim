@@ -29,6 +29,7 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       status: status,
       source: 'bimshop',
       shopName: 'Boutique Élégance',
+      shopId: 's1',
       customerName: customer,
       items: const [OrderItem(reference: 'BIM-000123', title: 'Robe soirée à plumes', variantLabel: 'M', quantity: 2, unitPriceFcfa: 20000, catalogPriceFcfa: 20000, lineTotalFcfa: 40000)],
       deliveryMode: mode,
@@ -555,6 +556,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('order-incident')), findsNothing);
     expect(find.byKey(const ValueKey('order-in-dispute')), findsNothing);
+    // Aucun remboursement dans BIM : même la vente close, le client peut toujours signaler la boutique.
+    expect(find.byKey(const ValueKey('order-report-shop')), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const ValueKey('order-dispute-window'))).data, 'Vente close : le délai pour signaler un problème est dépassé. Tu peux toujours évaluer la boutique.');
   });
 

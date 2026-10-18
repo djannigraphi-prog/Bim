@@ -1,0 +1,4 @@
+ALTER TABLE "content_reports" DROP CONSTRAINT "content_reports_target_ck";--> statement-breakpoint
+ALTER TABLE "content_reports" DROP CONSTRAINT "content_reports_reason_ck";--> statement-breakpoint
+ALTER TABLE "content_reports" ADD CONSTRAINT "content_reports_target_ck" CHECK ("content_reports"."target_type" IN ('post', 'comment', 'user', 'story', 'message', 'review', 'reel', 'shop'));--> statement-breakpoint
+ALTER TABLE "content_reports" ADD CONSTRAINT "content_reports_reason_ck" CHECK ("content_reports"."reason" IN ('spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'fraud', 'other'));

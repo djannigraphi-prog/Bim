@@ -368,7 +368,7 @@ indisponible (pas d'estimation inventée). Un service de calcul d'itinéraire pl
 > **Retour en boutique réalisé (17/10)** : après un refus ou une absence du client, la commande ne reste plus « en
 > livraison » sans issue : la boutique confirme avoir récupéré le colis (`POST /v1/shop/orders/:id/delivery/returned`,
 > une seule fois) ; la commande est annulée, le stock remis, le code et le paiement en attente annulés ; l'incident reste
-> ouvert pour le support ; aucun remboursement ni frais automatique (A8 : un paiement déjà confirmé se rembourse par le support).
+> ouvert pour le support ; aucun remboursement ni frais (BIM ne rembourse pas, V1-1810-R du 18/10/2026 ; le client peut signaler la boutique).
 > **Problème après la remise (17/10, L7-08)** : signalable 3 jours après la remise (décidé), réglé entre le client et
 > la boutique (pas de support), « problème signalé » affiché aux deux parties pendant ce délai ; ensuite vente close ;
 > le client garde son évaluation de la boutique. Refus : `DISPUTE_WINDOW_CLOSED`, `INCIDENT_NOT_FOR_SUPPORT`.

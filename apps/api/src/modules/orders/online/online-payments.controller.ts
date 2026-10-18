@@ -3,7 +3,7 @@ import type { RawBodyRequest } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiExcludeEndpoint, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Length, Min } from 'class-validator';
+import { IsOptional, IsString, Length } from 'class-validator';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../../admin/admin.decorators';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../../common/request-meta';
@@ -57,12 +57,7 @@ export class ShopPaymentAccountDto {
   @ApiPropertyOptional({ maxLength: 300 }) @IsOptional() @IsString() @Length(0, 300) note?: string;
 }
 
-export class RefundDto {
-  @ApiPropertyOptional({ description: 'Montant en F ; par défaut, le reste à rembourser' }) @IsOptional() @IsInt() @Min(1) amountFcfa?: number;
-  @ApiProperty({ minLength: 5, maxLength: 300 }) @IsString() @Length(5, 300) reason!: string;
-}
-
-/** Lot 8 — Administration des paiements en ligne : suivi (journalisé), comptes des boutiques, remboursements. */
+/** Lot 8 — Administration des paiements en ligne : suivi (journalisé), comptes des boutiques. Aucun remboursement (règle du fondateur, 18/10/2026). */
 @ApiTags('Administration')
 @ApiBearerAuth()
 @Controller('admin/v1/online-payments')
@@ -71,7 +66,7 @@ export class OnlinePaymentsAdminController {
 
   @Get()
   @AdminRoute('payments.online')
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'succeeded', 'failed', 'expired'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'succeeded', 'failed', 'expired', 'late_paid'] })
   list(@CurrentAdmin() a: AdminContext, @ReqMeta() meta: RequestMeta, @Query('status') status?: string) {
     return this.online.adminList(a, status, meta);
   }
@@ -93,12 +88,6 @@ export class OnlinePaymentsAdminController {
   @AdminRoute('payments.online')
   disable(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
     return this.online.disableAccount(a, id, meta);
-  }
-
-  @Post(':id/refund')
-  @AdminRoute('payments.refund')
-  refund(@CurrentAdmin() a: AdminContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RefundDto, @ReqMeta() meta: RequestMeta) {
-    return this.online.refund(a, id, dto.amountFcfa, dto.reason, meta);
   }
 }
 

@@ -62,8 +62,6 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `IDEMPOTENCY_KEY_REUSED` | 409 | clé anti-doublon déjà utilisée pour une autre demande |
 | `PAYEE_ACCOUNT_INVALID` | 422 | Lot 8 : compte de boutique refusé après contrôle chez le prestataire (introuvable, inactif, autre devise que XOF, ou part prévue pour le compte principal de BIM : elle doit être de 0 %) ; `details.problems` |
 | `PAYMENT_PROVIDER_UNAVAILABLE` | 503 | Lot 8 : le prestataire ne répond pas ou refuse ; réessayer plus tard |
-| `REFUND_NOT_ALLOWED` | 409 | Lot 8 : remboursement impossible (paiement non vérifié, refus du prestataire) |
-| `REFUND_AMOUNT_INVALID` | 400 | Lot 8 : montant à rembourser invalide ; `details.maxFcfa` |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Lot 8 : notification d'un prestataire de paiement à la signature invalide (rien n'est écrit) |
 | `NOT_A_BIM` | 409 | 5-E : les produits et services utilisés s'ajoutent seulement à un « J'ai fait mon BIM » |
 | `TARIFF_ALREADY_PUBLISHED` | 409 | 7-D : une grille de livraison publiée est immuable ; enregistrer un nouveau brouillon puis le publier |
