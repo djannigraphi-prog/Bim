@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
 
 export class OrderLineDto {
   @ApiProperty() @IsUUID() productId!: string;
@@ -99,4 +99,14 @@ export class CourierNoteDto {
 
 export class ReportReviewDto {
   @ApiProperty({ enum: ['spam', 'harassment', 'hate', 'false_info', 'other'] }) @IsIn(['spam', 'harassment', 'hate', 'false_info', 'other']) reason!: string;
+}
+
+/** V1 — Nouvelle tentative de livraison : le client accepte de payer une deuxième fois les frais. */
+export class RetryDeliveryDto {
+  @ApiProperty({ description: 'Le client accepte les frais de la nouvelle tentative' }) @IsBoolean() acceptFee!: boolean;
+}
+
+/** V1 — Réponse du livreur à une demande de changement de livreur. */
+export class ReassignAnswerDto {
+  @ApiProperty() @IsBoolean() accept!: boolean;
 }

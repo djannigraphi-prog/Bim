@@ -530,6 +530,21 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     }
   }
 
+  Future<void> _retry(OrderDetail o) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nouvelle livraison ?'),
+        content: Text('Le livreur repasse avec ton colis. Les frais de livraison${o.retryFeeFcfa != null ? ' (${formatFcfa(o.retryFeeFcfa!)})' : ''} sont dus une deuxième fois. Un nouveau code de remise s’affiche dans ta commande.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(key: const ValueKey('retry-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('J’accepte les frais')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) await _call(o, (api) => api.retryDelivery(o.id), done: 'Nouvelle livraison demandée');
+  }
+
   Future<void> _refuse(OrderDetail o) async {
     final r = await showDialog<({String reason, String details})>(context: context, builder: (_) => const _RefuseDialog());
     if (r != null && mounted) await _call(o, (api) => api.refuseDelivery(o.id, r.reason, details: r.details), done: 'Remise refusée');
@@ -712,6 +727,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                     onPressed: _busy ? null : () => _cancel(o),
                   ),
                 ],
+                // V1 : client absent — nouvelle tentative (frais payés une deuxième fois, nouveau code).
+                if (o.can('retry_delivery')) ...[
+                  const SizedBox(height: BimSpacing.sm),
+                  BimButton(
+                    key: const ValueKey('delivery-retry'),
+                    label: 'Demander une nouvelle livraison${o.retryFeeFcfa != null ? ' (+${formatFcfa(o.retryFeeFcfa!)})' : ''}',
+                    onPressed: _busy ? null : () => _retry(o),
+                  ),
+                ],
                 // 7-F : à l'arrivée du livreur, examiner l'article ; refuser la remise si besoin (le code n'est pas donné).
                 if (o.can('refuse_delivery')) ...[
                   const SizedBox(height: BimSpacing.sm),
@@ -791,6 +815,11 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
       ),
     );
     if (ok == true && mounted) await _act('delivery/returned', done: 'Retour enregistré, commande annulée');
+  }
+
+  Future<void> _reassign() async {
+    final reason = await showDialog<String>(context: context, builder: (_) => const _ReassignDialog());
+    if (reason != null && reason.trim().length >= 3 && mounted) await _act('delivery/reassign', reason: reason.trim(), done: 'Demande envoyée au livreur');
   }
 
   Future<void> _act(String action, {String? reason, String? code, int? amountFcfa, String? done}) async {
@@ -887,6 +916,10 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
                 // Retour en boutique après un refus ou une absence du client : la commande sera annulée, le stock remis.
                 if (o.can('confirm_return'))
                   BimButton(key: const ValueKey('delivery-returned'), label: 'Colis revenu en boutique', loading: _busy, onPressed: _busy ? null : _confirmReturn),
+                // V1 : changer de livreur après la prise en charge (il doit accepter ; sinon le support tranche).
+                if (o.can('request_reassign'))
+                  BimButton(key: const ValueKey('delivery-reassign'), label: 'Changer de livreur', variant: BimButtonVariant.outline, onPressed: _busy ? null : _reassign),
+                if (o.tracking?.reassignPending ?? false) const Text('Changement de livreur demandé : en attente de sa réponse.', key: ValueKey('reassign-pending')),
                 if (o.can('handover')) ...[
                   TextField(
                     key: const ValueKey('handover-input'),
@@ -1009,6 +1042,7 @@ class _CandidatesSheetState extends ConsumerState<_CandidatesSheet> {
                                 if (c.vehicle != null) vehicleLabel(c.vehicle),
                                 if (!c.selectable) 'un livreur prioritaire est disponible',
                                 if (c.selectable && c.reasonRequired) 'motif demandé',
+                                if (c.sameTrip) 'même trajet',
                               ].join(' · '),),
                               trailing: const Icon(Icons.chevron_right),
                               enabled: c.selectable && !_busy,
@@ -1077,6 +1111,40 @@ class _ReviewDialogState extends State<_ReviewDialog> {
             onPressed: _rating == 0 ? null : () => Navigator.pop(context, (rating: _rating, comment: _c.text.trim())),
             child: const Text('Publier'),
           ),
+        ],
+      );
+}
+
+/// V1 — Motif d'un changement de livreur (montré au livreur actuel et au support en cas de refus).
+class _ReassignDialog extends StatefulWidget {
+  const _ReassignDialog();
+
+  @override
+  State<_ReassignDialog> createState() => _ReassignDialogState();
+}
+
+class _ReassignDialogState extends State<_ReassignDialog> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Changer de livreur'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Le livreur actuel doit accepter et rapporter le colis. S’il refuse, le support tranche.'),
+            TextField(key: const ValueKey('reassign-reason'), controller: _c, maxLength: 300, decoration: const InputDecoration(labelText: 'Motif')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(key: const ValueKey('reassign-send'), onPressed: () => Navigator.pop(context, _c.text), child: const Text('Envoyer')),
         ],
       );
 }

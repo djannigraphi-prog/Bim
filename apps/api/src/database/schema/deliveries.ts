@@ -22,6 +22,12 @@ export const deliveries = pgTable(
       .notNull()
       .references(() => orders.id),
     status: varchar('status', { length: 18 }).notNull().default('searching'),
+    /** V1 : tentatives de livraison (1, puis 2 après une nouvelle tentative demandée par le client absent). */
+    attempts: integer('attempts').notNull().default(1),
+    /** V1 : changement de livreur demandé par la boutique après la prise en charge (accord du livreur, sinon support). */
+    reassignRequestedAt: timestamp('reassign_requested_at', { withTimezone: true }),
+    reassignReason: varchar('reassign_reason', { length: 300 }),
+    reassignRequestedBy: uuid('reassign_requested_by'),
     /** Livreur attribué (après acceptation). */
     courierId: uuid('courier_id').references(() => courierAccounts.id),
     /** Catégorie du livreur pour cette boutique au moment de l'acceptation : employee · partner · independent. */
@@ -46,6 +52,7 @@ export const deliveries = pgTable(
   (t) => [
     uniqueIndex('deliveries_order_uq').on(t.orderId),
     index('deliveries_courier_idx').on(t.courierId, t.createdAt),
+    check('deliveries_attempts_ck', sql`${t.attempts} BETWEEN 1 AND 3`),
     check('deliveries_status_ck', sql`${t.status} IN ('searching', 'offered', 'accepted', 'picked_up', 'arrived', 'code_validated', 'closed', 'refused_by_client', 'client_absent', 'cancelled')`),
     check('deliveries_category_ck', sql`${t.courierCategory} IS NULL OR ${t.courierCategory} IN ('employee', 'partner', 'independent')`),
     check('deliveries_refusal_ck', sql`${t.refusalReason} IS NULL OR ${t.refusalReason} IN ('incorrect', 'damaged', 'incomplete', 'other')`),
@@ -134,7 +141,7 @@ export const incidents = pgTable(
     check('incidents_status_ck', sql`${t.status} IN ('open', 'with_support', 'resolved')`),
     check(
       'incidents_reason_ck',
-      sql`${t.reason} IN ('item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other')`,
+      sql`${t.reason} IN ('item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'reassign_refused', 'other')`,
     ),
   ],
 );

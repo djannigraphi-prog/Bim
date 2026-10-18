@@ -166,6 +166,9 @@ class _FakeCourier extends CourierApi {
   Future<void> release(String deliveryId, String reason) async => calls.add('release $reason');
 
   @override
+  Future<void> answerReassign(String deliveryId, bool accept) async => calls.add('reassign $accept');
+
+  @override
   Future<CourseDetail> deliveryFee(String deliveryId, String decision, {String? reason}) async {
     calls.add('fee $decision ${reason ?? ''}'.trim());
     return detail = CourseDetail(mission: detail!.mission, status: 'closed', items: detail!.items, actions: const [], category: 'independent', feeAmountFcfa: 1500, feeStatus: decision == 'confirm' ? 'confirmed_by_courier' : 'contested_by_courier');
@@ -330,6 +333,25 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('release-send')));
     await tester.pumpAndSettle();
     expect(api.calls, ['release Moto en panne']);
+    expect(find.byKey(const ValueKey('course-released')), findsOneWidget);
+  });
+
+  testWidgets('V1 changement de livreur demandé par la boutique : motif affiché, accord puis course rendue', (tester) async {
+    final api = _FakeCourier();
+    api.detail = CourseDetail(
+      mission: const Mission(id: '', deliveryId: 'd1', mode: 'express', fromShop: 'Boutique Élégance', toPlace: 'Yopougon, Abidjan', itemsCount: 1, number: 'CMD-000042'),
+      status: 'picked_up',
+      items: const [(title: 'Robe', variant: 'M', quantity: 1)],
+      actions: const ['accept_reassign', 'refuse_reassign', 'report_incident'],
+      reassignReason: 'Retard de 40 minutes',
+    );
+    await _pump(tester, const CourseScreen(deliveryId: 'd1'), courier: api);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Retard de 40 minutes'), findsOneWidget);
+    expect(find.byKey(const ValueKey('course-arrived')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('course-reassign-accept')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['reassign true']);
     expect(find.byKey(const ValueKey('course-released')), findsOneWidget);
   });
 

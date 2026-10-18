@@ -23,7 +23,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online, DeliveryFeePayment? deliveryFee, DateTime? disputeUntil, bool disputeOpen = true, bool inDispute = false}) => OrderDetail(
+OrderDetail _detail({String status = 'pending_shop', List<String> actions = const ['cancel'], String? code, String? mode = 'pickup', String? customer, OrderPayment? payment, OrderReviews? reviews, DeliveryTracking? tracking, List<IncidentSummary> incidents = const [], OnlinePayment? online, DeliveryFeePayment? deliveryFee, DateTime? disputeUntil, bool disputeOpen = true, bool inDispute = false, int? retryFeeFcfa}) => OrderDetail(
       id: 'o1',
       number: 'CMD-000042',
       status: status,
@@ -48,6 +48,7 @@ OrderDetail _detail({String status = 'pending_shop', List<String> actions = cons
       deliveryFee: deliveryFee,
       disputeOpen: disputeOpen,
       inDispute: inDispute,
+      retryFeeFcfa: retryFeeFcfa,
     );
 
 /// API simulée (les règles — montant, stock, code, permissions — sont testées côté serveur).
@@ -117,6 +118,12 @@ class _FakeOrders extends OrdersApi {
   Future<OrderDetail> review(String id, {int? position, required int rating, String? comment}) async {
     calls.add('review ${position ?? 'shop'} $rating ${comment ?? ''}'.trim());
     return current = _detail(status: 'completed', actions: const [], reviews: OrderReviews(open: true, itemRatings: [position == 0 ? rating : null], shopRating: position == null ? rating : null));
+  }
+
+  @override
+  Future<OrderDetail> retryDelivery(String id) async {
+    calls.add('retry');
+    return current = _detail(status: 'in_delivery', mode: 'express', code: '7350', actions: const [], tracking: const DeliveryTracking(status: 'picked_up', courierName: 'Koffi', attempt: 2));
   }
 
   @override
@@ -436,6 +443,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(shop.calls, ['delivery/returned']);
     expect(find.byKey(const ValueKey('delivery-returned')), findsNothing);
+  });
+
+  testWidgets('V1 client absent : nouvelle livraison avec les frais affichés, confirmation, nouveau code', (tester) async {
+    final api = _FakeOrders()
+      ..current = _detail(status: 'in_delivery', mode: 'express', code: '4821', actions: const ['retry_delivery'], retryFeeFcfa: 1700, tracking: const DeliveryTracking(status: 'client_absent', courierName: 'Koffi'));
+    await _pump(tester, const OrderScreen(orderId: 'o1'), orders: api);
+    await tester.pumpAndSettle();
+    expect(find.text('Demander une nouvelle livraison (+${formatFcfa(1700)})'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('delivery-retry')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('retry-confirm')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['retry']);
+    expect(find.text('7350'), findsOneWidget);
+    expect(find.byKey(const ValueKey('delivery-retry')), findsNothing);
   });
 
   testWidgets('7-F/7-G client : refuser la remise avec un motif ouvre un incident, transmis au support', (tester) async {

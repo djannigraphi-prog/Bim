@@ -11,7 +11,7 @@ import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { SettingsService } from '../settings/settings.service';
 
-export const INCIDENT_REASONS = ['item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'other'] as const;
+export const INCIDENT_REASONS = ['item_incorrect', 'item_damaged', 'item_incomplete', 'client_absent', 'courier_absent', 'courier_not_there', 'delay', 'payment', 'behaviour', 'reassign_refused', 'other'] as const;
 export type IncidentReason = (typeof INCIDENT_REASONS)[number];
 export type IncidentActor = 'customer' | 'shop' | 'courier';
 /** Décision du 17/10/2026 : 3 photos au plus par incident, supprimées 30 jours après la clôture. */
@@ -146,6 +146,16 @@ export class IncidentsService {
   async hasOpen(tx: DbOrTx, deliveryId: string) {
     const [x] = await tx.select({ id: incidents.id }).from(incidents).where(and(eq(incidents.deliveryId, deliveryId), inArray(incidents.status, ['open', 'with_support']))).limit(1);
     return !!x;
+  }
+
+  /** V1 : nouvelle tentative demandée par le client absent — l'incident « client absent » est clos (sans effet financier). */
+  async closeForRetry(tx: DbOrTx, deliveryId: string) {
+    const open = await tx
+      .update(incidents)
+      .set({ status: 'resolved', resolution: 'Nouvelle tentative de livraison demandée par le client', resolvedAt: new Date() })
+      .where(and(eq(incidents.deliveryId, deliveryId), eq(incidents.reason, 'client_absent'), inArray(incidents.status, ['open', 'with_support'])))
+      .returning({ id: incidents.id });
+    for (const i of open) await this.event(tx, i.id, 'resolved', 'system', null, 'Nouvelle tentative de livraison');
   }
 
   /** Ouverture dans une transaction existante (refus du client, client absent). */

@@ -215,7 +215,7 @@ class PublicReview {
 
 /// 7-F — Suivi de la livraison d'une commande (le livreur : prénom pour le client, nom pour la boutique).
 class DeliveryTracking {
-  const DeliveryTracking({required this.status, this.courierName, this.vehicle, this.category, this.requestExpiresAt, this.reviewRating, this.refusalReason});
+  const DeliveryTracking({required this.status, this.courierName, this.vehicle, this.category, this.requestExpiresAt, this.reviewRating, this.refusalReason, this.attempt = 1, this.reassignPending = false});
   /// searching · offered · accepted · picked_up · arrived · code_validated · closed · refused_by_client · client_absent · cancelled
   final String status;
   final String? courierName;
@@ -224,6 +224,9 @@ class DeliveryTracking {
   final DateTime? requestExpiresAt;
   final int? reviewRating;
   final String? refusalReason;
+  /// V1 : tentative de livraison (2 après une nouvelle tentative) ; changement de livreur demandé par la boutique.
+  final int attempt;
+  final bool reassignPending;
   factory DeliveryTracking.fromJson(Map<String, dynamic> j) {
     final c = j['courier'] as Map<String, dynamic>?;
     return DeliveryTracking(
@@ -234,6 +237,8 @@ class DeliveryTracking {
       requestExpiresAt: j['requestExpiresAt'] == null ? null : DateTime.parse(j['requestExpiresAt'] as String),
       reviewRating: (j['review'] as Map<String, dynamic>?)?['rating'] as int?,
       refusalReason: j['refusalReason'] as String?,
+      attempt: (j['attempt'] ?? 1) as int,
+      reassignPending: (j['reassignPending'] ?? false) as bool,
     );
   }
 }
@@ -320,6 +325,7 @@ String incidentReasonLabel(String r) => const {
       'delay': 'Retard',
       'payment': 'Paiement',
       'behaviour': 'Comportement',
+      'reassign_refused': 'Changement de livreur refusé',
       'other': 'Autre',
     }[r] ??
     r;
@@ -328,14 +334,17 @@ String incidentStatusLabel(String s) => const {'open': 'Ouvert', 'with_support':
 
 /// Livreur éligible proposé à la boutique (calculé par le serveur).
 class CourierCandidate {
-  const CourierCandidate({required this.courierId, required this.fullName, required this.category, required this.selectable, required this.reasonRequired, this.vehicle});
+  const CourierCandidate({required this.courierId, required this.fullName, required this.category, required this.selectable, required this.reasonRequired, this.vehicle, this.sameTrip = false});
   final String courierId;
   final String fullName;
   final String category;
   final bool selectable;
   final bool reasonRequired;
   final String? vehicle;
+  /// V1 : courses groupées — il vient déjà à la boutique pour une autre commande.
+  final bool sameTrip;
   factory CourierCandidate.fromJson(Map<String, dynamic> j) => CourierCandidate(
+        sameTrip: (j['sameTrip'] ?? false) as bool,
         courierId: j['courierId'] as String,
         fullName: j['fullName'] as String,
         category: j['category'] as String,
@@ -413,6 +422,7 @@ class OrderDetail {
     this.deliveryFee,
     this.disputeOpen = true,
     this.inDispute = false,
+    this.retryFeeFcfa,
   });
 
   final String id;
@@ -452,6 +462,8 @@ class OrderDetail {
   final bool disputeOpen;
   /// Commande remise avec un incident non résolu ouvert depuis : « en litige ».
   final bool inDispute;
+  /// V1 : frais d'une nouvelle tentative de livraison (client absent).
+  final int? retryFeeFcfa;
   final List<OrderEvent> events;
   /// Actions possibles maintenant, calculées par le serveur.
   final List<String> actions;
@@ -494,6 +506,7 @@ class OrderDetail {
       disputeUntil: DateTime.tryParse((j['dispute'] as Map<String, dynamic>?)?['until'] as String? ?? '')?.toLocal(),
       disputeOpen: ((j['dispute'] as Map<String, dynamic>?)?['until'] == null) || ((j['dispute'] as Map<String, dynamic>?)?['open'] == true),
       inDispute: (j['dispute'] as Map<String, dynamic>?)?['inDispute'] == true,
+      retryFeeFcfa: j['retryFeeFcfa'] as int?,
       deliveryFee: j['deliveryFeePayment'] == null ? null : DeliveryFeePayment.fromJson(j['deliveryFeePayment'] as Map<String, dynamic>),
       events: [for (final e in (j['events'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) OrderEvent.fromJson(e)],
       actions: [for (final a in (j['actions'] as List<dynamic>? ?? const [])) a as String],
@@ -641,6 +654,9 @@ class OrdersApi {
   Future<OrderDetail> refuseDelivery(String id, String reason, {String? details}) async =>
       OrderDetail.fromJson(await _api.post('/v1/orders/$id/delivery/refuse', body: {'reason': reason, if (details != null && details.isNotEmpty) 'details': details}));
 
+  /// V1 : nouvelle tentative de livraison après une absence (frais acceptés).
+  Future<OrderDetail> retryDelivery(String id) async => OrderDetail.fromJson(await _api.post('/v1/orders/$id/delivery/retry', body: {'acceptFee': true}));
+
   Future<OrderDetail> reviewDelivery(String id, {required int rating, String? comment}) async =>
       OrderDetail.fromJson(await _api.post('/v1/orders/$id/delivery/review', body: {'rating': rating, if (comment != null && comment.isNotEmpty) 'comment': comment}));
 
@@ -710,7 +726,7 @@ class ShopOrdersApi {
   Future<OrderDetail> order(String id) async => OrderDetail.fromJson(await _api.get('/v1/shop/orders/$id'));
 
   /// `action` : confirm, decline, prepare, ready, handover, cancel, payment/cash, payment/confirm, payment/contest,
-  /// delivery/start, delivery/withdraw, delivery/returned.
+  /// delivery/start, delivery/withdraw, delivery/returned, delivery/reassign (V1).
   Future<OrderDetail> act(String id, String action, {String? reason, String? code, int? amountFcfa}) async => OrderDetail.fromJson(
         await _api.post('/v1/shop/orders/$id/$action', body: {if (reason != null) 'reason': reason, if (code != null) 'code': code, if (amountFcfa != null) 'amountFcfa': amountFcfa}),
       );

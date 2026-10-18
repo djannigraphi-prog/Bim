@@ -131,7 +131,7 @@ class Mission {
 
 /// Détail d'une course attribuée : contact et adresse du client seulement pendant la course ; jamais le code.
 class CourseDetail {
-  const CourseDetail({required this.mission, required this.status, required this.items, required this.actions, this.category, this.clientName, this.clientPhone, this.address, this.paymentMethod, this.amountToCollectFcfa, this.declaredByCustomer = false, this.cashReceived = false, this.reviewId, this.reviewRating, this.reviewComment, this.feeAmountFcfa, this.feeStatus, this.feeActions = const []});
+  const CourseDetail({required this.mission, required this.status, required this.items, required this.actions, this.category, this.clientName, this.clientPhone, this.address, this.paymentMethod, this.amountToCollectFcfa, this.declaredByCustomer = false, this.cashReceived = false, this.reviewId, this.reviewRating, this.reviewComment, this.feeAmountFcfa, this.feeStatus, this.feeActions = const [], this.reassignReason});
   final Mission mission;
   final String status;
   final String? category;
@@ -150,6 +150,8 @@ class CourseDetail {
   final int? feeAmountFcfa;
   final String? feeStatus;
   final List<String> feeActions;
+  /// V1 : la boutique demande un autre livreur (motif).
+  final String? reassignReason;
   final List<String> actions;
   bool can(String a) => actions.contains(a);
   factory CourseDetail.fromJson(Map<String, dynamic> j) {
@@ -175,6 +177,7 @@ class CourseDetail {
       feeAmountFcfa: f?['amountFcfa'] as int?,
       feeStatus: f?['status'] as String?,
       feeActions: [for (final a in (f?['actions'] as List<dynamic>? ?? const [])) a as String],
+      reassignReason: (j['reassignRequest'] as Map<String, dynamic>?)?['reason'] as String?,
       actions: (j['actions'] as List<dynamic>).cast<String>(),
     );
   }
@@ -243,6 +246,8 @@ class CourierApi {
   Future<CourseDetail> code(String deliveryId, String code) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/code', body: {'code': code}));
   Future<CourseDetail> cash(String deliveryId, int amountFcfa) async => CourseDetail.fromJson(await _api.post('/v1/courier/courses/$deliveryId/cash', body: {'amountFcfa': amountFcfa}));
   Future<void> clientAbsent(String deliveryId, {String? note}) => _api.post('/v1/courier/courses/$deliveryId/client-absent', body: {if (note != null && note.isNotEmpty) 'note': note});
+  /// V1 : réponse à une demande de changement de livreur (accord : rapporter le colis à la boutique).
+  Future<void> answerReassign(String deliveryId, bool accept) => _api.post('/v1/courier/courses/$deliveryId/reassign', body: {'accept': accept});
   /// Désistement avant la prise en charge (motif obligatoire) : la boutique choisit un autre livreur.
   Future<void> release(String deliveryId, String reason) => _api.post('/v1/courier/courses/$deliveryId/release', body: {'reason': reason});
   Future<void> incident(String deliveryId, String reason, {String? description}) =>

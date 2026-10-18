@@ -218,6 +218,26 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
     }
   }
 
+  Future<void> _answerReassign(bool accept) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(courierApiProvider).answerReassign(widget.deliveryId, accept);
+      ref.invalidate(coursesProvider);
+      if (!mounted) return;
+      if (accept) {
+        setState(() => _released = true);
+      } else {
+        showBimSnack(context, 'Refus enregistré : le support va trancher.');
+        ref.invalidate(courseProvider(widget.deliveryId));
+      }
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+      ref.invalidate(courseProvider(widget.deliveryId));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _contestFee(CourseDetail c) async {
     final reason = await showDialog<String>(context: context, builder: (_) => const ReleaseDialog(title: 'Frais non reçus', intro: 'Explique ce qui ne va pas (rien reçu, montant différent…).', confirm: 'Envoyer'));
     if (reason != null && mounted) await _run((api) => api.deliveryFee(c.mission.deliveryId, 'contest', reason: reason), done: 'Contestation enregistrée');
@@ -287,6 +307,13 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
                 ),
               ],
               const SizedBox(height: BimSpacing.lg),
+              // V1 : la boutique demande un autre livreur après la prise en charge.
+              if (c.can('accept_reassign')) ...[
+                Text('La boutique demande un autre livreur${c.reassignReason != null ? ' : « ${c.reassignReason} »' : ''}. Si tu acceptes, rapporte le colis à la boutique.', key: const ValueKey('course-reassign-info')),
+                const SizedBox(height: BimSpacing.sm),
+                BimButton(key: const ValueKey('course-reassign-accept'), label: 'J’accepte et je rapporte le colis', loading: _busy, onPressed: _busy ? null : () => _answerReassign(true)),
+                TextButton(key: const ValueKey('course-reassign-refuse'), onPressed: _busy ? null : () => _answerReassign(false), child: const Text('Je refuse (le support tranchera)')),
+              ],
               if (c.can('picked_up')) BimButton(key: const ValueKey('course-picked-up'), label: 'Colis pris en charge', loading: _busy, onPressed: _busy ? null : () => _run((api) => api.step(c.mission.deliveryId, 'picked-up'))),
               if (c.can('arrived')) BimButton(key: const ValueKey('course-arrived'), label: 'Je suis arrivé', loading: _busy, onPressed: _busy ? null : () => _run((api) => api.step(c.mission.deliveryId, 'arrived'))),
               if (c.can('validate_code')) ...[

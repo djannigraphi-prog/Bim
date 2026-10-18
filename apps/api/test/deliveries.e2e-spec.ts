@@ -530,4 +530,117 @@ describe('Livraisons (e2e)', () => {
     expect(course.waitedSeconds).toBeGreaterThanOrEqual(20 * 60);
     expect((await h.http().get(`/v1/orders/${second.id}/incidents`).set(client.auth)).body.items[0]).toMatchObject({ reason: 'client_absent', openedBy: 'courier' });
   });
+  // ------------------------------------------------------------------ V1 (décisions du 18/10/2026)
+
+  /** Course acceptée par le livreur (sollicité par la boutique), renvoie l'identifiant de la livraison. */
+  async function assign(s: Awaited<ReturnType<typeof shop>>, orderId: string, c: Awaited<ReturnType<typeof courier>>, reason?: string) {
+    await h.http().post(`/v1/shop/orders/${orderId}/delivery/start`).set(s.auth).expect(200);
+    await h.http().post(`/v1/shop/orders/${orderId}/delivery/offer`).set(s.auth).send({ courierId: c.courierId, ...(reason ? { reason } : {}) }).expect(200);
+    const m = (await h.http().get('/v1/courier/missions').set(c.space)).body.items.find((x: { offerId: string }) => x);
+    await h.http().post(`/v1/courier/missions/${m.offerId}/accept`).set(c.space).expect(200);
+    return (await h.pool.query('select id from deliveries where order_id = $1', [orderId])).rows[0].id as string;
+  }
+
+  it('V1 courses groupées : 3 courses à la fois au plus ; le livreur qui vient déjà à la boutique est proposé d’abord', async () => {
+    const s = await shop();
+    const client = await person();
+    const busy = await courier([home], undefined, 5);
+    const other = await courier([home], undefined, 5);
+    const first = await readyOrder(s, client, 'economy');
+    await assign(s, first, busy);
+    const second = await readyOrder(s, client, 'economy');
+    await h.http().post(`/v1/shop/orders/${second}/delivery/start`).set(s.auth).expect(200);
+    const list = (await h.http().get(`/v1/shop/orders/${second}/delivery/candidates`).set(s.auth).expect(200)).body.items.filter((x: { courierId: string }) => [busy.courierId, other.courierId].includes(x.courierId));
+    expect(list.map((x: { courierId: string; sameTrip: boolean }) => [x.courierId, x.sameTrip])).toEqual([
+      [busy.courierId, true],
+      [other.courierId, false],
+    ]);
+    // Deux courses de plus : la limite de 3 est atteinte malgré une capacité déclarée de 5.
+    await h.http().post(`/v1/shop/orders/${second}/delivery/offer`).set(s.auth).send({ courierId: busy.courierId }).expect(200);
+    const m = (await h.http().get('/v1/courier/missions').set(busy.space)).body.items[0];
+    await h.http().post(`/v1/courier/missions/${m.offerId}/accept`).set(busy.space).expect(200);
+    const third = await readyOrder(s, client, 'economy');
+    await assign(s, third, busy);
+    const fourth = await readyOrder(s, client, 'economy');
+    await h.http().post(`/v1/shop/orders/${fourth}/delivery/start`).set(s.auth).expect(200);
+    const ids = (await h.http().get(`/v1/shop/orders/${fourth}/delivery/candidates`).set(s.auth).expect(200)).body.items.map((x: { courierId: string }) => x.courierId);
+    expect(ids).not.toContain(busy.courierId);
+    expect(ids).toContain(other.courierId);
+  });
+
+  it('V1 changement de livreur après la prise en charge : accord du livreur (recherche reprise) ; refus : le support tranche', async () => {
+    const s = await shop();
+    const client = await person();
+    const c1 = await courier([home], { shopId: s.shopId, kind: 'employee' });
+    const c2 = await courier([home], { shopId: s.shopId, kind: 'employee' });
+    const id = await readyOrder(s, client);
+    const dId = await assign(s, id, c1);
+    // Avant la prise en charge : pas de changement (le livreur peut encore se désister).
+    expect((await h.http().get(`/v1/shop/orders/${id}`).set(s.auth)).body.actions).not.toContain('request_reassign');
+    await h.http().post(`/v1/courier/courses/${dId}/picked-up`).set(c1.space).expect(200);
+    expect((await h.http().get(`/v1/shop/orders/${id}`).set(s.auth)).body.actions).toContain('request_reassign');
+    await h.http().post(`/v1/shop/orders/${id}/delivery/reassign`).set(s.auth).send({ reason: 'x' }).expect(400);
+    const so = (await h.http().post(`/v1/shop/orders/${id}/delivery/reassign`).set(s.auth).send({ reason: 'Livreur en retard de 40 minutes' }).expect(200)).body;
+    expect(so.tracking).toMatchObject({ reassignPending: true });
+    expect(so.actions).not.toContain('request_reassign');
+    await h.http().post(`/v1/shop/orders/${id}/delivery/reassign`).set(s.auth).send({ reason: 'Encore une fois' }).expect(409);
+    let course = (await h.http().get(`/v1/courier/courses/${dId}`).set(c1.space).expect(200)).body;
+    expect(course).toMatchObject({ actions: ['accept_reassign', 'refuse_reassign', 'report_incident'], reassignRequest: { reason: 'Livreur en retard de 40 minutes' } });
+    // Refus : incident pour le support ; la course continue (bloquée tant que l'incident est ouvert).
+    course = (await h.http().post(`/v1/courier/courses/${dId}/reassign`).set(c1.space).send({ accept: false }).expect(200)).body;
+    expect(course.actions).toEqual(['arrived']);
+    expect((await h.pool.query("select status from incidents where delivery_id = $1 and reason = 'reassign_refused'", [dId])).rows).toEqual([{ status: 'open' }]);
+    // Nouvelle demande, acceptée : la commande redevient « prête », la recherche reprend sans l'ancien livreur.
+    await h.http().post(`/v1/shop/orders/${id}/delivery/reassign`).set(s.auth).send({ reason: 'Le livreur est d’accord' }).expect(200);
+    expect((await h.http().post(`/v1/courier/courses/${dId}/reassign`).set(c1.space).send({ accept: true }).expect(200)).body).toEqual({ status: 'released' });
+    await h.http().get(`/v1/courier/courses/${dId}`).set(c1.space).expect(404);
+    const after = (await h.http().get(`/v1/shop/orders/${id}`).set(s.auth).expect(200)).body;
+    expect(after).toMatchObject({ status: 'ready', tracking: { status: 'searching', reassignPending: false } });
+    const ids = (await h.http().get(`/v1/shop/orders/${id}/delivery/candidates`).set(s.auth).expect(200)).body.items.map((x: { courierId: string }) => x.courierId);
+    expect(ids).toContain(c2.courierId);
+    expect(ids).not.toContain(c1.courierId);
+  });
+
+  it('V1 nouvelle tentative après une absence : le client accepte les frais une deuxième fois ; nouveau code ; une seule fois', async () => {
+    const s = await shop();
+    const client = await person();
+    const c = await courier([home]);
+    const id = await readyOrder(s, client);
+    const dId = await assign(s, id, c);
+    const oldCode = (await h.http().get(`/v1/orders/${id}`).set(client.auth)).body.handoverCode as string;
+    await h.http().post(`/v1/courier/courses/${dId}/picked-up`).set(c.space).expect(200);
+    await h.http().post(`/v1/courier/courses/${dId}/arrived`).set(c.space).expect(200);
+    await h.pool.query("update deliveries set arrived_at = now() - interval '20 minutes' where id = $1", [dId]);
+    await h.http().post(`/v1/courier/courses/${dId}/client-absent`).set(c.space).send({}).expect(200);
+    let mine = (await h.http().get(`/v1/orders/${id}`).set(client.auth).expect(200)).body;
+    expect(mine.actions).toContain('retry_delivery');
+    expect(mine.retryFeeFcfa).toBe(1700);
+    await h.http().post(`/v1/orders/${id}/delivery/retry`).set(client.auth).send({ acceptFee: false }).expect(400);
+    mine = (await h.http().post(`/v1/orders/${id}/delivery/retry`).set(client.auth).send({ acceptFee: true }).expect(200)).body;
+    expect(mine).toMatchObject({ status: 'in_delivery', tracking: { status: 'picked_up', attempt: 2 } });
+    expect(mine.actions).not.toContain('retry_delivery');
+    expect(mine.handoverCode).not.toBe(oldCode);
+    expect((await h.pool.query('select delivery_fee_fcfa from orders where id = $1', [id])).rows[0].delivery_fee_fcfa).toBe(3400);
+    expect((await h.pool.query("select status from incidents where delivery_id = $1 and reason = 'client_absent'", [dId])).rows).toEqual([{ status: 'resolved' }]);
+    // L'ancien code ne vaut plus rien ; le nouveau, oui. Frais du livreur indépendant : deux courses.
+    await h.http().post(`/v1/courier/courses/${dId}/arrived`).set(c.space).expect(200);
+    await h.http().post(`/v1/courier/courses/${dId}/code`).set(c.space).send({ code: oldCode === '0000' ? '1111' : oldCode }).expect(400);
+    await h.http().post(`/v1/courier/courses/${dId}/code`).set(c.space).send({ code: mine.handoverCode }).expect(200);
+    expect((await h.pool.query("select amount_fcfa from order_payments where order_id = $1 and kind = 'delivery_fee'", [id])).rows[0].amount_fcfa).toBe(3400);
+
+    // Deuxième absence (autre commande, déjà une nouvelle tentative) : plus possible.
+    const id2 = await readyOrder(s, client);
+    const d2 = await assign(s, id2, c);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await h.http().post(`/v1/courier/courses/${d2}/picked-up`).set(c.space).expect(attempt === 1 ? 200 : 409);
+      await h.http().post(`/v1/courier/courses/${d2}/arrived`).set(c.space).expect(200);
+      await h.pool.query("update deliveries set arrived_at = now() - interval '20 minutes' where id = $1", [d2]);
+      await h.http().post(`/v1/courier/courses/${d2}/client-absent`).set(c.space).send({}).expect(200);
+      if (attempt === 1) await h.http().post(`/v1/orders/${id2}/delivery/retry`).set(client.auth).send({ acceptFee: true }).expect(200);
+    }
+    expect((await h.http().get(`/v1/orders/${id2}`).set(client.auth)).body.actions).not.toContain('retry_delivery');
+    expect((await h.http().post(`/v1/orders/${id2}/delivery/retry`).set(client.auth).send({ acceptFee: true }).expect(409)).body.error.code).toBe('RETRY_LIMIT');
+    // Le colis revient en boutique : la boutique le confirme comme avant.
+    await h.http().post(`/v1/shop/orders/${id2}/delivery/returned`).set(s.auth).expect(200);
+  });
 });

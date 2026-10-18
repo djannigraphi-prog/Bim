@@ -52,6 +52,8 @@ export interface Candidate {
   selectable: boolean;
   /** Un motif est exigé (économique : un livreur prioritaire disponible est passé). */
   reasonRequired: boolean;
+  /** V1 : courses groupées — ce livreur va déjà chercher une autre commande de la boutique (même trajet). */
+  sameTrip: boolean;
 }
 
 /**
@@ -122,6 +124,17 @@ export class DeliveriesService {
     });
   }
 
+  /** V1 : livreurs qui ont accepté une course de cette boutique sans avoir encore pris le colis (même trajet). */
+  private async headingToShop(tx: DbOrTx, shopId: string, courierIds: string[]) {
+    if (!courierIds.length) return new Set<string>();
+    const rows = await tx
+      .select({ c: deliveries.courierId })
+      .from(deliveries)
+      .innerJoin(orders, eq(orders.id, deliveries.orderId))
+      .where(and(inArray(deliveries.courierId, courierIds), eq(deliveries.status, 'accepted'), eq(orders.shopId, shopId)));
+    return new Set(rows.map((r) => r.c!));
+  }
+
   /** Livreurs en course (capacité occupée). */
   private async load(tx: DbOrTx, courierIds: string[]) {
     if (!courierIds.length) return new Map<string, number>();
@@ -156,14 +169,18 @@ export class DeliveriesService {
         ),
       );
     const busy = await this.load(tx, rows.map((r) => r.id));
+    // V1 (décision du 18/10/2026) : 3 courses en même temps au plus, quelle que soit la capacité déclarée.
+    const maxAtOnce = await this.intSetting('deliveries.max_courses_at_once', 3);
+    const sameTrip = await this.headingToShop(tx, o.shopId, rows.map((r) => r.id));
     const list: Array<Omit<Candidate, 'selectable' | 'reasonRequired'>> = [];
     for (const r of rows) {
-      if ((busy.get(r.id) ?? 0) >= r.capacity) continue;
+      if ((busy.get(r.id) ?? 0) >= Math.min(r.capacity, maxAtOnce)) continue;
       const category = await this.couriers.category(r.id, o.shopId, tx);
       if (o.paymentMethod === 'cash' && category !== 'employee') continue;
-      list.push({ courierId: r.id, fullName: r.fullName, category, vehicle: r.vehicle });
+      list.push({ courierId: r.id, fullName: r.fullName, category, vehicle: r.vehicle, sameTrip: sameTrip.has(r.id) });
     }
-    list.sort((a, b) => RANK[a.category] - RANK[b.category] || a.fullName.localeCompare(b.fullName));
+    // Même catégorie : celui qui vient déjà à la boutique d'abord (courses groupées).
+    list.sort((a, b) => RANK[a.category] - RANK[b.category] || Number(b.sameTrip) - Number(a.sameTrip) || a.fullName.localeCompare(b.fullName));
     const best = list.length ? RANK[list[0].category] : 0;
     return list.map((c) => ({
       ...c,
@@ -521,6 +538,8 @@ export class DeliveriesService {
       arrivedAt: d.arrivedAt,
       waitedSeconds: d.waitedSeconds,
       review: review ?? null,
+      attempt: d.attempts,
+      reassignRequest: d.reassignRequestedAt ? { at: d.reassignRequestedAt, reason: d.reassignReason } : null,
       // A3-b : frais payés par le client au livreur indépendant.
       deliveryFee: this.fees.courierView(await this.fees.forOrder(o.id)),
       actions: DeliveriesService.courierActions(d, p ?? null),
@@ -535,6 +554,8 @@ export class DeliveriesService {
   }
 
   static courierActions(d: Delivery, p: typeof orderPayments.$inferSelect | null): string[] {
+    // V1 : la boutique demande un autre livreur ; celui-ci accepte (il rapporte le colis) ou refuse (le support tranche).
+    if (d.reassignRequestedAt && (d.status === 'picked_up' || d.status === 'arrived')) return ['accept_reassign', 'refuse_reassign', 'report_incident'];
     switch (d.status) {
       case 'accepted':
         return ['picked_up', 'release'];
@@ -551,6 +572,72 @@ export class DeliveriesService {
       default:
         return [];
     }
+  }
+
+  // ------------------------------------------------------------------ V1 : changement de livreur, nouvelle tentative
+
+  /**
+   * La boutique demande un autre livreur alors que le colis est déjà pris en charge (décision du 18/10/2026) : le
+   * livreur actuel doit accepter (il rapporte le colis à la boutique, la recherche reprend) ; s'il refuse, le support
+   * tranche (incident). Une demande à la fois.
+   */
+  async requestReassign(staffId: string, shopId: string, orderId: string, reason: string, meta: RequestMeta) {
+    if (!reason || reason.trim().length < 3) throw Errors.validation({ fields: { reason: ['Indique pourquoi tu veux changer de livreur.'] } });
+    await this.db.transaction(async (tx) => {
+      const [o] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.shopId, shopId))).for('update').limit(1);
+      if (!o) throw Errors.notFound('Commande');
+      const [d] = await tx.select().from(deliveries).where(eq(deliveries.orderId, orderId)).for('update').limit(1);
+      if (!d || o.status !== 'in_delivery' || (d.status !== 'picked_up' && d.status !== 'arrived') || d.reassignRequestedAt) throw changed(d?.status ?? 'none');
+      await tx.update(deliveries).set({ reassignRequestedAt: new Date(), reassignReason: reason.trim(), reassignRequestedBy: staffId }).where(eq(deliveries.id, d.id));
+      await this.event(tx, d.id, 'reassign_requested', 'shop', staffId, { reason: reason.trim() });
+      await this.audit.log({ actorType: 'user', actorId: staffId, action: 'deliveries.reassign_requested', targetType: 'order', targetId: orderId, ip: meta.ip, userAgent: meta.userAgent, metadata: { shopId } }, tx);
+    });
+  }
+
+  /** Réponse du livreur actuel : accord (course rendue, recherche reprise, commande « prête ») ou refus (incident). */
+  async answerReassign(courierUserId: string, courierId: string, deliveryId: string, accept: boolean, meta: RequestMeta) {
+    await this.db.transaction(async (tx) => {
+      const { d, o } = await this.mine(tx, courierId, deliveryId);
+      if (!d.reassignRequestedAt || (d.status !== 'picked_up' && d.status !== 'arrived')) throw changed(d.status);
+      if (accept) {
+        await tx
+          .update(deliveries)
+          .set({ status: 'searching', courierId: null, courierCategory: null, acceptedAt: null, pickedUpAt: null, arrivedAt: null, reassignRequestedAt: null, reassignReason: null, reassignRequestedBy: null })
+          .where(eq(deliveries.id, d.id));
+        await this.event(tx, d.id, 'reassign_accepted', 'courier', courierUserId);
+        await this.orders.move(tx, o.id, ['in_delivery'], 'ready', {}, { type: 'courier_changed', actorType: 'courier', actorId: courierUserId });
+      } else {
+        await tx.update(deliveries).set({ reassignRequestedAt: null, reassignReason: null, reassignRequestedBy: null }).where(eq(deliveries.id, d.id));
+        await this.event(tx, d.id, 'reassign_refused', 'courier', courierUserId);
+        await this.incidents.openInTx(tx, { orderId: o.id, deliveryId: d.id, actorType: 'courier', actorId: courierUserId, reason: 'reassign_refused', description: d.reassignReason ?? undefined });
+      }
+      await this.audit.log({ actorType: 'user', actorId: courierUserId, action: accept ? 'deliveries.reassign_accepted' : 'deliveries.reassign_refused', targetType: 'order', targetId: o.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { courierId } }, tx);
+    });
+  }
+
+  /**
+   * Client absent : il demande une nouvelle tentative (décision du 18/10/2026) et accepte de payer une deuxième fois les
+   * frais de livraison ; nouveau code de remise ; le même livreur repart avec le colis. Impossible une fois le colis
+   * revenu en boutique ; nombre de tentatives limité (réglage).
+   */
+  async retry(customerId: string, orderId: string, acceptFee: boolean, meta: RequestMeta) {
+    if (!acceptFee) throw Errors.validation({ fields: { acceptFee: ['Accepte les frais de la nouvelle tentative.'] } });
+    const retries = await this.intSetting('deliveries.max_retries', 1);
+    await this.db.transaction(async (tx) => {
+      const [o] = await tx.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.customerId, customerId))).for('update').limit(1);
+      if (!o) throw Errors.notFound('Commande');
+      const [d] = await tx.select().from(deliveries).where(eq(deliveries.orderId, orderId)).for('update').limit(1);
+      if (!d || d.status !== 'client_absent' || d.returnedAt || o.status !== 'in_delivery') throw changed(d?.returnedAt ? 'returned' : (d?.status ?? 'none'));
+      if (d.attempts > retries) throw new AppError('RETRY_LIMIT', 'Plus de nouvelle tentative possible pour cette commande.', HttpStatus.CONFLICT);
+      const base = o.deliveryFeeFcfa !== null ? Math.round(o.deliveryFeeFcfa / d.attempts) : 0;
+      if (o.deliveryFeeFcfa !== null) await tx.update(orders).set({ deliveryFeeFcfa: o.deliveryFeeFcfa + base }).where(eq(orders.id, o.id));
+      await tx.update(deliveries).set({ status: 'picked_up', attempts: d.attempts + 1, arrivedAt: null, endedAt: null, endReason: null }).where(eq(deliveries.id, d.id));
+      await this.event(tx, d.id, 'retry_requested', 'customer', customerId, { feeFcfa: base });
+      await this.orders.event(tx, o.id, 'delivery_retry', 'customer', customerId, null, null, { feeFcfa: base, attempt: d.attempts + 1 });
+      await this.incidents.closeForRetry(tx, d.id);
+      await this.orders.replaceHandoverCode(tx, o.id);
+      await this.audit.log({ actorType: 'user', actorId: customerId, action: 'deliveries.retry_requested', targetType: 'order', targetId: o.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { feeFcfa: base } }, tx);
+    });
   }
 
   /** Le livreur signale l'évaluation reçue pour sa course (modération). */
@@ -604,15 +691,18 @@ export class DeliveriesService {
       waitFeeFcfa: d.waitFeeFcfa,
       refusalReason: d.refusalReason,
       returnedAt: d.returnedAt,
+      attempt: d.attempts,
+      reassignPending: !!d.reassignRequestedAt,
       events: events.map((e) => ({ type: e.type, actorType: e.actorType, at: e.createdAt })),
       review: review ?? null,
     };
   }
 
-  static partyActions(o: Order, d: Delivery | null, party: 'customer' | 'shop'): string[] {
+  static partyActions(o: Order, d: Delivery | null, party: 'customer' | 'shop', retriesAllowed = 1): string[] {
     if (o.deliveryMode === 'pickup' || !o.deliveryMode) return [];
     if (party === 'shop') {
       if (o.status === 'in_delivery' && d && RETURNABLE.includes(d.status) && !d.returnedAt) return ['confirm_return'];
+      if (o.status === 'in_delivery' && d && (d.status === 'picked_up' || d.status === 'arrived') && !d.reassignRequestedAt) return ['request_reassign'];
       if (o.status !== 'ready') return [];
       if (!d) return ['start_delivery'];
       if (d.status === 'searching') return ['select_courier'];
@@ -621,6 +711,9 @@ export class DeliveriesService {
     }
     if (!d) return [];
     if (d.status === 'arrived') return ['refuse_delivery', 'report_incident'];
+    // V1 : client absent — nouvelle tentative possible (frais de livraison payés une deuxième fois), tant que le colis
+    // n'est pas revenu en boutique.
+    if (d.status === 'client_absent' && !d.returnedAt && o.status === 'in_delivery' && d.attempts <= retriesAllowed) return ['retry_delivery'];
     if (d.status === 'closed') return ['review_delivery'];
     return [];
   }
@@ -643,7 +736,8 @@ export class DeliveriesService {
     const d = await this.forOrder(orderId);
     const tracking = await this.view(o, party);
     // Une livraison ne s'évalue qu'une fois : l'action disparaît dès qu'une évaluation existe.
-    const extra = DeliveriesService.partyActions(o, d, party).filter((x) => x !== 'review_delivery' || !tracking?.review);
+    const retries = await this.intSetting('deliveries.max_retries', 1);
+    const extra = DeliveriesService.partyActions(o, d, party, retries).filter((x) => x !== 'review_delivery' || !tracking?.review);
     // Lot 8 : paiement en ligne (client seulement), proposé uniquement s'il est réellement ouvert pour cette commande.
     const online = party === 'customer' ? await this.online.customerView(o) : null;
     if (online?.available) extra.push('pay_online');
@@ -655,6 +749,8 @@ export class DeliveriesService {
       incidents: await this.incidents.summaryForOrder(orderId, apiBase),
       dispute: { until: dispute.disputeUntil, open: dispute.disputeOpen ?? false, inDispute: dispute.inDispute },
       ...(party === 'customer' ? { onlinePayment: online } : {}),
+      // V1 : frais d'une nouvelle tentative (mêmes frais que la première livraison).
+      ...(party === 'customer' && extra.includes('retry_delivery') && o.deliveryFeeFcfa !== null && d ? { retryFeeFcfa: Math.round(o.deliveryFeeFcfa / d.attempts) } : {}),
       // A3-b : frais de livraison payés directement au livreur indépendant (client : coordonnées et action).
       deliveryFeePayment: party === 'customer' ? await this.fees.customerView(orderId) : DeliveriesService.shopFeeView(await this.fees.forOrder(orderId)),
       actions: [...v.actions, ...extra],

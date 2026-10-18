@@ -9,7 +9,7 @@ import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, Public, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
-import { AcceptProposalDto, CashReceivedDto, CreateOrderDto, DeclarePaymentDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto, ReviewDto, ReviewNoteDto, RefuseDeliveryDto, IncidentDto, OfferCourierDto, IncidentNoteDto, CodeDto, CourierNoteDto, ReportReviewDto } from './dto';
+import { AcceptProposalDto, CashReceivedDto, CreateOrderDto, DeclarePaymentDto, HandoverDto, OptionalReasonDto, PreviewOrderDto, ProposeOrderDto, ReasonDto, ReviewDto, ReviewNoteDto, RefuseDeliveryDto, IncidentDto, OfferCourierDto, IncidentNoteDto, CodeDto, CourierNoteDto, ReportReviewDto, RetryDeliveryDto, ReassignAnswerDto } from './dto';
 import { ReviewsService } from './reviews.service';
 import { DeliveriesService } from './deliveries.service';
 import { DeliveryFeesService } from './delivery-fees.service';
@@ -37,6 +37,15 @@ export class OrdersController {
   @ApiOperation({ summary: 'Refuser la remise après examen (motif obligatoire ; ouvre un incident ; jamais « livrée »)' })
   async refuse(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RefuseDeliveryDto, @Req() req: Request) {
     await this.deliveries.refuse(a.userId, id, dto.reason, dto.details);
+    return this.deliveries.customerView(a.userId, id, apiBase(req));
+  }
+
+  @Post(':id/delivery/retry')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Client absent : demander une nouvelle tentative (frais de livraison payés une deuxième fois, nouveau code)' })
+  async retryDelivery(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RetryDeliveryDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.deliveries.retry(a.userId, id, dto.acceptFee, meta);
     return this.deliveries.customerView(a.userId, id, apiBase(req));
   }
 
@@ -194,6 +203,15 @@ export class ShopOrdersController {
   @RequireShopPermission('deliveries.select_courier')
   async withdrawOffer(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     await this.deliveries.withdraw(a.userId, this.shop(a), id);
+    return this.deliveries.shopView(this.shop(a), id, apiBase(req));
+  }
+
+  @Post(':id/delivery/reassign')
+  @HttpCode(200)
+  @RequireShopPermission('deliveries.select_courier')
+  @ApiOperation({ summary: 'Demander un autre livreur après la prise en charge (le livreur actuel doit accepter ; sinon le support tranche)' })
+  async reassign(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    await this.deliveries.requestReassign(a.userId, this.shop(a), id, dto.reason, meta);
     return this.deliveries.shopView(this.shop(a), id, apiBase(req));
   }
 
@@ -570,6 +588,14 @@ export class CourierDeliveriesController {
   async close(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
     await this.deliveries.close(a.userId, this.c(a), id, meta);
     return this.deliveries.course(this.c(a), id);
+  }
+
+  @Post('courses/:id/reassign')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Répondre à une demande de changement de livreur (accord : rapporter le colis ; refus : le support tranche)' })
+  async answerReassign(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReassignAnswerDto, @ReqMeta() meta: RequestMeta) {
+    await this.deliveries.answerReassign(a.userId, this.c(a), id, dto.accept, meta);
+    return dto.accept ? { status: 'released' } : this.deliveries.course(this.c(a), id);
   }
 
   @Post('courses/:id/client-absent')

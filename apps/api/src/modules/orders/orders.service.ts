@@ -629,6 +629,15 @@ export class OrdersService {
     });
   }
 
+  /** V1 : nouvelle tentative de livraison — nouveau code de remise (l'ancien ne vaut plus rien), essais remis à zéro. */
+  async replaceHandoverCode(tx: Tx, orderId: string) {
+    const code = numericCode(4);
+    await tx
+      .update(orderHandoverCodes)
+      .set({ codeEncrypted: encryptBytes(Buffer.from(code), this.codeKey).toString('base64'), codeHash: hmacSha256(this.otpSecret, `handover:${orderId}:${code}`), failedAttempts: 0, status: 'active', usedAt: null, usedBy: null })
+      .where(eq(orderHandoverCodes.orderId, orderId));
+  }
+
   /** Annulation par le client : proposition refusée, ou commande annulée avant la préparation. */
   async cancelByCustomer(customerId: string, orderId: string, reason: string | undefined) {
     await this.ownedByCustomer(customerId, orderId);
