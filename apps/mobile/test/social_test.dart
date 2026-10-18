@@ -103,7 +103,6 @@ class _FakeSocial extends SocialApi {
 
   bool followed = false;
 
-  @override
   /// V1 : personnes à suivre (vide par défaut, pour ne pas décaler les autres écrans testés).
   bool withSuggestions = false;
 

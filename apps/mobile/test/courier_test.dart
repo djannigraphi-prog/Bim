@@ -338,11 +338,11 @@ void main() {
 
   testWidgets('V1 changement de livreur demandé par la boutique : motif affiché, accord puis course rendue', (tester) async {
     final api = _FakeCourier();
-    api.detail = CourseDetail(
-      mission: const Mission(id: '', deliveryId: 'd1', mode: 'express', fromShop: 'Boutique Élégance', toPlace: 'Yopougon, Abidjan', itemsCount: 1, number: 'CMD-000042'),
+    api.detail = const CourseDetail(
+      mission: Mission(id: '', deliveryId: 'd1', mode: 'express', fromShop: 'Boutique Élégance', toPlace: 'Yopougon, Abidjan', itemsCount: 1, number: 'CMD-000042'),
       status: 'picked_up',
-      items: const [(title: 'Robe', variant: 'M', quantity: 1)],
-      actions: const ['accept_reassign', 'refuse_reassign', 'report_incident'],
+      items: [(title: 'Robe', variant: 'M', quantity: 1)],
+      actions: ['accept_reassign', 'refuse_reassign', 'report_incident'],
       reassignReason: 'Retard de 40 minutes',
     );
     await _pump(tester, const CourseScreen(deliveryId: 'd1'), courier: api);
