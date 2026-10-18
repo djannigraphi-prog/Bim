@@ -365,6 +365,20 @@
       "when": 1792284304865,
       "tag": "0051_lot10a_lives",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792285040849,
+      "tag": "0052_lot11a_reels",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792285042054,
+      "tag": "0053_lot11a_settings",
+      "breakpoints": true
     }
   ]
 }

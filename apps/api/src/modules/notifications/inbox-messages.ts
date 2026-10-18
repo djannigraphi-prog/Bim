@@ -53,7 +53,7 @@ export function inboxText(s: InboxSource): string {
     }
     case 'coins_received': {
       const n = Number(s.chest ?? 0);
-      const what = s.snippet === 'comment' ? 'ton commentaire' : s.snippet === 'live' ? 'ton Live' : 'ta publication';
+      const what = s.snippet === 'comment' ? 'ton commentaire' : s.snippet === 'live' ? 'ton Live' : s.snippet === 'reel' ? 'ton Reel' : 'ta publication';
       return `${s.actorName ?? 'Quelqu’un'} t’a envoyé ${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} pièce${n > 1 ? 's' : ''} sur ${what}. Bravo !`;
     }
     case 'live_started':

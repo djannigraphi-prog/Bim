@@ -89,12 +89,17 @@ export class StorageService {
 
   /** Lecture d'un lien signé (stockage local uniquement). */
   async readSigned(token: string): Promise<Buffer> {
+    return (await this.readSignedFile(token)).body;
+  }
+
+  /** Lecture d'un lien signé avec le type du fichier (lot 11 : vidéos « .mp4 »). */
+  async readSignedFile(token: string): Promise<{ body: Buffer; contentType: string }> {
     if (this.cfg.MEDIA_STORAGE !== 'local') throw Errors.notFound('Fichier');
     const [key, expRaw, sig] = Buffer.from(token, 'base64url').toString('utf8').split('|');
     const exp = Number(expRaw);
     if (!key || !sig || !Number.isFinite(exp) || exp < Date.now() / 1000 || !safeEqualHex(sig, this.sign(key, exp))) throw Errors.notFound('Fichier');
     try {
-      return await readFile(this.localPath(key));
+      return { body: await readFile(this.localPath(key)), contentType: key.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg' };
     } catch {
       throw Errors.notFound('Fichier');
     }

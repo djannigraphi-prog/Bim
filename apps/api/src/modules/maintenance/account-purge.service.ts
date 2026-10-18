@@ -85,6 +85,10 @@ export const PURGE_BLOCKING_TABLES = [
   'lives',
   'live_comments',
   'live_viewers',
+  // Lot 11 : publier, aimer ou regarder un Reel est une activité.
+  'reels',
+  'reel_likes',
+  'reel_views',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */

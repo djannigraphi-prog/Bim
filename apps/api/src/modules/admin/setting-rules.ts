@@ -106,6 +106,8 @@ const RULES: Array<[RegExp, Rule]> = [
         : 'Liste de 1 à 12 cadeaux {"code", "name", "coins"} aux codes distincts.',
   ],
   [/^coins\.withdraw_min$/, intIn(100, 1_000_000)],
+  [/^reels\.max_seconds$/, intIn(5, 180)],
+  [/^reels\.daily_limit$/, intIn(1, 100)],
   [/^coins\.withdraw_daily_cap$/, intIn(1_000, 100_000_000)],
   [/^coins\.withdraw_instant_max$/, intIn(0, 100_000_000)],
   [/^coins\.withdraw_fee_percent$/, (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 10 ? null : 'Pourcentage entre 0 et 10.')],

@@ -3,6 +3,7 @@ import { boolean, check, index, integer, pgTable, timestamp, uniqueIndex, uuid, 
 import { adminUsers } from './platform';
 import { users } from './identity';
 import { lives } from './lives';
+import { reels } from './reels';
 import { postComments, posts } from './social';
 
 /**
@@ -112,11 +113,12 @@ export const coinGifts = pgTable(
     recipientId: uuid('recipient_id')
       .notNull()
       .references(() => users.id),
-    /** post · comment · live (lot 10) */
+    /** post · comment · live (lot 10) · reel (lot 11) */
     targetType: varchar('target_type', { length: 8 }).notNull(),
     postId: uuid('post_id').references(() => posts.id),
     commentId: uuid('comment_id').references(() => postComments.id),
     liveId: uuid('live_id').references(() => lives.id),
+    reelId: uuid('reel_id').references(() => reels.id),
     giftCode: varchar('gift_code', { length: 20 }).notNull(),
     quantity: integer('quantity').notNull(),
     coins: integer('coins').notNull(),
@@ -131,9 +133,10 @@ export const coinGifts = pgTable(
     index('coin_gifts_comment_idx').on(t.commentId),
     index('coin_gifts_recipient_idx').on(t.recipientId, t.createdAt),
     index('coin_gifts_live_idx').on(t.liveId, t.createdAt),
+    index('coin_gifts_reel_idx').on(t.reelId),
     check(
       'coin_gifts_target_ck',
-      sql`(${t.targetType} = 'post' AND ${t.postId} IS NOT NULL AND ${t.commentId} IS NULL AND ${t.liveId} IS NULL) OR (${t.targetType} = 'comment' AND ${t.postId} IS NOT NULL AND ${t.commentId} IS NOT NULL AND ${t.liveId} IS NULL) OR (${t.targetType} = 'live' AND ${t.liveId} IS NOT NULL AND ${t.postId} IS NULL AND ${t.commentId} IS NULL)`,
+      sql`(${t.targetType} = 'post' AND ${t.postId} IS NOT NULL AND ${t.commentId} IS NULL AND ${t.liveId} IS NULL AND ${t.reelId} IS NULL) OR (${t.targetType} = 'comment' AND ${t.postId} IS NOT NULL AND ${t.commentId} IS NOT NULL AND ${t.liveId} IS NULL AND ${t.reelId} IS NULL) OR (${t.targetType} = 'live' AND ${t.liveId} IS NOT NULL AND ${t.postId} IS NULL AND ${t.commentId} IS NULL AND ${t.reelId} IS NULL) OR (${t.targetType} = 'reel' AND ${t.reelId} IS NOT NULL AND ${t.postId} IS NULL AND ${t.commentId} IS NULL AND ${t.liveId} IS NULL)`,
     ),
     check('coin_gifts_coins_ck', sql`${t.coins} > 0 AND ${t.quantity} > 0`),
     check('coin_gifts_self_ck', sql`${t.senderId} <> ${t.recipientId}`),

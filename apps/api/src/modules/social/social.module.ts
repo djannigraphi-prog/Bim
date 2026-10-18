@@ -5,6 +5,7 @@ import { WalletModule } from '../wallet/wallet.module';
 import { ModerationService } from './moderation.service';
 import { PeopleService } from './people.service';
 import { PostsService } from './posts.service';
+import { ReelsService } from './reels.service';
 import { StoriesService } from './stories.service';
 import { ModerationController, SocialController } from './social.controller';
 
@@ -12,7 +13,7 @@ import { ModerationController, SocialController } from './social.controller';
 @Module({
   imports: [ProjectsModule, CatalogModule, WalletModule],
   controllers: [SocialController, ModerationController],
-  providers: [PostsService, PeopleService, ModerationService, StoriesService],
+  providers: [PostsService, PeopleService, ModerationService, StoriesService, ReelsService],
   exports: [StoriesService],
 })
 export class SocialModule {}

@@ -1757,6 +1757,223 @@
         ]
       }
     },
+    "/v1/reels": {
+      "get": {
+        "operationId": "SocialController_reelFeed",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reels (écran 15) : publics et ceux des personnes suivies, du plus récent au plus ancien",
+        "tags": [
+          "Social"
+        ]
+      },
+      "post": {
+        "operationId": "SocialController_createReel",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "video"
+                ],
+                "properties": {
+                  "video": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "caption": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "followers"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publier un Reel (vidéo MP4, 60 s au plus ; métadonnées et position effacées)",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/v1/reels/{id}": {
+      "get": {
+        "operationId": "SocialController_reel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Un Reel",
+        "tags": [
+          "Social"
+        ]
+      },
+      "delete": {
+        "operationId": "SocialController_deleteReel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprimer mon Reel (fichier effacé)",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/v1/reels/{id}/like": {
+      "put": {
+        "operationId": "SocialController_likeReel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "J’aime un Reel",
+        "tags": [
+          "Social"
+        ]
+      },
+      "delete": {
+        "operationId": "SocialController_unlikeReel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Je n’aime plus",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
+    "/v1/reels/{id}/view": {
+      "post": {
+        "operationId": "SocialController_viewReel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reel vu (une vue par personne)",
+        "tags": [
+          "Social"
+        ]
+      }
+    },
     "/v1/public/feed": {
       "get": {
         "operationId": "SocialController_publicFeed",
@@ -11045,7 +11262,8 @@
               "user",
               "story",
               "message",
-              "review"
+              "review",
+              "reel"
             ]
           },
           "targetId": {
@@ -11265,7 +11483,8 @@
             "enum": [
               "post",
               "comment",
-              "live"
+              "live",
+              "reel"
             ]
           },
           "targetId": {

@@ -13,6 +13,12 @@ export class CreatePostDto {
   visibility?: Visibility;
 }
 
+/** Lot 11 : Reel (la vidéo arrive en multipart, champ `video`). */
+export class CreateReelDto {
+  @ApiPropertyOptional({ maxLength: 300 }) @IsOptional() @IsString() @MaxLength(300) caption?: string;
+  @ApiPropertyOptional({ enum: ['public', 'followers'], default: 'public' }) @IsOptional() @IsIn(['public', 'followers']) visibility?: 'public' | 'followers';
+}
+
 /** « J'ai fait mon BIM » (écrans 16 et 31) : photos avant / après d'un projet, publiées avec l'accord de la personne. */
 export class CreateBimPostDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() projectId!: string;
@@ -39,9 +45,9 @@ export class CreateCommentDto {
 export const CONTENT_REASONS = ['spam', 'harassment', 'nudity', 'violence', 'hate', 'self_harm', 'false_info', 'other'] as const;
 
 export class ReportContentDto {
-  @ApiProperty({ enum: ['post', 'comment', 'user', 'story', 'message', 'review'] })
-  @IsIn(['post', 'comment', 'user', 'story', 'message', 'review'])
-  targetType!: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review';
+  @ApiProperty({ enum: ['post', 'comment', 'user', 'story', 'message', 'review', 'reel'] })
+  @IsIn(['post', 'comment', 'user', 'story', 'message', 'review', 'reel'])
+  targetType!: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review' | 'reel';
   @ApiProperty({ format: 'uuid' }) @IsUUID() targetId!: string;
   @ApiProperty({ enum: CONTENT_REASONS }) @IsIn(CONTENT_REASONS) reason!: (typeof CONTENT_REASONS)[number];
   @ApiPropertyOptional({ maxLength: 500 }) @IsOptional() @IsString() @MaxLength(500) message?: string;

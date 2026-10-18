@@ -17,8 +17,8 @@ export class MediaController {
   // par le jeton signé et temporaire. Sans cet en-tête, helmet impose « same-origin » et le navigateur bloque l'image.
   @Header('Cross-Origin-Resource-Policy', 'cross-origin')
   async read(@Param('token') token: string, @Res() res: Response) {
-    const body = await this.storage.readSigned(token);
-    res.type('image/jpeg').send(body);
+    const f = await this.storage.readSignedFile(token);
+    res.type(f.contentType).send(f.body);
   }
 }
 

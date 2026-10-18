@@ -83,6 +83,8 @@ const schema = z
     MEDIA_LOCAL_DIR: z.string().default('./.media'),
     MEDIA_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
     MEDIA_MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(25).default(10),
+    /** Lot 11 : taille maximale d'un Reel (vidéo MP4), en Mo. */
+    MEDIA_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(100).default(30),
     S3_BUCKET: z.string().default(''),
     S3_REGION: z.string().default('eu-west-3'),
     /** Uniquement pour un stockage compatible S3 (ex. MinIO en test) ; vide pour AWS. */

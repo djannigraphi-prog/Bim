@@ -3,13 +3,13 @@ import { api, errorText } from '../api';
 
 interface ContentReport {
   id: string;
-  targetType: 'post' | 'comment' | 'user' | 'story' | 'message';
+  targetType: 'post' | 'comment' | 'user' | 'story' | 'message' | 'review' | 'reel';
   targetId: string;
   reason: string;
   message: string | null;
   reporter: string;
   author: { id: string; username: string; fullName: string; status: string } | null;
-  content: { kind: string; text: string | null; status: string | null; images: string[]; visibility?: string; postId?: string };
+  content: { kind: string; text: string | null; status: string | null; images: string[]; visibility?: string; postId?: string; videoUrl?: string | null };
   status: 'open' | 'resolved';
   action: 'none' | 'hidden' | null;
   resolution: string | null;
@@ -28,7 +28,7 @@ const REASONS: Record<string, string> = {
   other: 'Autre',
 };
 // Lot 6-A : un message privé n'apparaît ici que s'il a été signalé ; chaque affichage est journalisé par l'API.
-const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé', review: 'Évaluation' };
+const TARGETS: Record<string, string> = { post: 'Publication', comment: 'Commentaire', user: 'Profil', story: 'Story', message: 'Message privé', review: 'Évaluation', reel: 'Reel' };
 const STATUS: Record<string, string> = { published: 'en ligne', hidden: 'masqué', deleted: 'supprimé par son auteur' };
 
 /**
@@ -92,6 +92,7 @@ export function Moderation({ canModerate }: { canModerate: boolean }) {
                 <img className="report-image" src={url} alt="Image de la publication signalée" />
               </a>
             ))}
+            {r.content.videoUrl && <video className="report-image" src={r.content.videoUrl} controls preload="metadata" aria-label="Vidéo du Reel signalé (lien temporaire)" />}
             {r.content.status && <div className="muted">État du contenu : {STATUS[r.content.status] ?? r.content.status}</div>}
             {r.author && r.author.status !== 'active' && <div className="muted">Compte de l’auteur : {r.author.status}</div>}
             {r.status === 'resolved' ? (

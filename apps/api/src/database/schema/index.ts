@@ -18,3 +18,4 @@ export * from './reviews';
 export * from './deliveries';
 export * from './wallet';
 export * from './lives';
+export * from './reels';

@@ -9,10 +9,11 @@ import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
 import { AuthContext, CurrentAuth, Public } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { CreateBimPostDto, CreateCommentDto, CreatePostDto, PostProductsDto, ReportContentDto, ResolveContentReportDto, VISIBILITIES } from './dto';
+import { CreateBimPostDto, CreateCommentDto, CreatePostDto, CreateReelDto, PostProductsDto, ReportContentDto, ResolveContentReportDto, VISIBILITIES } from './dto';
 import { ModerationService } from './moderation.service';
 import { PeopleService } from './people.service';
 import { MAX_POST_IMAGES, PostsService } from './posts.service';
+import { ReelsService } from './reels.service';
 import { StoriesService } from './stories.service';
 
 const UPLOAD_LIMIT = 25 * 1024 * 1024; // taille réelle contrôlée par le service (MEDIA_MAX_UPLOAD_MB), message clair
@@ -26,7 +27,59 @@ export class SocialController {
     private readonly posts: PostsService,
     private readonly people: PeopleService,
     private readonly stories: StoriesService,
+    private readonly reels: ReelsService,
   ) {}
+
+  // ------------------------------------------------------------------------------------------------ Lot 11 : Reels
+
+  @Get('reels')
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOperation({ summary: 'Reels (écran 15) : publics et ceux des personnes suivies, du plus récent au plus ancien' })
+  reelFeed(@CurrentAuth() a: AuthContext, @Req() req: Request, @Query('cursor') cursor?: string) {
+    return this.reels.feed(a.userId, this.cursor(cursor), apiBase(req));
+  }
+
+  @Post('reels')
+  @Throttle({ default: { limit: 10, ttl: 600_000 } })
+  @UseInterceptors(FileInterceptor('video', { limits: { fileSize: 100 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['video'], properties: { video: { type: 'string', format: 'binary' }, caption: { type: 'string' }, visibility: { type: 'string', enum: ['public', 'followers'] } } } })
+  @ApiOperation({ summary: 'Publier un Reel (vidéo MP4, 60 s au plus ; métadonnées et position effacées)' })
+  createReel(@CurrentAuth() a: AuthContext, @Req() req: Request, @UploadedFile() video: Express.Multer.File | undefined, @Body() dto: CreateReelDto, @ReqMeta() meta: RequestMeta) {
+    return this.reels.create(a.userId, video, dto, meta, apiBase(req));
+  }
+
+  @Get('reels/:id')
+  @ApiOperation({ summary: 'Un Reel' })
+  reel(@CurrentAuth() a: AuthContext, @Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    return this.reels.detail(a.userId, id, apiBase(req));
+  }
+
+  @Delete('reels/:id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Supprimer mon Reel (fichier effacé)' })
+  async deleteReel(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
+    await this.reels.remove(a.userId, id, meta);
+  }
+
+  @Put('reels/:id/like')
+  @ApiOperation({ summary: 'J’aime un Reel' })
+  likeReel(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.reels.like(a.userId, id, true);
+  }
+
+  @Delete('reels/:id/like')
+  @ApiOperation({ summary: 'Je n’aime plus' })
+  unlikeReel(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.reels.like(a.userId, id, false);
+  }
+
+  @Post('reels/:id/view')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Reel vu (une vue par personne)' })
+  viewReel(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.reels.view(a.userId, id);
+  }
 
   @Public()
   @Get('public/feed')
@@ -272,8 +325,8 @@ export class ModerationController {
   @AdminRoute('content.moderate')
   @ApiOperation({ summary: 'Rétablir une publication ou un commentaire masqué' })
   restore(@CurrentAdmin() a: AdminContext, @Param('type') type: string, @Param('id', ParseUUIDPipe) id: string, @ReqMeta() meta: RequestMeta) {
-    if (type !== 'post' && type !== 'comment' && type !== 'story' && type !== 'message' && type !== 'review') {
-      throw Errors.validation({ fields: { type: ['« post », « comment », « story », « message » ou « review ».'] } });
+    if (type !== 'post' && type !== 'comment' && type !== 'story' && type !== 'message' && type !== 'review' && type !== 'reel') {
+      throw Errors.validation({ fields: { type: ['« post », « comment », « story », « message », « review » ou « reel ».'] } });
     }
     return this.moderation.restore(a, type, id, meta);
   }

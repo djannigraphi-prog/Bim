@@ -44,6 +44,14 @@ class _FeedViewState extends ConsumerState<FeedView> {
             _TabPill(label: 'Pour toi', selected: _tab == 'for_you', onTap: () => setState(() => _tab = 'for_you')),
             const SizedBox(width: BimSpacing.sm),
             _TabPill(label: 'Abonnés', selected: _tab == 'following', onTap: () => setState(() => _tab = 'following')),
+            const Spacer(),
+            // Lot 11 : Reels (vidéos courtes).
+            TextButton.icon(
+              key: const ValueKey('open-reels'),
+              onPressed: () => context.push('/reels'),
+              icon: const Icon(Icons.slow_motion_video_rounded),
+              label: const Text('Reels'),
+            ),
           ],
         ),
       ),

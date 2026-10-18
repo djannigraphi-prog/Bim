@@ -13,6 +13,7 @@ import { StorageService } from '../media/storage';
 import { notBlockedBetween, commentParentPublished } from './access';
 import { ReportContentDto } from './dto';
 import { PostsService } from './posts.service';
+import { ReelsService } from './reels.service';
 import { StoriesService } from './stories.service';
 
 /**
@@ -30,6 +31,7 @@ export class PeopleService {
     private readonly posts: PostsService,
     private readonly stories: StoriesService,
     private readonly audit: AuditService,
+    private readonly reels: ReelsService,
   ) {}
 
   /** Personne active et visible par `viewerId` (aucun blocage entre eux), par nom d'utilisateur ou identifiant. */
@@ -203,6 +205,8 @@ export class PeopleService {
       const found = m ?? fromClient;
       if (!found) throw Errors.notFound('Message');
       targetUserId = found.senderId;
+    } else if (dto.targetType === 'reel') {
+      targetUserId = (await this.reels.visible(viewerId, dto.targetId)).reel.userId;
     } else if (dto.targetType === 'story') {
       targetUserId = (await this.stories.visibleStory(viewerId, dto.targetId)).userId;
     } else if (dto.targetType === 'review') {

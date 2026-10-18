@@ -1,6 +1,6 @@
 import { AnyColumn, SQL, sql } from 'drizzle-orm';
 import type { Database } from '../../database/database.module';
-import { postComments, posts, users } from '../../database/schema';
+import { postComments, posts, reels, users } from '../../database/schema';
 
 /**
  * Règles de visibilité du social (lot 4), écrites une seule fois et appliquées dans la requête SQL elle-même.
@@ -15,6 +15,15 @@ export function postVisibleTo(viewerId: string): SQL {
       OR ${posts.visibility} = 'public'
       OR (${posts.visibility} = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${viewerId} AND f.followee_id = ${posts.userId}))
     ) AND ${notBlockedBetween(viewerId, posts.userId)})`;
+}
+
+/** Lot 11 : mêmes règles pour un Reel (publié, auteur actif, public ou abonnés suivis, aucun blocage). Joindre `users`. */
+export function reelVisibleTo(viewerId: string): SQL {
+  return sql`(${reels.status} = 'published' AND ${users.status} = 'active' AND (
+      ${reels.userId} = ${viewerId}
+      OR ${reels.visibility} = 'public'
+      OR (${reels.visibility} = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${viewerId} AND f.followee_id = ${reels.userId}))
+    ) AND ${notBlockedBetween(viewerId, reels.userId)})`;
 }
 
 /** Aucun blocage, dans un sens ou dans l'autre, entre `viewerId` et la personne de la colonne `other`. */

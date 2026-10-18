@@ -5,20 +5,20 @@ import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { DB, Database, DbOrTx } from '../../database/database.module';
-import { coinGifts, coinLedger, coinPurchases, lives, postComments, posts, subscriptions, userContacts, users, wallets, withdrawals } from '../../database/schema';
+import { coinGifts, coinLedger, coinPurchases, lives, postComments, posts, reels, subscriptions, userContacts, users, wallets, withdrawals } from '../../database/schema';
 import type { AdminContext } from '../admin/admin.decorators';
 import { AgePolicyService } from '../age-policy/age-policy.service';
 import { AuditService } from '../audit/audit.service';
 import { CLOCK, Clock } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
-import { commentParentPublished, notBlockedBetween, postVisibleTo } from '../social/access';
+import { commentParentPublished, notBlockedBetween, postVisibleTo, reelVisibleTo } from '../social/access';
 
 export const PREMIUM_PLAN = 'user_premium';
 export const PREMIUM_PERIOD_DAYS = 30;
 export const GIFT_MAX_QUANTITY = 99;
 export const WITHDRAWAL_OPERATORS = ['orange', 'mtn', 'moov', 'wave'] as const;
 export type WithdrawalOperator = (typeof WITHDRAWAL_OPERATORS)[number];
-export const GIFT_TARGETS = ['post', 'comment', 'live'] as const;
+export const GIFT_TARGETS = ['post', 'comment', 'live', 'reel'] as const;
 export type GiftTarget = (typeof GIFT_TARGETS)[number];
 
 export interface Gift {
@@ -245,7 +245,17 @@ export class WalletService {
   // ------------------------------------------------------------------------------------------------ Envois
 
   /** Destinataire et publication d'un envoi, après contrôle de la visibilité et des blocages. */
-  private async target(senderId: string, targetType: GiftTarget, targetId: string): Promise<{ postId: string | null; commentId: string | null; liveId: string | null; recipientId: string }> {
+  private async target(
+    senderId: string,
+    targetType: GiftTarget,
+    targetId: string,
+  ): Promise<{ postId: string | null; commentId: string | null; liveId: string | null; reelId: string | null; recipientId: string }> {
+    if (targetType === 'reel') {
+      // Lot 11 : pièces sur un Reel visible, reçues par son auteur.
+      const [r] = await this.db.select({ id: reels.id, userId: reels.userId }).from(reels).innerJoin(users, eq(users.id, reels.userId)).where(and(eq(reels.id, targetId), reelVisibleTo(senderId)));
+      if (!r) throw Errors.notFound('Reel');
+      return { postId: null, commentId: null, liveId: null, reelId: r.id, recipientId: r.userId };
+    }
     if (targetType === 'live') {
       // Lot 10 : cadeau pendant un Live en cours, reçu par la personne qui l'anime.
       const [l] = await this.db
@@ -255,7 +265,7 @@ export class WalletService {
         .where(and(eq(lives.id, targetId), eq(users.status, 'active'), notBlockedBetween(senderId, lives.hostUserId)));
       if (!l) throw Errors.notFound('Live');
       if (l.status !== 'live') throw conflict('LIVE_NOT_RUNNING', 'Ce Live n’est pas en cours.');
-      return { postId: null, commentId: null, liveId: l.id, recipientId: l.hostUserId };
+      return { postId: null, commentId: null, liveId: l.id, reelId: null, recipientId: l.hostUserId };
     }
     if (targetType === 'post') {
       const [r] = await this.db
@@ -264,7 +274,7 @@ export class WalletService {
         .innerJoin(users, eq(users.id, posts.userId))
         .where(and(eq(posts.id, targetId), postVisibleTo(senderId)));
       if (!r) throw Errors.notFound('Publication');
-      return { postId: r.postId, commentId: null, liveId: null, recipientId: r.recipientId };
+      return { postId: r.postId, commentId: null, liveId: null, reelId: null, recipientId: r.recipientId };
     }
     const [c] = await this.db
       .select({ commentId: postComments.id, postId: postComments.postId, recipientId: postComments.userId })
@@ -274,7 +284,7 @@ export class WalletService {
     if (!c) throw Errors.notFound('Commentaire');
     const [p] = await this.db.select({ id: posts.id }).from(posts).innerJoin(users, eq(users.id, posts.userId)).where(and(eq(posts.id, c.postId), postVisibleTo(senderId)));
     if (!p) throw Errors.notFound('Commentaire');
-    return { ...c, liveId: null };
+    return { ...c, liveId: null, reelId: null };
   }
 
   async gift(
@@ -312,6 +322,7 @@ export class WalletService {
           postId: t.postId,
           commentId: t.commentId,
           liveId: t.liveId,
+          reelId: t.reelId,
           giftCode: gift.code,
           quantity: dto.quantity,
           coins,
@@ -323,7 +334,8 @@ export class WalletService {
         if (fromPurchased > 0) await this.credit(tx, senderId, 'purchased', -fromPurchased, 'gift_sent', id);
         if (coins - fromPurchased > 0) await this.credit(tx, senderId, 'received', -(coins - fromPurchased), 'gift_sent', id);
         await this.credit(tx, t.recipientId, 'received', coins, 'gift_received', id);
-        if (t.liveId) await tx.update(lives).set({ coinCount: sql`${lives.coinCount} + ${coins}` }).where(eq(lives.id, t.liveId));
+        if (t.reelId) await tx.update(reels).set({ coinCount: sql`${reels.coinCount} + ${coins}` }).where(eq(reels.id, t.reelId));
+        else if (t.liveId) await tx.update(lives).set({ coinCount: sql`${lives.coinCount} + ${coins}` }).where(eq(lives.id, t.liveId));
         else if (t.commentId) await tx.update(postComments).set({ coinCount: sql`${postComments.coinCount} + ${coins}` }).where(eq(postComments.id, t.commentId));
         else await tx.update(posts).set({ coinCount: sql`${posts.coinCount} + ${coins}` }).where(eq(posts.id, t.postId!));
         await this.audit.log({ actorType: 'user', actorId: senderId, action: 'coins.gift_sent', targetType: dto.targetType, targetId: dto.targetId, ip: meta.ip, userAgent: meta.userAgent, metadata: { giftId: id, coins, gift: gift.code } }, tx);
@@ -335,14 +347,16 @@ export class WalletService {
   }
 
   private async giftResult(senderId: string, g: typeof coinGifts.$inferSelect) {
-    const [target] = g.liveId
+    const [target] = g.reelId
+      ? await this.db.select({ coinCount: reels.coinCount }).from(reels).where(eq(reels.id, g.reelId))
+      : g.liveId
       ? await this.db.select({ coinCount: lives.coinCount }).from(lives).where(eq(lives.id, g.liveId))
       : g.commentId
         ? await this.db.select({ coinCount: postComments.coinCount }).from(postComments).where(eq(postComments.id, g.commentId))
         : await this.db.select({ coinCount: posts.coinCount }).from(posts).where(eq(posts.id, g.postId!));
     const b = await this.balances(senderId);
     return {
-      gift: { id: g.id, targetType: g.targetType, postId: g.postId, commentId: g.commentId, liveId: g.liveId, giftCode: g.giftCode, quantity: g.quantity, coins: g.coins, anonymous: g.anonymous, at: g.createdAt },
+      gift: { id: g.id, targetType: g.targetType, postId: g.postId, commentId: g.commentId, liveId: g.liveId, reelId: g.reelId, giftCode: g.giftCode, quantity: g.quantity, coins: g.coins, anonymous: g.anonymous, at: g.createdAt },
       targetCoinCount: target?.coinCount ?? 0,
       balance: { total: b.purchased + b.received, purchased: b.purchased, received: b.received, withdrawable: b.received },
     };
