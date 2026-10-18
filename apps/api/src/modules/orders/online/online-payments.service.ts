@@ -389,24 +389,40 @@ export class OnlinePaymentsService {
     const [i] = await this.db.select().from(paymentIntents).where(eq(paymentIntents.id, intentId)).limit(1);
     if (!i || i.provider !== provider.name) throw Errors.notFound('Paiement en ligne');
     if (i.status !== 'succeeded') throw new AppError('REFUND_NOT_ALLOWED', 'Seul un paiement vérifié se rembourse.', HttpStatus.CONFLICT);
-    const [{ used }] = await this.db
-      .select({ used: sql<number>`coalesce(sum(${paymentRefunds.amountFcfa}), 0)::int` })
-      .from(paymentRefunds)
-      .where(and(eq(paymentRefunds.intentId, i.id), inArray(paymentRefunds.status, ['pending', 'processing', 'processed'])));
-    const amount = amountFcfa ?? i.amountFcfa - used;
-    if (!Number.isInteger(amount) || amount < 1 || amount + used > i.amountFcfa) {
-      throw new AppError('REFUND_AMOUNT_INVALID', `Au plus ${i.amountFcfa - used} F à rembourser.`, HttpStatus.BAD_REQUEST, { maxFcfa: i.amountFcfa - used });
+    // Réservation sous verrou AVANT d'appeler le prestataire : deux demandes simultanées ne dépassent jamais le montant
+    // payé (la seconde voit la première, ou se heurte à l'index « un seul remboursement en cours »).
+    const id = uuidv7();
+    let amount = 0;
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.select({ id: paymentIntents.id }).from(paymentIntents).where(eq(paymentIntents.id, i.id)).for('update');
+        const [{ used }] = await tx
+          .select({ used: sql<number>`coalesce(sum(${paymentRefunds.amountFcfa}), 0)::int` })
+          .from(paymentRefunds)
+          .where(and(eq(paymentRefunds.intentId, i.id), inArray(paymentRefunds.status, ['pending', 'processing', 'processed'])));
+        amount = amountFcfa ?? i.amountFcfa - used;
+        if (!Number.isInteger(amount) || amount < 1 || amount + used > i.amountFcfa) {
+          throw new AppError('REFUND_AMOUNT_INVALID', `Au plus ${i.amountFcfa - used} F à rembourser.`, HttpStatus.BAD_REQUEST, { maxFcfa: i.amountFcfa - used });
+        }
+        await tx.insert(paymentRefunds).values({ id, intentId: i.id, amountFcfa: amount, reason: reason.trim(), status: 'pending', requestedByAdmin: a.adminId });
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') throw new AppError('REFUND_NOT_ALLOWED', 'Un remboursement est déjà en cours pour ce paiement.', HttpStatus.CONFLICT);
+      throw e;
     }
     let r;
     try {
       r = await provider.refund(i.providerRef, amount, reason);
     } catch (e) {
+      await this.db.update(paymentRefunds).set({ status: 'failed', settledAt: new Date() }).where(eq(paymentRefunds.id, id));
       if (e instanceof ProviderError) throw new AppError('PAYMENT_PROVIDER_UNAVAILABLE', 'Le prestataire a refusé ou ne répond pas.', HttpStatus.SERVICE_UNAVAILABLE);
       throw new AppError('REFUND_NOT_ALLOWED', 'Le prestataire a refusé ce remboursement.', HttpStatus.CONFLICT);
     }
-    const id = uuidv7();
     await this.db.transaction(async (tx) => {
-      await tx.insert(paymentRefunds).values({ id, intentId: i.id, amountFcfa: amount, reason: reason.trim(), status: r.status, providerRefundRef: r.refundRef, requestedByAdmin: a.adminId });
+      await tx
+        .update(paymentRefunds)
+        .set({ status: r.status, providerRefundRef: r.refundRef, settledAt: r.status === 'processed' || r.status === 'failed' ? new Date() : null })
+        .where(eq(paymentRefunds.id, id));
       await this.audit.log({ actorType: 'admin', actorId: a.adminId, action: 'admin.payment_refund_requested', targetType: 'payment_intent', targetId: i.id, ip: meta.ip, userAgent: meta.userAgent, metadata: { amountFcfa: amount } }, tx);
     });
     return { id, status: r.status, amountFcfa: amount };

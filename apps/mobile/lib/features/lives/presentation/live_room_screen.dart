@@ -32,6 +32,7 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
   String? _after;
   String? _giftsAfter;
   LiveGiftEvent? _shownGift;
+  final _seenGifts = <String>{};
   Timer? _poll;
   Timer? _giftTimer;
   Object? _error;
@@ -63,13 +64,18 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
         if (_comments.length > 60) _comments.removeRange(0, _comments.length - 60);
         _after = s.nextAfter;
         _giftsAfter = s.nextGiftsAfter;
-        if (s.gifts.isNotEmpty) _showGift(s.gifts.last);
+        // Les lectures se recouvrent un peu : un cadeau déjà montré ne s'affiche pas deux fois.
+        final fresh = s.gifts.where((g) => _seenGifts.add(g.id)).toList();
+        if (fresh.isNotEmpty) _showGift(fresh.last);
       });
       _poll?.cancel();
       _poll = Timer(widget.pollEvery ?? Duration(seconds: s.pollSeconds), () => unawaited(_refresh()));
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e);
+      // Une erreur passagère (réseau, trop de lectures) n'arrête pas le Live : nouvel essai un peu plus tard.
+      _poll?.cancel();
+      _poll = Timer(widget.pollEvery ?? const Duration(seconds: 5), () => unawaited(_refresh()));
     }
   }
 
@@ -94,6 +100,28 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
       if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// L'hôte retire un commentaire (appui long).
+  Future<void> _removeComment(LiveComment c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Retirer ce commentaire ?'),
+        content: Text('« ${c.text} »'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Retirer')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ref.read(livesApiProvider).hideComment(widget.liveId, c.id);
+      if (mounted) setState(() => _comments.removeWhere((x) => x.id == c.id));
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
     }
   }
 
@@ -162,7 +190,7 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
                       _TopBar(live: l),
                       const Spacer(),
                       if (l.pinnedProduct != null) _PinnedCard(product: l.pinnedProduct!),
-                      _CommentsList(comments: _comments),
+                      _CommentsList(comments: _comments, onRemove: l.isMine ? _removeComment : null),
                       if (l.isLive) _BottomBar(input: _input, sending: _sending, live: l, onSend: _send, onHeart: _heart, onGift: _gift),
                       if (l.isMine && l.status == 'scheduled')
                         Padding(
@@ -281,9 +309,12 @@ class _PinnedCard extends StatelessWidget {
 }
 
 class _CommentsList extends StatelessWidget {
-  const _CommentsList({required this.comments});
+  const _CommentsList({required this.comments, this.onRemove});
 
   final List<LiveComment> comments;
+
+  /// Hôte seulement : appui long pour retirer un commentaire.
+  final ValueChanged<LiveComment>? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -294,14 +325,18 @@ class _CommentsList extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (final c in last)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(text: '${c.author}  ', style: const TextStyle(fontWeight: FontWeight.w700, color: BimColors.grey200)),
-                    TextSpan(text: c.text, style: const TextStyle(color: BimColors.white)),
-                  ],
+            GestureDetector(
+              key: ValueKey('live-comment-${c.id}'),
+              onLongPress: onRemove == null ? null : () => onRemove!(c),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '${c.author}  ', style: const TextStyle(fontWeight: FontWeight.w700, color: BimColors.grey200)),
+                      TextSpan(text: c.text, style: const TextStyle(color: BimColors.white)),
+                    ],
+                  ),
                 ),
               ),
             ),

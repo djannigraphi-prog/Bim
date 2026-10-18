@@ -42,7 +42,8 @@ export class LivesController {
   }
 
   @Get('lives/:id/state')
-  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  // Lu toutes les 2 s par chaque spectateur ; plusieurs téléphones peuvent partager une même adresse (opérateur, Wi-Fi).
+  @Throttle({ default: { limit: 1200, ttl: 60_000 } })
   @ApiQuery({ name: 'after', required: false, description: 'Dernier commentaire déjà reçu' })
   @ApiQuery({ name: 'giftsAfter', required: false, description: 'Dernier cadeau déjà reçu' })
   @ApiOperation({ summary: 'État du Live, lu toutes les 2 secondes : spectateurs, cœurs, pièces, nouveaux commentaires et cadeaux' })

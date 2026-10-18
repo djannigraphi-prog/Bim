@@ -307,6 +307,20 @@ describe('Authentification (e2e)', () => {
       expect(delta).toBeLessThan(5000);
     });
 
+    it('audit du 18/10/2026 : une deuxième demande rend la première inutilisable, que le compte existe ou non', async () => {
+      const a = await registerAndActivate(h);
+      const unknownId = `inconnu.${Date.now()}`;
+      const r1 = await h.http().post('/v1/auth/password/forgot').send({ identifier: a.body.username }).expect(202);
+      const f1 = await h.http().post('/v1/auth/password/forgot').send({ identifier: unknownId }).expect(202);
+      await h.pool.query("update verification_codes set last_sent_at = now() - interval '2 minutes' where id = any($1)", [[r1.body.challengeId, f1.body.challengeId]]);
+      await h.http().post('/v1/auth/password/forgot').send({ identifier: a.body.username }).expect(202);
+      await h.http().post('/v1/auth/password/forgot').send({ identifier: unknownId }).expect(202);
+      const r = await h.http().post('/v1/auth/password/reset').send({ challengeId: r1.body.challengeId, code: '123456', newPassword: 'Nouveau-Mdp-2026' }).expect(400);
+      const f = await h.http().post('/v1/auth/password/reset').send({ challengeId: f1.body.challengeId, code: '123456', newPassword: 'Nouveau-Mdp-2026' }).expect(400);
+      expect(f.body.error.code).toBe(r.body.error.code);
+      expect(f.body.error.message).toBe(r.body.error.message);
+    });
+
     it('M1 : la réinitialisation ne révèle plus le nom d’utilisateur du titulaire du défi', async () => {
       const a = await registerAndActivate(h);
       const f = await h.http().post('/v1/auth/password/forgot').send({ identifier: `+225${a.body.phone}` }).expect(202);

@@ -111,7 +111,8 @@ export class DeliveryFeesService {
       const now = new Date();
       await tx
         .update(orderPayments)
-        .set(decision === 'confirm' ? { decision: 'confirmed', decidedAt: now, decidedBy: courierUserId } : { decision: 'contested', decidedAt: now, decidedBy: courierUserId, contestReason: reason!.trim() })
+        // Une contestation va dans la file « à vérifier » de l'équipe, comme pour l'article (audit du 18/10/2026).
+        .set(decision === 'confirm' ? { decision: 'confirmed', decidedAt: now, decidedBy: courierUserId } : { decision: 'contested', decidedAt: now, decidedBy: courierUserId, contestReason: reason!.trim(), reviewQueuedAt: now })
         .where(eq(orderPayments.id, f.id));
       await this.orders.event(tx, d.orderId, decision === 'confirm' ? 'delivery_fee_confirmed' : 'delivery_fee_contested', 'courier', courierUserId, null, null, decision === 'contest' ? { reason: reason!.trim() } : {});
       await this.audit.log({ actorType: 'user', actorId: courierUserId, action: `payments.delivery_fee_${decision === 'confirm' ? 'confirmed' : 'contested'}`, targetType: 'order', targetId: d.orderId, ip: meta.ip, userAgent: meta.userAgent, metadata: { courierId, amountFcfa: f.amountFcfa } }, tx);

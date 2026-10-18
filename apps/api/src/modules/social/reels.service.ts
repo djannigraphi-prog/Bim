@@ -63,6 +63,9 @@ export class ReelsService {
       if (e instanceof Mp4Error) throw Errors.validation({ fields: { video: ['Format non reconnu : envoie une vidéo MP4.'] } });
       throw e;
     }
+    if (info.metadataTrack) {
+      throw new AppError('REEL_LOCATION_TRACK', 'Cette vidéo contient des données de position. Désactive la localisation de la caméra ou choisis une autre vidéo.', HttpStatus.BAD_REQUEST);
+    }
     if (info.durationMs <= 0 || info.durationMs > maxSeconds * 1000 + 500) {
       throw new AppError('REEL_TOO_LONG', `Un Reel dure ${maxSeconds} secondes au plus.`, HttpStatus.BAD_REQUEST, { maxSeconds, durationMs: info.durationMs });
     }
@@ -154,12 +157,18 @@ export class ReelsService {
     return v;
   }
 
+  /**
+   * Suppression par l'auteur, même masqué par la modération. Un Reel masqué ou signalé (signalement ouvert) disparaît
+   * pour tout le monde mais la vidéo est gardée pour la modération ; sinon elle est effacée.
+   */
   async remove(userId: string, reelId: string, meta: RequestMeta) {
-    const { reel } = await this.visible(userId, reelId);
-    if (reel.userId !== userId) throw Errors.forbidden('Seul son auteur peut supprimer ce Reel.');
+    const [reel] = await this.db.select().from(reels).where(and(eq(reels.id, reelId), eq(reels.userId, userId), inArray(reels.status, ['published', 'hidden'])));
+    if (!reel) throw Errors.notFound('Reel');
+    const [open] = await this.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM content_reports WHERE target_type = 'reel' AND target_id = ${reelId} AND status = 'open'`).then((r) => r.rows);
+    const keepForModeration = reel.status === 'hidden' || (open?.n ?? 0) > 0;
     await this.db.update(reels).set({ status: 'deleted' }).where(eq(reels.id, reelId));
-    await this.storage.remove(reel.storageKey).catch(() => undefined);
-    await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.reel_deleted', targetType: 'reel', targetId: reelId, ip: meta.ip, userAgent: meta.userAgent });
+    if (!keepForModeration) await this.storage.remove(reel.storageKey).catch(() => undefined);
+    await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.reel_deleted', targetType: 'reel', targetId: reelId, ip: meta.ip, userAgent: meta.userAgent, metadata: { keptForModeration: keepForModeration } });
   }
 
   async like(viewerId: string, reelId: string, on: boolean) {

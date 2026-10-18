@@ -77,10 +77,24 @@ describe('Messagerie (e2e)', () => {
     birth.setFullYear(birth.getFullYear() - 17);
     const minor = await user({ birthDate: birth.toISOString().slice(0, 10) });
     const adult = await user();
-    expect((await start(adult, minor, 403)).body.error.code).toBe('FORBIDDEN');
+    // Audit du 18/10/2026 : aucun refus visible (sinon on devinerait l'âge) ; elle ne reçoit simplement rien.
+    const c0 = (await start(adult, minor)).body;
+    expect(c0).toMatchObject({ status: 'active', pendingForOther: true });
+    await say(adult, c0.id, 'Salut !');
+    expect(await list(minor)).toEqual([]);
+    expect(await list(minor, 'requests')).toEqual([]);
+    expect(await unread(minor)).toEqual({ conversations: 0, requests: 0 });
+    await h.http().get(`/v1/conversations/${c0.id}/messages`).set(minor.auth).expect(404);
+    // Elle suit l'adulte : le message suivant arrive comme une demande ordinaire.
     await follow(minor, adult);
     const c = (await start(adult, minor)).body;
     expect(c.status).toBe('active');
+    await say(adult, c.id, 'Tu es là ?');
+    expect((await list(minor, 'requests')).map((x) => x.id)).toEqual([c.id]);
+    // Elle ne le suit plus : plus rien n'arrive, même dans une conversation déjà ouverte.
+    await h.http().delete(`/v1/people/${adult.username}/follow`).set(minor.auth).expect(200);
+    await say(adult, c.id, 'Encore moi');
+    expect(await list(minor, 'requests')).toEqual([]);
   });
 
   it('accès : tiers refusés, blocage, compte suspendu, espace boutique', async () => {

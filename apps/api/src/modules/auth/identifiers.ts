@@ -52,7 +52,8 @@ export function classifyIdentifier(raw: string, defaultRegion: string): Identifi
 
 /** Masque une coordonnée pour l'affichage : +225 07 •• •• 44 65, y•••@gmail.com */
 export function maskDestination(channel: 'phone' | 'email', value: string): string {
-  if (channel === 'phone') return value.length > 6 ? `${value.slice(0, 6)}${'•'.repeat(value.length - 10)}${value.slice(-4)}` : '••••';
+  // Numéros courts (moins de 11 caractères, certains territoires) : jamais de longueur négative (audit du 18/10/2026).
+  if (channel === 'phone') return value.length > 10 ? `${value.slice(0, 6)}${'•'.repeat(value.length - 10)}${value.slice(-4)}` : `${value.slice(0, 3)}••••`;
   const [local, domain] = value.split('@');
   return `${local.slice(0, 1)}•••@${domain}`;
 }

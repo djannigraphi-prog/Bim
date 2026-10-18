@@ -115,6 +115,16 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     expect((await rows(b.p.id))[0]).toMatchObject({ status: 'sent', send_tries: 2 });
   });
 
+  it('audit du 18/10/2026 : après une pause terminée, les rappels reprennent même si le projet n’a pas été rouvert', async () => {
+    const a = await setup(['15:00']);
+    await h.http().post(`/v1/projects/${a.p.id}/pause`).set(a.auth).send({ days: 2 }).expect(200);
+    // Pause passée (avant-hier → hier) ; le statut « paused » est resté en base faute d'ouverture du projet.
+    await h.pool.query(`update project_pauses set start_day = $2::date - 3, end_day = $2::date - 2 where project_id = $1`, [a.p.id, day]);
+    await h.pool.query(`update projects set status = 'paused', paused_until = $2::date - 2 where id = $1`, [a.p.id, day]);
+    await worker.tick(at('15:00'));
+    expect((await rows(a.p.id))[0]).toMatchObject({ status: 'sent' });
+  });
+
   it('revérifié juste avant l’envoi : tâche cochée entre-temps, projet en pause, rappels désactivés, heures calmes', async () => {
     const done = await setup(['15:00']);
     await worker.plan(at('15:00'));
@@ -129,7 +139,9 @@ describe('Rappels : worker, reprise, doublons, surveillance (e2e)', () => {
     await worker.plan(at('15:00'));
     await h.http().post(`/v1/projects/${paused.p.id}/pause`).set(paused.auth).send({ days: 2 }).expect(200);
     await worker.dispatch(at('15:00'));
-    expect((await rows(paused.p.id))[0]).toMatchObject({ status: 'skipped', reason: 'project_inactive' });
+    // Audit du 18/10/2026 : les jours de pause sont exclus par date (« not_due ») ; le statut « paused » resté en base
+    // après la pause n'empêche plus les rappels suivants.
+    expect((await rows(paused.p.id))[0]).toMatchObject({ status: 'skipped', reason: 'not_due' });
 
     const off = await setup(['15:00']);
     await worker.plan(at('15:00'));

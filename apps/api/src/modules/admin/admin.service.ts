@@ -121,7 +121,9 @@ export class AdminService {
       .orderBy(asc(users.username))
       .limit(20);
     // Une recherche dans les données personnelles est journalisée (qui a cherché quoi).
-    await this.log(a, meta, 'admin.users_searched', undefined, undefined, { query: raw, results: rows.length });
+    // Jamais un numéro ou un e-mail complet dans le journal (T-010) : recherche masquée.
+    const shown = digits.length >= 6 ? `${digits.slice(0, 3)}•••${digits.slice(-2)}` : raw.includes('@') ? `${raw.slice(0, 1)}•••@${raw.split('@')[1] ?? ''}` : raw;
+    await this.log(a, meta, 'admin.users_searched', undefined, undefined, { query: shown, results: rows.length });
     return { items: rows };
   }
 

@@ -259,12 +259,16 @@ export class WalletService {
     if (targetType === 'live') {
       // Lot 10 : cadeau pendant un Live en cours, reçu par la personne qui l'anime.
       const [l] = await this.db
-        .select({ id: lives.id, hostUserId: lives.hostUserId, status: lives.status })
+        .select({ id: lives.id, hostUserId: lives.hostUserId, status: lives.status, kind: lives.kind, startedAt: lives.startedAt })
         .from(lives)
         .innerJoin(users, eq(users.id, lives.hostUserId))
         .where(and(eq(lives.id, targetId), eq(users.status, 'active'), notBlockedBetween(senderId, lives.hostUserId)));
       if (!l) throw Errors.notFound('Live');
-      if (l.status !== 'live') throw conflict('LIVE_NOT_RUNNING', 'Ce Live n’est pas en cours.');
+      // Live arrêté de lui-même après 4 heures (même règle que la lecture du Live).
+      const tooOld = !l.startedAt || this.clock.now().getTime() - l.startedAt.getTime() >= 4 * 3_600_000;
+      if (l.status !== 'live' || tooOld) throw conflict('LIVE_NOT_RUNNING', 'Ce Live n’est pas en cours.');
+      // F10 non décidé : une boutique ne reçoit pas de pièces (Live vente).
+      if (l.kind !== 'simple') throw conflict('RECIPIENT_NOT_PREMIUM', 'Les boutiques ne reçoivent pas encore de pièces.');
       return { postId: null, commentId: null, liveId: l.id, reelId: null, recipientId: l.hostUserId };
     }
     if (targetType === 'post') {

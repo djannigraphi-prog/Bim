@@ -112,7 +112,15 @@ export class VerificationService {
    * Défi leurre pour « mot de passe oublié » quand aucun compte ne correspond : même forme de réponse,
    * même cycle de vie au renvoi, aucun envoi, aucun code accepté.
    */
-  async createDecoy(channel: 'phone' | 'email', ip: string | null, visibility: Visibility, scope: string | null = null): Promise<Challenge> {
+  async createDecoy(channel: 'phone' | 'email', ip: string | null, visibility: Visibility, scope: string | null = null, identifier = ''): Promise<Challenge> {
+    // Comme pour un vrai compte, un nouveau défi rend le précédent inutilisable (sinon la différence de comportement
+    // révélerait si le compte existe ; audit du 18/10/2026). Les leurres d'un même identifiant sont reliés par une
+    // empreinte (jamais l'identifiant lui-même).
+    const decoyDestination = `none:${hmacSha256(this.cfg.OTP_SECRET, `decoy:${identifier.trim().toLowerCase()}`).slice(0, 32)}`;
+    await this.db
+      .update(verificationCodes)
+      .set({ consumedAt: new Date() })
+      .where(and(isNull(verificationCodes.userId), eq(verificationCodes.destination, decoyDestination), eq(verificationCodes.purpose, 'password_reset'), isNull(verificationCodes.consumedAt)));
     const id = uuidv7();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.cfg.OTP_TTL_SECONDS * 1000);
@@ -121,7 +129,7 @@ export class VerificationService {
       userId: null,
       purpose: 'password_reset',
       channel,
-      destination: 'none',
+      destination: decoyDestination,
       scope,
       codeHash: this.hashCode(id, numericCode(6)),
       maxAttempts: this.cfg.OTP_MAX_ATTEMPTS,
@@ -188,7 +196,7 @@ export class VerificationService {
     const isReset = row.purpose === 'password_reset';
     // Un défi leurre (userId null) suit exactement le même cycle de vie, sans envoi.
     if (row.userId) await this.delivery.sendCode(row.channel, row.destination, code, row.purpose);
-    return this.toChallenge(row.id, row.channel, row.destination, expiresAt, now, {
+    return this.toChallenge(row.id, row.channel, row.userId ? row.destination : 'none', expiresAt, now, {
       revealDestination: !isReset,
       revealChannel: row.scope !== HIDE_CHANNEL_SCOPE,
     });

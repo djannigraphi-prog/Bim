@@ -104,7 +104,8 @@ export class LivesService {
         viewers: l.status === 'live' ? (viewers.get(l.id) ?? 0) : 0,
         peakViewers: l.peakViewers,
         isMine: l.hostUserId === viewerId,
-        canGift: this.cfg.DEMO_MODE && l.status === 'live' && l.hostUserId !== viewerId && premium.has(l.hostUserId),
+        // F10 non décidé : pas de pièces pendant un Live vente (boutique).
+        canGift: this.cfg.DEMO_MODE && l.status === 'live' && l.kind === 'simple' && l.hostUserId !== viewerId && premium.has(l.hostUserId),
         demo: true,
         video: 'unavailable' as const,
       };
@@ -120,7 +121,8 @@ export class LivesService {
       .select({ l: lives })
       .from(lives)
       .innerJoin(users, eq(users.id, lives.hostUserId))
-      .where(and(eq(lives.status, 'scheduled'), visible))
+      // Un Live programmé dont l'heure est passée depuis plus de 2 heures n'est plus proposé.
+      .where(and(eq(lives.status, 'scheduled'), gt(lives.scheduledAt, new Date(this.clock.now().getTime() - 2 * 3_600_000)), visible))
       .orderBy(asc(lives.scheduledAt))
       .limit(30);
     const running = [];
@@ -265,25 +267,36 @@ export class LivesService {
     }
     const [view] = await this.views(viewerId, [l]);
     if (view.viewers > l.peakViewers) await this.db.update(lives).set({ peakViewers: sql`greatest(${lives.peakViewers}, ${view.viewers})` }).where(eq(lives.id, liveId));
+    // Curseurs avec recouvrement de 5 secondes : un identifiant plus ancien enregistré un peu plus tard (même
+    // milliseconde, autre instance, attente d'un verrou) n'est jamais perdu ; l'app ignore ce qu'elle a déjà.
+    const OVERLAP_MS = 5000;
     const commentConds = [eq(liveComments.liveId, liveId), eq(liveComments.status, 'published'), eq(users.status, 'active'), notBlockedBetween(viewerId, liveComments.userId)];
-    if (after) commentConds.push(gt(liveComments.id, after));
+    if (after) {
+      const [c] = await this.db.select({ at: liveComments.createdAt }).from(liveComments).where(and(eq(liveComments.id, after), eq(liveComments.liveId, liveId)));
+      if (c) commentConds.push(gt(liveComments.createdAt, new Date(c.at.getTime() - OVERLAP_MS)));
+    }
     const comments = await this.db
       .select({ id: liveComments.id, text: liveComments.text, at: liveComments.createdAt, user: { id: users.id, username: users.username, fullName: users.fullName } })
       .from(liveComments)
       .innerJoin(users, eq(users.id, liveComments.userId))
       .where(and(...commentConds))
-      .orderBy(after ? asc(liveComments.id) : desc(liveComments.id))
+      .orderBy(after ? asc(liveComments.createdAt) : desc(liveComments.createdAt), after ? asc(liveComments.id) : desc(liveComments.id))
       .limit(PAGE);
     if (!after) comments.reverse();
-    const giftConds = [eq(coinGifts.liveId, liveId)];
-    if (giftsAfter) giftConds.push(gt(coinGifts.id, giftsAfter));
-    else giftConds.push(gt(coinGifts.createdAt, new Date(now.getTime() - 10_000)));
+    // Cadeaux : personnes actives et non bloquées seulement (comme les commentaires).
+    const giftConds = [eq(coinGifts.liveId, liveId), eq(users.status, 'active'), notBlockedBetween(viewerId, coinGifts.senderId)];
+    let giftsSince = new Date(now.getTime() - 10_000);
+    if (giftsAfter) {
+      const [g] = await this.db.select({ at: coinGifts.createdAt }).from(coinGifts).where(and(eq(coinGifts.id, giftsAfter), eq(coinGifts.liveId, liveId)));
+      if (g) giftsSince = new Date(g.at.getTime() - OVERLAP_MS);
+    }
+    giftConds.push(gt(coinGifts.createdAt, giftsSince));
     const gifts = await this.db
       .select({ id: coinGifts.id, giftCode: coinGifts.giftCode, quantity: coinGifts.quantity, coins: coinGifts.coins, anonymous: coinGifts.anonymous, fullName: users.fullName })
       .from(coinGifts)
       .innerJoin(users, eq(users.id, coinGifts.senderId))
       .where(and(...giftConds))
-      .orderBy(asc(coinGifts.id))
+      .orderBy(asc(coinGifts.createdAt), asc(coinGifts.id))
       .limit(20);
     return {
       live: view,

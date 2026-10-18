@@ -7,6 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../merchant/data/shop_api.dart';
 import '../data/lives_api.dart';
 
 String _when(DateTime? d) {
@@ -119,6 +120,19 @@ class _NewLiveSheetState extends ConsumerState<NewLiveSheet> {
   bool _later = false;
   DateTime? _at;
   bool _busy = false;
+  String? _productId;
+  List<ProductSummary> _products = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Live vente : article à épingler, parmi les articles en ligne de la boutique.
+    if (widget.asShop) {
+      ref.read(shopApiProvider).products(status: 'published').then((p) {
+        if (mounted) setState(() => _products = p);
+      }).catchError((Object _) {});
+    }
+  }
 
   @override
   void dispose() {
@@ -138,7 +152,7 @@ class _NewLiveSheetState extends ConsumerState<NewLiveSheet> {
   Future<void> _submit() async {
     setState(() => _busy = true);
     try {
-      final l = await ref.read(livesApiProvider).create(title: _title.text.trim(), scheduledAt: _later ? _at : null, asShop: widget.asShop);
+      final l = await ref.read(livesApiProvider).create(title: _title.text.trim(), scheduledAt: _later ? _at : null, asShop: widget.asShop, productId: _productId);
       if (!mounted) return;
       showBimSnack(context, _later ? 'Live programmé. Tes abonnés le verront dans « Programmés ».' : 'Tu es en direct (mode démo).');
       Navigator.of(context).pop(l);
@@ -179,6 +193,20 @@ class _NewLiveSheetState extends ConsumerState<NewLiveSheet> {
                 ChoiceChip(key: const ValueKey('live-later'), label: const Text('Programmer'), selected: _later, onSelected: (_) => setState(() => _later = true)),
               ],
             ),
+            if (widget.asShop && _products.isNotEmpty) ...[
+              const SizedBox(height: BimSpacing.sm),
+              DropdownButtonFormField<String?>(
+                key: const ValueKey('live-product'),
+                value: _productId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Article épinglé (facultatif)'),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('Aucun')),
+                  for (final p in _products) DropdownMenuItem<String?>(value: p.id, child: Text(p.title, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => setState(() => _productId = v),
+              ),
+            ],
             if (_later)
               TextButton.icon(
                 key: const ValueKey('live-pick-date'),

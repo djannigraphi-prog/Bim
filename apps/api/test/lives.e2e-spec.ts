@@ -67,8 +67,10 @@ describe('Lives : prototype (e2e)', () => {
     s = await state(host.auth, live.id);
     expect(s.comments.map((c: { text: string }) => c.text)).toEqual(['Bravo Awa !', 'Merci à vous']);
     expect(s.live).toMatchObject({ viewers: 1, heartCount: 5, isMine: true });
+    // Après le curseur : rien de nouveau (un recouvrement de quelques secondes peut renvoyer des commentaires déjà reçus).
     const next = await state(host.auth, live.id, `?after=${s.nextAfter}`);
-    expect(next.comments).toEqual([]);
+    const known = new Set(s.comments.map((c: { id: string }) => c.id));
+    expect(next.comments.every((c: { id: string }) => known.has(c.id))).toBe(true);
 
     // L'hôte retire un commentaire.
     await h.http().delete(`/v1/lives/${live.id}/comments/${s.comments[0].id}`).set(host.auth).expect(204);
@@ -85,7 +87,8 @@ describe('Lives : prototype (e2e)', () => {
     s = await state(host.auth, live.id);
     expect(s.live.coinCount).toBe(1000);
     expect(s.gifts).toEqual([expect.objectContaining({ giftCode: 'safe', coins: 1000, from: 'Koffi Yao' })]);
-    expect((await state(host.auth, live.id, `?giftsAfter=${s.nextGiftsAfter}`)).gifts).toEqual([]);
+    const again = (await state(host.auth, live.id, `?giftsAfter=${s.nextGiftsAfter}`)).gifts;
+    expect(again.every((g: { id: string }) => g.id === s.gifts[0].id)).toBe(true);
     expect((await h.http().get('/v1/wallet').set(host.auth).expect(200)).body.balance.received).toBe(1000);
 
     // Notifications : l'abonné voit « en direct », l'hôte voit les pièces reçues.

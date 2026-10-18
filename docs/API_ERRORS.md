@@ -53,6 +53,8 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INCIDENT_NOT_FOR_SUPPORT` | 409 | L7-08 : un problème signalé après la remise se règle entre le client et la boutique, sans le support |
 | `DISPUTE_WINDOW_CLOSED` | 409 | L7-08 : vente close — délai de 3 jours après la remise dépassé pour signaler un problème ou échanger sur un incident signalé après la remise (`details.days`) |
 | `APP_UPDATE_REQUIRED` | 426 | Lot 7-A : version de l'app plus ancienne que le minimum décidé pour sa plateforme (`details.minVersion`, `details.platform`) ; l'app affiche « Mise à jour nécessaire » |
+| `REEL_LOCATION_TRACK` | 400 | Lot 11 : la vidéo porte une piste de données de position (caméra d'action) |
+| `HANDOVER_CODE_NOT_BLOCKED` · `HANDOVER_CODE_RENEWALS_EXHAUSTED` | 409 | Nouveau code de remise : le code n'est pas bloqué ; plus de nouveau code possible (2 au plus) |
 | `REEL_TOO_LONG` | 400 | Lot 11 : vidéo plus longue que `reels.max_seconds` (`details.maxSeconds`, `details.durationMs`) |
 | `LIVE_ALREADY_RUNNING` · `LIVE_NOT_RUNNING` · `LIVE_NOT_SCHEDULED` · `LIVE_NOT_SALE` · `LIVE_ENDED` · `SHOP_NOT_ACTIVE` | 409 | Lot 10 : un Live déjà en cours ; Live pas (ou plus) en cours ; Live plus programmé ; épingle réservée au Live vente ; Live terminé ; boutique non validée |
 | `RECIPIENT_NOT_PREMIUM` · `COINS_SELF_GIFT` · `INSUFFICIENT_COINS` | 409 | Lot 9 : la personne n'a pas Premium (elle ne peut pas recevoir de pièces) ; envoi à soi-même ; solde insuffisant (`details.needed`, et `balance` ou `withdrawable`) |

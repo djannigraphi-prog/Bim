@@ -38,6 +38,7 @@ describe('Reels (e2e)', () => {
     await upload(a.auth, null, {}, 400);
     await upload(a.auth, Buffer.from('%PDF-1.4 pas une vidéo'), {}, 400);
     expect((await upload(a.auth, testMp4({ seconds: 75 }), {}, 400)).body.error).toMatchObject({ code: 'REEL_TOO_LONG', details: { maxSeconds: 60 } });
+    expect((await upload(a.auth, testMp4({ gpsTrack: true }), {}, 400)).body.error.code).toBe('REEL_LOCATION_TRACK');
 
     const feed = (await h.http().get('/v1/reels').set(b.auth).expect(200)).body;
     expect(feed.items.map((x: { id: string }) => x.id)).toContain(r.id);
@@ -60,7 +61,7 @@ describe('Reels (e2e)', () => {
     const inbox = (await h.http().get('/v1/me/notifications').set(a.auth).expect(200)).body.items.map((i: { text: string }) => i.text);
     expect(inbox.some((t: string) => /t’a envoyé 10 pièces sur ton Reel/.test(t))).toBe(true);
 
-    await h.http().delete(`/v1/reels/${r.id}`).set(b.auth).expect(403);
+    await h.http().delete(`/v1/reels/${r.id}`).set(b.auth).expect(404); // pas son Reel : introuvable
     await h.http().delete(`/v1/reels/${r.id}`).set(a.auth).expect(204);
     await h.http().get(`/v1/reels/${r.id}`).set(b.auth).expect(404);
     await h.http().get(new URL(r.video.url).pathname).expect(404);

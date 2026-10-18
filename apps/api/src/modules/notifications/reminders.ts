@@ -87,7 +87,8 @@ export function reminderKey(projectId: string, taskId: string, day: Day, attempt
  * n'apparaît que dans une seule fenêtre, et la clé empêche tout doublon si deux planificateurs se recouvrent.
  */
 export function dueReminders(ctx: ReminderContext, from: Date, to: Date): ReminderOccurrence[] {
-  if (ctx.status !== 'active' || to <= from) return [];
+  // « paused » accepté : les jours de pause sont exclus par date (audit du 18/10/2026, statut resté en base après la pause).
+  if ((ctx.status !== 'active' && ctx.status !== 'paused') || to <= from) return [];
   const out: ReminderOccurrence[] = [];
   const maxOffset = Math.max(0, ...ctx.offsets);
   // Jours locaux à examiner : la fenêtre, élargie du plus long délai (un rappel « +2 h » d'une tâche de la veille).

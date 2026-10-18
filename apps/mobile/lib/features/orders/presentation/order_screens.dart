@@ -623,8 +623,14 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                       ],
                     ),
                   ),
-                if (o.handoverCodeStatus == 'blocked')
-                  const Padding(padding: EdgeInsets.only(top: BimSpacing.sm), child: Text('Code bloqué après trop d’essais : contacte le support.', style: TextStyle(color: BimColors.red))),
+                if (o.handoverCodeStatus == 'blocked') ...[
+                  const Padding(padding: EdgeInsets.only(top: BimSpacing.sm), child: Text('Code bloqué après trop d’essais.', style: TextStyle(color: BimColors.red))),
+                  TextButton(
+                    key: const ValueKey('renew-code'),
+                    onPressed: () => _call(o, (api) => api.renewHandoverCode(o.id), done: 'Nouveau code créé'),
+                    child: const Text('Recevoir un nouveau code'),
+                  ),
+                ],
                 if (o.status == 'proposed' && o.expiresAt != null)
                   Padding(padding: const EdgeInsets.only(top: BimSpacing.sm), child: Text('Proposition valable jusqu’au ${formatDateTimeFr(o.expiresAt!)}.', style: theme.textTheme.bodySmall)),
               ],

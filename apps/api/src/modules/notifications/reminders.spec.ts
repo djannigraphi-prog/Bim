@@ -48,7 +48,10 @@ describe('calcul des rappels (lot 2)', () => {
     const day = [at('2026-10-15T00:00:00Z'), at('2026-10-16T00:00:00Z')] as const;
     expect(dueReminders(base({ completions: new Set(['t|2026-10-15']) }), ...day)).toHaveLength(0);
     expect(dueReminders(base({ pauses: [{ startDay: '2026-10-14', endDay: '2026-10-16' }] }), ...day)).toHaveLength(0);
-    expect(dueReminders(base({ status: 'paused' }), ...day)).toHaveLength(0);
+    // Projet en pause : ses jours de pause ne déclenchent rien ; une pause terminée (statut « paused » resté en base,
+    // audit du 18/10/2026) n'empêche plus les rappels.
+    expect(dueReminders(base({ status: 'paused', pauses: [{ startDay: '2026-10-15', endDay: '2026-10-17' }] }), ...day)).toHaveLength(0);
+    expect(dueReminders(base({ status: 'paused', pauses: [{ startDay: '2026-10-12', endDay: '2026-10-13' }] }), ...day).length).toBeGreaterThan(0);
     expect(dueReminders(base({ status: 'completed' }), ...day)).toHaveLength(0);
     expect(dueReminders(base({ startDate: '2026-10-16' }), ...day)).toHaveLength(0);
     expect(dueReminders(base({ plannedEndDate: '2026-10-14' }), ...day)).toHaveLength(0);

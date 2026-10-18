@@ -15,7 +15,7 @@ import { StorageService } from '../media/storage';
 import { CLOCK, Clock, ProjectsService } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
 import { WalletService } from '../wallet/wallet.service';
-import { notBlockedBetween, postVisibleTo, commentParentPublished, recountComments } from './access';
+import { notBlockedBetween, openReport, postVisibleTo, commentParentPublished, recountComments } from './access';
 import { CreateBimPostDto, CreateCommentDto, CreatePostDto } from './dto';
 
 export const MAX_POST_IMAGES = 4;
@@ -165,14 +165,17 @@ export class PostsService {
     const [p] = await this.db.select().from(posts).where(and(eq(posts.id, postId), eq(posts.userId, userId)));
     if (!p || p.status === 'deleted') throw Errors.notFound('Publication');
     const media = await this.db.select({ key: postMedia.storageKey }).from(postMedia).where(eq(postMedia.postId, postId));
+    // Audit du 18/10/2026 : une publication masquée ou signalée (signalement ouvert) disparaît pour tous, mais son texte
+    // et ses photos restent pour la modération (pas d'effacement de preuve).
+    const evidence = p.status === 'hidden' || (await openReport(this.db, 'post', postId));
     await this.db.transaction(async (tx) => {
-      await tx.update(posts).set({ status: 'deleted', text: null, updatedAt: this.clock.now() }).where(eq(posts.id, postId));
-      await tx.delete(postMedia).where(eq(postMedia.postId, postId));
+      await tx.update(posts).set({ status: 'deleted', ...(evidence ? {} : { text: null }), updatedAt: this.clock.now() }).where(eq(posts.id, postId));
+      if (!evidence) await tx.delete(postMedia).where(eq(postMedia.postId, postId));
       await tx.delete(postProducts).where(eq(postProducts.postId, postId));
-      await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.post_deleted', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent }, tx);
+      await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.post_deleted', targetType: 'post', targetId: postId, ip: meta.ip, userAgent: meta.userAgent, metadata: { keptForModeration: evidence } }, tx);
     });
     // Fichiers effacés du stockage : une publication supprimée ne laisse pas d'image derrière elle.
-    for (const m of media) await this.storage.remove(m.key).catch(() => undefined);
+    if (!evidence) for (const m of media) await this.storage.remove(m.key).catch(() => undefined);
   }
 
   // ------------------------------------------------------------------------------------------------ Produits et services utilisés (5-E)

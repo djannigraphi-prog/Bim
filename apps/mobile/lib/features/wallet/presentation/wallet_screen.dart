@@ -179,7 +179,7 @@ class _WithdrawSheetState extends ConsumerState<WithdrawSheet> {
   final _amount = TextEditingController();
   String _operator = 'orange';
   bool _busy = false;
-  String _key = newIdempotencyKey();
+  final String _key = newIdempotencyKey();
 
   @override
   void dispose() {
@@ -200,7 +200,7 @@ class _WithdrawSheetState extends ConsumerState<WithdrawSheet> {
       showBimSnack(context, r.status == 'review' ? 'Demande envoyée : l’équipe BIM la vérifie.' : 'Retrait enregistré (démo : rien n’est versé).');
       Navigator.of(context).pop();
     } on ApiException catch (e) {
-      _key = newIdempotencyKey();
+      // Même clé conservée : si la réponse s'est perdue alors que l'envoi a réussi, le nouvel essai ne paie pas deux fois.
       if (mounted) {
         setState(() => _busy = false);
         showApiError(context, e);
@@ -318,14 +318,15 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                   const Text('Premium arrive bientôt sur BIM.', key: ValueKey('premium-closed'))
                 else if (p.active) ...[
                   Text(
-                    p.autoRenew ? 'Premium actif jusqu’au ${_day(p.until)}, renouvelé automatiquement.' : 'Premium actif jusqu’au ${_day(p.until)}, sans renouvellement.',
+                    // Démo : abonnement de 30 jours, à reprendre ensuite (aucun renouvellement payant).
+                    p.autoRenew ? 'Premium actif jusqu’au ${_day(p.until)}.' : 'Premium actif jusqu’au ${_day(p.until)}, résilié.',
                     key: const ValueKey('premium-state'),
                   ),
                   const SizedBox(height: BimSpacing.md),
                   if (p.autoRenew)
                     BimButton(label: 'Résilier', variant: BimButtonVariant.outline, loading: _busy, onPressed: _busy ? null : () => _run(api.cancelPremium, 'Résilié : Premium reste actif jusqu’à la fin de la période.'))
                   else
-                    BimButton(label: 'Reprendre le renouvellement', loading: _busy, onPressed: _busy ? null : () => _run(api.subscribe, 'Renouvellement repris.')),
+                    BimButton(label: 'Annuler la résiliation', loading: _busy, onPressed: _busy ? null : () => _run(api.subscribe, 'Résiliation annulée.')),
                 ] else
                   BimButton(
                     key: const ValueKey('premium-subscribe'),

@@ -99,7 +99,7 @@ export class InboxService {
       -- Lot 9 : pièces reçues sur une publication ou un commentaire (nom caché si l'envoi est anonyme).
       UNION ALL
       SELECT 'gift:' || g.id, 'coins_received', g.created_at, NULL, NULL, g.coins::text, NULL, NULL, NULL,
-             CASE WHEN g.anonymous THEN NULL ELSE u.full_name END, NULL, g.post_id::text, g.target_type
+             CASE WHEN g.anonymous THEN NULL ELSE u.full_name END, NULL, COALESCE(g.post_id, g.live_id, g.reel_id)::text, g.target_type
       FROM coin_gifts g JOIN users u ON u.id = g.sender_id
       WHERE g.recipient_id = ${userId} AND u.status = 'active' AND g.created_at > ${since}
         AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${userId}))`;
@@ -190,9 +190,13 @@ function link(r: Row): string | null {
       return '/reports';
     case 'live_started':
       return r.post_id ? `/lives/${r.post_id}` : null;
+    case 'coins_received':
+      // Lot 9-11 : le lien suit la cible (publication ou commentaire, Live, Reel).
+      if (r.snippet === 'live') return r.post_id ? `/lives/${r.post_id}` : null;
+      if (r.snippet === 'reel') return '/reels';
+      return r.post_id ? `/posts/${r.post_id}` : null;
     case 'post_liked':
     case 'post_commented':
-    case 'coins_received':
       return r.post_id ? `/posts/${r.post_id}` : null;
     case 'new_follower':
       return r.actor_username ? `/people/${r.actor_username}` : null;

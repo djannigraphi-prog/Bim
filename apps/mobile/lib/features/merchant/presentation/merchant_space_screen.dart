@@ -133,7 +133,9 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   children: [
                     if (d.can('products.edit'))
                       _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
-                    _Action(
+                    // Lot 10 : Live vente réservé au propriétaire (contrôlé aussi par le serveur).
+                    if (d.isOwner)
+                      _Action(
                       icon: Icons.videocam_outlined,
                       label: 'Live',
                       onTap: () async {

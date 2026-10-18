@@ -195,6 +195,9 @@ class LivesApi {
 
   Future<void> comment(String id, String text) => _api.post('/v1/lives/$id/comments', body: {'text': text});
 
+  /// L'hôte retire un commentaire de son Live.
+  Future<void> hideComment(String id, String commentId) => _api.delete('/v1/lives/$id/comments/$commentId');
+
   Future<int> hearts(String id, int count) async => _int((await _api.post('/v1/lives/$id/hearts', body: {'count': count}))['heartCount']);
 }
 

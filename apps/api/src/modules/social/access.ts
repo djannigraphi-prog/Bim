@@ -51,3 +51,9 @@ export async function recountComments(tx: Pick<Database, 'execute'>, postId: str
         AND (c.parent_id IS NULL OR EXISTS (SELECT 1 FROM post_comments pc WHERE pc.id = c.parent_id AND pc.status = 'published'))
     ) WHERE id = ${postId}`);
 }
+
+/** Un signalement ouvert existe sur ce contenu (audit du 18/10/2026 : on ne détruit pas une preuve). */
+export async function openReport(db: Pick<Database, 'execute'>, targetType: string, targetId: string): Promise<boolean> {
+  const r = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM content_reports WHERE target_type = ${targetType} AND target_id = ${targetId} AND status = 'open'`);
+  return (r.rows[0]?.n ?? 0) > 0;
+}

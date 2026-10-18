@@ -129,6 +129,14 @@ export class OrdersController {
     return this.deliveries.customerView(a.userId, id, apiBase(req));
   }
 
+  @Post(':id/handover-code/renew')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Code de remise bloqué après trop d’essais : en obtenir un nouveau (2 fois au plus)' })
+  async renewCode(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    await this.orders.renewBlockedCode(a.userId, id);
+    return this.deliveries.customerView(a.userId, id, apiBase(req));
+  }
+
   @Post(':id/cancel')
   @HttpCode(200)
   @ApiOperation({ summary: 'Refuser une proposition, ou annuler avant la préparation' })

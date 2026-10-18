@@ -97,7 +97,7 @@ class _GiftSheetState extends ConsumerState<GiftSheet> {
   int _qty = 1;
   bool _anonymous = false;
   bool _busy = false;
-  String _key = newIdempotencyKey();
+  final String _key = newIdempotencyKey();
 
   Future<void> _send(GiftOption g) async {
     setState(() => _busy = true);
@@ -108,7 +108,7 @@ class _GiftSheetState extends ConsumerState<GiftSheet> {
       showBimSnack(context, '${coinsLabel(g.coins * _qty)} pièces envoyées à ${widget.recipientName}. Merci !');
       Navigator.of(context).pop(r.targetCoinCount);
     } on ApiException catch (e) {
-      _key = newIdempotencyKey();
+      // Même clé conservée : si la réponse s'est perdue alors que l'envoi a réussi, le nouvel essai ne paie pas deux fois.
       if (mounted) {
         setState(() => _busy = false);
         showApiError(context, e);

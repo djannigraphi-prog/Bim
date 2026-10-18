@@ -6,8 +6,10 @@ import { Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
-import { DB, Database } from '../../database/database.module';
-import { MESSAGE_REACTIONS, conversationMembers, conversations, follows, messageReactions, messages, orderItems, orders, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
+import { DB, Database, DbOrTx } from '../../database/database.module';
+import { MESSAGE_REACTIONS, conversationMembers, conversations, follows, messageReactions, messages, orderItems, orders, projectCategories, projectGoals, projectOffers, projects, shopMembers, shops, userBlocks, users } from '../../database/schema';
+import { generateTitle } from '../projects/plan';
+import { openReport } from '../social/access';
 import { ageOn } from '../age-policy/age';
 import { AuditService } from '../audit/audit.service';
 import { BimShopService } from '../catalog/bimshop.service';
@@ -117,7 +119,7 @@ export class MessagingService {
     if (!conv) throw Errors.notFound('Conversation');
     const members = await this.db.select().from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId));
     const me = members.find((m) => m.userId === userId);
-    if (!me || (me.status === 'declined' && !allowDeclined)) throw Errors.notFound('Conversation');
+    if (!me || me.status === 'withheld' || (me.status === 'declined' && !allowDeclined)) throw Errors.notFound('Conversation');
     if (conv.kind === 'shop') {
       const shop = await this.reachableShop({ id: conv.shopId! }, userId);
       if (!shop) throw Errors.notFound('Conversation');
@@ -128,6 +130,28 @@ export class MessagingService {
     const [u] = await this.db.select().from(users).where(eq(users.id, other.userId));
     if (!u || u.status !== 'active' || (await this.blocked(userId, other.userId)).length) throw Errors.notFound('Conversation');
     return { conv, me, otherReadId: other.lastReadMessageId, other, otherUser: u, shop: null };
+  }
+
+  /**
+   * Règle des moins de 18 ans (audit du 18/10/2026), appliquée à l'ouverture ET à chaque message : une personne mineure
+   * qui ne suit pas l'autre ne reçoit rien (« withheld ») ; dès qu'elle la suit, c'est une demande ordinaire. La
+   * personne qui écrit ne voit aucune différence (pas d'indice sur l'âge).
+   */
+  private async minorShield(db: DbOrTx, conversationId: string, senderId: string, otherId: string) {
+    const [u] = await db.select({ birthDate: users.birthDate }).from(users).where(eq(users.id, otherId));
+    if (!u) return;
+    const withheld = ageOn(u.birthDate) < 18 && !(await this.follows(otherId, senderId));
+    if (withheld) {
+      await db
+        .update(conversationMembers)
+        .set({ status: 'withheld' })
+        .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, otherId), inArray(conversationMembers.status, ['active', 'request'])));
+    } else {
+      await db
+        .update(conversationMembers)
+        .set({ status: 'request' })
+        .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, otherId), eq(conversationMembers.status, 'withheld')));
+    }
   }
 
   person(u: typeof users.$inferSelect, avatarUrl: string | null) {
@@ -148,12 +172,12 @@ export class MessagingService {
         .update(conversationMembers)
         .set({ status: 'active' })
         .where(and(eq(conversationMembers.conversationId, existing.id), eq(conversationMembers.userId, userId), eq(conversationMembers.status, 'declined')));
+      await this.minorShield(this.db, existing.id, userId, target.id);
       return this.summary(userId, existing.id, apiBase);
     }
     const followsMe = await this.follows(target.id, userId);
-    if (!followsMe && ageOn(target.birthDate) < 18) {
-      throw Errors.forbidden('Cette personne ne peut recevoir de messages que des comptes qu’elle suit.');
-    }
+    // Moins de 18 ans, sans suivre l'auteur : la conversation s'ouvre normalement pour lui, elle ne reçoit rien.
+    const withheld = !followsMe && ageOn(target.birthDate) < 18;
     const max = await this.limit('messages.new_conversations_daily_limit', 20);
     const id = uuidv7();
     await this.db.transaction(async (tx) => {
@@ -165,7 +189,7 @@ export class MessagingService {
       if (!created.length) return;
       await tx.insert(conversationMembers).values([
         { conversationId: id, userId, status: 'active' },
-        { conversationId: id, userId: target.id, status: followsMe ? 'active' : 'request' },
+        { conversationId: id, userId: target.id, status: followsMe ? 'active' : withheld ? 'withheld' : 'request' },
       ]);
     });
     const [conv] = await this.db.select({ id: conversations.id }).from(conversations).where(eq(conversations.directKey, key));
@@ -235,12 +259,15 @@ export class MessagingService {
     const [product] = conv.contextProductId ? await this.bimshop.visibleCards([conv.contextProductId], apiBase) : [];
     let offer: { id: string; projectTitle: string } | null = null;
     if (conv.contextOfferId) {
+      // Jamais le titre saisi par la personne : la boutique le verrait (audit, E-1) ; titre recomposé comme les offres.
       const [o] = await this.db
-        .select({ id: projectOffers.id, projectTitle: projects.title })
+        .select({ id: projectOffers.id, pattern: projectGoals.titlePattern, quantity: projects.targetQuantity, category: projectCategories.label })
         .from(projectOffers)
         .innerJoin(projects, eq(projects.id, projectOffers.projectId))
+        .innerJoin(projectCategories, eq(projectCategories.code, projects.categoryCode))
+        .leftJoin(projectGoals, eq(projectGoals.code, projects.goalCode))
         .where(eq(projectOffers.id, conv.contextOfferId));
-      offer = o ?? null;
+      offer = o ? { id: o.id, projectTitle: generateTitle({ pattern: o.pattern, quantity: o.quantity, description: null, categoryLabel: o.category }) } : null;
     }
     return product || offer ? { product: product ?? null, offer } : null;
   }
@@ -303,7 +330,7 @@ export class MessagingService {
       kind: conv.kind,
       status: me.status,
       /** Ma demande n'a pas encore été acceptée (l'autre personne ne me suit pas) : je peux écrire, elle choisira. */
-      pendingForOther: other?.status === 'request',
+      pendingForOther: other?.status === 'request' || other?.status === 'withheld',
       person: otherUser ? this.person(otherUser, await this.url(otherUser.avatarKey, apiBase)) : null,
       shop: shop ? this.shopRef(shop, await this.url(shop.logoKey, apiBase)) : null,
       context: await this.context(conv, apiBase),
@@ -512,6 +539,10 @@ export class MessagingService {
 
   async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
     const { conv, me, otherReadId } = await this.access(userId, conversationId);
+    if (conv.kind === 'direct') {
+      const other = (await this.db.select({ userId: conversationMembers.userId }).from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId))).find((x) => x.userId !== userId);
+      if (other) await this.minorShield(this.db, conversationId, userId, other.userId);
+    }
     const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, replyToId: input.replyToId, meta }, async (tx, id, now) => {
       // Répondre à une demande vaut acceptation ; mon propre message est lu.
       await tx
@@ -571,7 +602,9 @@ export class MessagingService {
 
   /** Conversation lue jusqu'au dernier message (statut « Vu » chez l'autre personne). */
   async read(userId: string, conversationId: string) {
-    await this.access(userId, conversationId);
+    const { me } = await this.access(userId, conversationId);
+    // Une demande pas encore acceptée n'affiche jamais « Vu » chez l'autre (E10).
+    if (me.status === 'request') return { lastReadMessageId: me.lastReadMessageId ?? null };
     const [last] = await this.db.select({ id: messages.id }).from(messages).where(eq(messages.conversationId, conversationId)).orderBy(desc(messages.id)).limit(1);
     if (last) {
       await this.db
@@ -596,9 +629,11 @@ export class MessagingService {
       .where(and(eq(messages.id, messageId), eq(messages.senderId, userId), isNull(messages.senderShopId), eq(messages.status, 'published')));
     if (!m) throw Errors.notFound('Message');
     await this.access(userId, m.conversationId);
-    await this.db.update(messages).set({ status: 'deleted', text: null, mediaKey: null }).where(eq(messages.id, m.id));
+    // Signalé (signalement ouvert) : « Message supprimé » pour les deux, mais le contenu reste pour la modération.
+    const evidence = await openReport(this.db, 'message', m.id);
+    await this.db.update(messages).set({ status: 'deleted', ...(evidence ? {} : { text: null, mediaKey: null }) }).where(eq(messages.id, m.id));
     await this.db.delete(messageReactions).where(eq(messageReactions.messageId, m.id));
-    if (m.mediaKey) await this.storage.remove(m.mediaKey).catch(() => undefined);
+    if (m.mediaKey && !evidence) await this.storage.remove(m.mediaKey).catch(() => undefined);
   }
 
   // ------------------------------------------------------------------------------------------------ Signalement et modération

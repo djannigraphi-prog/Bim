@@ -1,0 +1,2 @@
+ALTER TABLE "conversation_members" DROP CONSTRAINT "conversation_members_status_ck";--> statement-breakpoint
+ALTER TABLE "conversation_members" ADD CONSTRAINT "conversation_members_status_ck" CHECK ("conversation_members"."status" IN ('active', 'request', 'declined', 'withheld'));

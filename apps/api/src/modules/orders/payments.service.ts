@@ -218,6 +218,8 @@ export class PaymentsService {
         id: r.p.id,
         orderNumber: r.number,
         orderStatus: r.status,
+        /** article · delivery_fee (frais payés au livreur, contestés par lui). */
+        kind: r.p.kind,
         shop: r.shop,
         customer: r.customer,
         method: r.p.method,

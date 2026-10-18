@@ -7411,6 +7411,35 @@
         ]
       }
     },
+    "/v1/orders/{id}/handover-code/renew": {
+      "post": {
+        "operationId": "OrdersController_renewCode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Code de remise bloqué après trop d’essais : en obtenir un nouveau (2 fois au plus)",
+        "tags": [
+          "Commandes"
+        ]
+      }
+    },
     "/v1/orders/{id}/cancel": {
       "post": {
         "operationId": "OrdersController_cancel",

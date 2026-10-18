@@ -304,6 +304,7 @@ void main() {
     expect(find.byKey(const ValueKey('action-requests')), findsNothing);
     expect(find.byKey(const ValueKey('action-team')), findsNothing);
     expect(find.byKey(const ValueKey('shop-orders')), findsNothing);
+    expect(find.text('Live'), findsNothing); // Live vente : propriétaire seulement (lot 10)
     // Le propriétaire voit tout.
     await _pump(tester, _FakeShop(), '/shop');
     expect(find.byKey(const ValueKey('add-product')), findsOneWidget);

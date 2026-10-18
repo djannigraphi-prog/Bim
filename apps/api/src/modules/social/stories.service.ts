@@ -13,7 +13,7 @@ import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { CLOCK, Clock } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
-import { notBlockedBetween } from './access';
+import { notBlockedBetween, openReport } from './access';
 import { PostsService } from './posts.service';
 
 /** Durée de vie d'une story. */
@@ -120,11 +120,13 @@ export class StoriesService {
   async remove(userId: string, storyId: string, meta: RequestMeta) {
     const [s] = await this.db.select().from(stories).where(and(eq(stories.id, storyId), eq(stories.userId, userId)));
     if (!s || s.status === 'deleted') throw Errors.notFound('Story');
+    // Masquée ou signalée : la photo reste pour la modération (pas d'effacement de preuve, audit du 18/10/2026).
+    const evidence = s.status === 'hidden' || (await openReport(this.db, 'story', storyId));
     await this.db.transaction(async (tx) => {
       await tx.update(stories).set({ status: 'deleted' }).where(eq(stories.id, storyId));
-      await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.story_deleted', targetType: 'story', targetId: storyId, ip: meta.ip, userAgent: meta.userAgent }, tx);
+      await this.audit.log({ actorType: 'user', actorId: userId, action: 'social.story_deleted', targetType: 'story', targetId: storyId, ip: meta.ip, userAgent: meta.userAgent, metadata: { keptForModeration: evidence } }, tx);
     });
-    await this.storage.remove(s.storageKey).catch(() => undefined);
+    if (!evidence) await this.storage.remove(s.storageKey).catch(() => undefined);
   }
 
   /** Story visible par `viewerId` (pour un signalement), sinon « introuvable ». */

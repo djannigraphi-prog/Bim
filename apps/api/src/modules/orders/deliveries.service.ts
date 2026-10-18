@@ -290,7 +290,8 @@ export class DeliveriesService {
       if (d.status !== 'offered' || o.status !== 'ready') throw changed(d.status);
       // Éligibilité revérifiée : la priorité et la catégorie ne permettent jamais à un livreur non éligible d'accepter.
       const still = (await this.candidates(o, { ...d, status: 'searching' }, tx)).find((x) => x.courierId === courierId);
-      if (!still) {
+      // En livraison rapide, un livreur devenu non prioritaire (un employé s'est libéré entre-temps) ne peut plus accepter.
+      if (!still || !still.selectable) {
         await tx.update(deliveryOffers).set({ status: 'expired', answeredAt: now }).where(eq(deliveryOffers.id, of.id));
         await tx.update(deliveries).set({ status: 'searching' }).where(eq(deliveries.id, d.id));
         await this.event(tx, d.id, 'request_invalidated', 'system', null);

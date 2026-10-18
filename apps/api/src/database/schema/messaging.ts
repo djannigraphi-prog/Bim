@@ -53,7 +53,9 @@ export const conversations = pgTable(
 );
 
 /**
- * Membre d'une conversation. status : active (dans « Tous »), request (demande à accepter : la personne ne suit pas
+ * Membre d'une conversation. withheld (audit du 18/10/2026) : personne de moins de 18 ans qui ne suit pas l'autre ; elle
+ * ne voit rien (ni demande ni message), sans que l'autre le sache ; repasse en demande si elle le suit.
+ * status : active (dans « Tous »), request (demande à accepter : la personne ne suit pas
  * l'auteur), declined (demande refusée : masquée, l'auteur n'en est pas averti).
  */
 export const conversationMembers = pgTable(
@@ -74,7 +76,7 @@ export const conversationMembers = pgTable(
   (t) => [
     primaryKey({ columns: [t.conversationId, t.userId] }),
     index('conversation_members_user_idx').on(t.userId, t.status),
-    check('conversation_members_status_ck', sql`${t.status} IN ('active', 'request', 'declined')`),
+    check('conversation_members_status_ck', sql`${t.status} IN ('active', 'request', 'declined', 'withheld')`),
   ],
 );
 

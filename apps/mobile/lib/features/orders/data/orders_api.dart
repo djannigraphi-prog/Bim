@@ -661,6 +661,9 @@ class OrdersApi {
     return (status: r['status'] as String, failureReason: r['failureReason'] as String?);
   }
 
+  /// Code de remise bloqué après trop d'essais : nouveau code (l'ancien ne vaut plus rien).
+  Future<OrderDetail> renewHandoverCode(String id) async => OrderDetail.fromJson(await _api.post('/v1/orders/$id/handover-code/renew'));
+
   Future<OrderDetail> cancel(String id, {String? reason}) async => OrderDetail.fromJson(await _api.post('/v1/orders/$id/cancel', body: {if (reason != null) 'reason': reason}));
 }
 

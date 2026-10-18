@@ -39,7 +39,9 @@ export async function loadReminderContexts(
   since: Date,
 ): Promise<Array<{ userId: string; ctx: ReminderContext }>> {
   if (!people.size) return [];
-  const projectRows = await db.select().from(projects).where(and(eq(projects.status, 'active'), inArray(projects.userId, [...people.keys()])));
+  // Audit du 18/10/2026 : un projet reste « paused » en base tant que la personne ne l'a pas rouvert, même après la fin
+  // de la pause. Les jours de pause sont exclus par date (dueTasks) : les projets en pause sont donc lus aussi.
+  const projectRows = await db.select().from(projects).where(and(inArray(projects.status, ['active', 'paused']), inArray(projects.userId, [...people.keys()])));
   if (!projectRows.length) return [];
   const ids = projectRows.map((p) => p.id);
   const [tasks, pauses] = await Promise.all([

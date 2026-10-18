@@ -239,6 +239,12 @@ describe('Commandes (e2e)', () => {
     // Même le bon code ne passe plus.
     expect((await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code }).expect(409)).body.error.code).toBe('HANDOVER_CODE_BLOCKED');
     expect((await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body).toMatchObject({ status: 'ready', handoverCode: null, handoverCodeStatus: 'blocked' });
+    // Audit du 18/10/2026 : le client obtient un nouveau code (l'ancien ne vaut plus rien), 2 fois au plus.
+    await h.http().post(`/v1/orders/${o.id}/handover-code/renew`).set(s.auth).expect(403); // espace boutique : route du client
+    const renewed = (await h.http().post(`/v1/orders/${o.id}/handover-code/renew`).set(client.auth).expect(200)).body;
+    expect(renewed).toMatchObject({ handoverCodeStatus: 'active', handoverCode: expect.stringMatching(/^\d{4}$/) });
+    expect((await h.http().post(`/v1/orders/${o.id}/handover-code/renew`).set(client.auth).expect(409)).body.error.code).toBe('HANDOVER_CODE_NOT_BLOCKED');
+    await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code: renewed.handoverCode }).expect(200);
   });
 
   it('confirmations simultanées répétées : jamais d’erreur interne (verrou de la variante pris avant le mouvement de stock)', async () => {
@@ -421,7 +427,7 @@ describe('Commandes (e2e)', () => {
     await h.pool.query("insert into shop_member_permissions (shop_id, user_id, permission) values ($1, $2, 'orders.read')", [s.shopId, staff.userId]);
     const list = (await h.http().get('/v1/shop/orders?box=todo').set(st).expect(200)).body.items;
     expect(list).toEqual([expect.objectContaining({ id: o.id, number: o.number, status: 'pending_shop', customerName: 'Awa Koné', actions: ['confirm', 'decline'] })]);
-    expect((await h.http().get('/v1/shop/orders/counts').set(st).expect(200)).body).toEqual({ toConfirm: 1, toPrepare: 0, ready: 0, paymentsToConfirm: 0 });
+    expect((await h.http().get('/v1/shop/orders/counts').set(st).expect(200)).body).toEqual({ toConfirm: 1, toPrepare: 0, ready: 0, inDelivery: 0, paymentsToConfirm: 0 });
     await h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(st).expect(403);
     await h.pool.query("insert into shop_member_permissions (shop_id, user_id, permission) values ($1, $2, 'orders.prepare')", [s.shopId, staff.userId]);
     await h.http().post(`/v1/shop/orders/${o.id}/confirm`).set(st).expect(200);

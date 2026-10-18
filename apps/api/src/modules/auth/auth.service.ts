@@ -237,7 +237,7 @@ export class AuthService {
     const matching = identifier && identifier.kind !== 'username' ? contacts.find((c) => c.type === identifier.kind && c.value === identifier.value) : undefined;
     const target = matching ?? (user && user.status === 'active' ? await this.usersService.recoveryContact(user.id) : null);
     if (!user || !target) {
-      return { ...(await this.verification.createDecoy(announcedChannel, meta.ip, visibility, scope ?? null)), message };
+      return { ...(await this.verification.createDecoy(announcedChannel, meta.ip, visibility, scope ?? null, dto.identifier)), message };
     }
     let created: Awaited<ReturnType<VerificationService['createDeferred']>>;
     try {
@@ -250,7 +250,7 @@ export class AuthService {
       // Plafond d'envois atteint pour cette coordonnée : même réponse qu'un compte inconnu, sinon le 429 révélerait
       // que le compte existe (audit, A-8). Aucun code n'est envoyé.
       if (e instanceof AppError && e.code === 'TOO_MANY_ATTEMPTS') {
-        return { ...(await this.verification.createDecoy(announcedChannel, meta.ip, visibility, scope ?? null)), message };
+        return { ...(await this.verification.createDecoy(announcedChannel, meta.ip, visibility, scope ?? null, dto.identifier)), message };
       }
       throw e;
     }

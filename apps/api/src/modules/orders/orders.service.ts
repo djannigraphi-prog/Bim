@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
 import { createHmac } from 'node:crypto';
 import { AppError, Errors } from '../../common/errors';
 import { decryptBytes, encryptBytes, hmacSha256, numericCode, safeEqualHex } from '../../common/crypto';
@@ -62,6 +62,8 @@ export interface FulfilmentInput {
 
 /** Statuts où la commande est encore ouverte côté client (code visible, annulation possible…). */
 const ACTIVE = ['confirmed', 'preparing', 'ready', 'in_delivery'] as const;
+/** Nouveaux codes de remise qu'un client peut obtenir après un blocage (audit du 18/10/2026). */
+export const HANDOVER_CODE_RENEWALS = 2;
 const ENDED = ['declined', 'expired', 'cancelled'];
 const MAX_LINES = 20;
 
@@ -602,8 +604,29 @@ export class OrdersService {
 
   static throwCodeResult(result: { ok: true } | { ok: false; code: string; remaining?: number }) {
     if (result.ok) return;
-    if (result.code === 'HANDOVER_CODE_BLOCKED') throw new AppError('HANDOVER_CODE_BLOCKED', 'Trop d’essais : ce code est bloqué. Le support peut le recréer.', HttpStatus.CONFLICT);
+    if (result.code === 'HANDOVER_CODE_BLOCKED') throw new AppError('HANDOVER_CODE_BLOCKED', 'Trop d’essais : ce code est bloqué. Le client peut en demander un nouveau dans sa commande.', HttpStatus.CONFLICT);
     throw new AppError('HANDOVER_CODE_INVALID', 'Code incorrect.', HttpStatus.BAD_REQUEST, { remaining: result.remaining });
+  }
+
+  /**
+   * Code bloqué après trop d'essais (audit du 18/10/2026) : le client, seul à voir son code, en obtient un nouveau
+   * (l'ancien ne vaut plus rien), au plus HANDOVER_CODE_RENEWALS fois par commande. Les essais repartent de zéro.
+   */
+  async renewBlockedCode(customerId: string, orderId: string) {
+    await this.ownedByCustomer(customerId, orderId);
+    await this.db.transaction(async (tx) => {
+      const [o] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
+      const [c] = await tx.select().from(orderHandoverCodes).where(eq(orderHandoverCodes.orderId, orderId)).for('update').limit(1);
+      if (!c || c.status !== 'blocked' || !(ACTIVE as readonly string[]).includes(o.status)) throw new AppError('HANDOVER_CODE_NOT_BLOCKED', 'Ce code n’est pas bloqué.', HttpStatus.CONFLICT);
+      const [{ n }] = await tx.select({ n: count() }).from(orderEvents).where(and(eq(orderEvents.orderId, orderId), eq(orderEvents.type, 'handover_code_renewed')));
+      if (n >= HANDOVER_CODE_RENEWALS) throw new AppError('HANDOVER_CODE_RENEWALS_EXHAUSTED', 'Plus de nouveau code possible pour cette commande : signale un problème.', HttpStatus.CONFLICT);
+      const code = numericCode(4);
+      await tx
+        .update(orderHandoverCodes)
+        .set({ codeEncrypted: encryptBytes(Buffer.from(code), this.codeKey).toString('base64'), codeHash: hmacSha256(this.otpSecret, `handover:${orderId}:${code}`), failedAttempts: 0, status: 'active' })
+        .where(eq(orderHandoverCodes.orderId, orderId));
+      await tx.insert(orderEvents).values({ id: uuidv7(), orderId, type: 'handover_code_renewed', actorType: 'customer', actorId: customerId, fromStatus: o.status, toStatus: o.status, data: {} });
+    });
   }
 
   /** Annulation par le client : proposition refusée, ou commande annulée avant la préparation. */
@@ -611,7 +634,8 @@ export class OrdersService {
     await this.ownedByCustomer(customerId, orderId);
     await this.expireIfDue(orderId);
     await this.db.transaction(async (tx) => {
-      const [cur] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1);
+      // Statut lu sous verrou : deux gestes simultanés (accepter puis refuser) ne choisissent pas la mauvaise issue.
+      const [cur] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
       const to = cur.status === 'proposed' ? 'declined' : 'cancelled';
       const { before } = await this.move(tx, orderId, ['proposed', 'pending_shop', 'confirmed'], to, { closedAt: new Date(), endedByType: 'customer', endedById: customerId, endReason: reason ?? null, endedFromStatus: cur.status, expiresAt: null }, { type: to === 'declined' ? 'proposal_declined' : 'cancelled', actorType: 'customer', actorId: customerId, data: reason ? { reason } : {} });
       await this.returnStock(tx, before, customerId);
@@ -625,7 +649,11 @@ export class OrdersService {
     await this.ownedByShop(shopId, orderId);
     await this.expireIfDue(orderId);
     await this.db.transaction(async (tx) => {
-      const [cur] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1);
+      // Même ordre de verrouillage que les gestes du livreur (sollicitations, livraison, puis commande) : pas d'interblocage.
+      const [dl] = await tx.select({ id: deliveries.id }).from(deliveries).where(eq(deliveries.orderId, orderId)).limit(1);
+      if (dl) await tx.select({ id: deliveryOffers.id }).from(deliveryOffers).where(eq(deliveryOffers.deliveryId, dl.id)).for('update');
+      await tx.select({ id: deliveries.id }).from(deliveries).where(eq(deliveries.orderId, orderId)).for('update');
+      const [cur] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
       const { before } = await this.move(tx, orderId, ['proposed', 'confirmed', 'preparing', 'ready'], 'cancelled', { closedAt: new Date(), endedByType: 'shop', endedById: staffId, endReason: reason, endedFromStatus: cur.status, expiresAt: null }, { type: cur.status === 'proposed' ? 'proposal_withdrawn' : 'cancelled', actorType: 'shop', actorId: staffId, data: { reason } });
       await this.returnStock(tx, before, staffId);
       // 7-F : la livraison non encore prise en charge est annulée, son état figé (le colis n'a pas quitté la boutique).
@@ -838,7 +866,7 @@ export class OrdersService {
   /** « Commandes reçues » (boutique) : à traiter, en cours, terminées. */
   async listForShop(shopId: string, box: 'todo' | 'active' | 'done', cursor: string | undefined, apiBase: string) {
     await this.expireOwned(eq(orders.shopId, shopId));
-    const statuses = { todo: ['pending_shop', 'confirmed'], active: ['proposed', 'preparing', 'ready', 'delivered'], done: ['completed', 'declined', 'expired', 'cancelled'] }[box];
+    const statuses = { todo: ['pending_shop', 'confirmed'], active: ['proposed', 'preparing', 'ready', 'in_delivery', 'delivered'], done: ['completed', 'declined', 'expired', 'cancelled'] }[box];
     if (!statuses) throw Errors.validation({ fields: { box: ['todo, active ou done.'] } });
     const rows = await this.db
       .select({ o: orders, customerName: users.fullName })
@@ -860,7 +888,7 @@ export class OrdersService {
     await this.expireOwned(eq(orders.shopId, shopId));
     const rows = await this.db.select({ status: orders.status, n: sql<number>`count(*)::int` }).from(orders).where(eq(orders.shopId, shopId)).groupBy(orders.status);
     const by = Object.fromEntries(rows.map((r) => [r.status, r.n]));
-    return { toConfirm: by.pending_shop ?? 0, toPrepare: (by.confirmed ?? 0) + (by.preparing ?? 0), ready: by.ready ?? 0, paymentsToConfirm: await this.payments.shopPendingCount(shopId) };
+    return { toConfirm: by.pending_shop ?? 0, toPrepare: (by.confirmed ?? 0) + (by.preparing ?? 0), ready: by.ready ?? 0, inDelivery: by.in_delivery ?? 0, paymentsToConfirm: await this.payments.shopPendingCount(shopId) };
   }
 
   private async expireOwned(where: ReturnType<typeof eq>) {

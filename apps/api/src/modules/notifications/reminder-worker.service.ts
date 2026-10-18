@@ -151,7 +151,8 @@ export class ReminderWorkerService {
     if (!s.enabled) return this.finish(d.id, 'skipped', 'platform_disabled', now);
     // Revérification juste avant l'envoi : la situation a pu changer depuis la planification.
     const [p] = await this.db.select().from(projects).where(eq(projects.id, d.projectId!));
-    if (!p || p.status !== 'active') return this.finish(d.id, 'skipped', 'project_inactive', now);
+    // En pause en base mais pause terminée : les jours de pause sont exclus juste après (dueTasks).
+    if (!p || (p.status !== 'active' && p.status !== 'paused')) return this.finish(d.id, 'skipped', 'project_inactive', now);
     const [task] = await this.db.select().from(projectTasks).where(eq(projectTasks.id, d.taskId!));
     const pauses = await this.db.select().from(projectPauses).where(eq(projectPauses.projectId, p.id));
     if (!task || !isActiveOn(task, d.day!) || !dueTasks(d.day!, [task], pauses).length) return this.finish(d.id, 'skipped', 'not_due', now);

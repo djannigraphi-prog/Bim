@@ -43,7 +43,12 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
     unawaited(_load());
   }
 
+  bool _fetching = false;
+
   Future<void> _load() async {
+    // Une seule page à la fois : deux défilements rapides ne chargent pas deux fois la même page.
+    if (_fetching) return;
+    _fetching = true;
     try {
       final page = await ref.read(reelsApiProvider).feed(cursor: _cursor);
       if (!mounted) return;
@@ -55,7 +60,9 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
         _error = null;
       });
       if (_items.isNotEmpty) _markViewed(_items[_index]);
+      _fetching = false;
     } on ApiException catch (e) {
+      _fetching = false;
       if (mounted) {
         setState(() {
           _loading = false;
