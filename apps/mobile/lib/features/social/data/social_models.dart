@@ -103,6 +103,8 @@ class FeedPost {
     this.text,
     this.journey,
     this.usedProducts = const [],
+    this.coinCount = 0,
+    this.canGift = false,
   });
 
   final String id;
@@ -125,11 +127,15 @@ class FeedPost {
   /// 5-E : fiches associées, seulement dans le détail (les fils n'en contiennent pas).
   final List<UsedProduct> usedProducts;
 
+  /// Lot 9 : pièces reçues ; « Encourager » possible (auteur Premium, pas moi, mode démonstration).
+  final int coinCount;
+  final bool canGift;
+
   bool get isBim => kind == 'bim';
   PostMedia? get before => media.where((m) => m.kind == 'before').firstOrNull;
   PostMedia? get after => media.where((m) => m.kind == 'after').firstOrNull;
 
-  FeedPost copyWith({int? likeCount, bool? likedByMe, int? commentCount, bool? followingAuthor}) => FeedPost(
+  FeedPost copyWith({int? likeCount, bool? likedByMe, int? commentCount, bool? followingAuthor, int? coinCount}) => FeedPost(
         id: id,
         kind: kind,
         text: text,
@@ -144,6 +150,8 @@ class FeedPost {
         isMine: isMine,
         followingAuthor: followingAuthor ?? this.followingAuthor,
         usedProducts: usedProducts,
+        coinCount: coinCount ?? this.coinCount,
+        canGift: canGift,
       );
 
   factory FeedPost.fromJson(Map<String, dynamic> j) => FeedPost(
@@ -161,6 +169,8 @@ class FeedPost {
         isMine: (j['isMine'] ?? false) as bool,
         followingAuthor: (j['followingAuthor'] ?? false) as bool,
         usedProducts: [for (final u in ((j['usedProducts'] ?? const <dynamic>[]) as List<dynamic>).cast<Map<String, dynamic>>()) UsedProduct.fromJson(u)],
+        coinCount: (j['coinCount'] ?? 0) as int,
+        canGift: (j['canGift'] ?? false) as bool,
       );
 }
 
@@ -187,6 +197,8 @@ class PostComment {
     required this.canDelete,
     required this.isMine,
     this.parentId,
+    this.coinCount = 0,
+    this.canGift = false,
   });
 
   final String id;
@@ -198,10 +210,12 @@ class PostComment {
   final bool likedByMe;
   final bool canDelete;
   final bool isMine;
+  final int coinCount;
+  final bool canGift;
 
   bool get isReply => parentId != null;
 
-  PostComment copyWith({int? likeCount, bool? likedByMe}) => PostComment(
+  PostComment copyWith({int? likeCount, bool? likedByMe, int? coinCount}) => PostComment(
         id: id,
         parentId: parentId,
         text: text,
@@ -211,6 +225,8 @@ class PostComment {
         likedByMe: likedByMe ?? this.likedByMe,
         canDelete: canDelete,
         isMine: isMine,
+        coinCount: coinCount ?? this.coinCount,
+        canGift: canGift,
       );
 
   factory PostComment.fromJson(Map<String, dynamic> j) => PostComment(
@@ -223,6 +239,8 @@ class PostComment {
         likedByMe: (j['likedByMe'] ?? false) as bool,
         canDelete: (j['canDelete'] ?? false) as bool,
         isMine: (j['isMine'] ?? false) as bool,
+        coinCount: (j['coinCount'] ?? 0) as int,
+        canGift: (j['canGift'] ?? false) as bool,
       );
 }
 

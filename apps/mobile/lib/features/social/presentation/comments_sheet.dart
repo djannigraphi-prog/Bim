@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
 import '../data/social_api.dart';
+import '../../wallet/presentation/gift_sheet.dart';
 import '../data/social_models.dart';
 import 'moderation_sheets.dart';
 import 'social_widgets.dart';
@@ -144,6 +145,19 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
     }
   }
 
+  /// Lot 9 : pièces sur un commentaire (auteur Premium).
+  Future<void> _coins(PostComment c) async {
+    final total = await showGiftSheet(context, targetType: 'comment', targetId: c.id, recipientName: c.author.fullName);
+    if (total == null || !mounted) return;
+    setState(() {
+      _page = CommentsPage(
+        total: _page!.total,
+        nextCursor: _page!.nextCursor,
+        items: [for (final x in _page!.items) x.id == c.id ? x.copyWith(coinCount: total) : x],
+      );
+    });
+  }
+
   Future<void> _menu(PostComment c) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -215,7 +229,7 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
                         : ListView(
                             padding: const EdgeInsets.symmetric(vertical: BimSpacing.sm),
                             children: [
-                              for (final c in page.items) _CommentTile(comment: c, onLike: () => _like(c), onReply: () => _reply(c), onMore: () => _menu(c)),
+                              for (final c in page.items) _CommentTile(comment: c, onLike: () => _like(c), onReply: () => _reply(c), onMore: () => _menu(c), onCoins: () => _coins(c)),
                               if (page.nextCursor != null)
                                 Center(
                                   child: TextButton(
@@ -280,12 +294,13 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, required this.onLike, required this.onReply, required this.onMore});
+  const _CommentTile({required this.comment, required this.onLike, required this.onReply, required this.onMore, required this.onCoins});
 
   final PostComment comment;
   final VoidCallback onLike;
   final VoidCallback onReply;
   final VoidCallback onMore;
+  final VoidCallback onCoins;
 
   @override
   Widget build(BuildContext context) {
@@ -331,6 +346,8 @@ class _CommentTile extends StatelessWidget {
                 onPressed: onLike,
               ),
               Text(compactCount(c.likeCount), style: theme.textTheme.bodySmall),
+              if (c.canGift || c.coinCount > 0)
+                CoinButton(key: ValueKey('comment-coins-${c.id}'), count: c.coinCount, canGift: c.canGift, compact: true, onTap: c.canGift ? onCoins : null),
             ],
           ),
         ],

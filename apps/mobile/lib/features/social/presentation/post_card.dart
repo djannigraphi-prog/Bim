@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
 import '../data/social_api.dart';
+import '../../wallet/presentation/gift_sheet.dart';
 import '../data/social_models.dart';
 import 'comments_sheet.dart';
 import 'moderation_sheets.dart';
@@ -47,6 +48,12 @@ class PostCard extends ConsumerWidget {
   Future<void> _comments(BuildContext context) async {
     final total = await showCommentsSheet(context, post.id);
     if (total != null && total != post.commentCount) onChanged(post.copyWith(commentCount: total));
+  }
+
+  Future<void> _coins(BuildContext context) async {
+    if (!post.canGift) return showDonorsSheet(context, post.id);
+    final total = await showGiftSheet(context, targetType: 'post', targetId: post.id, recipientName: post.author.fullName);
+    if (total != null) onChanged(post.copyWith(coinCount: total));
   }
 
   @override
@@ -138,7 +145,12 @@ class PostCard extends ConsumerWidget {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(BimSpacing.md, BimSpacing.xs, BimSpacing.screen, 0),
-            child: PostActions(post: post, onLike: gate ?? () => _like(context, ref), onComments: gate ?? () => _comments(context)),
+            child: PostActions(
+              post: post,
+              onLike: gate ?? () => _like(context, ref),
+              onComments: gate ?? () => _comments(context),
+              onCoins: gate ?? () => _coins(context),
+            ),
           ),
           if (post.isBim && post.journey != null && post.journey!.subject.isNotEmpty)
             Padding(

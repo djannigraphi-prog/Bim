@@ -14,6 +14,7 @@ import 'comments_sheet.dart';
 import 'moderation_sheets.dart';
 import 'social_widgets.dart';
 import 'used_products.dart';
+import '../../wallet/presentation/gift_sheet.dart';
 
 /// Écran 11 — Publication : avant / après à comparer avec le curseur, résumé du parcours, j'aime et commentaires.
 /// 5-E : « Produits et services utilisés » (lien vers la fiche, jamais d'achat : règle E2) ; pièces : lot 9.
@@ -154,6 +155,11 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                 onComments: () async {
                   final total = await showCommentsSheet(context, post.id);
                   if (total != null && mounted) setState(() => _local = post.copyWith(commentCount: total));
+                },
+                onCoins: () async {
+                  if (!post.canGift) return showDonorsSheet(context, post.id);
+                  final total = await showGiftSheet(context, targetType: 'post', targetId: post.id, recipientName: post.author.fullName);
+                  if (total != null && mounted) setState(() => _local = post.copyWith(coinCount: total));
                 },
               ),
               if ((post.text ?? '').isNotEmpty)

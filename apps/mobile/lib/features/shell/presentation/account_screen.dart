@@ -87,6 +87,23 @@ class AccountScreen extends ConsumerWidget {
               onTap: () => context.push('/account/devices'),
             ),
             const SizedBox(height: BimSpacing.lg),
+            Text('PIÈCES ET PREMIUM', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+            ListTile(
+              key: const ValueKey('account-wallet'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.monetization_on_outlined),
+              title: const Text('Mes pièces'),
+              subtitle: const Text('Solde, achat, retrait'),
+              onTap: () => context.push('/wallet'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.workspace_premium_outlined),
+              title: const Text('Premium'),
+              subtitle: const Text('Recevoir des pièces, sans publicité'),
+              onTap: () => context.push('/premium'),
+            ),
+            const SizedBox(height: BimSpacing.lg),
             Text('NOTIFICATIONS', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
             ListTile(
               contentPadding: EdgeInsets.zero,

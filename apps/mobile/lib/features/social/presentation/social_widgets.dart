@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/util/date_fr.dart';
+import '../../wallet/presentation/gift_sheet.dart';
 import '../data/social_models.dart';
 
 /// Photo de profil ronde, ou initiales sur fond doux quand la personne n'a pas de photo (lot 4).
@@ -246,11 +247,14 @@ class BimBadge extends StatelessWidget {
 
 /// Ligne « ♥ 10,2 k  💬 214 » d'une publication (pièces : lot 9).
 class PostActions extends StatelessWidget {
-  const PostActions({super.key, required this.post, required this.onLike, required this.onComments});
+  const PostActions({super.key, required this.post, required this.onLike, required this.onComments, this.onCoins});
 
   final FeedPost post;
   final VoidCallback onLike;
   final VoidCallback onComments;
+
+  /// Lot 9 : « Encourager » (ou liste des donateurs) ; le bouton n'apparaît que si la publication peut en recevoir.
+  final VoidCallback? onCoins;
 
   @override
   Widget build(BuildContext context) {
@@ -293,6 +297,10 @@ class PostActions extends StatelessWidget {
             ),
           ),
         ),
+        if (onCoins != null && (post.canGift || post.coinCount > 0)) ...[
+          const SizedBox(width: BimSpacing.sm),
+          CoinButton(key: ValueKey('coins-${post.id}'), count: post.coinCount, canGift: post.canGift, onTap: onCoins),
+        ],
       ],
     );
   }
