@@ -374,7 +374,7 @@ class _FakeBimShopApi extends BimShopApi {
       );
 
   @override
-  Future<PublicShop> shop(String slug) async =>
+  Future<PublicShop> shop(String slug, {String? cursor}) async =>
       PublicShop(shop: _elegance, description: 'Robes de soirée et tenues corporate, retouches sur place.', followers: 0, productCount: 2, items: _cards.sublist(0, 2));
 }
 
