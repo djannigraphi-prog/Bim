@@ -53,6 +53,7 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `INCIDENT_NOT_FOR_SUPPORT` | 409 | L7-08 : un problème signalé après la remise se règle entre le client et la boutique, sans le support |
 | `DISPUTE_WINDOW_CLOSED` | 409 | L7-08 : vente close — délai de 3 jours après la remise dépassé pour signaler un problème ou échanger sur un incident signalé après la remise (`details.days`) |
 | `APP_UPDATE_REQUIRED` | 426 | Lot 7-A : version de l'app plus ancienne que le minimum décidé pour sa plateforme (`details.minVersion`, `details.platform`) ; l'app affiche « Mise à jour nécessaire » |
+| `LIVE_ALREADY_RUNNING` · `LIVE_NOT_RUNNING` · `LIVE_NOT_SCHEDULED` · `LIVE_NOT_SALE` · `LIVE_ENDED` · `SHOP_NOT_ACTIVE` | 409 | Lot 10 : un Live déjà en cours ; Live pas (ou plus) en cours ; Live plus programmé ; épingle réservée au Live vente ; Live terminé ; boutique non validée |
 | `RECIPIENT_NOT_PREMIUM` · `COINS_SELF_GIFT` · `INSUFFICIENT_COINS` | 409 | Lot 9 : la personne n'a pas Premium (elle ne peut pas recevoir de pièces) ; envoi à soi-même ; solde insuffisant (`details.needed`, et `balance` ou `withdrawable`) |
 | `PHONE_NOT_VERIFIED` · `WITHDRAWAL_DAILY_CAP` · `WITHDRAWAL_ALREADY_DECIDED` | 409 | Lot 9 : retrait sans téléphone vérifié ; plafond sur 24 heures atteint (`details.dailyCap`) ; retrait déjà validé ou refusé |
 | `IDEMPOTENCY_KEY_REUSED` | 409 | clé anti-doublon déjà utilisée pour une autre demande |

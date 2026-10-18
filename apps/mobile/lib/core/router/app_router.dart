@@ -45,6 +45,7 @@ import '../../features/social/presentation/composer_screen.dart';
 import '../../features/social/presentation/post_detail_screen.dart';
 import '../../features/social/presentation/profile_screen.dart';
 import '../../features/wallet/presentation/wallet_screen.dart';
+import '../../features/lives/presentation/live_room_screen.dart';
 
 /// Fait réévaluer les redirections du routeur à chaque changement de session.
 class _SessionListenable extends ChangeNotifier {
@@ -103,6 +104,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
       GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
       GoRoute(path: '/premium', builder: (_, __) => const PremiumScreen()),
+      GoRoute(path: '/lives/:id', builder: (_, s) => LiveRoomScreen(liveId: s.pathParameters['id']!)),
       // Lot 1 — projets BIM (écrans 18 à 30).
       GoRoute(path: '/projects', builder: (_, __) => const MyProjectsScreen()),
       GoRoute(path: '/projects/new', builder: (_, __) => const NewProjectScreen()),

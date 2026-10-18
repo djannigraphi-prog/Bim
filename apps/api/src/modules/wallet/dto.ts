@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
-import { GIFT_MAX_QUANTITY, WITHDRAWAL_OPERATORS, WithdrawalOperator } from './wallet.service';
+import { GIFT_MAX_QUANTITY, GIFT_TARGETS, GiftTarget, WITHDRAWAL_OPERATORS, WithdrawalOperator } from './wallet.service';
 
 const IDEM = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -15,7 +15,7 @@ export class BuyCoinsDto {
 }
 
 export class SendCoinsDto {
-  @ApiProperty({ enum: ['post', 'comment'] }) @IsIn(['post', 'comment']) targetType!: 'post' | 'comment';
+  @ApiProperty({ enum: GIFT_TARGETS }) @IsIn([...GIFT_TARGETS]) targetType!: GiftTarget;
   @ApiProperty() @IsUUID() targetId!: string;
   @ApiProperty({ description: 'Code du cadeau (voir GET /v1/wallet)' }) @IsString() @Length(2, 20) giftCode!: string;
   @ApiProperty({ minimum: 1, maximum: GIFT_MAX_QUANTITY }) @IsInt() @Min(1) @Max(GIFT_MAX_QUANTITY) quantity!: number;

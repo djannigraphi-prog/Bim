@@ -148,9 +148,16 @@ void main() {
     expect(find.text('Stock : 3'), findsOneWidget);
     // 7-B : commandes à traiter, compteurs réels.
     expect(find.text('2 à confirmer · 1 à préparer · 1 paiement à confirmer'), findsOneWidget);
-    await tester.tap(find.text('Live'));
+    // Lot 10 (prototype) : « Live » ouvre le lancement d'un Live vente (mode démo) ; « Promo » reste à venir.
+    await tester.tap(find.text('Promo'));
     await tester.pumpAndSettle();
     expect(find.text('Bientôt disponible'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Live'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live vente'), findsOneWidget);
+    expect(find.byKey(const ValueKey('live-submit')), findsOneWidget);
   });
 
   testWidgets('le « + » ouvre un nouvel article ; brouillon enregistré avec rubrique et prix', (tester) async {

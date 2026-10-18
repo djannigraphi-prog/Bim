@@ -11,6 +11,7 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../account/data/account_api.dart';
+import '../../lives/presentation/lives_view.dart';
 import '../../auth/application/session_controller.dart';
 import '../../messaging/data/messaging_api.dart';
 import '../../orders/data/orders_api.dart';
@@ -132,7 +133,14 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   children: [
                     if (d.can('products.edit'))
                       _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
-                    _Action(icon: Icons.videocam_outlined, label: 'Live', onTap: () => showComingSoon(context, feature: 'Le live')),
+                    _Action(
+                      icon: Icons.videocam_outlined,
+                      label: 'Live',
+                      onTap: () async {
+                        final l = await showNewLiveSheet(context, asShop: true);
+                        if (l != null && context.mounted) await context.push('/lives/${l.id}');
+                      },
+                    ),
                     _Action(icon: Icons.local_offer_outlined, label: 'Promo', onTap: () => showComingSoon(context, feature: 'Les promotions')),
                     // 7-E : livreurs de la boutique (permission « paramètres de livraison »).
                     if (d.can('deliveries.settings'))

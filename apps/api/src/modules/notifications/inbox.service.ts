@@ -90,6 +90,12 @@ export class InboxService {
       FROM order_events e JOIN orders o ON o.id = e.order_id JOIN shops s ON s.id = o.shop_id
       WHERE o.customer_id = ${userId} AND e.actor_type IN ('shop', 'system', 'courier') AND e.created_at > ${since}
         AND e.type IN ('proposed', 'confirmed', 'declined', 'ready', 'handed_over', 'cancelled', 'proposal_withdrawn', 'expired', 'courier_assigned', 'picked_up', 'courier_arrived', 'delivered')
+      -- Lot 10 : une personne que je suis lance un Live (lien vers le Live ; « id » du Live dans la colonne post_id).
+      UNION ALL
+      SELECT 'live:' || l.id, 'live_started', l.started_at, NULL, NULL, NULL, NULL, NULL, NULL, u.full_name, u.username, l.id::text, l.title
+      FROM lives l JOIN users u ON u.id = l.host_user_id JOIN follows f ON f.followee_id = l.host_user_id AND f.follower_id = ${userId}
+      WHERE l.started_at IS NOT NULL AND l.started_at > ${since} AND u.status = 'active' AND l.host_user_id <> ${userId}
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${userId}))
       -- Lot 9 : pièces reçues sur une publication ou un commentaire (nom caché si l'envoi est anonyme).
       UNION ALL
       SELECT 'gift:' || g.id, 'coins_received', g.created_at, NULL, NULL, g.coins::text, NULL, NULL, NULL,
@@ -114,7 +120,7 @@ export class InboxService {
         SELECT * FROM (${this.sources(userId, since)}) x
         WHERE (${opts.category ?? null}::text IS NULL
                OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected', 'order_update') THEN 'support'
-                        WHEN x.type IN ('post_liked', 'post_commented', 'new_follower', 'coins_received') THEN 'social'
+                        WHEN x.type IN ('post_liked', 'post_commented', 'new_follower', 'coins_received', 'live_started') THEN 'social'
                         ELSE 'projects' END) = ${opts.category ?? null}::text)
           -- Page suivante : position (date à la milliseconde, identifiant) du dernier élément vu ; aucun élément de même
           -- date n'est sauté (audit, défaut 4). Sans beforeId (anciennes versions de l'app) : comportement d'origine.
@@ -182,6 +188,8 @@ function link(r: Row): string | null {
       return r.project_id && r.day ? `/projects/${r.project_id}/day/${r.day}` : null;
     case 'report_answered':
       return '/reports';
+    case 'live_started':
+      return r.post_id ? `/lives/${r.post_id}` : null;
     case 'post_liked':
     case 'post_commented':
     case 'coins_received':

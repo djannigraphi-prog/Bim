@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { boolean, check, index, integer, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { adminUsers } from './platform';
 import { users } from './identity';
+import { lives } from './lives';
 import { postComments, posts } from './social';
 
 /**
@@ -111,12 +112,11 @@ export const coinGifts = pgTable(
     recipientId: uuid('recipient_id')
       .notNull()
       .references(() => users.id),
-    /** post · comment */
+    /** post · comment · live (lot 10) */
     targetType: varchar('target_type', { length: 8 }).notNull(),
-    postId: uuid('post_id')
-      .notNull()
-      .references(() => posts.id),
+    postId: uuid('post_id').references(() => posts.id),
     commentId: uuid('comment_id').references(() => postComments.id),
+    liveId: uuid('live_id').references(() => lives.id),
     giftCode: varchar('gift_code', { length: 20 }).notNull(),
     quantity: integer('quantity').notNull(),
     coins: integer('coins').notNull(),
@@ -130,7 +130,11 @@ export const coinGifts = pgTable(
     index('coin_gifts_post_idx').on(t.postId, t.createdAt),
     index('coin_gifts_comment_idx').on(t.commentId),
     index('coin_gifts_recipient_idx').on(t.recipientId, t.createdAt),
-    check('coin_gifts_target_ck', sql`(${t.targetType} = 'post' AND ${t.commentId} IS NULL) OR (${t.targetType} = 'comment' AND ${t.commentId} IS NOT NULL)`),
+    index('coin_gifts_live_idx').on(t.liveId, t.createdAt),
+    check(
+      'coin_gifts_target_ck',
+      sql`(${t.targetType} = 'post' AND ${t.postId} IS NOT NULL AND ${t.commentId} IS NULL AND ${t.liveId} IS NULL) OR (${t.targetType} = 'comment' AND ${t.postId} IS NOT NULL AND ${t.commentId} IS NOT NULL AND ${t.liveId} IS NULL) OR (${t.targetType} = 'live' AND ${t.liveId} IS NOT NULL AND ${t.postId} IS NULL AND ${t.commentId} IS NULL)`,
+    ),
     check('coin_gifts_coins_ck', sql`${t.coins} > 0 AND ${t.quantity} > 0`),
     check('coin_gifts_self_ck', sql`${t.senderId} <> ${t.recipientId}`),
   ],

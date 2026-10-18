@@ -81,6 +81,10 @@ export const PURGE_BLOCKING_TABLES = [
   'coin_purchases',
   'coin_gifts',
   'withdrawals',
+  // Lot 10 : animer, commenter ou regarder un Live est une activité.
+  'lives',
+  'live_comments',
+  'live_viewers',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -105,6 +109,7 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   incident_photos: ['uploaded_by'],
   payment_intents: ['created_by'],
   coin_gifts: ['sender_id', 'recipient_id'],
+  lives: ['host_user_id'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [

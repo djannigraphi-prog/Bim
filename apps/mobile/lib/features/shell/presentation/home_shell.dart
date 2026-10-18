@@ -9,6 +9,7 @@ import '../../../core/widgets/brand.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../bimshop/presentation/bimshop_view.dart';
+import '../../lives/presentation/lives_view.dart';
 import '../../messaging/data/messaging_api.dart';
 import '../../messaging/presentation/messages_view.dart';
 import '../../notifications/data/inbox_api.dart';
@@ -63,7 +64,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       }
       return;
     }
-    if (i == 1 && _visitor) {
+    if ((i == 1 || i == 3) && _visitor) {
       showVisitorGate(context, ref);
       return;
     }
@@ -114,6 +115,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ? FeedView(visitor: session is! SessionSignedIn)
           : _tab == 1 && session is SessionSignedIn
               ? const MessagesView()
+              : _tab == 3 && session is SessionSignedIn
+              ? const LivesView()
               : _tab == 4
               ? BimShopView(visitor: session is! SessionSignedIn)
               : Center(

@@ -5,7 +5,7 @@ import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { DB, Database, DbOrTx } from '../../database/database.module';
-import { coinGifts, coinLedger, coinPurchases, postComments, posts, subscriptions, userContacts, users, wallets, withdrawals } from '../../database/schema';
+import { coinGifts, coinLedger, coinPurchases, lives, postComments, posts, subscriptions, userContacts, users, wallets, withdrawals } from '../../database/schema';
 import type { AdminContext } from '../admin/admin.decorators';
 import { AgePolicyService } from '../age-policy/age-policy.service';
 import { AuditService } from '../audit/audit.service';
@@ -18,6 +18,8 @@ export const PREMIUM_PERIOD_DAYS = 30;
 export const GIFT_MAX_QUANTITY = 99;
 export const WITHDRAWAL_OPERATORS = ['orange', 'mtn', 'moov', 'wave'] as const;
 export type WithdrawalOperator = (typeof WITHDRAWAL_OPERATORS)[number];
+export const GIFT_TARGETS = ['post', 'comment', 'live'] as const;
+export type GiftTarget = (typeof GIFT_TARGETS)[number];
 
 export interface Gift {
   code: string;
@@ -243,7 +245,18 @@ export class WalletService {
   // ------------------------------------------------------------------------------------------------ Envois
 
   /** Destinataire et publication d'un envoi, après contrôle de la visibilité et des blocages. */
-  private async target(senderId: string, targetType: 'post' | 'comment', targetId: string) {
+  private async target(senderId: string, targetType: GiftTarget, targetId: string): Promise<{ postId: string | null; commentId: string | null; liveId: string | null; recipientId: string }> {
+    if (targetType === 'live') {
+      // Lot 10 : cadeau pendant un Live en cours, reçu par la personne qui l'anime.
+      const [l] = await this.db
+        .select({ id: lives.id, hostUserId: lives.hostUserId, status: lives.status })
+        .from(lives)
+        .innerJoin(users, eq(users.id, lives.hostUserId))
+        .where(and(eq(lives.id, targetId), eq(users.status, 'active'), notBlockedBetween(senderId, lives.hostUserId)));
+      if (!l) throw Errors.notFound('Live');
+      if (l.status !== 'live') throw conflict('LIVE_NOT_RUNNING', 'Ce Live n’est pas en cours.');
+      return { postId: null, commentId: null, liveId: l.id, recipientId: l.hostUserId };
+    }
     if (targetType === 'post') {
       const [r] = await this.db
         .select({ postId: posts.id, recipientId: posts.userId })
@@ -251,7 +264,7 @@ export class WalletService {
         .innerJoin(users, eq(users.id, posts.userId))
         .where(and(eq(posts.id, targetId), postVisibleTo(senderId)));
       if (!r) throw Errors.notFound('Publication');
-      return { postId: r.postId, commentId: null, recipientId: r.recipientId };
+      return { postId: r.postId, commentId: null, liveId: null, recipientId: r.recipientId };
     }
     const [c] = await this.db
       .select({ commentId: postComments.id, postId: postComments.postId, recipientId: postComments.userId })
@@ -261,12 +274,12 @@ export class WalletService {
     if (!c) throw Errors.notFound('Commentaire');
     const [p] = await this.db.select({ id: posts.id }).from(posts).innerJoin(users, eq(users.id, posts.userId)).where(and(eq(posts.id, c.postId), postVisibleTo(senderId)));
     if (!p) throw Errors.notFound('Commentaire');
-    return c;
+    return { ...c, liveId: null };
   }
 
   async gift(
     senderId: string,
-    dto: { targetType: 'post' | 'comment'; targetId: string; giftCode: string; quantity: number; anonymous?: boolean; idempotencyKey: string },
+    dto: { targetType: GiftTarget; targetId: string; giftCode: string; quantity: number; anonymous?: boolean; idempotencyKey: string },
     meta: RequestMeta,
   ) {
     this.assertDemo('L’envoi de pièces');
@@ -298,6 +311,7 @@ export class WalletService {
           targetType: dto.targetType,
           postId: t.postId,
           commentId: t.commentId,
+          liveId: t.liveId,
           giftCode: gift.code,
           quantity: dto.quantity,
           coins,
@@ -309,8 +323,9 @@ export class WalletService {
         if (fromPurchased > 0) await this.credit(tx, senderId, 'purchased', -fromPurchased, 'gift_sent', id);
         if (coins - fromPurchased > 0) await this.credit(tx, senderId, 'received', -(coins - fromPurchased), 'gift_sent', id);
         await this.credit(tx, t.recipientId, 'received', coins, 'gift_received', id);
-        if (t.commentId) await tx.update(postComments).set({ coinCount: sql`${postComments.coinCount} + ${coins}` }).where(eq(postComments.id, t.commentId));
-        else await tx.update(posts).set({ coinCount: sql`${posts.coinCount} + ${coins}` }).where(eq(posts.id, t.postId));
+        if (t.liveId) await tx.update(lives).set({ coinCount: sql`${lives.coinCount} + ${coins}` }).where(eq(lives.id, t.liveId));
+        else if (t.commentId) await tx.update(postComments).set({ coinCount: sql`${postComments.coinCount} + ${coins}` }).where(eq(postComments.id, t.commentId));
+        else await tx.update(posts).set({ coinCount: sql`${posts.coinCount} + ${coins}` }).where(eq(posts.id, t.postId!));
         await this.audit.log({ actorType: 'user', actorId: senderId, action: 'coins.gift_sent', targetType: dto.targetType, targetId: dto.targetId, ip: meta.ip, userAgent: meta.userAgent, metadata: { giftId: id, coins, gift: gift.code } }, tx);
       });
     } catch (e) {
@@ -320,12 +335,14 @@ export class WalletService {
   }
 
   private async giftResult(senderId: string, g: typeof coinGifts.$inferSelect) {
-    const [target] = g.commentId
-      ? await this.db.select({ coinCount: postComments.coinCount }).from(postComments).where(eq(postComments.id, g.commentId))
-      : await this.db.select({ coinCount: posts.coinCount }).from(posts).where(eq(posts.id, g.postId));
+    const [target] = g.liveId
+      ? await this.db.select({ coinCount: lives.coinCount }).from(lives).where(eq(lives.id, g.liveId))
+      : g.commentId
+        ? await this.db.select({ coinCount: postComments.coinCount }).from(postComments).where(eq(postComments.id, g.commentId))
+        : await this.db.select({ coinCount: posts.coinCount }).from(posts).where(eq(posts.id, g.postId!));
     const b = await this.balances(senderId);
     return {
-      gift: { id: g.id, targetType: g.targetType, postId: g.postId, commentId: g.commentId, giftCode: g.giftCode, quantity: g.quantity, coins: g.coins, anonymous: g.anonymous, at: g.createdAt },
+      gift: { id: g.id, targetType: g.targetType, postId: g.postId, commentId: g.commentId, liveId: g.liveId, giftCode: g.giftCode, quantity: g.quantity, coins: g.coins, anonymous: g.anonymous, at: g.createdAt },
       targetCoinCount: target?.coinCount ?? 0,
       balance: { total: b.purchased + b.received, purchased: b.purchased, received: b.received, withdrawable: b.received },
     };

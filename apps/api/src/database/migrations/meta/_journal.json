@@ -358,6 +358,13 @@
       "when": 1792282979759,
       "tag": "0050_lot9a_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792284304865,
+      "tag": "0051_lot10a_lives",
+      "breakpoints": true
     }
   ]
 }

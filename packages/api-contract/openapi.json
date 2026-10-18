@@ -4211,6 +4211,372 @@
         ]
       }
     },
+    "/v1/lives": {
+      "get": {
+        "operationId": "LivesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lives en cours et programmés (écran 39)",
+        "tags": [
+          "Lives"
+        ]
+      },
+      "post": {
+        "operationId": "LivesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lancer ou programmer un Live simple (écran 44)",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/shop/lives": {
+      "post": {
+        "operationId": "LivesController_createForShop",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShopLiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lancer ou programmer un Live vente de la boutique active (écran 40), article épinglé facultatif",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}": {
+      "get": {
+        "operationId": "LivesController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Un Live",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/state": {
+      "get": {
+        "operationId": "LivesController_state",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "Dernier commentaire déjà reçu",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "giftsAfter",
+            "required": false,
+            "in": "query",
+            "description": "Dernier cadeau déjà reçu",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "État du Live, lu toutes les 2 secondes : spectateurs, cœurs, pièces, nouveaux commentaires et cadeaux",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/start": {
+      "post": {
+        "operationId": "LivesController_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commencer un Live programmé",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/end": {
+      "post": {
+        "operationId": "LivesController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Terminer (ou annuler s’il est programmé)",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/pinned-product": {
+      "put": {
+        "operationId": "LivesController_pin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Épingler un article publié de la boutique (Live vente)",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/comments": {
+      "post": {
+        "operationId": "LivesController_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commenter un Live en cours",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/comments/{commentId}": {
+      "delete": {
+        "operationId": "LivesController_hideComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer un commentaire de mon Live",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
+    "/v1/lives/{id}/hearts": {
+      "post": {
+        "operationId": "LivesController_hearts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveHeartsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Envoyer des cœurs",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
     "/v1/merchant/applications/mine": {
       "get": {
         "operationId": "MerchantApplicationsController_mine",
@@ -10898,7 +11264,8 @@
             "type": "string",
             "enum": [
               "post",
-              "comment"
+              "comment",
+              "live"
             ]
           },
           "targetId": {
@@ -11025,6 +11392,80 @@
             "description": "Identifiant d’une réponse rapide proposée par le dernier message de Peni"
           }
         }
+      },
+      "CreateLiveDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "scheduledAt": {
+            "type": "string",
+            "description": "Absent : le Live commence tout de suite ; sinon programmé (30 jours au plus)"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "CreateShopLiveDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "scheduledAt": {
+            "type": "string",
+            "description": "Absent : le Live commence tout de suite ; sinon programmé (30 jours au plus)"
+          },
+          "productId": {
+            "type": "string",
+            "description": "Article publié de la boutique, épinglé pendant le Live"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "PinProductDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "object",
+            "nullable": true,
+            "description": "null : retirer l’article épinglé"
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "LiveCommentDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "LiveHeartsDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "count"
+        ]
       },
       "CreateApplicationDto": {
         "type": "object",
