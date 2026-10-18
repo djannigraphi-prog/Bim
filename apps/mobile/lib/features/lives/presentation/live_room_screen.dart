@@ -10,6 +10,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../wallet/data/wallet_api.dart' show coinsLabel;
 import '../../wallet/presentation/gift_sheet.dart';
+import 'live_effects.dart';
 import '../data/lives_api.dart';
 
 /// Écrans 40, 43 et 44 — Live en cours : spectateurs, commentaires, cœurs, cadeaux animés (visibles par tous), article
@@ -35,6 +36,9 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
   final _seenGifts = <String>{};
   Timer? _poll;
   Timer? _giftTimer;
+  /// V1 : cœurs qui s'envolent (un par appui).
+  final List<int> _hearts = [];
+  int _heartSeq = 0;
   Object? _error;
   final _input = TextEditingController();
   bool _sending = false;
@@ -128,9 +132,29 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
   Future<void> _heart() async {
     final l = _live;
     if (l == null) return;
-    setState(() => _live = l.copyWith(heartCount: l.heartCount + 1));
+    setState(() {
+      _live = l.copyWith(heartCount: l.heartCount + 1);
+      if (_hearts.length < 12) _hearts.add(_heartSeq++);
+    });
     try {
       await ref.read(livesApiProvider).hearts(widget.liveId, 1);
+    } on ApiException catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  /// V1 — Gadgets Premium de l'hôte : message épinglé et ambiance.
+  Future<void> _gadgets(LiveSummary l) async {
+    final r = await showModalBottomSheet<({String? message, String theme})>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _GadgetsSheet(live: l),
+    );
+    if (r == null || !mounted) return;
+    try {
+      final updated = await ref.read(livesApiProvider).gadgets(widget.liveId, pinnedMessage: r.message, theme: r.theme);
+      if (mounted) setState(() => _live = updated);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     }
@@ -168,10 +192,12 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
               )
             : Stack(
                 children: [
-                  // Pas de service vidéo dans le prototype : une scène neutre à la place de l'image.
-                  const Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [BimColors.grey900, BimColors.black])),
+                  // Pas de service vidéo dans le prototype : une scène à la place de l'image (ambiance choisie par l'hôte Premium).
+                  Positioned.fill(
+                    child: AnimatedContainer(
+                      key: ValueKey('live-theme-${l.theme}'),
+                      duration: const Duration(milliseconds: 600),
+                      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: liveThemeColors(l.theme))),
                     ),
                   ),
                   const Align(
@@ -188,6 +214,20 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
                   Column(
                     children: [
                       _TopBar(live: l),
+                      if (l.pinnedMessage != null)
+                        Container(
+                          key: const ValueKey('live-pinned-message'),
+                          margin: const EdgeInsets.symmetric(horizontal: BimSpacing.md),
+                          padding: const EdgeInsets.symmetric(horizontal: BimSpacing.md, vertical: BimSpacing.sm),
+                          decoration: BoxDecoration(color: BimColors.coin.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(BimRadius.chip)),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.push_pin_rounded, size: 16, color: BimColors.black),
+                              const SizedBox(width: BimSpacing.xs),
+                              Expanded(child: Text(l.pinnedMessage!, style: const TextStyle(color: BimColors.black, fontWeight: FontWeight.w700))),
+                            ],
+                          ),
+                        ),
                       const Spacer(),
                       if (l.pinnedProduct != null) _PinnedCard(product: l.pinnedProduct!),
                       _CommentsList(comments: _comments, onRemove: l.isMine ? _removeComment : null),
@@ -210,6 +250,8 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
                     child: Row(
                       children: [
                         if (l.isMine && l.status != 'ended')
+                          IconButton(key: const ValueKey('live-gadgets'), tooltip: 'Gadgets du Live', icon: const Icon(Icons.auto_awesome_rounded, color: BimColors.coin), onPressed: () => _gadgets(l)),
+                        if (l.isMine && l.status != 'ended')
                           TextButton(
                             key: const ValueKey('live-end'),
                             onPressed: () => _hostAction(api.end),
@@ -219,20 +261,21 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
                       ],
                     ),
                   ),
+                  for (final h in _hearts)
+                    Positioned(
+                      right: 28,
+                      bottom: 80,
+                      child: FloatingHeart(key: ValueKey('heart-$h'), seed: h, onDone: () => setState(() => _hearts.remove(h))),
+                    ),
                   if (_shownGift != null)
                     Align(
                       alignment: const Alignment(0, 0.1),
-                      child: Container(
-                        key: const ValueKey('live-gift-anim'),
-                        padding: const EdgeInsets.all(BimSpacing.md),
-                        decoration: BoxDecoration(color: BimColors.white.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(BimRadius.card)),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            GiftArt(code: _shownGift!.giftCode, size: 72),
-                            Text('${_shownGift!.from ?? 'Quelqu’un'} · ${coinsLabel(_shownGift!.coins)} pièces', style: const TextStyle(fontWeight: FontWeight.w800)),
-                          ],
-                        ),
+                      // V1 : cadeau animé (rebond, pièces qui jaillissent ou pluie de pièces selon la valeur).
+                      child: GiftBurst(
+                        key: ValueKey('gift-${_shownGift!.id}'),
+                        giftCode: _shownGift!.giftCode,
+                        coins: _shownGift!.coins,
+                        label: '${_shownGift!.from ?? 'Quelqu’un'} · ${coinsLabel(_shownGift!.coins)} pièces',
                       ),
                     ),
                 ],
@@ -378,4 +421,70 @@ class _BottomBar extends StatelessWidget {
           ],
         ),
       );
+}
+
+/// V1 — Gadgets Premium : message épinglé (140 caractères) et ambiance de la scène. Sans Premium : invitation à le
+/// prendre (le serveur refuse de toute façon).
+class _GadgetsSheet extends StatefulWidget {
+  const _GadgetsSheet({required this.live});
+
+  final LiveSummary live;
+
+  @override
+  State<_GadgetsSheet> createState() => _GadgetsSheetState();
+}
+
+class _GadgetsSheetState extends State<_GadgetsSheet> {
+  late final _message = TextEditingController(text: widget.live.pinnedMessage ?? '');
+  late String _theme = widget.live.theme;
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final premium = widget.live.hostPremium;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.lg + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Gadgets du Live', style: theme.textTheme.titleLarge),
+          const SizedBox(height: BimSpacing.xs),
+          Text(premium ? 'Réservés aux membres Premium : tu y as accès.' : 'Réservés aux membres Premium. Tu peux seulement retirer ce qui est en place.', key: const ValueKey('gadgets-premium-info')),
+          const SizedBox(height: BimSpacing.md),
+          TextField(
+            key: const ValueKey('gadgets-message'),
+            controller: _message,
+            enabled: premium || _message.text.isNotEmpty,
+            maxLength: 140,
+            decoration: const InputDecoration(labelText: 'Message épinglé pour tous'),
+          ),
+          Wrap(
+            spacing: BimSpacing.sm,
+            children: [
+              for (final e in liveThemes.entries)
+                ChoiceChip(
+                  key: ValueKey('gadgets-theme-${e.key}'),
+                  label: Text(e.value.$1),
+                  selected: _theme == e.key,
+                  onSelected: premium || e.key == 'classic' ? (_) => setState(() => _theme = e.key) : null,
+                ),
+            ],
+          ),
+          const SizedBox(height: BimSpacing.md),
+          FilledButton(
+            key: const ValueKey('gadgets-save'),
+            onPressed: () => Navigator.pop(context, (message: _message.text.trim().isEmpty ? null : _message.text.trim(), theme: _theme)),
+            child: const Text('Appliquer'),
+          ),
+        ],
+      ),
+    );
+  }
 }

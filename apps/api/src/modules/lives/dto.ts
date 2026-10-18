@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min, ValidateIf } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { LIVE_HEARTS_MAX } from './lives.service';
 
 export class CreateLiveDto {
@@ -21,4 +21,10 @@ export class LiveCommentDto {
 
 export class LiveHeartsDto {
   @ApiProperty({ minimum: 1, maximum: LIVE_HEARTS_MAX }) @IsInt() @Min(1) @Max(LIVE_HEARTS_MAX) count!: number;
+}
+
+/** V1 — Gadgets Premium du Live : message épinglé (null pour le retirer) et ambiance. */
+export class LiveGadgetsDto {
+  @ApiPropertyOptional({ maxLength: 140, nullable: true }) @IsOptional() @IsString() @MaxLength(140) pinnedMessage?: string | null;
+  @ApiPropertyOptional({ enum: ['classic', 'sunset', 'ocean', 'gold'] }) @IsOptional() @IsIn(['classic', 'sunset', 'ocean', 'gold']) theme?: string;
 }

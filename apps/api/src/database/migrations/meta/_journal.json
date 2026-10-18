@@ -414,6 +414,13 @@
       "when": 1792337964965,
       "tag": "0058_v1_store_purchases",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1792338152682,
+      "tag": "0059_v1_live_gadgets",
+      "breakpoints": true
     }
   ]
 }

@@ -39,6 +39,9 @@ class LiveSummary {
     this.viewers = 0,
     this.isMine = false,
     this.canGift = false,
+    this.hostPremium = false,
+    this.pinnedMessage,
+    this.theme = 'classic',
   });
 
   final String id;
@@ -61,6 +64,10 @@ class LiveSummary {
   final int viewers;
   final bool isMine;
   final bool canGift;
+  /// V1 — gadgets Premium de l'hôte : message épinglé et ambiance (classic · sunset · ocean · gold).
+  final bool hostPremium;
+  final String? pinnedMessage;
+  final String theme;
 
   bool get isLive => status == 'live';
   bool get isSale => kind == 'sale';
@@ -85,6 +92,9 @@ class LiveSummary {
         viewers: viewers,
         isMine: isMine,
         canGift: canGift,
+        hostPremium: hostPremium,
+        pinnedMessage: pinnedMessage,
+        theme: theme,
       );
 
   factory LiveSummary.fromJson(Map<String, dynamic> j) {
@@ -110,6 +120,9 @@ class LiveSummary {
       viewers: _int(j['viewers']),
       isMine: (j['isMine'] ?? false) as bool,
       canGift: (j['canGift'] ?? false) as bool,
+      hostPremium: (_map(j['gadgets'])['hostPremium'] ?? false) as bool,
+      pinnedMessage: _map(j['gadgets'])['pinnedMessage'] as String?,
+      theme: (_map(j['gadgets'])['theme'] ?? 'classic') as String,
     );
   }
 }
@@ -197,6 +210,9 @@ class LivesApi {
 
   /// L'hôte retire un commentaire de son Live.
   Future<void> hideComment(String id, String commentId) => _api.delete('/v1/lives/$id/comments/$commentId');
+  /// V1 — gadgets Premium : message épinglé (null : retiré) et ambiance de la scène.
+  Future<LiveSummary> gadgets(String id, {String? pinnedMessage, required String theme}) async =>
+      LiveSummary.fromJson(await _api.put('/v1/lives/$id/gadgets', body: {'pinnedMessage': pinnedMessage, 'theme': theme}));
 
   Future<int> hearts(String id, int count) async => _int((await _api.post('/v1/lives/$id/hearts', body: {'count': count}))['heartCount']);
 }

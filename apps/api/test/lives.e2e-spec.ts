@@ -154,4 +154,22 @@ describe('Lives : prototype (e2e)', () => {
     const again = (await h.http().post('/v1/lives').set(host.auth).send({ title: 'Nouveau' }).expect(201)).body;
     await h.http().post(`/v1/lives/${again.id}/end`).set(host.auth).expect(200);
   });
+  it('V1 gadgets Premium : message épinglé et ambiance réservés à l’hôte Premium ; retrait toujours possible', async () => {
+    const host = await user();
+    const fan = await user();
+    const l = (await h.http().post('/v1/lives').set(host.auth).send({ title: 'Routine du soir' }).expect(201)).body;
+    expect(l.gadgets).toEqual({ hostPremium: false, pinnedMessage: null, theme: 'classic' });
+    expect((await h.http().put(`/v1/lives/${l.id}/gadgets`).set(host.auth).send({ pinnedMessage: 'Code promo BIM10' }).expect(403)).body.error.code).toBe('PREMIUM_REQUIRED');
+    await h.http().put(`/v1/lives/${l.id}/gadgets`).set(host.auth).send({ theme: 'gold' }).expect(403);
+    await h.http().put(`/v1/lives/${l.id}/gadgets`).set(host.auth).send({ theme: 'disco' }).expect(400);
+    await h.http().post('/v1/premium/subscribe').set(host.auth).send({ channel: 'demo' }).expect(200);
+    const g = (await h.http().put(`/v1/lives/${l.id}/gadgets`).set(host.auth).send({ pinnedMessage: '  Code promo BIM10  ', theme: 'sunset' }).expect(200)).body;
+    expect(g.gadgets).toEqual({ hostPremium: true, pinnedMessage: 'Code promo BIM10', theme: 'sunset' });
+    // Les spectateurs voient les gadgets ; eux ne peuvent pas les changer.
+    expect((await h.http().get(`/v1/lives/${l.id}`).set(fan.auth).expect(200)).body.gadgets).toMatchObject({ pinnedMessage: 'Code promo BIM10', theme: 'sunset' });
+    await h.http().put(`/v1/lives/${l.id}/gadgets`).set(fan.auth).send({ theme: 'classic' }).expect(404);
+    // Retrait du message (même sans Premium plus tard).
+    await h.pool.query('update subscriptions set current_period_end = now() - interval \'1 day\' where user_id = $1', [host.userId]);
+    expect((await h.http().put(`/v1/lives/${l.id}/gadgets`).set(host.auth).send({ pinnedMessage: null, theme: 'classic' }).expect(200)).body.gadgets).toEqual({ hostPremium: false, pinnedMessage: null, theme: 'classic' });
+  });
 });

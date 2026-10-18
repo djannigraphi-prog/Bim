@@ -18,7 +18,7 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-LiveSummary _live({String id = 'l1', String status = 'live', bool mine = false, bool sale = false, int hearts = 4}) => LiveSummary(
+LiveSummary _live({String id = 'l1', String status = 'live', bool mine = false, bool sale = false, int hearts = 4, bool premium = false, String? message, String theme = 'classic'}) => LiveSummary(
       id: id,
       kind: sale ? 'sale' : 'simple',
       title: sale ? 'Soldes de la semaine' : 'Routine du matin',
@@ -32,6 +32,9 @@ LiveSummary _live({String id = 'l1', String status = 'live', bool mine = false, 
       viewers: 12,
       isMine: mine,
       canGift: !mine,
+      hostPremium: premium,
+      pinnedMessage: message,
+      theme: theme,
     );
 
 /// API simulée : garde les appels ; les règles (hôte, statut, Premium) sont testées côté API.
@@ -42,6 +45,12 @@ class _FakeLives extends LivesApi {
   LiveSummary? current;
   final calls = <String>[];
   int polls = 0;
+
+  @override
+  Future<LiveSummary> gadgets(String id, {String? pinnedMessage, required String theme}) async {
+    calls.add('gadgets $id ${pinnedMessage ?? '-'} $theme');
+    return current = _live(mine: true, premium: true, message: pinnedMessage, theme: theme);
+  }
 
   @override
   Future<LivesList> list() async => LivesList(available: available, live: available ? [_live()] : const [], upcoming: available ? [_live(id: 'l2', status: 'scheduled')] : const []);
@@ -152,6 +161,33 @@ void main() {
     await tester.tap(find.text('Commander'));
     await tester.pumpAndSettle();
     expect(find.text('fiche p1'), findsOneWidget);
+  });
+
+  testWidgets('V1 gadgets Premium : l’hôte épingle un message et choisit une ambiance, visibles par tous', (tester) async {
+    final api = _FakeLives(current: _live(mine: true, premium: true));
+    await _pump(tester, const LiveRoomScreen(liveId: 'l1', pollEvery: Duration(minutes: 5)), api);
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.byKey(const ValueKey('live-pinned-message')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('live-gadgets')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('gadgets-message')), 'Code promo BIM10');
+    await tester.tap(find.byKey(const ValueKey('gadgets-theme-gold')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('gadgets-save')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('gadgets l1 Code promo BIM10 gold'));
+    expect(find.text('Code promo BIM10'), findsOneWidget);
+    expect(find.byKey(const ValueKey('live-theme-gold')), findsOneWidget);
+  });
+
+  testWidgets('V1 gadgets sans Premium : ambiances verrouillées', (tester) async {
+    final api = _FakeLives(current: _live(mine: true));
+    await _pump(tester, const LiveRoomScreen(liveId: 'l1', pollEvery: Duration(minutes: 5)), api);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.tap(find.byKey(const ValueKey('live-gadgets')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Réservés aux membres Premium. Tu peux seulement'), findsOneWidget);
+    expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('gadgets-theme-ocean'))).onSelected, isNull);
   });
 
   testWidgets('l’hôte termine son Live : « Ce Live est terminé », plus de commentaires', (tester) async {

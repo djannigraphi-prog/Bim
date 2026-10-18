@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireShopPermission, RequireSpace } from '../auth/auth.decorators';
-import { CreateLiveDto, CreateShopLiveDto, LiveCommentDto, LiveHeartsDto, PinProductDto } from './dto';
+import { CreateLiveDto, CreateShopLiveDto, LiveCommentDto, LiveHeartsDto, PinProductDto, LiveGadgetsDto } from './dto';
 import { LivesService } from './lives.service';
 
 /** Lot 10 (prototype) — Lives sans service vidéo (mode démonstration). */
@@ -70,6 +70,12 @@ export class LivesController {
   @ApiOperation({ summary: 'Épingler un article publié de la boutique (Live vente)' })
   pin(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PinProductDto) {
     return this.lives.pin(a.userId, id, dto.productId);
+  }
+
+  @Put('lives/:id/gadgets')
+  @ApiOperation({ summary: 'Gadgets Premium de l’hôte : message épinglé, ambiance de la scène' })
+  gadgets(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LiveGadgetsDto) {
+    return this.lives.gadgets(a.userId, id, dto);
   }
 
   @Post('lives/:id/comments')

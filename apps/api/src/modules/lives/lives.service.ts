@@ -108,6 +108,8 @@ export class LivesService {
         canGift: this.cfg.DEMO_MODE && l.status === 'live' && l.kind === 'simple' && l.hostUserId !== viewerId && premium.has(l.hostUserId),
         demo: true,
         video: 'unavailable' as const,
+        /** V1 — gadgets Premium de l'hôte (message épinglé, ambiance de la scène). */
+        gadgets: { hostPremium: premium.has(l.hostUserId), pinnedMessage: l.pinnedMessage, theme: l.theme },
       };
     });
   }
@@ -219,6 +221,23 @@ export class LivesService {
     if (l.kind !== 'sale' || !l.shopId) throw conflict('LIVE_NOT_SALE', 'Seul un Live vente épingle un article.');
     if (l.status === 'ended') throw conflict('LIVE_ENDED', 'Ce Live est terminé.');
     await this.db.update(lives).set({ pinnedProductId: await this.checkProduct(l.shopId, productId) }).where(eq(lives.id, liveId));
+    return this.detail(userId, liveId);
+  }
+
+  /**
+   * V1 — Gadgets Premium : l'hôte Premium épingle un message pour tous et choisit l'ambiance de la scène. Sans Premium,
+   * seule l'ambiance « classique » et l'absence de message sont possibles (on peut toujours les retirer).
+   */
+  async gadgets(userId: string, liveId: string, input: { pinnedMessage?: string | null; theme?: string }) {
+    const l = await this.hosted(userId, liveId);
+    if (l.status === 'ended') throw conflict('LIVE_ENDED', 'Ce Live est terminé.');
+    const message = input.pinnedMessage === undefined ? l.pinnedMessage : input.pinnedMessage?.trim() || null;
+    const theme = input.theme ?? l.theme;
+    const premium = (await this.wallet.premiumUsers([userId])).has(userId);
+    if (!premium && ((message && message !== l.pinnedMessage) || (theme !== 'classic' && theme !== l.theme))) {
+      throw new AppError('PREMIUM_REQUIRED', 'Les gadgets du Live sont réservés aux membres Premium.', HttpStatus.FORBIDDEN);
+    }
+    await this.db.update(lives).set({ pinnedMessage: message, theme }).where(eq(lives.id, liveId));
     return this.detail(userId, liveId);
   }
 

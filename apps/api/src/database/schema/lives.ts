@@ -29,9 +29,13 @@ export const lives = pgTable(
     heartCount: integer('heart_count').notNull().default(0),
     coinCount: integer('coin_count').notNull().default(0),
     peakViewers: integer('peak_viewers').notNull().default(0),
+    /** V1 — gadgets Premium de l'hôte : message épinglé et ambiance de la scène. */
+    pinnedMessage: varchar('pinned_message', { length: 140 }),
+    theme: varchar('theme', { length: 12 }).notNull().default('classic'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    check('lives_theme_ck', sql`${t.theme} IN ('classic', 'sunset', 'ocean', 'gold')`),
     index('lives_status_idx').on(t.status, t.startedAt),
     index('lives_scheduled_idx').on(t.status, t.scheduledAt),
     index('lives_host_idx').on(t.hostUserId, t.createdAt),
