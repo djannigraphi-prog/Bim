@@ -4709,6 +4709,45 @@
         ]
       }
     },
+    "/v1/lives/{id}/gadgets": {
+      "put": {
+        "operationId": "LivesController_gadgets",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveGadgetsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gadgets Premium de l’hôte : message épinglé, ambiance de la scène",
+        "tags": [
+          "Lives"
+        ]
+      }
+    },
     "/v1/lives/{id}/comments": {
       "post": {
         "operationId": "LivesController_comment",
@@ -12080,6 +12119,25 @@
         "required": [
           "productId"
         ]
+      },
+      "LiveGadgetsDto": {
+        "type": "object",
+        "properties": {
+          "pinnedMessage": {
+            "type": "object",
+            "maxLength": 140,
+            "nullable": true
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "sunset",
+              "ocean",
+              "gold"
+            ]
+          }
+        }
       },
       "LiveCommentDto": {
         "type": "object",
