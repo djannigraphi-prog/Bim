@@ -197,7 +197,7 @@ class _NewLiveSheetState extends ConsumerState<NewLiveSheet> {
               const SizedBox(height: BimSpacing.sm),
               DropdownButtonFormField<String?>(
                 key: const ValueKey('live-product'),
-                value: _productId,
+                initialValue: _productId,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Article épinglé (facultatif)'),
                 items: [

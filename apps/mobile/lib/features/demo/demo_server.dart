@@ -45,6 +45,7 @@ class DemoServerButton extends ConsumerStatefulWidget {
 class _DemoServerButtonState extends ConsumerState<DemoServerButton> {
   Future<void> _edit() async {
     final api = ref.read(apiClientProvider);
+    final messenger = ScaffoldMessenger.of(context);
     final ctrl = TextEditingController(text: api.baseUrl);
     final url = await showDialog<String>(
       context: context,
@@ -69,14 +70,14 @@ class _DemoServerButtonState extends ConsumerState<DemoServerButton> {
     if (url == null) return;
     final normalized = DemoServer.normalize(url);
     if (normalized == null) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Adresse non valable.')));
+      messenger.showSnackBar(const SnackBar(content: Text('Adresse non valable.')));
       return;
     }
     api.setBaseUrl(normalized);
     await DemoServer.save(normalized);
-    if (!context.mounted) return;
+    if (!mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Serveur de démo : $normalized')));
+    messenger.showSnackBar(SnackBar(content: Text('Serveur de démo : $normalized')));
   }
 
   @override
