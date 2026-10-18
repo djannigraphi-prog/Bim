@@ -32,6 +32,8 @@ export const ADMIN_PERMISSIONS = {
   'couriers.review': ['super_admin', 'support'],
   /** 7-G : incidents transmis au support (lecture journalisée, décision notée). */
   'incidents.review': ['super_admin', 'support'],
+  /** Lot 9 (prototype) : retraits de pièces à vérifier (premier retrait, gros montant) — proposé. */
+  'coins.payouts': ['super_admin', 'finance'],
   'admins.manage': ['super_admin'],
   /** Surveillance technique (état du worker des rappels…) : exploitation, pas d'accès aux données des personnes. */
   'system.health': ['super_admin', 'tech', 'support'],

@@ -104,6 +104,11 @@ const schema = z
      */
     PENI_LLM_PROVIDER: z.enum(['none']).default('none'),
     /**
+     * Prototype (lots 9 à 11) : ouvre le circuit « demo » de Premium, des pièces, des retraits et des Lives, sans aucun
+     * argent réel ni service payant. Interdit en production ; à couper avant l'ouverture au public.
+     */
+    DEMO_MODE: boolish.default(false),
+    /**
      * Lot 8 — Prestataire de paiement en ligne : « none » (aucun paiement en ligne) ou « simulator » (développement et
      * tests seulement). Aucun prestataire réel (Paystack, CinetPay…) ne sera ajouté sans l'autorisation explicite du
      * fondateur, après examen de l'étude ; aucune clé de production dans le dépôt.
@@ -155,6 +160,9 @@ const schema = z
     }
     if (cfg.MEDIA_STORAGE === 's3' && !cfg.S3_BUCKET) {
       ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'S3_BUCKET est obligatoire avec MEDIA_STORAGE=s3' });
+    }
+    if (cfg.NODE_ENV === 'production' && cfg.DEMO_MODE) {
+      ctx.addIssue({ code: 'custom', path: ['DEMO_MODE'], message: 'Le mode démonstration (achats et retraits simulés) est interdit en production' });
     }
     if (!devLike && cfg.PAYMENT_PROVIDER === 'simulator') {
       ctx.addIssue({ code: 'custom', path: ['PAYMENT_PROVIDER'], message: 'Le simulateur de paiement est interdit hors développement' });

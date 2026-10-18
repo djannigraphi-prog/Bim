@@ -166,6 +166,22 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### P-0018 — Premier prototype sans dépense (18/10/2026, 00 h 17) · Fondateur · **en cours**
+
+Demande : un prototype de l'application pour une présentation, **sans rien de payant** hormis l'hébergement et les
+magasins d'applications ; les éléments payants seront faits après la levée de fonds. Application :
+
+- **Mode démonstration** (`DEMO_MODE`, faux par défaut, **refusé en production**) : ouvre le circuit simulé de Premium,
+  des pièces, des retraits et (à venir) des Lives. Aucun argent réel, aucun prestataire, aucune clé.
+- **Questions sans réponse** : les réponses « Conseillé » du questionnaire sont appliquées comme réglages
+  **provisoires** (`provisional`), modifiables dans l'administration : PRIX 2 000 F/mois ; F8 seules les pièces reçues
+  sont retirables ; F9 Premium exigé pour recevoir sur un commentaire ; F11 pièces reçues gardées après Premium ; F12
+  premier retrait vérifié à la main par l'équipe ; F13 S3 (frais opérateur 1 % payés par la personne) et S6 (minimum
+  5 000) ; F14 plafond de 5 millions sur 24 heures ; DELAI vérification au-delà de 100 000. Âge de l'abonnement payant :
+  18 ans provisoire (comme les pièces), à vérifier avec l'avocat.
+- **Reste fermé** jusqu'aux décisions : achat réel (Apple / Google, site web Mobile Money), versement réel, avis BCEAO,
+  boutiques bénéficiaires de pièces (F10, avec les Lives), Livreur Premium (F17), appels.
+
 ### D-2010 — Client absent, partenaires, Peni (17/10/2026, 20 h 10) · Fondateur · **appliquée**
 
 - **Client absent** : pas de nouvelle tentative ; le colis revient à la boutique, qui confirme le retour ; la commande est

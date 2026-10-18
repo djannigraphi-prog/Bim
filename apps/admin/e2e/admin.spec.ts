@@ -270,6 +270,14 @@ test('paiements en ligne (lot 8) : page accessible, aucun prestataire annoncé, 
   await expect(page.getByText('Aucun paiement en ligne.')).toBeVisible();
 });
 
+test('retraits de pièces (lot 9, prototype) : page accessible, versement simulé seulement, file vide', async ({ page }) => {
+  await signIn(page);
+  await page.getByRole('link', { name: 'Retraits de pièces' }).click();
+  await expect(page.getByRole('heading', { name: 'Retraits de pièces' })).toBeVisible();
+  await expect(page.getByText('Commission BIM : 0 F', { exact: false })).toBeVisible();
+  await expect(page.getByText('Aucun retrait.')).toBeVisible();
+});
+
 test('livreurs (7-E) : page de vérification accessible, aucune demande au départ', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Livreurs' }).click();

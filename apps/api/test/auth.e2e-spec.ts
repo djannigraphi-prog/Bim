@@ -358,7 +358,7 @@ describe('Authentification (e2e)', () => {
   });
 
   describe('Capacités liées à l’âge (F15)', () => {
-    it('17 ans : inscription possible, pièces refusées ; règles non décidées fermées', async () => {
+    it('17 ans : inscription possible, pièces et abonnement payant refusés', async () => {
       const today = new Date();
       const birth = new Date(Date.UTC(today.getUTCFullYear() - 17, today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10);
       const a = await registerAndActivate(h, { birthDate: birth });
@@ -366,7 +366,8 @@ describe('Authentification (e2e)', () => {
       expect(caps.body.age.registration).toMatchObject({ allowed: true, minAge: 16, ruleStatus: 'provisional' });
       expect(caps.body.age.coins_purchase).toMatchObject({ allowed: false, minAge: 18 });
       expect(caps.body.age.coins_withdrawal).toMatchObject({ allowed: false, minAge: 18 });
-      expect(caps.body.age.paid_subscription).toEqual({ allowed: false, ruleStatus: 'pending', minAge: null });
+      // Lot 9 (prototype, 18/10/2026) : 18 ans provisoire pour l'abonnement payant, comme les pièces (à vérifier).
+      expect(caps.body.age.paid_subscription).toEqual({ allowed: false, ruleStatus: 'provisional', minAge: 18 });
     });
 
     it('un seuil modifié dans les réglages s’applique sans changer le code', async () => {

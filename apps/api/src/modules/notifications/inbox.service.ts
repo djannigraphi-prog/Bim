@@ -89,7 +89,14 @@ export class InboxService {
       SELECT 'order:' || e.id, 'order_update', e.created_at, NULL, NULL, o.number, NULL, NULL, NULL, s.name, NULL, o.id::text, e.type
       FROM order_events e JOIN orders o ON o.id = e.order_id JOIN shops s ON s.id = o.shop_id
       WHERE o.customer_id = ${userId} AND e.actor_type IN ('shop', 'system', 'courier') AND e.created_at > ${since}
-        AND e.type IN ('proposed', 'confirmed', 'declined', 'ready', 'handed_over', 'cancelled', 'proposal_withdrawn', 'expired', 'courier_assigned', 'picked_up', 'courier_arrived', 'delivered')`;
+        AND e.type IN ('proposed', 'confirmed', 'declined', 'ready', 'handed_over', 'cancelled', 'proposal_withdrawn', 'expired', 'courier_assigned', 'picked_up', 'courier_arrived', 'delivered')
+      -- Lot 9 : pièces reçues sur une publication ou un commentaire (nom caché si l'envoi est anonyme).
+      UNION ALL
+      SELECT 'gift:' || g.id, 'coins_received', g.created_at, NULL, NULL, g.coins::text, NULL, NULL, NULL,
+             CASE WHEN g.anonymous THEN NULL ELSE u.full_name END, NULL, g.post_id::text, g.target_type
+      FROM coin_gifts g JOIN users u ON u.id = g.sender_id
+      WHERE g.recipient_id = ${userId} AND u.status = 'active' AND g.created_at > ${since}
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${userId}))`;
   }
 
   private async seenUntil(userId: string): Promise<Date | null> {
@@ -107,7 +114,7 @@ export class InboxService {
         SELECT * FROM (${this.sources(userId, since)}) x
         WHERE (${opts.category ?? null}::text IS NULL
                OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected', 'order_update') THEN 'support'
-                        WHEN x.type IN ('post_liked', 'post_commented', 'new_follower') THEN 'social'
+                        WHEN x.type IN ('post_liked', 'post_commented', 'new_follower', 'coins_received') THEN 'social'
                         ELSE 'projects' END) = ${opts.category ?? null}::text)
           -- Page suivante : position (date à la milliseconde, identifiant) du dernier élément vu ; aucun élément de même
           -- date n'est sauté (audit, défaut 4). Sans beforeId (anciennes versions de l'app) : comportement d'origine.
@@ -177,6 +184,7 @@ function link(r: Row): string | null {
       return '/reports';
     case 'post_liked':
     case 'post_commented':
+    case 'coins_received':
       return r.post_id ? `/posts/${r.post_id}` : null;
     case 'new_follower':
       return r.actor_username ? `/people/${r.actor_username}` : null;

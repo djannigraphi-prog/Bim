@@ -47,6 +47,25 @@ describe('règles des réglages administrables', () => {
     expect(validateSettingValue('peni.conversation_retention_days', 6)).not.toBeNull();
   });
 
+  it('lot 9 (prototype) : prix Premium, packs, cadeaux et règles de retrait', () => {
+    expect(validateSettingValue('premium.user_price_fcfa', 2000)).toBeNull();
+    expect(validateSettingValue('premium.user_price_fcfa', 0)).not.toBeNull();
+    expect(validateSettingValue('coins.packs', [100, 500, 1000, 5000, 10000, 50000])).toBeNull();
+    expect(validateSettingValue('coins.packs', [500, 100])).not.toBeNull();
+    expect(validateSettingValue('coins.packs', [])).not.toBeNull();
+    const gifts = [{ code: 'coin1', name: 'Pièce', coins: 1 }, { code: 'ship', name: 'Bateau pirate', coins: 100000 }];
+    expect(validateSettingValue('coins.gifts', gifts)).toBeNull();
+    expect(validateSettingValue('coins.gifts', [...gifts, { code: 'coin1', name: 'Doublon', coins: 2 }])).not.toBeNull();
+    expect(validateSettingValue('coins.gifts', [{ code: 'x', name: 'Trop court', coins: 1 }])).not.toBeNull();
+    expect(validateSettingValue('coins.gifts', [{ code: 'zero', name: 'Zéro', coins: 0 }])).not.toBeNull();
+    expect(validateSettingValue('coins.withdraw_min', 5000)).toBeNull();
+    expect(validateSettingValue('coins.withdraw_min', 10)).not.toBeNull();
+    expect(validateSettingValue('coins.withdraw_daily_cap', 5_000_000)).toBeNull();
+    expect(validateSettingValue('coins.withdraw_instant_max', 100_000)).toBeNull();
+    expect(validateSettingValue('coins.withdraw_fee_percent', 1.5)).toBeNull();
+    expect(validateSettingValue('coins.withdraw_fee_percent', 30)).not.toBeNull();
+  });
+
   it('valeur manquante refusée', () => {
     expect(validateSettingValue('x.y', undefined)).not.toBeNull();
   });

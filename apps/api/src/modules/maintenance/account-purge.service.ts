@@ -73,6 +73,14 @@ export const PURGE_BLOCKING_TABLES = [
   'message_reactions',
   // Lot 8 : lancer un paiement en ligne est une activité.
   'payment_intents',
+  // Lot 9 : un abonnement, un portefeuille, un achat, un envoi ou un retrait de pièces est une activité (et un compte
+  // financier : jamais supprimé automatiquement).
+  'subscriptions',
+  'wallets',
+  'coin_ledger',
+  'coin_purchases',
+  'coin_gifts',
+  'withdrawals',
 ] as const;
 
 /** Colonnes qui relient chaque table bloquante au compte (user_id par défaut). */
@@ -96,6 +104,7 @@ const BLOCKING_COLUMNS: Partial<Record<(typeof PURGE_BLOCKING_TABLES)[number], s
   deliveries: ['return_confirmed_by'],
   incident_photos: ['uploaded_by'],
   payment_intents: ['created_by'],
+  coin_gifts: ['sender_id', 'recipient_id'],
 };
 /** Tables supprimées avec le compte (données d'inscription, sans activité) ; contrôles particuliers indiqués. */
 export const PURGE_CASCADED_TABLES = [

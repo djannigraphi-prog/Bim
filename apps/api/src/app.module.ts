@@ -29,6 +29,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
 import { TariffsModule } from './modules/tariffs/tariffs.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { CouriersModule } from './modules/couriers/couriers.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 
 /**
  * Monolithe modulaire : un module par domaine. Les modules transverses (configuration, base, réglages, audit,
@@ -76,6 +77,7 @@ import { CouriersModule } from './modules/couriers/couriers.module';
     MaintenanceModule,
     PeniModule,
     SocialModule,
+    WalletModule,
     MerchantsModule,
     CatalogModule,
     OffersModule,

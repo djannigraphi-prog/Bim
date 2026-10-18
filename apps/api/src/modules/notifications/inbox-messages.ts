@@ -7,11 +7,11 @@ import { reminderMessage } from './reminders';
 
 /**
  * v2 (15/10/2026) : suit les textes v3 des rappels. Le 16/10/2026 (lot 4), types sociaux ajoutés (j'aime, commentaire,
- * abonnement, contenu masqué) sans changer les textes existants : la version reste v2.
+ * abonnement, contenu masqué) sans changer les textes existants : la version reste v2. Lot 9 : pièces reçues (ajout).
  */
 export const INBOX_TEMPLATES_VERSION = 'v2';
 
-export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected' | 'project_offer' | 'order_update';
+export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected' | 'project_offer' | 'order_update' | 'coins_received';
 export type InboxCategory = 'projects' | 'support' | 'social';
 
 export interface InboxSource {
@@ -27,7 +27,7 @@ export interface InboxSource {
   snippet?: string | null;
 }
 
-const SOCIAL: InboxType[] = ['post_liked', 'post_commented', 'new_follower'];
+const SOCIAL: InboxType[] = ['post_liked', 'post_commented', 'new_follower', 'coins_received'];
 export const inboxCategory = (type: InboxType): InboxCategory =>
   type === 'report_answered' || type === 'content_hidden' || type === 'merchant_approved' || type === 'merchant_rejected' || type === 'order_update' ? 'support' : SOCIAL.includes(type) ? 'social' : 'projects';
 export const inboxSender = (type: InboxType): 'peni' | 'bim' => (type === 'chest_opened' || type === 'task_reminder' ? 'peni' : 'bim');
@@ -50,6 +50,11 @@ export function inboxText(s: InboxSource): string {
     case 'post_commented': {
       const t = (s.snippet ?? '').trim();
       return t ? `${s.actorName ?? 'Quelqu’un'} a commenté ta publication : « ${t.length > 80 ? `${t.slice(0, 79)}…` : t} »` : `${s.actorName ?? 'Quelqu’un'} a commenté ta publication.`;
+    }
+    case 'coins_received': {
+      const n = Number(s.chest ?? 0);
+      const what = s.snippet === 'comment' ? 'ton commentaire' : 'ta publication';
+      return `${s.actorName ?? 'Quelqu’un'} t’a envoyé ${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} pièce${n > 1 ? 's' : ''} sur ${what}. Bravo !`;
     }
     case 'new_follower':
       return `${s.actorName ?? 'Quelqu’un'} s’est abonné·e à toi.`;

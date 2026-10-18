@@ -14,6 +14,7 @@ import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { CLOCK, Clock, ProjectsService } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
+import { WalletService } from '../wallet/wallet.service';
 import { notBlockedBetween, postVisibleTo, commentParentPublished, recountComments } from './access';
 import { CreateBimPostDto, CreateCommentDto, CreatePostDto } from './dto';
 
@@ -22,6 +23,8 @@ export const MAX_POST_IMAGES = 4;
 export const MAX_POST_PRODUCTS = 5;
 const PAGE = 20;
 const COMMENTS_PAGE = 30;
+/** Visiteur sans compte (fil public) : aucun j'aime, aucun abonnement, rien n'est « à moi », aucun envoi. */
+const NO_VIEWER = '00000000-0000-0000-0000-000000000000';
 
 type PostRow = typeof posts.$inferSelect;
 type Author = { id: string; username: string; fullName: string; avatarKey: string | null };
@@ -43,6 +46,7 @@ export class PostsService {
     private readonly projects: ProjectsService,
     private readonly audit: AuditService,
     private readonly bimshop: BimShopService,
+    private readonly wallet: WalletService,
   ) {}
 
   private async limit(key: string, fallback: number): Promise<number> {
@@ -272,7 +276,7 @@ export class PostsService {
       .limit(PAGE + 1);
     const page = rows.slice(0, PAGE);
     // Identifiant nul pour la personne qui regarde : aucun j'aime, aucun abonnement, rien n'est « à moi ».
-    return { items: await this.views('00000000-0000-0000-0000-000000000000', page, apiBase), nextCursor: rows.length > PAGE ? page[page.length - 1].post.id : null };
+    return { items: await this.views(NO_VIEWER, page, apiBase), nextCursor: rows.length > PAGE ? page[page.length - 1].post.id : null };
   }
 
   /** Publications d'une personne visibles par `viewerId` (grille du profil, écran 52). */
@@ -317,10 +321,11 @@ export class PostsService {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.post.id);
     const authorIds = [...new Set(rows.map((r) => r.author.id))];
-    const [media, liked, followed] = await Promise.all([
+    const [media, liked, followed, premium] = await Promise.all([
       this.db.select().from(postMedia).where(inArray(postMedia.postId, ids)).orderBy(asc(postMedia.position)),
       this.db.select({ postId: postLikes.postId }).from(postLikes).where(and(eq(postLikes.userId, viewerId), inArray(postLikes.postId, ids))),
       this.db.select({ id: follows.followeeId }).from(follows).where(and(eq(follows.followerId, viewerId), inArray(follows.followeeId, authorIds))),
+      this.wallet.premiumUsers(authorIds),
     ]);
     const likedSet = new Set(liked.map((l) => l.postId));
     const followedSet = new Set(followed.map((f) => f.id));
@@ -348,6 +353,9 @@ export class PostsService {
         likeCount: p.likeCount,
         commentCount: p.commentCount,
         likedByMe: likedSet.has(p.id),
+        // Lot 9 : pièces reçues ; « Encourager » seulement vers une personne Premium (prototype : DEMO_MODE).
+        coinCount: p.coinCount,
+        canGift: this.wallet.demo && viewerId !== NO_VIEWER && author.id !== viewerId && premium.has(author.id),
         isMine: author.id === viewerId,
         followingAuthor: followedSet.has(author.id),
       });
@@ -401,6 +409,7 @@ export class PostsService {
       ? await this.db.select({ id: commentLikes.commentId }).from(commentLikes).where(and(eq(commentLikes.userId, viewerId), inArray(commentLikes.commentId, all.map((r) => r.c.id))))
       : [];
     const likedSet = new Set(liked.map((l) => l.id));
+    const premium = await this.wallet.premiumUsers([...new Set(all.map((r) => r.author.id))]);
     const [post] = await this.db.select({ userId: posts.userId, commentCount: posts.commentCount }).from(posts).where(eq(posts.id, postId));
     const avatars = new Map<string, string | null>();
     const view = async (r: (typeof all)[number]) => {
@@ -413,6 +422,8 @@ export class PostsService {
         author: { id: r.author.id, username: r.author.username, fullName: r.author.fullName, avatarUrl: avatars.get(r.author.id) ?? null },
         likeCount: r.c.likeCount,
         likedByMe: likedSet.has(r.c.id),
+        coinCount: r.c.coinCount,
+        canGift: this.wallet.demo && r.author.id !== viewerId && premium.has(r.author.id),
         // L'auteur du commentaire ou de la publication peut le supprimer.
         canDelete: r.author.id === viewerId || post.userId === viewerId,
         isMine: r.author.id === viewerId,
@@ -469,6 +480,8 @@ export class PostsService {
       author: { id: me.id, username: me.username, fullName: me.fullName, avatarUrl: await this.avatarUrl(me.avatarKey, apiBase) },
       likeCount: 0,
       likedByMe: false,
+      coinCount: 0,
+      canGift: false,
       canDelete: true,
       isMine: true,
     };

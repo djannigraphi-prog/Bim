@@ -51,6 +51,14 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...base, KYC_ENCRYPTION_KEY: base.ADMIN_TOTP_ENCRYPTION_KEY })).toThrow(/KYC_ENCRYPTION_KEY/);
   });
 
+  it('prototype : mode démonstration fermé par défaut, interdit en production, permis en préproduction', () => {
+    const prod = { ...base, NODE_ENV: 'production', SMS_PROVIDER: 'none', EMAIL_PROVIDER: 'none', TRUST_PROXY: '1' };
+    expect(loadConfig({ ...base }).DEMO_MODE).toBe(false);
+    expect(loadConfig({ ...base, DEMO_MODE: 'true' }).DEMO_MODE).toBe(true);
+    expect(() => loadConfig({ ...prod, DEMO_MODE: 'true' })).toThrow(/DEMO_MODE/);
+    expect(loadConfig({ ...prod, NODE_ENV: 'staging', DEMO_MODE: 'true' }).DEMO_MODE).toBe(true);
+  });
+
   it('lot 8 : prestataire désactivé par défaut ; simulateur interdit en production ; Paystack en clé de test seulement', () => {
     expect(loadConfig({ ...base }).PAYMENT_PROVIDER).toBe('none');
     expect(() => loadConfig({ ...base, NODE_ENV: 'production', PAYMENT_PROVIDER: 'simulator', PAYMENT_SIMULATOR_SECRET: 's'.repeat(20) })).toThrow(/PAYMENT_PROVIDER/);

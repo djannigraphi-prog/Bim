@@ -35,6 +35,8 @@ export const posts = pgTable(
     status: varchar('status', { length: 10 }).notNull().default('published'),
     moderationNote: varchar('moderation_note', { length: 500 }),
     likeCount: integer('like_count').notNull().default(0),
+    /** Lot 9 : pièces reçues (total, 1 pièce = 1 F) ; tenu à jour avec les envois. */
+    coinCount: integer('coin_count').notNull().default(0),
     commentCount: integer('comment_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -99,6 +101,8 @@ export const postComments = pgTable(
     text: varchar('text', { length: 1000 }).notNull(),
     status: varchar('status', { length: 10 }).notNull().default('published'),
     likeCount: integer('like_count').notNull().default(0),
+    /** Lot 9 : pièces reçues (total, 1 pièce = 1 F) ; tenu à jour avec les envois. */
+    coinCount: integer('coin_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

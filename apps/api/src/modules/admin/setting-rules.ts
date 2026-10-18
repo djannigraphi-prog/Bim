@@ -82,6 +82,33 @@ const RULES: Array<[RegExp, Rule]> = [
   [/^reviews\.window_days$/, intIn(1, 365)],
   [/^deliveries\.(mission_accept_minutes|client_absent_after_minutes)$/, intIn(1, 240)],
   [/^delivery\.wait_fees_enabled$/, (v) => (typeof v === 'boolean' ? null : 'true ou false.')],
+  // Lot 9 (prototype) : Premium, pièces et retraits.
+  [/^premium\.user_price_fcfa$/, intIn(100, 100_000)],
+  [
+    /^coins\.packs$/,
+    (v) =>
+      Array.isArray(v) && v.length >= 1 && v.length <= 12 && v.every((x, i) => Number.isInteger(x) && x >= 1 && x <= 1_000_000 && (i === 0 || x > (v[i - 1] as number)))
+        ? null
+        : 'Liste croissante de 1 à 12 packs, en pièces (1 à 1 000 000).',
+  ],
+  [
+    /^coins\.gifts$/,
+    (v) =>
+      Array.isArray(v) &&
+      v.length >= 1 &&
+      v.length <= 12 &&
+      new Set(v.map((g) => (g as { code?: unknown })?.code)).size === v.length &&
+      v.every((g) => {
+        const x = g as Record<string, unknown>;
+        return x && /^[a-z0-9_]{2,20}$/.test(String(x.code)) && typeof x.name === 'string' && x.name.trim().length >= 1 && x.name.length <= 40 && Number.isInteger(x.coins) && (x.coins as number) >= 1 && (x.coins as number) <= 1_000_000;
+      })
+        ? null
+        : 'Liste de 1 à 12 cadeaux {"code", "name", "coins"} aux codes distincts.',
+  ],
+  [/^coins\.withdraw_min$/, intIn(100, 1_000_000)],
+  [/^coins\.withdraw_daily_cap$/, intIn(1_000, 100_000_000)],
+  [/^coins\.withdraw_instant_max$/, intIn(0, 100_000_000)],
+  [/^coins\.withdraw_fee_percent$/, (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 10 ? null : 'Pourcentage entre 0 et 10.')],
 ];
 
 export function validateSettingValue(key: string, value: unknown): string | null {

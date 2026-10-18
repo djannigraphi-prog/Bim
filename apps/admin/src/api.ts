@@ -101,7 +101,8 @@ export type Permission =
   | 'incidents.review'
   | 'payments.online'
   | 'payments.refund'
-  | 'couriers.review';
+  | 'couriers.review'
+  | 'coins.payouts';
 
 export interface AdminProfile {
   id: string;

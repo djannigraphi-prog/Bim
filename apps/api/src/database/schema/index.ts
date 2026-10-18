@@ -16,3 +16,4 @@ export * from './payments';
 export * from './couriers';
 export * from './reviews';
 export * from './deliveries';
+export * from './wallet';

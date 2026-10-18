@@ -3633,6 +3633,288 @@
         ]
       }
     },
+    "/v1/premium": {
+      "get": {
+        "operationId": "WalletController_premium",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mon abonnement Premium (prix, état, fin de période)",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/premium/subscribe": {
+      "post": {
+        "operationId": "WalletController_subscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribePremiumDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "S’abonner à Premium (prototype : simulé, aucun paiement)",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/premium/cancel": {
+      "post": {
+        "operationId": "WalletController_cancel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Résilier : Premium reste actif jusqu’à la fin de la période",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/wallet": {
+      "get": {
+        "operationId": "WalletController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Portefeuille (écran 58) : solde, pièces retirables, packs, cadeaux, historique, retraits",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/wallet/purchases": {
+      "post": {
+        "operationId": "WalletController_buy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyCoinsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Acheter un pack de pièces (prototype : simulé, aucun paiement)",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/coins/gifts": {
+      "post": {
+        "operationId": "WalletController_gift",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendCoinsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encourager (écran 13) : envoyer des pièces sur une publication ou un commentaire",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/posts/{id}/donors": {
+      "get": {
+        "operationId": "WalletController_donors",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Donateurs d’une publication (les envois anonymes sont regroupés, sans nom)",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/v1/wallet/withdrawals": {
+      "post": {
+        "operationId": "WalletController_withdraw",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawCoinsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirer des pièces reçues vers mon Mobile Money (prototype : versement simulé)",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
+    "/admin/v1/withdrawals": {
+      "get": {
+        "operationId": "WithdrawalsAdminController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "review",
+                "paid",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retraits de pièces : à vérifier (premier retrait, gros montant), versés, refusés",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/v1/withdrawals/{id}/decision": {
+      "post": {
+        "operationId": "WithdrawalsAdminController_decide",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideWithdrawalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Valider (versement simulé) ou refuser (pièces rendues, motif obligatoire)",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/v1/peni/conversations": {
       "post": {
         "operationId": "PeniController_start",
@@ -10558,6 +10840,128 @@
         },
         "required": [
           "quantity"
+        ]
+      },
+      "SubscribePremiumDto": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "demo"
+            ],
+            "description": "Prototype : seul le circuit simulé existe (aucun paiement)"
+          }
+        },
+        "required": [
+          "channel"
+        ]
+      },
+      "BuyCoinsDto": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "number",
+            "description": "Pack choisi, en pièces (1 pièce = 1 F)"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "demo"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Clé anti-doublon générée par l’app"
+          }
+        },
+        "required": [
+          "coins",
+          "channel",
+          "idempotencyKey"
+        ]
+      },
+      "SendCoinsDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "giftCode": {
+            "type": "string",
+            "description": "Code du cadeau (voir GET /v1/wallet)"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "anonymous": {
+            "type": "boolean",
+            "description": "Mon nom n’apparaît pas dans la liste des donateurs"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId",
+          "giftCode",
+          "quantity",
+          "idempotencyKey"
+        ]
+      },
+      "WithdrawCoinsDto": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "number",
+            "description": "Pièces reçues à retirer"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "orange",
+              "mtn",
+              "moov",
+              "wave"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "coins",
+          "operator",
+          "idempotencyKey"
+        ]
+      },
+      "DecideWithdrawalDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Motif, obligatoire pour refuser (les pièces sont rendues)"
+          }
+        },
+        "required": [
+          "decision"
         ]
       },
       "StartPeniConversationDto": {
