@@ -236,7 +236,7 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const ValueKey('shop-counts'))).data, '2 articles · 2 abonnés');
     expect(find.text('Abonné'), findsOneWidget);
     // « Voir plus » : page suivante des articles, puis plus de bouton (audit du 18/10).
-    await tester.scrollUntilVisible(find.byKey(const ValueKey('shop-more')), 200);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('shop-more')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('shop-more')));
     await tester.pumpAndSettle();
     expect(find.text('Robe Lumière'), findsOneWidget);
