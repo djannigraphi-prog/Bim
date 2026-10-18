@@ -1,6 +1,22 @@
 # PROJECT_STATUS.md — État réel du projet BIM
 
-Dernière mise à jour : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 : étapes A à K développées et testées sans dépense (préférences, notifications programmées et leurs actions, centre de notifications, envoi serveur prêt mais inactif) ; rien d'activé ; activation en attente de l'accord du fondateur.
+Dernière mise à jour : 18/10/2026 — version 1 sans dépense (voir la section dédiée). Précédemment : 15/10/2026, session 1 — lots 0 et 1 terminés et vérifiés (CI complète, émulateur Android, navigateur) ; décisions C8 appliquées, coffres compris ; lot 2 : étapes A à K développées et testées sans dépense (préférences, notifications programmées et leurs actions, centre de notifications, envoi serveur prêt mais inactif) ; rien d'activé ; activation en attente de l'accord du fondateur.
+
+## Version 1 sans dépense (18/10/2026, décision V1-1810)
+
+| Étape | Contenu | Tests | État |
+| --- | --- | --- | --- |
+| V1-A | Points de l'audit : frais du livreur employé, paiement tardif remboursé automatiquement, « Voir plus », invitation neutre (migration 0055) | e2e et Flutter | fait |
+| V1-B | Messages vocaux (M4A, 2 min, métadonnées effacées) et groupes (32, dès 18 ans, invitations, administrateurs) (0056) | 3 e2e, 3 Flutter | fait |
+| V1-C | Courses groupées (3), changement de livreur après la prise en charge, nouvelle tentative de livraison (0057) | 3 e2e, 2 Flutter | fait |
+| V1-D | Achats dans l'app vérifiés auprès du magasin, désactivés (`STORE_PROVIDER`), simulateur (0058) | 3 e2e | serveur fait ; app et vérificateurs Google / Apple avec les comptes |
+| V1-E | Cadeaux animés, cœurs animés, gadgets Premium des Lives (message épinglé, ambiances) (0059) | 1 e2e, 2 Flutter | fait |
+| V1-F | « Pour toi » classé, personnes à suivre (jamais de mineurs) | 2 e2e, 2 Flutter | fait |
+| V1-G | Version anglaise | — | **reportée** (environ 2 000 textes dans l'app et les messages du serveur) |
+| V1-H | Codes par e-mail via SMTP (`EMAIL_PROVIDER=smtp`) ; plan du lancement gratuit | 1 e2e | fait |
+
+Reste avant l'ouverture au public : comptes des magasins, hébergement, projet Firebase, fournisseur d'e-mail (actions
+du fondateur), tests sur de vrais téléphones, connexion Google, version iPhone compilée.
 
 ## Résumé
 

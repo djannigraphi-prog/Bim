@@ -166,6 +166,27 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1810 — Finir la version 1 sans dépense (18/10/2026, 15 h 10) · Fondateur · **appliquée**
+
+Demande : « trouve des solutions pour coder et finaliser sans dépense, en gardant à l'idée qu'il y aura des
+améliorations après le lancement, qui consisteront à payer ce qui était à la base payant ». Réponses du fondateur :
+« OK » pour toutes les propositions.
+
+- Audit : le livreur **employé** encaisse aussi les frais de livraison pour la boutique ; un paiement en ligne **reçu en
+  retard** (ou non conforme) est enregistré et **remboursé automatiquement** ; « Voir plus » ; invitation dans l'équipe
+  sans révéler l'âge.
+- Messagerie : vocaux de **2 minutes** au plus ; groupes de **32** personnes au plus, créés **dès 18 ans** ; une
+  personne de 16-17 ans n'est ajoutée que si elle suit la personne qui l'ajoute.
+- Livraisons : **3** courses à la fois au plus ; changement de livreur décidé par la **boutique** avec l'accord du
+  livreur, sinon le support ; nouvelle tentative **payée par le client** (nouveau code, son accord avant).
+  Nombre de nouvelles tentatives : 1 (**proposé**).
+- Lives : cadeaux animés et gadgets Premium dessinés dans l'app.
+- Recommandations : abonnements, catégories des projets, j'aime ; **sans publicité**.
+- Version anglaise : à traduire par Claude, relue par le fondateur (**reportée** : environ 2 000 textes, voir l'état).
+- Recherche par photo : **reportée** après le lancement.
+- Services payants : chacun derrière une prise désactivée ; solution gratuite au lancement (`docs/PLAN_V1_GRATUIT.md`).
+  Achats dans l'app : circuit codé côté serveur (simulateur), vérificateurs Google et Apple avec les comptes.
+
 ### P-0018 — Premier prototype sans dépense (18/10/2026, 00 h 17) · Fondateur · **en cours**
 
 Demande : un prototype de l'application pour une présentation, **sans rien de payant** hormis l'hébergement et les
