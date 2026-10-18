@@ -251,11 +251,11 @@ test('paiements à vérifier (7-C) : page accessible, aucune confirmation implic
   await expect(page.getByText('Aucun paiement à vérifier.')).toBeVisible();
 });
 
-test('incidents (7-G) : page accessible au support, aucune sanction automatique annoncée', async ({ page }) => {
+test('incidents (7-G) : page accessible au support, aucune sanction ni remboursement annoncés', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: 'Incidents' }).click();
   await expect(page.getByRole('heading', { name: 'Incidents' })).toBeVisible();
-  await expect(page.getByText('Aucune pénalité, aucun frais ni remboursement automatique')).toBeVisible();
+  await expect(page.getByText('Aucune pénalité, aucun frais, aucun remboursement (BIM ne rembourse pas)')).toBeVisible();
   await expect(page.getByText('Aucun incident.')).toBeVisible();
   await page.getByRole('tab', { name: 'Résolus' }).click();
   await expect(page.getByRole('tab', { name: 'Résolus' })).toHaveAttribute('aria-selected', 'true');
@@ -267,6 +267,8 @@ test('paiements en ligne (lot 8) : page accessible, aucun prestataire annoncé, 
   await page.getByRole('link', { name: 'Paiements en ligne' }).click();
   await expect(page.getByRole('heading', { name: 'Paiements en ligne' })).toBeVisible();
   await expect(page.getByText('aucun (paiement en ligne fermé)')).toBeVisible();
+  await expect(page.getByText('BIM ne fait aucun remboursement', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rembourser' })).toHaveCount(0);
   await expect(page.getByText('Aucun paiement en ligne.')).toBeVisible();
 });
 
