@@ -33,3 +33,10 @@ export class DecideWithdrawalDto {
   @ApiProperty({ enum: ['approve', 'reject'] }) @IsIn(['approve', 'reject']) decision!: 'approve' | 'reject';
   @ApiPropertyOptional({ description: 'Motif, obligatoire pour refuser (les pièces sont rendues)' }) @IsOptional() @IsString() @Length(1, 300) reason?: string;
 }
+
+/** V1 — Achat dans l'app à vérifier auprès du magasin. */
+export class StorePurchaseDto {
+  @ApiProperty({ enum: ['google', 'apple'] }) @IsIn(['google', 'apple']) platform!: 'google' | 'apple';
+  @ApiProperty({ example: 'bim.coins.500' }) @IsString() @Length(3, 100) productId!: string;
+  @ApiProperty({ description: 'Jeton d’achat (Google) ou transaction signée (Apple) fourni par le magasin' }) @IsString() @Length(8, 8000) purchaseToken!: string;
+}

@@ -28,7 +28,7 @@ export const subscriptions = pgTable(
       .references(() => users.id),
     /** user_premium (les abonnements marchand et livreur viendront plus tard). */
     plan: varchar('plan', { length: 20 }).notNull(),
-    /** demo (prototype) ; plus tard apple · google · web. */
+    /** demo (prototype) · google · apple (V1 : achat dans l'app vérifié auprès du magasin). */
     channel: varchar('channel', { length: 10 }).notNull(),
     priceFcfa: integer('price_fcfa').notNull(),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
@@ -37,7 +37,7 @@ export const subscriptions = pgTable(
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('subscriptions_user_idx').on(t.userId, t.plan, t.currentPeriodEnd), check('subscriptions_channel_ck', sql`${t.channel} IN ('demo')`)],
+  (t) => [index('subscriptions_user_idx').on(t.userId, t.plan, t.currentPeriodEnd), check('subscriptions_channel_ck', sql`${t.channel} IN ('demo', 'google', 'apple')`)],
 );
 
 /** Solde par personne, cumul du grand livre (contrôlé par les tests). */
@@ -98,7 +98,7 @@ export const coinPurchases = pgTable(
   (t) => [
     uniqueIndex('coin_purchases_idem_uq').on(t.userId, t.idempotencyKey),
     check('coin_purchases_coins_ck', sql`${t.coins} > 0`),
-    check('coin_purchases_channel_ck', sql`${t.channel} IN ('demo')`),
+    check('coin_purchases_channel_ck', sql`${t.channel} IN ('demo', 'google', 'apple')`),
   ],
 );
 
@@ -179,5 +179,37 @@ export const withdrawals = pgTable(
     check('withdrawals_operator_ck', sql`${t.operator} IN ('orange', 'mtn', 'moov', 'wave')`),
     check('withdrawals_channel_ck', sql`${t.channel} IN ('demo')`),
     check('withdrawals_amount_ck', sql`${t.coins} > 0 AND ${t.feeFcfa} >= 0 AND ${t.netFcfa} = ${t.coins} - ${t.feeFcfa}`),
+  ],
+);
+
+/**
+ * V1 — Achat dans l'app vérifié auprès du magasin (Google Play, App Store). Une transaction du magasin ne sert qu'une
+ * fois (anti-rejeu) ; le montant vient du catalogue des produits (réglage), jamais de l'app.
+ */
+export const storePurchases = pgTable(
+  'store_purchases',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** google · apple */
+    platform: varchar('platform', { length: 8 }).notNull(),
+    productId: varchar('product_id', { length: 100 }).notNull(),
+    /** Identifiant de la transaction chez le magasin (commande Google, transaction Apple). */
+    transactionId: varchar('transaction_id', { length: 120 }).notNull(),
+    /** coins · premium */
+    kind: varchar('kind', { length: 8 }).notNull(),
+    coins: integer('coins'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** Achat de test du magasin (comptes testeurs) : signalé, jamais confondu avec un vrai paiement. */
+    testPurchase: boolean('test_purchase').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('store_purchases_tx_uq').on(t.platform, t.transactionId),
+    index('store_purchases_user_idx').on(t.userId, t.createdAt),
+    check('store_purchases_platform_ck', sql`${t.platform} IN ('google', 'apple')`),
+    check('store_purchases_kind_ck', sql`(${t.kind} = 'coins' AND ${t.coins} > 0) OR (${t.kind} = 'premium' AND ${t.expiresAt} IS NOT NULL)`),
   ],
 );

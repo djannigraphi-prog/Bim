@@ -407,6 +407,13 @@
       "when": 1792337491843,
       "tag": "0057_v1_deliveries",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792337964965,
+      "tag": "0058_v1_store_purchases",
+      "breakpoints": true
     }
   ]
 }

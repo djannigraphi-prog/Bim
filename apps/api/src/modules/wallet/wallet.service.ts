@@ -5,12 +5,13 @@ import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { DB, Database, DbOrTx } from '../../database/database.module';
-import { coinGifts, coinLedger, coinPurchases, lives, postComments, posts, reels, subscriptions, userContacts, users, wallets, withdrawals } from '../../database/schema';
+import { coinGifts, coinLedger, coinPurchases, lives, postComments, posts, reels, storePurchases, subscriptions, userContacts, users, wallets, withdrawals } from '../../database/schema';
 import type { AdminContext } from '../admin/admin.decorators';
 import { AgePolicyService } from '../age-policy/age-policy.service';
 import { AuditService } from '../audit/audit.service';
 import { CLOCK, Clock } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
+import { SimulatorStore, StorePlatform, StoreUnavailableError, StoreVerifier } from './store';
 import { commentParentPublished, notBlockedBetween, postVisibleTo, reelVisibleTo } from '../social/access';
 
 export const PREMIUM_PLAN = 'user_premium';
@@ -48,7 +49,12 @@ export class WalletService {
     private readonly settings: SettingsService,
     private readonly agePolicy: AgePolicyService,
     private readonly audit: AuditService,
-  ) {}
+  ) {
+    this.store = cfg.STORE_PROVIDER === 'simulator' ? new SimulatorStore() : null;
+  }
+
+  /** V1 : vérificateur des achats dans l'app (null : aucun achat par le magasin). */
+  readonly store: StoreVerifier | null;
 
   get demo(): boolean {
     return this.cfg.DEMO_MODE;
@@ -112,8 +118,10 @@ export class WalletService {
   async premium(userId: string) {
     const s = await this.current(userId);
     return {
-      available: this.demo,
+      available: this.demo || !!this.store,
       demo: this.demo,
+      /** V1 : achat dans l'app (magasin) possible ; produit Premium du catalogue. */
+      store: this.store ? Object.entries(await this.storeProducts()).filter(([, p]) => p.kind === 'premium').map(([id]) => id) : [],
       priceFcfa: await this.num('premium.user_price_fcfa', 2000),
       periodDays: PREMIUM_PERIOD_DAYS,
       active: s !== null,
@@ -185,8 +193,10 @@ export class WalletService {
         FROM coin_ledger WHERE user_id = ${userId}`),
     ]);
     return {
-      available: this.demo,
+      available: this.demo || !!this.store,
       demo: this.demo,
+      /** V1 : packs vendus dans l'app (magasin), d'après le catalogue. */
+      storePacks: this.store ? Object.entries(await this.storeProducts()).filter(([, p]) => p.kind === 'coins').map(([id, p]) => ({ productId: id, coins: p.coins })) : [],
       coinValueFcfa: 1,
       balance: { total: b.purchased + b.received, purchased: b.purchased, received: b.received, withdrawable: b.received },
       premium: { active: premium !== null, until: premium?.currentPeriodEnd ?? null },
@@ -240,6 +250,74 @@ export class WalletService {
     }
     if (p!.coins !== coins) throw conflict('IDEMPOTENCY_KEY_REUSED', 'Cette clé a déjà servi pour un autre achat.');
     return { purchase: { id: p!.id, coins: p!.coins, priceFcfa: p!.priceFcfa, channel: p!.channel, at: p!.createdAt }, balance: (await this.wallet(userId)).balance };
+  }
+
+  // ------------------------------------------------------------------------------------------------ Achats dans l'app (V1)
+
+  /** Catalogue des produits vendus dans l'app (réglage) : identifiant du magasin → pièces ou Premium. */
+  async storeProducts(): Promise<Record<string, { kind: 'coins' | 'premium'; coins?: number; days?: number }>> {
+    const v = (await this.settings.get<Record<string, { kind: 'coins' | 'premium'; coins?: number; days?: number }>>('store.products'))?.value;
+    return v && typeof v === 'object' ? v : {};
+  }
+
+  /**
+   * Achat fait dans l'app (Google Play, App Store) : le serveur le vérifie auprès du magasin, contrôle le produit, puis
+   * crédite les pièces ou ouvre Premium d'après son catalogue. Une transaction ne sert qu'une fois (rejeu : même
+   * résultat, sans second crédit). L'âge minimal s'applique comme pour le circuit simulé.
+   */
+  async storePurchase(userId: string, input: { platform: StorePlatform; productId: string; purchaseToken: string }, meta: RequestMeta) {
+    if (!this.store) throw Errors.notConfigured('L’achat dans l’app');
+    const product = (await this.storeProducts())[input.productId];
+    if (!product) throw Errors.validation({ fields: { productId: ['Produit inconnu.'] } });
+    const [u] = await this.db.select({ birthDate: users.birthDate }).from(users).where(eq(users.id, userId));
+    await this.agePolicy.assert(product.kind === 'coins' ? 'coins_purchase' : 'paid_subscription', u.birthDate);
+    let v;
+    try {
+      v = await this.store.verify(input.platform, input.productId, input.purchaseToken);
+    } catch (e) {
+      if (e instanceof StoreUnavailableError) throw new AppError('STORE_UNAVAILABLE', 'Le magasin ne répond pas. Ton achat sera vérifié dès que possible : réessaie dans quelques minutes.', HttpStatus.SERVICE_UNAVAILABLE);
+      throw e;
+    }
+    if (!v.valid || !v.transactionId) throw new AppError('STORE_PURCHASE_INVALID', 'Achat introuvable ou annulé chez le magasin.', HttpStatus.UNPROCESSABLE_ENTITY);
+    if (v.productId !== input.productId) throw new AppError('STORE_PURCHASE_INVALID', 'Cet achat ne correspond pas au produit annoncé.', HttpStatus.UNPROCESSABLE_ENTITY);
+    const existing = async () => {
+      const [p] = await this.db.select().from(storePurchases).where(and(eq(storePurchases.platform, input.platform), eq(storePurchases.transactionId, v.transactionId)));
+      return p ?? null;
+    };
+    let p = await existing();
+    if (!p) {
+      try {
+        await this.db.transaction(async (tx) => {
+          const id = uuidv7();
+          const now = this.clock.now();
+          const expiresAt = product.kind === 'premium' ? (v.expiresAt ?? new Date(now.getTime() + (product.days ?? PREMIUM_PERIOD_DAYS) * 86_400_000)) : null;
+          await tx.insert(storePurchases).values({ id, userId, platform: input.platform, productId: input.productId, transactionId: v.transactionId, kind: product.kind, coins: product.kind === 'coins' ? product.coins! : null, expiresAt, testPurchase: v.testPurchase });
+          if (product.kind === 'coins') {
+            await tx.insert(coinPurchases).values({ id, userId, coins: product.coins!, priceFcfa: product.coins!, channel: input.platform, idempotencyKey: `store:${id}` });
+            await this.credit(tx, userId, 'purchased', product.coins!, 'purchase', id, input.platform);
+          } else {
+            await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('premium'), hashtext(${userId}))`);
+            const cur = await this.current(userId, tx);
+            const price = await this.num('premium.user_price_fcfa', 2000);
+            if (cur) {
+              await tx.update(subscriptions).set({ currentPeriodEnd: expiresAt! > cur.currentPeriodEnd ? expiresAt! : cur.currentPeriodEnd, autoRenew: true, cancelledAt: null, channel: input.platform }).where(eq(subscriptions.id, cur.id));
+            } else {
+              await tx.insert(subscriptions).values({ id, userId, plan: PREMIUM_PLAN, channel: input.platform, priceFcfa: price, startedAt: now, currentPeriodEnd: expiresAt! });
+            }
+          }
+          await this.audit.log(
+            { actorType: 'user', actorId: userId, action: 'store.purchase_verified', targetType: 'store_purchase', targetId: id, ip: meta.ip, userAgent: meta.userAgent, metadata: { platform: input.platform, productId: input.productId, test: v.testPurchase } },
+            tx,
+          );
+        });
+      } catch (e) {
+        if ((e as { code?: string }).code !== '23505') throw e;
+      }
+      p = await existing();
+    }
+    // Rejeu par une autre personne : jamais crédité deux fois, ni chez quelqu'un d'autre.
+    if (p!.userId !== userId) throw new AppError('STORE_PURCHASE_INVALID', 'Cet achat appartient à un autre compte.', HttpStatus.CONFLICT);
+    return { purchase: { id: p!.id, platform: p!.platform, productId: p!.productId, kind: p!.kind, coins: p!.coins, expiresAt: p!.expiresAt, test: p!.testPurchase }, balance: (await this.wallet(userId)).balance, premium: await this.premium(userId) };
   }
 
   // ------------------------------------------------------------------------------------------------ Envois

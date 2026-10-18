@@ -121,6 +121,12 @@ const schema = z
     /** Secret de signature des notifications du simulateur (valeur de test, jamais une clé de prestataire). */
     PAYMENT_SIMULATOR_SECRET: z.string().default(''),
     /**
+     * V1 — Achats dans l'app (Premium et pièces) vérifiés auprès du magasin (Google Play, App Store) : « none » (aucun
+     * achat par le magasin) ou « simulator » (développement et tests seulement). Les vérificateurs Google et Apple
+     * seront ajoutés avec les comptes développeur, après l'accord du fondateur (aucune dépense sans lui).
+     */
+    STORE_PROVIDER: z.enum(['none', 'simulator']).default('none'),
+    /**
      * Lot 8 — Clé secrète Paystack : **clé de test seulement** (`sk_test_…`) ; une clé de production est refusée tant que
      * le fondateur n'a pas autorisé les paiements réels. Secret : injecté depuis le coffre, jamais dans le dépôt.
      */
@@ -167,6 +173,9 @@ const schema = z
     }
     if (cfg.NODE_ENV === 'production' && cfg.DEMO_MODE) {
       ctx.addIssue({ code: 'custom', path: ['DEMO_MODE'], message: 'Le mode démonstration (achats et retraits simulés) est interdit en production' });
+    }
+    if (!devLike && cfg.STORE_PROVIDER === 'simulator') {
+      ctx.addIssue({ code: 'custom', path: ['STORE_PROVIDER'], message: 'Le simulateur du magasin est interdit hors développement' });
     }
     if (!devLike && cfg.PAYMENT_PROVIDER === 'simulator') {
       ctx.addIssue({ code: 'custom', path: ['PAYMENT_PROVIDER'], message: 'Le simulateur de paiement est interdit hors développement' });

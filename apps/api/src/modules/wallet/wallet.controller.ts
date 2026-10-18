@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiHeader, ApiOperation, ApiQuery, ApiTags } from '@nest
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
 import { AuthContext, CurrentAuth, RequireStepUp } from '../auth/auth.decorators';
-import { BuyCoinsDto, DecideWithdrawalDto, SendCoinsDto, SubscribePremiumDto, WithdrawCoinsDto } from './dto';
+import { BuyCoinsDto, DecideWithdrawalDto, SendCoinsDto, StorePurchaseDto, SubscribePremiumDto, WithdrawCoinsDto } from './dto';
 import { WalletService } from './wallet.service';
 
 /** Lot 9 (prototype) — Premium, portefeuille, envois et retraits de pièces. Circuit simulé seulement (DEMO_MODE). */
@@ -32,6 +32,14 @@ export class WalletController {
   @ApiOperation({ summary: 'Résilier : Premium reste actif jusqu’à la fin de la période' })
   cancel(@CurrentAuth() a: AuthContext, @ReqMeta() meta: RequestMeta) {
     return this.wallet.cancel(a.userId, meta);
+  }
+
+  @Post('store/purchases')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Achat dans l’app (Google Play, App Store) : vérifié auprès du magasin, puis pièces créditées ou Premium ouvert' })
+  storePurchase(@CurrentAuth() a: AuthContext, @Body() dto: StorePurchaseDto, @ReqMeta() meta: RequestMeta) {
+    return this.wallet.storePurchase(a.userId, dto, meta);
   }
 
   @Get('wallet')

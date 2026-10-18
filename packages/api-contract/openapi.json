@@ -3920,6 +3920,36 @@
         ]
       }
     },
+    "/v1/store/purchases": {
+      "post": {
+        "operationId": "WalletController_storePurchase",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorePurchaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Achat dans l’app (Google Play, App Store) : vérifié auprès du magasin, puis pièces créditées ou Premium ouvert",
+        "tags": [
+          "Pièces et Premium"
+        ]
+      }
+    },
     "/v1/wallet": {
       "get": {
         "operationId": "WalletController_get",
@@ -11814,6 +11844,31 @@
         },
         "required": [
           "channel"
+        ]
+      },
+      "StorePurchaseDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "google",
+              "apple"
+            ]
+          },
+          "productId": {
+            "type": "string",
+            "example": "bim.coins.500"
+          },
+          "purchaseToken": {
+            "type": "string",
+            "description": "Jeton d’achat (Google) ou transaction signée (Apple) fourni par le magasin"
+          }
+        },
+        "required": [
+          "platform",
+          "productId",
+          "purchaseToken"
         ]
       },
       "BuyCoinsDto": {

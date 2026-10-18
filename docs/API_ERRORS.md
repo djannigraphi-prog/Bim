@@ -92,5 +92,10 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `ADMIN_EXISTS` · `SELF_LOCKOUT` · `LAST_SUPER_ADMIN` · `INVALID_STATUS` | 409 | gestion des comptes d'administration et des statuts de compte |
 | `NO_MEASURE` | 409 | l'objectif du projet ne se mesure pas en chiffres |
 | `REPORT_NOT_OPEN` · `CODE_TAKEN` | 409 | signalement déjà traité ; code de catégorie ou d'objectif déjà utilisé |
+| `STORE_PURCHASE_INVALID` | 422 · 409 | achat dans l’app introuvable, annulé, d’un autre produit ou d’un autre compte |
+| `STORE_UNAVAILABLE` | 503 | le magasin (Google Play, App Store) ne répond pas : rien n’est crédité, réessayer |
+| `VOICE_TOO_LONG` | 400 | message vocal au-delà de 2 minutes (`details.maxSeconds`) |
+| `GROUP_ADMIN_ONLY` | 403 | action réservée aux administrateurs du groupe |
+| `RETRY_LIMIT` | 409 | plus de nouvelle tentative de livraison possible |
 | `INVITE_NOT_POSSIBLE` | 409 | invitation dans l’équipe d’une boutique impossible (motif volontairement non précisé, ex. âge) |
 | `INTERNAL_ERROR` | 500 | erreur inattendue (détail uniquement dans les journaux) |
