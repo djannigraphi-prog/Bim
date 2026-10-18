@@ -511,17 +511,18 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                         decoration: const InputDecoration(hintText: 'Message…', counterText: ''),
                       ),
                     ),
+                    // V1 : champ vide → micro (message vocal, 2 minutes au plus), à côté du bouton d'envoi.
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _input,
                       builder: (_, value, __) => value.text.trim().isEmpty && !_sending
-                          // V1 : champ vide → micro (message vocal, 2 minutes au plus).
                           ? IconButton(key: const ValueKey('voice-record'), tooltip: 'Enregistrer un vocal', icon: const Icon(Icons.mic_none_rounded, color: BimColors.red), onPressed: _startRecording)
-                          : IconButton(
-                              key: const ValueKey('message-send'),
-                              tooltip: 'Envoyer',
-                              icon: _sending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_rounded, color: BimColors.red),
-                              onPressed: _sending ? null : _send,
-                            ),
+                          : const SizedBox.shrink(),
+                    ),
+                    IconButton(
+                      key: const ValueKey('message-send'),
+                      tooltip: 'Envoyer',
+                      icon: _sending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_rounded, color: BimColors.red),
+                      onPressed: _sending ? null : _send,
                     ),
                   ],
                 ),

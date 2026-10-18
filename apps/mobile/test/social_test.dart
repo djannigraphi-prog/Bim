@@ -336,6 +336,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Personnes à suivre'), findsOneWidget);
     expect(find.text('Suivie par 3 de tes abonnements'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('suggestion-follow-koffi.y')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('suggestion-follow-koffi.y')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
