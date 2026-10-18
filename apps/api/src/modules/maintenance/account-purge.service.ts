@@ -79,6 +79,7 @@ export const PURGE_BLOCKING_TABLES = [
   'wallets',
   'coin_ledger',
   'coin_purchases',
+  'store_purchases',
   'coin_gifts',
   'withdrawals',
   // Lot 10 : animer, commenter ou regarder un Live est une activité.
