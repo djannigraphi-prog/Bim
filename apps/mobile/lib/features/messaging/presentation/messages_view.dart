@@ -9,7 +9,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../social/presentation/social_widgets.dart';
 import '../data/messaging_api.dart';
-import 'conversation_screen.dart' show ShopAvatar;
+import 'conversation_screen.dart' show GroupAvatar, ShopAvatar;
 
 /// Ouvre (ou retrouve) la conversation avec une personne puis l'affiche.
 Future<void> openConversationWith(BuildContext context, WidgetRef ref, String username) async {
@@ -50,6 +50,25 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
   bool _requests = false;
 
   Future<void> _newMessage() async {
+    // V1 : un message à une personne, ou un nouveau groupe.
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(key: const ValueKey('new-direct'), leading: const Icon(Icons.person_outline), title: const Text('Nouveau message'), onTap: () => Navigator.pop(ctx, 'direct')),
+            ListTile(key: const ValueKey('new-group'), leading: const Icon(Icons.groups_outlined), title: const Text('Nouveau groupe'), onTap: () => Navigator.pop(ctx, 'group')),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'group') {
+      await context.push('/messages/new-group');
+      ref.invalidate(conversationsProvider);
+      return;
+    }
     final username = await showDialog<String>(context: context, builder: (_) => const _NewMessageDialog());
     if (username == null || username.isEmpty || !mounted) return;
     await openConversationWith(context, ref, username.replaceFirst('@', ''));
@@ -179,7 +198,7 @@ class ConversationTile extends StatelessWidget {
     return ListTile(
       key: ValueKey('conversation-${c.id}'),
       contentPadding: EdgeInsets.zero,
-      leading: c.shop != null ? ShopAvatar(shop: c.shop!, size: 48) : (c.person != null ? PersonAvatar(person: c.person!, size: 48) : null),
+      leading: c.isGroup ? const GroupAvatar(size: 48) : (c.shop != null ? ShopAvatar(shop: c.shop!, size: 48) : (c.person != null ? PersonAvatar(person: c.person!, size: 48) : null)),
       title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

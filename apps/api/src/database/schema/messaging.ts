@@ -43,12 +43,15 @@ export const conversations = pgTable(
     contextProductId: uuid('context_product_id').references(() => products.id, { onDelete: 'set null' }),
     /** 6-B : offre de projet à l'origine de la conversation (« Discuter » de l'écran 49). */
     contextOfferId: uuid('context_offer_id').references(() => projectOffers.id, { onDelete: 'set null' }),
+    /** V1 (18/10/2026) : nom d'un groupe (kind group). */
+    title: varchar('title', { length: 60 }),
   },
   (t) => [
     uniqueIndex('conversations_direct_uq').on(t.directKey),
     index('conversations_shop_idx').on(t.shopId, t.lastMessageAt),
-    check('conversations_kind_ck', sql`${t.kind} IN ('direct', 'shop')`),
-    check('conversations_shop_ck', sql`(${t.kind} = 'direct' AND ${t.shopId} IS NULL) OR (${t.kind} = 'shop' AND ${t.shopId} IS NOT NULL)`),
+    check('conversations_kind_ck', sql`${t.kind} IN ('direct', 'shop', 'group')`),
+    check('conversations_shop_ck', sql`(${t.kind} IN ('direct', 'group') AND ${t.shopId} IS NULL) OR (${t.kind} = 'shop' AND ${t.shopId} IS NOT NULL)`),
+    check('conversations_group_ck', sql`(${t.kind} = 'group') = (${t.title} IS NOT NULL)`),
   ],
 );
 
@@ -72,15 +75,20 @@ export const conversationMembers = pgTable(
     lastReadMessageId: uuid('last_read_message_id'),
     lastReadAt: timestamp('last_read_at', { withTimezone: true }),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Groupe : admin (gère le groupe) ou member. */
+    role: varchar('role', { length: 8 }).notNull().default('member'),
+    /** Groupe : personne qui a ajouté ce membre. */
+    addedBy: uuid('added_by').references(() => users.id, { onDelete: 'set null' }),
   },
   (t) => [
     primaryKey({ columns: [t.conversationId, t.userId] }),
     index('conversation_members_user_idx').on(t.userId, t.status),
-    check('conversation_members_status_ck', sql`${t.status} IN ('active', 'request', 'declined', 'withheld')`),
+    check('conversation_members_status_ck', sql`${t.status} IN ('active', 'request', 'declined', 'withheld', 'left')`),
+    check('conversation_members_role_ck', sql`${t.role} IN ('admin', 'member')`),
   ],
 );
 
-/** Message. kind : text · photo · order (7-B : carte d'une proposition de commande). status : published · deleted (par son auteur) · hidden (modération). */
+/** Message. kind : text · photo · order (7-B : carte d'une proposition de commande) · voice (V1 : message vocal) · system (groupe : membre ajouté, parti…). status : published · deleted (par son auteur) · hidden (modération). */
 export const messages = pgTable(
   'messages',
   {
@@ -100,6 +108,8 @@ export const messages = pgTable(
     orderId: uuid('order_id').references(() => orders.id),
     mediaWidth: integer('media_width'),
     mediaHeight: integer('media_height'),
+    /** V1 : durée d'un message vocal, en millisecondes. */
+    mediaDurationMs: integer('media_duration_ms'),
     /** 6-C : message cité (réponse citée), toujours de la même conversation (contrôlé par le serveur et la base). */
     replyToId: uuid('reply_to_id').references((): AnyPgColumn => messages.id),
     status: varchar('status', { length: 10 }).notNull().default('published'),
@@ -108,9 +118,12 @@ export const messages = pgTable(
   (t) => [
     index('messages_conversation_idx').on(t.conversationId, t.id),
     index('messages_sender_idx').on(t.senderId, t.createdAt),
-    check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo', 'order')`),
+    check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo', 'order', 'voice', 'system')`),
     check('messages_status_ck', sql`${t.status} IN ('published', 'deleted', 'hidden')`),
-    check('messages_content_ck', sql`(${t.kind} = 'text' AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR (${t.kind} = 'order' AND ${t.orderId} IS NOT NULL) OR ${t.status} <> 'published'`),
+    check(
+      'messages_content_ck',
+      sql`(${t.kind} IN ('text', 'system') AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR (${t.kind} = 'voice' AND ${t.mediaKey} IS NOT NULL AND ${t.mediaDurationMs} IS NOT NULL) OR (${t.kind} = 'order' AND ${t.orderId} IS NOT NULL) OR ${t.status} <> 'published'`,
+    ),
   ],
 );
 

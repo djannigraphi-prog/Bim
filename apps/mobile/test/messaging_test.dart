@@ -2,8 +2,10 @@ import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
 import 'package:bim/features/merchant/data/shop_api.dart' show formatFcfa;
+import 'package:bim/features/messaging/application/voice.dart';
 import 'package:bim/features/messaging/data/messaging_api.dart';
 import 'package:bim/features/messaging/presentation/conversation_screen.dart';
+import 'package:bim/features/messaging/presentation/group_screens.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/messaging/presentation/messages_view.dart';
 import 'package:bim/features/messaging/presentation/shop_inbox_screen.dart';
@@ -98,6 +100,75 @@ class _FakeMessaging extends MessagingApi {
   }
 }
 
+/// Enregistreur simulé (le micro du téléphone n'existe pas dans les tests).
+class _FakeRecorder implements VoiceRecorder {
+  final calls = <String>[];
+  bool allowed = true;
+
+  @override
+  Future<bool> start() async {
+    calls.add('start');
+    return allowed;
+  }
+
+  @override
+  Future<List<int>?> stop() async {
+    calls.add('stop');
+    return List<int>.filled(2000, 1);
+  }
+
+  @override
+  Future<void> cancel() async => calls.add('cancel');
+
+  @override
+  void dispose() {}
+}
+
+/// V1 : un groupe, avec un message système, un message d'une autre personne et un message d'une personne bloquée.
+class _FakeGroup extends _FakeMessaging {
+  final voices = <int>[];
+
+  @override
+  Future<ConversationSummary> conversation(String id) async =>
+      ConversationSummary(id: id, kind: 'group', status: status, pendingForOther: false, unread: 0, groupTitle: 'Team running', memberCount: 4, myRole: 'admin');
+
+  @override
+  Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async => (
+        items: [
+          ChatMessage(id: 'g3', mine: false, kind: 'text', status: 'published', createdAt: DateTime(2026, 10, 18, 9, 2), blockedSender: true, senderName: 'Paul Tano'),
+          ChatMessage(id: 'g2', mine: false, kind: 'voice', status: 'published', createdAt: DateTime(2026, 10, 18, 9, 1), voiceUrl: 'http://127.0.0.1:9/v.m4a', durationMs: 42000, senderName: 'Koffi Yao', senderUsername: 'koffi'),
+          ChatMessage(id: 'g1', mine: false, kind: 'system', status: 'published', createdAt: DateTime(2026, 10, 18, 9), text: 'Awa a créé le groupe « Team running »'),
+        ],
+        nextBefore: null,
+      );
+
+  @override
+  Future<ChatMessage> sendVoice(String conversationId, List<int> bytes) async {
+    voices.add(bytes.length);
+    return ChatMessage(id: 'g9', mine: true, kind: 'voice', status: 'published', createdAt: DateTime(2026, 10, 18, 10), voiceUrl: 'http://127.0.0.1:9/w.m4a', durationMs: 3000);
+  }
+
+  @override
+  Future<({ConversationSummary conversation, List<String> notAdded})> createGroup(String title, List<String> usernames) async {
+    calls.add('group $title ${usernames.join('+')}');
+    return (conversation: await conversation('g-new'), notAdded: ['inconnu']);
+  }
+
+  @override
+  Future<({List<GroupMember> items, String myRole, int maxMembers})> groupMembers(String id) async => (
+        items: const [
+          GroupMember(username: 'awa.kone', fullName: 'Awa Koné', role: 'admin', isMe: true),
+          GroupMember(username: 'koffi', fullName: 'Koffi Yao', role: 'member'),
+          GroupMember(username: 'paul', fullName: 'Paul Tano', role: 'member', invited: true),
+        ],
+        myRole: 'admin',
+        maxMembers: 32,
+      );
+
+  @override
+  Future<void> leaveGroup(String id) async => calls.add('leave $id');
+}
+
 const _shop = ChatShop(id: 's1', name: 'Boutique Élégance', slug: 'boutique-elegance', verified: true);
 const _robe = ShopCard(
   id: 'x1',
@@ -117,7 +188,7 @@ class _FakeShopChat extends _FakeMessaging {
   @override
   Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async => (
         items: [
-          ChatMessage(id: 'k3', mine: false, kind: 'voice', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 22)),
+          ChatMessage(id: 'k3', mine: false, kind: 'sticker', status: 'published', createdAt: DateTime(2026, 10, 16, 14, 22)),
           ChatMessage(
             id: 'k2',
             mine: false,
@@ -189,13 +260,15 @@ class _FakeShopInbox extends ShopInboxApi {
   Future<List<({String id, String text})>> quickReplies() async => const [(id: 'q1', text: 'Oui, dès demain.')];
 }
 
-Future<void> _pump(WidgetTester tester, _FakeMessaging api, Widget home, {_FakeShopInbox? inbox}) async {
+Future<void> _pump(WidgetTester tester, _FakeMessaging api, Widget home, {_FakeShopInbox? inbox, VoiceRecorder? recorder}) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final router = GoRouter(routes: [
     GoRoute(path: '/', builder: (_, __) => home),
+    GoRoute(path: '/messages/new-group', builder: (_, __) => const NewGroupScreen()),
     GoRoute(path: '/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, refreshEvery: null)),
+    GoRoute(path: '/messages/:id/group', builder: (_, s) => GroupInfoScreen(conversationId: s.pathParameters['id']!)),
     GoRoute(path: '/shop/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!, refreshEvery: null, asShop: true)),
     GoRoute(path: '/orders/:id', builder: (_, s) => Scaffold(body: Text('commande ${s.pathParameters['id']}'))),
     GoRoute(path: '/bimshop/products/:id', builder: (_, s) => Scaffold(body: Text('fiche ${s.pathParameters['id']}'))),
@@ -205,6 +278,7 @@ Future<void> _pump(WidgetTester tester, _FakeMessaging api, Widget home, {_FakeS
       apiClientProvider.overrideWithValue(_client()),
       messagingApiProvider.overrideWithValue(api),
       shopInboxApiProvider.overrideWithValue(inbox ?? _FakeShopInbox()),
+      voiceRecorderProvider.overrideWithValue(recorder ?? _FakeRecorder()),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);
@@ -225,6 +299,8 @@ void main() {
     expect(find.text('Bonjour, je suis coach'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('new-message')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('new-direct')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('new-message-username')), '@awa.kone');
     await tester.tap(find.byKey(const ValueKey('new-message-go')));
@@ -370,5 +446,76 @@ void main() {
     expect(find.byKey(const ValueKey('reaction-picker')), findsNothing);
     expect(find.byKey(const ValueKey('message-reply')), findsNothing);
     expect(find.byKey(const ValueKey('message-report')), findsOneWidget);
+  });
+
+  testWidgets('V1 : groupe — auteur des messages, message système, personne bloquée, vocal ; infos et départ', (tester) async {
+    final api = _FakeGroup();
+    final rec = _FakeRecorder();
+    await _pump(tester, api, const ConversationScreen(conversationId: 'g1', refreshEvery: null), recorder: rec);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Team running'), findsOneWidget);
+    expect(find.text('4 membres'), findsOneWidget);
+    expect(find.text('Awa a créé le groupe « Team running »'), findsOneWidget);
+    expect(find.text('Koffi Yao'), findsOneWidget);
+    expect(find.byKey(const ValueKey('voice-g2')), findsOneWidget);
+    expect(find.text('0:42'), findsOneWidget);
+    expect(find.text('Message d’une personne bloquée'), findsOneWidget);
+
+    // Vocal : micro (champ vide), décompte, envoi.
+    await tester.tap(find.byKey(const ValueKey('voice-record')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('voice-recording')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('0:03 / 2:00'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('voice-send')));
+    await tester.pumpAndSettle();
+    expect(rec.calls, ['start', 'stop']);
+    expect(api.voices, [2000]);
+    expect(find.byKey(const ValueKey('voice-g9')), findsOneWidget);
+
+    // Infos du groupe : membres, invité, départ.
+    await tester.tap(find.byKey(const ValueKey('group-info')));
+    await tester.pumpAndSettle();
+    expect(find.text('Awa Koné (toi)'), findsOneWidget);
+    expect(find.text('@paul · invité·e'), findsOneWidget);
+    expect(find.byKey(const ValueKey('group-add')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('group-leave')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('group-leave-confirm')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('leave g1'));
+  });
+
+  testWidgets('V1 : vocal annulé, micro refusé : rien n’est envoyé', (tester) async {
+    final api = _FakeGroup();
+    final rec = _FakeRecorder();
+    await _pump(tester, api, const ConversationScreen(conversationId: 'g1', refreshEvery: null), recorder: rec);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('voice-record')));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.tap(find.byKey(const ValueKey('voice-cancel')));
+    await tester.pumpAndSettle();
+    expect(rec.calls, ['start', 'cancel']);
+    rec.allowed = false;
+    await tester.tap(find.byKey(const ValueKey('voice-record')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('voice-recording')), findsNothing);
+    expect(api.voices, isEmpty);
+  });
+
+  testWidgets('V1 : nouveau groupe — nom, personnes, personnes non ajoutées signalées', (tester) async {
+    final api = _FakeGroup();
+    await _pump(tester, api, const Scaffold(body: MessagesView()));
+    await tester.tap(find.byKey(const ValueKey('new-message')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('new-group')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('group-title')), 'Team running');
+    await tester.enterText(find.byKey(const ValueKey('group-people')), '@koffi, @Paul inconnu');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('group-create')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('group Team running koffi+paul+inconnu'));
+    expect(find.text('Pas ajouté·es : @inconnu'), findsOneWidget);
   });
 }

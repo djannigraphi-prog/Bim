@@ -138,9 +138,9 @@ export class ShopInboxService {
   }
 
   /** Répondre au nom de la boutique ; la conversation est lue par la boutique jusqu'à ce message. */
-  async send(userId: string, shopId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
+  async send(userId: string, shopId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
     const { member } = await this.access(shopId, conversationId);
-    const m = await this.messaging.persist({ conversationId, senderId: userId, senderShopId: shopId, text: input.text, photo: input.photo, replyToId: input.replyToId, meta }, async (tx, id) => {
+    const m = await this.messaging.persist({ conversationId, senderId: userId, senderShopId: shopId, text: input.text, photo: input.photo, voice: input.voice, replyToId: input.replyToId, meta }, async (tx, id) => {
       await tx.update(conversations).set({ shopLastReadMessageId: id }).where(eq(conversations.id, conversationId));
     });
     return this.messaging.view(m, true, member.lastReadMessageId, apiBase, { userId, shopId });

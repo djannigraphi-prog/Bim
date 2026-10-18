@@ -1,8 +1,8 @@
 /// <reference types="multer" />
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
-import { Errors } from '../../common/errors';
+import { AppError, Errors } from '../../common/errors';
 import { lockUserQuota } from '../../common/quota-lock';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
@@ -13,6 +13,7 @@ import { openReport } from '../social/access';
 import { ageOn } from '../age-policy/age';
 import { AuditService } from '../audit/audit.service';
 import { BimShopService } from '../catalog/bimshop.service';
+import { Mp4Error, inspectMp4, scrubMp4Metadata } from '../media/mp4';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { SettingsService } from '../settings/settings.service';
@@ -52,6 +53,7 @@ export function counterpartReachable(userId: string, conversation: { id: unknown
     (${conversation.kind} = 'direct' AND EXISTS (SELECT 1 FROM conversation_members o JOIN users ou ON ou.id = o.user_id
        WHERE o.conversation_id = ${conversation.id} AND o.user_id <> ${userId} AND ou.status = 'active'
          AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = ${userId}))))
+    OR ${conversation.kind} = 'group'
     OR (${conversation.kind} = 'shop' AND EXISTS (SELECT 1 FROM shops s JOIN users ow ON ow.id = s.owner_user_id
        WHERE s.id = ${conversation.shopId} AND s.status = 'active' AND ow.status = 'active'
          AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${userId} AND b.blocked_id = ow.id) OR (b.blocker_id = ow.id AND b.blocked_id = ${userId}))))
@@ -119,7 +121,14 @@ export class MessagingService {
     if (!conv) throw Errors.notFound('Conversation');
     const members = await this.db.select().from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId));
     const me = members.find((m) => m.userId === userId);
-    if (!me || me.status === 'withheld' || (me.status === 'declined' && !allowDeclined)) throw Errors.notFound('Conversation');
+    if (!me || me.status === 'withheld' || me.status === 'left' || (me.status === 'declined' && !allowDeclined)) throw Errors.notFound('Conversation');
+    if (conv.kind === 'group') {
+      // « Vu » dans un groupe : lu par tous les autres membres actifs (le plus ancien « dernier lu » d'entre eux).
+      const others = members.filter((m) => m.userId !== userId && m.status === 'active');
+      const reads = others.map((m) => m.lastReadMessageId);
+      const otherReadId = others.length && reads.every((r) => r) ? (reads as string[]).sort()[0] : null;
+      return { conv, me, otherReadId, other: null, otherUser: null, shop: null };
+    }
     if (conv.kind === 'shop') {
       const shop = await this.reachableShop({ id: conv.shopId! }, userId);
       if (!shop) throw Errors.notFound('Conversation');
@@ -334,6 +343,8 @@ export class MessagingService {
       person: otherUser ? this.person(otherUser, await this.url(otherUser.avatarKey, apiBase)) : null,
       shop: shop ? this.shopRef(shop, await this.url(shop.logoKey, apiBase)) : null,
       context: await this.context(conv, apiBase),
+      /** V1 : groupe (nom, nombre de membres, mon rôle). */
+      group: conv.kind === 'group' ? await this.groupInfo(conv, me) : null,
       lastMessage: last ? { senderIsMe: this.mine(last, userId), preview: this.preview(last), createdAt: last.createdAt } : null,
       unread,
       lastMessageAt: conv.lastMessageAt,
@@ -349,6 +360,8 @@ export class MessagingService {
     if (m.status === 'deleted') return 'Message supprimé';
     if (m.status === 'hidden') return 'Message masqué par la modération';
     if (m.kind === 'photo') return 'Photo';
+    if (m.kind === 'voice') return 'Message vocal';
+    if (m.kind === 'system') return (m.text ?? '').slice(0, 120);
     if (m.kind === 'text') return (m.text ?? '').slice(0, 120);
     if (m.kind === 'order') return 'Proposition de commande';
     // Types à venir (cartes de commande, lot 7) : texte neutre, jamais de contenu interne.
@@ -411,9 +424,16 @@ export class MessagingService {
   }
 
   /** Vue d'un message ; `mine` = écrit par moi (ou par ma boutique, côté boutique). */
-  async view(m: MessageRow, mine: boolean, otherReadId: string | null, apiBase: string, viewer?: Viewer) {
-    const visible = m.status === 'published';
+  async view(m: MessageRow, mine: boolean, otherReadId: string | null, apiBase: string, viewer?: Viewer, group?: { blocked: Set<string> }) {
+    // Groupe : le contenu d'une personne que j'ai bloquée (ou qui m'a bloqué) n'est pas montré.
+    const blockedSender = !!group && !mine && group.blocked.has(m.senderId);
+    const visible = m.status === 'published' && !blockedSender;
     const v = viewer ?? { userId: m.senderId, shopId: null };
+    let sender: ReturnType<MessagingService['person']> | null = null;
+    if (group && !mine && m.kind !== 'system') {
+      const [u] = await this.db.select().from(users).where(eq(users.id, m.senderId)).limit(1);
+      sender = u ? this.person(u, blockedSender ? null : await this.url(u.avatarKey, apiBase)) : null;
+    }
     return {
       id: m.id,
       senderIsMe: mine,
@@ -421,6 +441,13 @@ export class MessagingService {
       text: visible ? m.text : null,
       photoUrl: visible && m.kind === 'photo' ? await this.url(m.mediaKey, apiBase) : null,
       photo: visible && m.kind === 'photo' ? { width: m.mediaWidth, height: m.mediaHeight } : null,
+      /** V1 : message vocal (lien temporaire, durée). */
+      voiceUrl: visible && m.kind === 'voice' ? await this.url(m.mediaKey, apiBase) : null,
+      durationMs: m.kind === 'voice' ? m.mediaDurationMs : null,
+      /** V1 : groupe — auteur du message (null pour mes messages). */
+      sender,
+      /** V1 : groupe — message d'une personne bloquée, non affiché. */
+      blockedSender,
       status: m.status,
       createdAt: m.createdAt,
       /** Mes messages : lus par l'autre partie. */
@@ -460,14 +487,15 @@ export class MessagingService {
    * même transaction (état de lecture, archivage). La photo est effacée du stockage si l'enregistrement échoue.
    */
   async persist(
-    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; replyToId?: string; meta: RequestMeta },
+    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; replyToId?: string; meta: RequestMeta },
     after: (tx: Tx, id: string, now: Date) => Promise<void>,
   ): Promise<MessageRow> {
     const text = p.text?.trim();
-    if (!text && !p.photo) throw Errors.validation({ fields: { text: ['Écris un message ou ajoute une photo.'] } });
-    if (text && p.photo) throw Errors.validation({ fields: { text: ['Un message contient un texte ou une photo.'] } });
+    if (!text && !p.photo && !p.voice) throw Errors.validation({ fields: { text: ['Écris un message, ajoute une photo ou enregistre un vocal.'] } });
+    if ([text, p.photo, p.voice].filter(Boolean).length > 1) throw Errors.validation({ fields: { text: ['Un message contient un texte, une photo ou un vocal.'] } });
     if (text && text.length > 2000) throw Errors.validation({ fields: { text: ['2000 caractères au plus.'] } });
-    if (p.photo && !this.storage.available) throw Errors.notConfigured('Le stockage des photos');
+    if ((p.photo || p.voice) && !this.storage.available) throw Errors.notConfigured('Le stockage des fichiers');
+    const voice = p.voice ? await this.checkVoice(p.voice) : null;
     if (p.replyToId) {
       // 6-C : on ne cite qu'un message publié de la même conversation.
       const [q] = await this.db
@@ -484,7 +512,11 @@ export class MessagingService {
       img = await encodePrivateImage(p.photo, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photo');
       key = `messages/${p.conversationId}/${id}.jpg`;
       await this.storage.put(key, img.data, 'image/jpeg');
+    } else if (voice) {
+      key = `messages/${p.conversationId}/${id}.m4a`;
+      await this.storage.put(key, voice.data, 'audio/mp4');
     }
+    const kind = img ? 'photo' : voice ? 'voice' : 'text';
     try {
       await this.db.transaction(async (tx) => {
         await lockUserQuota(tx, 'messages', p.senderId);
@@ -496,11 +528,12 @@ export class MessagingService {
           conversationId: p.conversationId,
           senderId: p.senderId,
           senderShopId: p.senderShopId,
-          kind: img ? 'photo' : 'text',
-          text: img ? null : text,
+          kind,
+          text: kind === 'text' ? text : null,
           mediaKey: key,
           mediaWidth: img?.width ?? null,
           mediaHeight: img?.height ?? null,
+          mediaDurationMs: voice?.durationMs ?? null,
           replyToId: p.replyToId ?? null,
           createdAt: now,
         });
@@ -515,7 +548,7 @@ export class MessagingService {
             targetId: p.conversationId,
             ip: p.meta.ip,
             userAgent: p.meta.userAgent,
-            metadata: { kind: img ? 'photo' : 'text', ...(p.senderShopId ? { shopId: p.senderShopId } : {}), ...(p.replyToId ? { reply: true } : {}) },
+            metadata: { kind, ...(p.senderShopId ? { shopId: p.senderShopId } : {}), ...(p.replyToId ? { reply: true } : {}) },
           },
           tx,
         );
@@ -530,20 +563,53 @@ export class MessagingService {
 
   /** Messages, du plus récent au plus ancien, 30 par page (`before` = identifiant du plus ancien déjà affiché). */
   async messages(userId: string, conversationId: string, before: string | undefined, apiBase: string) {
-    const { otherReadId } = await this.access(userId, conversationId);
+    const { conv, me, otherReadId } = await this.access(userId, conversationId);
     const { rows, nextBefore } = await this.page(conversationId, before);
+    const group = conv.kind === 'group' ? { blocked: await this.blockedIds(userId) } : undefined;
     const items = [];
-    for (const m of rows) items.push(await this.view(m, this.mine(m, userId), otherReadId, apiBase, { userId, shopId: null }));
+    // Groupe : une personne ajoutée ne lit pas les messages d'avant son arrivée.
+    for (const m of rows) if (!group || m.createdAt >= me.joinedAt) items.push(await this.view(m, this.mine(m, userId), otherReadId, apiBase, { userId, shopId: null }, group));
     return { items, nextBefore };
   }
 
-  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
+  /** Personnes bloquées par moi ou qui m'ont bloqué. */
+  async blockedIds(userId: string) {
+    const rows = await this.db
+      .select({ a: userBlocks.blockerId, b: userBlocks.blockedId })
+      .from(userBlocks)
+      .where(sql`${userBlocks.blockerId} = ${userId} OR ${userBlocks.blockedId} = ${userId}`);
+    return new Set(rows.map((r) => (r.a === userId ? r.b : r.a)));
+  }
+
+  /**
+   * V1 — Message vocal : fichier M4A (AAC) enregistré par l'app, sans image ; durée lue dans le fichier, 2 minutes au
+   * plus (réglage décidé) ; métadonnées effacées (appareil, logiciel, dates). Aucun transcodage, aucun service payant.
+   */
+  private async checkVoice(f: Express.Multer.File) {
+    if (f.size > 5 * 1024 * 1024) throw Errors.validation({ fields: { voice: ['5 Mo au plus.'] } });
+    let info;
+    try {
+      info = inspectMp4(f.buffer);
+    } catch (e) {
+      if (e instanceof Mp4Error) throw Errors.validation({ fields: { voice: ['Format non reconnu : un message vocal est un fichier M4A.'] } });
+      throw e;
+    }
+    if (info.width !== null || info.metadataTrack) throw Errors.validation({ fields: { voice: ['Un message vocal ne contient que du son.'] } });
+    const maxSeconds = await this.limit('messages.voice_max_seconds', 120);
+    if (info.durationMs < 300) throw Errors.validation({ fields: { voice: ['Message vocal trop court.'] } });
+    if (info.durationMs > maxSeconds * 1000 + 500) {
+      throw new AppError('VOICE_TOO_LONG', `Un message vocal dure ${Math.round(maxSeconds / 60)} minutes au plus.`, HttpStatus.BAD_REQUEST, { maxSeconds });
+    }
+    return { data: scrubMp4Metadata(f.buffer), durationMs: info.durationMs };
+  }
+
+  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
     const { conv, me, otherReadId } = await this.access(userId, conversationId);
     if (conv.kind === 'direct') {
       const other = (await this.db.select({ userId: conversationMembers.userId }).from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId))).find((x) => x.userId !== userId);
       if (other) await this.minorShield(this.db, conversationId, userId, other.userId);
     }
-    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, replyToId: input.replyToId, meta }, async (tx, id, now) => {
+    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, voice: input.voice, replyToId: input.replyToId, meta }, async (tx, id, now) => {
       // Répondre à une demande vaut acceptation ; mon propre message est lu.
       await tx
         .update(conversationMembers)
@@ -553,7 +619,7 @@ export class MessagingService {
       if (conv.kind === 'shop') await tx.update(conversations).set({ shopArchivedAt: null }).where(eq(conversations.id, conversationId));
       // L'autre personne avait refusé ma demande : le message reste invisible pour elle (elle n'est pas relancée).
     });
-    return this.view(m, true, otherReadId, apiBase, { userId, shopId: null });
+    return this.view(m, true, otherReadId, apiBase, { userId, shopId: null }, conv.kind === 'group' ? { blocked: new Set() } : undefined);
   }
 
   // ------------------------------------------------------------------------------------------------ Réactions (6-C)
@@ -592,12 +658,14 @@ export class MessagingService {
   async react(userId: string, messageId: string, emoji: string | null, apiBase: string) {
     const [m] = await this.db.select().from(messages).where(eq(messages.id, messageId));
     if (!m) throw Errors.notFound('Message');
-    const { me, otherReadId } = await this.access(userId, m.conversationId);
+    const { conv, me, otherReadId } = await this.access(userId, m.conversationId);
     // Réagir à une demande préviendrait son auteur qu'elle a été lue (E10) : accepter d'abord.
     if (me.status === 'request') throw Errors.conflict('REQUEST_PENDING', 'Accepte d’abord cette demande pour réagir.');
-    if (m.status !== 'published') throw Errors.notFound('Message');
+    if (m.status !== 'published' || m.kind === 'system') throw Errors.notFound('Message');
+    const group = conv.kind === 'group' ? { blocked: await this.blockedIds(userId) } : undefined;
+    if (group?.blocked.has(m.senderId)) throw Errors.notFound('Message');
     await this.setReaction(this.db, m.id, { userId, shopId: null }, emoji === null ? null : MessagingService.checkReaction(emoji));
-    return this.view(m, this.mine(m, userId), otherReadId, apiBase, { userId, shopId: null });
+    return this.view(m, this.mine(m, userId), otherReadId, apiBase, { userId, shopId: null }, group);
   }
 
   /** Conversation lue jusqu'au dernier message (statut « Vu » chez l'autre personne). */
@@ -626,7 +694,7 @@ export class MessagingService {
     const [m] = await this.db
       .select()
       .from(messages)
-      .where(and(eq(messages.id, messageId), eq(messages.senderId, userId), isNull(messages.senderShopId), eq(messages.status, 'published')));
+      .where(and(eq(messages.id, messageId), eq(messages.senderId, userId), isNull(messages.senderShopId), eq(messages.status, 'published'), ne(messages.kind, 'system')));
     if (!m) throw Errors.notFound('Message');
     await this.access(userId, m.conversationId);
     // Signalé (signalement ouvert) : « Message supprimé » pour les deux, mais le contenu reste pour la modération.
@@ -636,11 +704,196 @@ export class MessagingService {
     if (m.mediaKey && !evidence) await this.storage.remove(m.mediaKey).catch(() => undefined);
   }
 
+  // ------------------------------------------------------------------------------------------------ Groupes (V1)
+
+  /** Nom, nombre de membres actifs, mon rôle. */
+  private async groupInfo(conv: ConversationRow, me: MemberRow) {
+    const [{ n }] = await this.db
+      .select({ n: count() })
+      .from(conversationMembers)
+      .where(and(eq(conversationMembers.conversationId, conv.id), eq(conversationMembers.status, 'active')));
+    return { title: conv.title, memberCount: n, myRole: me.role, invited: me.status === 'request' };
+  }
+
+  private async groupMax() {
+    return this.limit('messages.group_max_members', 32);
+  }
+
+  /** Message du système dans un groupe (création, arrivée, départ) : jamais de contenu personnel au-delà du nom. */
+  private async systemMessage(tx: DbOrTx, conversationId: string, actorId: string, text: string) {
+    const now = new Date();
+    await tx.insert(messages).values({ id: uuidv7(), conversationId, senderId: actorId, kind: 'system', text: text.slice(0, 300), createdAt: now });
+    await tx.update(conversations).set({ lastMessageAt: now }).where(eq(conversations.id, conversationId));
+  }
+
+  /**
+   * Personnes ajoutables à un groupe par `adderId` (décisions du 18/10/2026) : compte actif, aucun blocage ; une personne
+   * de 16-17 ans seulement si elle suit la personne qui l'ajoute. Ceux qui ne suivent pas l'ajouteur reçoivent une
+   * invitation (« request »), comme une demande de message. Aucune raison n'est donnée pour une personne écartée.
+   */
+  private async addable(adderId: string, usernames: string[]) {
+    const names = [...new Set(usernames.map((u) => u.trim().toLowerCase()).filter(Boolean))];
+    const rows = names.length ? await this.db.select().from(users).where(inArray(users.username, names)) : [];
+    const blocked = await this.blockedIds(adderId);
+    const ok: { id: string; name: string; status: 'active' | 'request' }[] = [];
+    const notAdded: string[] = [];
+    for (const name of names) {
+      const u = rows.find((r) => r.username === name);
+      if (!u || u.status !== 'active' || u.id === adderId || blocked.has(u.id)) {
+        notAdded.push(name);
+        continue;
+      }
+      const followsAdder = await this.follows(u.id, adderId);
+      if (ageOn(u.birthDate) < 18 && !followsAdder) {
+        notAdded.push(name);
+        continue;
+      }
+      ok.push({ id: u.id, name: u.fullName.split(' ')[0], status: followsAdder ? 'active' : 'request' });
+    }
+    return { ok, notAdded };
+  }
+
+  /** Créer un groupe : réservé aux 18 ans et plus (décision du 18/10/2026) ; 32 personnes au plus, créateur compris. */
+  async createGroup(userId: string, input: { title: string; usernames: string[] }, apiBase: string) {
+    const title = input.title.trim();
+    if (title.length < 1 || title.length > 60) throw Errors.validation({ fields: { title: ['Le nom du groupe compte 1 à 60 caractères.'] } });
+    const [me] = await this.db.select().from(users).where(eq(users.id, userId));
+    if (!me || ageOn(me.birthDate) < 18) {
+      throw new AppError('AGE_REQUIREMENT_NOT_MET', 'Créer un groupe est réservé aux personnes d’au moins 18 ans.', HttpStatus.FORBIDDEN, { capability: 'group_creation', minAge: 18 });
+    }
+    const max = await this.groupMax();
+    const { ok, notAdded } = await this.addable(userId, input.usernames);
+    if (!ok.length) throw Errors.validation({ fields: { usernames: ['Ajoute au moins une personne qui peut rejoindre le groupe.'] } });
+    if (ok.length + 1 > max) throw Errors.validation({ fields: { usernames: [`${max} personnes au plus dans un groupe, toi compris.`] } });
+    const dailyMax = await this.limit('messages.new_conversations_daily_limit', 20);
+    const id = uuidv7();
+    await this.db.transaction(async (tx) => {
+      await lockUserQuota(tx, 'conversations', userId);
+      const [{ n }] = await tx.select({ n: count() }).from(conversations).where(and(eq(conversations.createdBy, userId), gt(conversations.createdAt, new Date(Date.now() - 24 * 3600_000))));
+      if (n >= dailyMax) throw Errors.tooMany('Tu as commencé beaucoup de conversations aujourd’hui. Réessaie demain.', { reason: 'MESSAGES_NEW_CONVERSATIONS_LIMIT', limit: dailyMax });
+      await tx.insert(conversations).values({ id, kind: 'group', title, createdBy: userId });
+      await tx.insert(conversationMembers).values([
+        { conversationId: id, userId, status: 'active', role: 'admin' },
+        ...ok.map((o) => ({ conversationId: id, userId: o.id, status: o.status, role: 'member', addedBy: userId })),
+      ]);
+      await this.systemMessage(tx, id, userId, `${me.fullName.split(' ')[0]} a créé le groupe « ${title} »`);
+      await this.audit.log({ actorType: 'user', actorId: userId, action: 'messages.group_created', targetType: 'conversation', targetId: id, metadata: { members: ok.length + 1 } }, tx);
+    });
+    return { conversation: await this.summary(userId, id, apiBase), notAdded };
+  }
+
+  /** Accès d'un membre actif au groupe ; `admin` : réservé aux administrateurs du groupe. */
+  private async groupAccess(userId: string, conversationId: string, admin = false) {
+    const a = await this.access(userId, conversationId);
+    if (a.conv.kind !== 'group') throw Errors.notFound('Groupe');
+    if (admin && (a.me.role !== 'admin' || a.me.status !== 'active')) throw new AppError('GROUP_ADMIN_ONLY', 'Seul un administrateur du groupe peut le faire.', HttpStatus.FORBIDDEN);
+    return a;
+  }
+
+  /** Membres du groupe (actifs et invités), administrateurs d'abord. */
+  async groupMembers(userId: string, conversationId: string, apiBase: string) {
+    const { me } = await this.groupAccess(userId, conversationId);
+    const rows = await this.db
+      .select({ m: conversationMembers, u: users })
+      .from(conversationMembers)
+      .innerJoin(users, eq(users.id, conversationMembers.userId))
+      .where(and(eq(conversationMembers.conversationId, conversationId), inArray(conversationMembers.status, ['active', 'request'])))
+      .orderBy(asc(conversationMembers.joinedAt));
+    const blocked = await this.blockedIds(userId);
+    const items = [];
+    for (const r of rows.sort((x, y) => (x.m.role === y.m.role ? 0 : x.m.role === 'admin' ? -1 : 1))) {
+      if (r.u.status !== 'active') continue;
+      items.push({ ...this.person(r.u, blocked.has(r.u.id) ? null : await this.url(r.u.avatarKey, apiBase)), role: r.m.role, invited: r.m.status === 'request', isMe: r.u.id === userId });
+    }
+    return { items, myRole: me.role, maxMembers: await this.groupMax() };
+  }
+
+  /** Ajouter des personnes (administrateur) ; limite de taille vérifiée sous verrou. */
+  async addGroupMembers(userId: string, conversationId: string, usernames: string[], apiBase: string) {
+    await this.groupAccess(userId, conversationId, true);
+    const { ok, notAdded } = await this.addable(userId, usernames);
+    const [me] = await this.db.select().from(users).where(eq(users.id, userId));
+    const max = await this.groupMax();
+    await this.db.transaction(async (tx) => {
+      await tx.select({ id: conversations.id }).from(conversations).where(eq(conversations.id, conversationId)).for('update');
+      const current = await tx.select().from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId));
+      const present = new Set(current.filter((m) => m.status === 'active' || m.status === 'request').map((m) => m.userId));
+      const fresh = ok.filter((o) => !present.has(o.id));
+      if (present.size + fresh.length > max) throw Errors.validation({ fields: { usernames: [`${max} personnes au plus dans un groupe.`] } });
+      for (const o of fresh) {
+        const was = current.find((m) => m.userId === o.id);
+        if (was) {
+          await tx
+            .update(conversationMembers)
+            .set({ status: o.status, role: 'member', addedBy: userId, joinedAt: new Date(), lastReadMessageId: null })
+            .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, o.id)));
+        } else {
+          await tx.insert(conversationMembers).values({ conversationId, userId: o.id, status: o.status, role: 'member', addedBy: userId });
+        }
+      }
+      if (fresh.length) await this.systemMessage(tx, conversationId, userId, `${me.fullName.split(' ')[0]} a ajouté ${fresh.map((f) => f.name).join(', ')}`);
+    });
+    return { members: await this.groupMembers(userId, conversationId, apiBase), notAdded };
+  }
+
+  /** Retirer quelqu'un (administrateur), ou quitter le groupe soi-même. Le dernier administrateur qui part passe la main. */
+  async leaveGroup(userId: string, conversationId: string, targetUsername?: string) {
+    const { me } = await this.groupAccess(userId, conversationId, !!targetUsername);
+    let targetId = userId;
+    if (targetUsername) {
+      const [t] = await this.db.select({ id: users.id }).from(users).where(eq(users.username, targetUsername.trim().toLowerCase()));
+      if (!t || t.id === userId) throw Errors.notFound('Membre');
+      targetId = t.id;
+    }
+    const [actor] = await this.db.select({ fullName: users.fullName }).from(users).where(eq(users.id, userId));
+    await this.db.transaction(async (tx) => {
+      await tx.select({ id: conversations.id }).from(conversations).where(eq(conversations.id, conversationId)).for('update');
+      const [t] = await tx
+        .update(conversationMembers)
+        .set({ status: 'left', role: 'member' })
+        .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, targetId), inArray(conversationMembers.status, ['active', 'request', 'declined'])))
+        .returning();
+      if (!t) throw Errors.notFound('Membre');
+      const [tu] = await tx.select({ fullName: users.fullName }).from(users).where(eq(users.id, targetId));
+      const first = (n: string) => n.split(' ')[0];
+      await this.systemMessage(tx, conversationId, userId, targetUsername ? `${first(actor.fullName)} a retiré ${first(tu.fullName)}` : `${first(actor.fullName)} a quitté le groupe`);
+      if (!targetUsername && me.role === 'admin') {
+        const admins = await tx
+          .select({ id: conversationMembers.userId })
+          .from(conversationMembers)
+          .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.role, 'admin'), eq(conversationMembers.status, 'active')));
+        if (!admins.length) {
+          const [next] = await tx
+            .select({ id: conversationMembers.userId })
+            .from(conversationMembers)
+            .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.status, 'active')))
+            .orderBy(asc(conversationMembers.joinedAt))
+            .limit(1);
+          if (next) await tx.update(conversationMembers).set({ role: 'admin' }).where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, next.id)));
+        }
+      }
+    });
+    return { status: 'left' as const };
+  }
+
+  /** Renommer le groupe (administrateur). */
+  async renameGroup(userId: string, conversationId: string, title: string, apiBase: string) {
+    await this.groupAccess(userId, conversationId, true);
+    const t = title.trim();
+    if (t.length < 1 || t.length > 60) throw Errors.validation({ fields: { title: ['Le nom du groupe compte 1 à 60 caractères.'] } });
+    const [actor] = await this.db.select({ fullName: users.fullName }).from(users).where(eq(users.id, userId));
+    await this.db.transaction(async (tx) => {
+      await tx.update(conversations).set({ title: t }).where(eq(conversations.id, conversationId));
+      await this.systemMessage(tx, conversationId, userId, `${actor.fullName.split(' ')[0]} a renommé le groupe « ${t} »`);
+    });
+    return this.summary(userId, conversationId, apiBase);
+  }
+
   // ------------------------------------------------------------------------------------------------ Signalement et modération
 
   /** Message signalable par un membre de la conversation (pas le sien) ; renvoie l'auteur signalé. */
   async reportableMessage(userId: string, messageId: string): Promise<string> {
-    const [m] = await this.db.select().from(messages).where(and(eq(messages.id, messageId), eq(messages.status, 'published'), ne(messages.senderId, userId)));
+    const [m] = await this.db.select().from(messages).where(and(eq(messages.id, messageId), eq(messages.status, 'published'), ne(messages.senderId, userId), ne(messages.kind, 'system')));
     if (!m) throw Errors.notFound('Message');
     const [member] = await this.db
       .select({ s: conversationMembers.status })
@@ -658,7 +911,7 @@ export class MessagingService {
       await this.audit.log({ actorType: 'admin', actorId: adminId, action: 'admin.reported_message_viewed', targetType: 'message', targetId: m.id, ip: meta.ip, userAgent: meta.userAgent });
     }
     const out = [];
-    for (const m of rows) out.push({ id: m.id, kind: m.kind, text: m.text, status: m.status, photoUrl: m.kind === 'photo' ? await this.url(m.mediaKey, apiBase) : null });
+    for (const m of rows) out.push({ id: m.id, kind: m.kind, text: m.text, status: m.status, photoUrl: m.kind === 'photo' ? await this.url(m.mediaKey, apiBase) : null, voiceUrl: m.kind === 'voice' ? await this.url(m.mediaKey, apiBase) : null });
     return out;
   }
 }

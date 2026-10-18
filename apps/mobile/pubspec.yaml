@@ -32,6 +32,10 @@ dependencies:
   timezone: ^0.11.0
   # Lot 8 : page de paiement du prestataire ouverte dans le navigateur (paiement en ligne, désactivé par défaut).
   url_launcher: ^6.3.1
+  # V1 : messages vocaux enregistrés sur le téléphone (AAC dans un fichier M4A), sans service payant.
+  record: ^6.0.0
+  # Dossier temporaire du vocal avant l'envoi.
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

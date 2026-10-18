@@ -1,6 +1,6 @@
 /// <reference types="multer" />
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Req, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -89,19 +89,24 @@ export class ShopInboxController {
 
   @Post(':id/messages')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'photo', maxCount: 1 }, { name: 'voice', maxCount: 1 }], { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
   @ApiConsumes('application/json', 'multipart/form-data')
-  @ApiBody({ schema: { type: 'object', properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, replyToId: { type: 'string', format: 'uuid' } } } })
-  @ApiOperation({ summary: 'Répondre au nom de la boutique (texte ou photo ré-encodée sans métadonnées)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, voice: { type: 'string', format: 'binary', description: 'Message vocal M4A (AAC), 2 minutes au plus' }, replyToId: { type: 'string', format: 'uuid' } },
+    },
+  })
+  @ApiOperation({ summary: 'Répondre au nom de la boutique (texte, photo ré-encodée sans métadonnées ou message vocal)' })
   send(
     @CurrentAuth() a: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SendMessageDto,
-    @UploadedFile() photo: Express.Multer.File | undefined,
+    @UploadedFiles() files: { photo?: Express.Multer.File[]; voice?: Express.Multer.File[] } | undefined,
     @ReqMeta() meta: RequestMeta,
     @Req() req: Request,
   ) {
-    return this.inbox.send(a.userId, a.space.id, id, { text: dto.text, photo, replyToId: dto.replyToId }, meta, apiBase(req));
+    return this.inbox.send(a.userId, a.space.id, id, { text: dto.text, photo: files?.photo?.[0], voice: files?.voice?.[0], replyToId: dto.replyToId }, meta, apiBase(req));
   }
 
   @Post(':id/read')

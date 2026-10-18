@@ -27,6 +27,7 @@ import '../../features/shell/presentation/account_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../../features/merchant/presentation/merchant_apply_screen.dart';
 import '../../features/messaging/presentation/conversation_screen.dart';
+import '../../features/messaging/presentation/group_screens.dart';
 import '../../features/courier/presentation/courier_courses.dart';
 import '../../features/courier/presentation/courier_screens.dart';
 import '../../features/orders/presentation/checkout_screen.dart';
@@ -135,7 +136,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/merchant/apply', builder: (_, __) => const MerchantApplyScreen()),
       GoRoute(path: '/shop', builder: (_, __) => const MerchantSpaceScreen()),
       // Lot 6-A : messagerie entre personnes.
+      GoRoute(path: '/messages/new-group', builder: (_, __) => const NewGroupScreen()),
       GoRoute(path: '/messages/:id', builder: (_, s) => ConversationScreen(conversationId: s.pathParameters['id']!)),
+      GoRoute(path: '/messages/:id/group', builder: (_, s) => GroupInfoScreen(conversationId: s.pathParameters['id']!)),
       GoRoute(path: '/shop/requests', builder: (_, __) => const ShopRequestsScreen()),
       GoRoute(path: '/shop/messages', builder: (_, __) => const ShopInboxScreen()),
       GoRoute(path: '/shop/team', builder: (_, __) => const ShopTeamScreen()),

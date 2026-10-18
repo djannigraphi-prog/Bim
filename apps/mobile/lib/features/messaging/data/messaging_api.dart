@@ -58,6 +58,9 @@ class ConversationSummary {
     this.lastPreview,
     this.lastFromMe = false,
     this.lastAt,
+    this.groupTitle,
+    this.memberCount = 0,
+    this.myRole,
   });
 
   final String id;
@@ -79,17 +82,27 @@ class ConversationSummary {
   final String? lastPreview;
   final bool lastFromMe;
   final DateTime? lastAt;
+  /// V1 : groupe (nom, membres actifs, mon rôle : admin ou member).
+  final String? groupTitle;
+  final int memberCount;
+  final String? myRole;
 
   bool get isRequest => status == 'request';
   bool get withShop => kind == 'shop';
-  String get title => shop?.name ?? person?.fullName ?? '';
-  String get subtitle => shop != null ? 'Boutique' : '@${person?.username ?? ''}';
+  bool get isGroup => kind == 'group';
+  bool get isGroupAdmin => isGroup && myRole == 'admin';
+  String get title => groupTitle ?? shop?.name ?? person?.fullName ?? '';
+  String get subtitle => isGroup ? '$memberCount membre${memberCount > 1 ? 's' : ''}' : (shop != null ? 'Boutique' : '@${person?.username ?? ''}');
 
   factory ConversationSummary.fromJson(Map<String, dynamic> j) {
     final last = j['lastMessage'] as Map<String, dynamic>?;
     final person = j['person'] as Map<String, dynamic>?;
     final shop = j['shop'] as Map<String, dynamic>?;
+    final group = j['group'] as Map<String, dynamic>?;
     return ConversationSummary(
+      groupTitle: group?['title'] as String?,
+      memberCount: (group?['memberCount'] ?? 0) as int,
+      myRole: group?['myRole'] as String?,
       id: j['id'] as String,
       kind: (j['kind'] ?? 'direct') as String,
       status: (j['status'] ?? 'active') as String,
@@ -117,6 +130,26 @@ class OrderCard {
   final String? title;
   factory OrderCard.fromJson(Map<String, dynamic> j) =>
       OrderCard(id: j['id'] as String, number: j['number'] as String, status: j['status'] as String, itemsTotalFcfa: j['itemsTotalFcfa'] as int, title: j['title'] as String?);
+}
+
+/// V1 — Membre d'un groupe : administrateur ou membre ; invité tant qu'il n'a pas accepté.
+class GroupMember {
+  const GroupMember({required this.username, required this.fullName, required this.role, this.avatarUrl, this.invited = false, this.isMe = false});
+  final String username;
+  final String fullName;
+  final String role;
+  final String? avatarUrl;
+  final bool invited;
+  final bool isMe;
+  bool get isAdmin => role == 'admin';
+  factory GroupMember.fromJson(Map<String, dynamic> j) => GroupMember(
+        username: j['username'] as String,
+        fullName: (j['fullName'] ?? '') as String,
+        role: (j['role'] ?? 'member') as String,
+        avatarUrl: j['avatarUrl'] as String?,
+        invited: (j['invited'] ?? false) as bool,
+        isMe: (j['isMe'] ?? false) as bool,
+      );
 }
 
 /// 6-C — Réactions proposées (liste fermée, la même que celle du serveur).
@@ -147,10 +180,16 @@ class ChatMessage {
     this.replyTo,
     this.reactions = const [],
     this.myReaction,
+    this.voiceUrl,
+    this.durationMs,
+    this.senderName,
+    this.senderUsername,
+    this.blockedSender = false,
   });
 
   final String id;
   final bool mine;
+  /// text · photo · order · voice (V1) · system (V1 : groupe)
   final String kind;
   /// published · deleted · hidden
   final String status;
@@ -165,11 +204,18 @@ class ChatMessage {
   /// 6-C : réactions par émoji (ordre de la liste) et la mienne (ou celle de ma boutique).
   final List<({String emoji, int count})> reactions;
   final String? myReaction;
+  /// V1 : message vocal (lien temporaire) et sa durée.
+  final String? voiceUrl;
+  final int? durationMs;
+  /// V1 : groupe — auteur d'un message reçu ; message d'une personne bloquée (non affiché).
+  final String? senderName;
+  final String? senderUsername;
+  final bool blockedSender;
 
-  bool get visible => status == 'published';
-  /// Types connus de cette version (texte, photo). Les types à venir (cartes de commande, lot 7) s'affichent
-  /// avec un texte neutre au lieu d'une bulle vide.
-  bool get supported => kind == 'text' || kind == 'photo' || (kind == 'order' && order != null);
+  bool get visible => status == 'published' && !blockedSender;
+  bool get isSystem => kind == 'system';
+  /// Types connus de cette version. Les types à venir s'affichent avec un texte neutre au lieu d'une bulle vide.
+  bool get supported => kind == 'text' || kind == 'photo' || kind == 'voice' || kind == 'system' || (kind == 'order' && order != null);
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
         id: j['id'] as String,
@@ -186,13 +232,23 @@ class ChatMessage {
           for (final r in ((j['reactions'] as Map<String, dynamic>?)?['items'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) (emoji: r['emoji'] as String, count: r['count'] as int),
         ],
         myReaction: (j['reactions'] as Map<String, dynamic>?)?['mine'] as String?,
+        voiceUrl: j['voiceUrl'] as String?,
+        durationMs: j['durationMs'] as int?,
+        senderName: (j['sender'] as Map<String, dynamic>?)?['fullName'] as String?,
+        senderUsername: (j['sender'] as Map<String, dynamic>?)?['username'] as String?,
+        blockedSender: (j['blockedSender'] ?? false) as bool,
       );
 
   /// Aperçu court (bandeau « Réponse à »).
   String get preview => switch (status) {
         'deleted' => 'Message supprimé',
         'hidden' => 'Message masqué par la modération',
-        _ => kind == 'photo' ? 'Photo' : (kind == 'order' ? 'Proposition de commande' : (text ?? '')),
+        _ => switch (kind) {
+            'photo' => 'Photo',
+            'voice' => 'Message vocal',
+            'order' => 'Proposition de commande',
+            _ => text ?? '',
+          },
       };
 }
 
@@ -202,6 +258,8 @@ abstract class ConversationBackend {
   Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before});
   Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId});
   Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes);
+  /// V1 : message vocal (M4A, 2 minutes au plus).
+  Future<ChatMessage> sendVoice(String conversationId, List<int> bytes);
   Future<void> read(String conversationId);
   Future<void> deleteMessage(String id);
   /// 6-C : poser ou changer (`emoji`) ou retirer (`null`) ma réaction ; renvoie le message à jour.
@@ -259,6 +317,37 @@ class MessagingApi implements ConversationBackend {
       );
 
   @override
+  Future<ChatMessage> sendVoice(String conversationId, List<int> bytes) async => ChatMessage.fromJson(
+        await _api.upload('/v1/conversations/$conversationId/messages', field: 'voice', bytes: bytes, filename: 'vocal.m4a', contentType: 'audio/mp4'),
+      );
+
+  // ---------------------------------------------------------------- Groupes (V1)
+
+  /// Créer un groupe (18 ans et plus) ; renvoie aussi les personnes non ajoutées (sans motif).
+  Future<({ConversationSummary conversation, List<String> notAdded})> createGroup(String title, List<String> usernames) async {
+    final r = await _api.post('/v1/conversations/groups', body: {'title': title, 'usernames': usernames});
+    return (conversation: ConversationSummary.fromJson(r['conversation'] as Map<String, dynamic>), notAdded: (r['notAdded'] as List<dynamic>).cast<String>());
+  }
+
+  Future<({List<GroupMember> items, String myRole, int maxMembers})> groupMembers(String id) async {
+    final r = await _api.get('/v1/conversations/$id/members');
+    return (
+      items: [for (final m in (r['items'] as List<dynamic>).cast<Map<String, dynamic>>()) GroupMember.fromJson(m)],
+      myRole: (r['myRole'] ?? 'member') as String,
+      maxMembers: (r['maxMembers'] ?? 32) as int,
+    );
+  }
+
+  Future<List<String>> addGroupMembers(String id, List<String> usernames) async {
+    final r = await _api.post('/v1/conversations/$id/members', body: {'usernames': usernames});
+    return (r['notAdded'] as List<dynamic>).cast<String>();
+  }
+
+  Future<void> removeGroupMember(String id, String username) => _api.delete('/v1/conversations/$id/members/${Uri.encodeComponent(username)}');
+  Future<void> leaveGroup(String id) => _api.post('/v1/conversations/$id/leave');
+  Future<void> renameGroup(String id, String title) => _api.patch('/v1/conversations/$id', body: {'title': title});
+
+  @override
   Future<void> read(String conversationId) => _api.post('/v1/conversations/$conversationId/read');
   Future<void> accept(String conversationId) => _api.post('/v1/conversations/$conversationId/accept');
   Future<void> decline(String conversationId) => _api.post('/v1/conversations/$conversationId/decline');
@@ -310,6 +399,11 @@ class ShopInboxApi implements ConversationBackend {
   @override
   Future<ChatMessage> sendPhoto(String conversationId, List<int> bytes) async => ChatMessage.fromJson(
         await _api.upload('/v1/shop/inbox/$conversationId/messages', field: 'photo', bytes: bytes, filename: 'photo.jpg', contentType: 'image/jpeg'),
+      );
+
+  @override
+  Future<ChatMessage> sendVoice(String conversationId, List<int> bytes) async => ChatMessage.fromJson(
+        await _api.upload('/v1/shop/inbox/$conversationId/messages', field: 'voice', bytes: bytes, filename: 'vocal.m4a', contentType: 'audio/mp4'),
       );
 
   @override

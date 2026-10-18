@@ -14,6 +14,7 @@ import '../../orders/data/orders_api.dart';
 import '../../projects/application/photo_source.dart';
 import '../../social/presentation/moderation_sheets.dart';
 import '../../social/presentation/social_widgets.dart';
+import '../application/voice.dart';
 import '../data/messaging_api.dart';
 
 /// Délai entre deux mises à jour de la conversation ouverte (pas de notification sur le téléphone en 6-A).
@@ -47,6 +48,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   /// 6-C : message auquel je réponds (bandeau au-dessus de la saisie).
   ChatMessage? _replyTo;
   Timer? _timer;
+  /// V1 : enregistrement d'un message vocal en cours.
+  VoiceRecorder? _recorder;
+  Timer? _recTimer;
+  Duration _recElapsed = Duration.zero;
 
   ConversationBackend get _api => widget.asShop ? ref.read(shopInboxApiProvider) : ref.read(messagingApiProvider);
 
@@ -73,8 +78,54 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _recTimer?.cancel();
+    if (_recorder != null) unawaited(_recorder!.cancel());
     _input.dispose();
     super.dispose();
+  }
+
+  // ------------------------------------------------------------------ V1 : messages vocaux
+
+  Future<void> _startRecording() async {
+    final rec = ref.read(voiceRecorderProvider);
+    bool ok;
+    try {
+      ok = await rec.start();
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    if (!ok) {
+      showBimSnack(context, 'Autorise le micro dans les réglages du téléphone pour envoyer un vocal.');
+      return;
+    }
+    setState(() {
+      _recorder = rec;
+      _recElapsed = Duration.zero;
+    });
+    _recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _recElapsed += const Duration(seconds: 1));
+      // 2 minutes au plus : envoyé automatiquement.
+      if (_recElapsed >= voiceMaxDuration) unawaited(_stopRecording(send: true));
+    });
+  }
+
+  Future<void> _stopRecording({required bool send}) async {
+    final rec = _recorder;
+    if (rec == null) return;
+    _recTimer?.cancel();
+    setState(() => _recorder = null);
+    if (!send) {
+      await rec.cancel();
+      return;
+    }
+    final bytes = await rec.stop();
+    if (bytes == null || bytes.isEmpty || _recElapsed < const Duration(seconds: 1)) {
+      if (mounted) showBimSnack(context, 'Vocal trop court : garde le micro au moins une seconde.');
+      return;
+    }
+    await _send(voice: bytes);
   }
 
   /// Première page + résumé (personne, statut de demande) ; la conversation est marquée lue.
@@ -136,17 +187,22 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     }
   }
 
-  Future<void> _send({List<int>? photo}) async {
+  Future<void> _send({List<int>? photo, List<int>? voice}) async {
     final text = _input.text.trim();
-    if (photo == null && text.isEmpty) return;
+    final media = photo != null || voice != null;
+    if (!media && text.isEmpty) return;
     setState(() => _sending = true);
     try {
-      final m = photo != null ? await _api.sendPhoto(widget.conversationId, photo) : await _api.sendText(widget.conversationId, text, replyToId: _replyTo?.id);
+      final m = photo != null
+          ? await _api.sendPhoto(widget.conversationId, photo)
+          : voice != null
+              ? await _api.sendVoice(widget.conversationId, voice)
+              : await _api.sendText(widget.conversationId, text, replyToId: _replyTo?.id);
       if (!mounted) return;
-      if (photo == null) _input.clear();
+      if (!media) _input.clear();
       setState(() {
         _messages = [m, ..._messages];
-        if (photo == null) _replyTo = null;
+        if (!media) _replyTo = null;
       });
       // Répondre à une demande vaut acceptation : statut mis à jour.
       if (_conversation?.isRequest ?? false) {
@@ -205,7 +261,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 
   Future<void> _messageMenu(ChatMessage m) async {
-    if (!m.visible) return;
+    if (!m.visible || m.isSystem) return;
     // Demande pas encore acceptée : ni réaction ni réponse (lire une demande ne prévient pas son auteur).
     final canAnswer = !(_conversation?.isRequest ?? false);
     final choice = await showModalBottomSheet<String>(
@@ -268,6 +324,18 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     }
   }
 
+  /// V1 : infos du groupe (membres, ajout, départ) ; au retour, la conversation est relue (ou fermée si j'ai quitté).
+  Future<void> _openGroup() async {
+    final left = await context.push<bool>('/messages/${widget.conversationId}/group');
+    if (!mounted) return;
+    if (left == true) {
+      _invalidateLists();
+      if (context.canPop()) context.pop();
+      return;
+    }
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -286,8 +354,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   if (c != null) ...[
                     InkWell(
                       key: const ValueKey('conversation-counterpart'),
-                      onTap: () => c.shop != null ? context.push('/bimshop/shops/${c.shop!.slug}') : (c.person != null ? context.push('/people/${c.person!.username}') : null),
-                      child: c.shop != null ? ShopAvatar(shop: c.shop!) : (c.person != null ? PersonAvatar(person: c.person!) : const SizedBox(width: 40, height: 40)),
+                      onTap: () => c.isGroup
+                          ? _openGroup()
+                          : (c.shop != null ? context.push('/bimshop/shops/${c.shop!.slug}') : (c.person != null ? context.push('/people/${c.person!.username}') : null)),
+                      child: c.isGroup
+                          ? const GroupAvatar()
+                          : (c.shop != null ? ShopAvatar(shop: c.shop!) : (c.person != null ? PersonAvatar(person: c.person!) : const SizedBox(width: 40, height: 40))),
                     ),
                     const SizedBox(width: BimSpacing.sm),
                     Expanded(
@@ -306,6 +378,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     ),
                   ] else
                     const Spacer(),
+                  if (c?.isGroup ?? false)
+                    IconButton(key: const ValueKey('group-info'), tooltip: 'Infos du groupe', icon: const Icon(Icons.group_outlined), onPressed: _openGroup),
                 ],
               ),
             ),
@@ -345,9 +419,17 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                               return Center(child: TextButton(key: const ValueKey('messages-older'), onPressed: _more, child: const Text('Messages précédents')));
                             }
                             final m = _messages[i];
+                            if (m.isSystem) {
+                              return Padding(
+                                key: ValueKey('message-${m.id}'),
+                                padding: const EdgeInsets.symmetric(vertical: BimSpacing.xs),
+                                child: Text(m.text ?? '', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
+                              );
+                            }
                             return _Bubble(
                               message: m,
                               asShop: widget.asShop,
+                              inGroup: c?.isGroup ?? false,
                               otherName: c?.title ?? '',
                               showRead: identical(m, lastMineRead) && (m.read ?? false),
                               onLongPress: () => _messageMenu(m),
@@ -360,7 +442,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 padding: const EdgeInsets.all(BimSpacing.md),
                 child: Column(
                   children: [
-                    Text('${c!.title} veut t’envoyer un message.', textAlign: TextAlign.center),
+                    Text(c!.isGroup ? 'Tu es invité·e dans le groupe « ${c.title} ».' : '${c.title} veut t’envoyer un message.', textAlign: TextAlign.center),
                     const SizedBox(height: BimSpacing.sm),
                     Row(
                       children: [
@@ -395,6 +477,21 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   ),
                 ),
               if (widget.asShop) _QuickReplies(onPick: (t) => setState(() => _input.text = t)),
+              if (_recorder != null)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(BimSpacing.sm, BimSpacing.xs, BimSpacing.sm, BimSpacing.sm + MediaQuery.viewInsetsOf(context).bottom),
+                  child: Row(
+                    key: const ValueKey('voice-recording'),
+                    children: [
+                      IconButton(key: const ValueKey('voice-cancel'), tooltip: 'Annuler le vocal', icon: const Icon(Icons.delete_outline), onPressed: () => _stopRecording(send: false)),
+                      const Icon(Icons.fiber_manual_record, color: BimColors.red, size: 14),
+                      const SizedBox(width: BimSpacing.sm),
+                      Expanded(child: Text('${formatVoiceDuration(_recElapsed)} / ${formatVoiceDuration(voiceMaxDuration)}', key: const ValueKey('voice-elapsed'))),
+                      IconButton(key: const ValueKey('voice-send'), tooltip: 'Envoyer le vocal', icon: const Icon(Icons.send_rounded, color: BimColors.red), onPressed: () => _stopRecording(send: true)),
+                    ],
+                  ),
+                )
+              else
               Padding(
                 padding: EdgeInsets.fromLTRB(BimSpacing.sm, BimSpacing.xs, BimSpacing.sm, BimSpacing.sm + MediaQuery.viewInsetsOf(context).bottom),
                 child: Row(
@@ -414,11 +511,17 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                         decoration: const InputDecoration(hintText: 'Message…', counterText: ''),
                       ),
                     ),
-                    IconButton(
-                      key: const ValueKey('message-send'),
-                      tooltip: 'Envoyer',
-                      icon: _sending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_rounded, color: BimColors.red),
-                      onPressed: _sending ? null : _send,
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _input,
+                      builder: (_, value, __) => value.text.trim().isEmpty && !_sending
+                          // V1 : champ vide → micro (message vocal, 2 minutes au plus).
+                          ? IconButton(key: const ValueKey('voice-record'), tooltip: 'Enregistrer un vocal', icon: const Icon(Icons.mic_none_rounded, color: BimColors.red), onPressed: _startRecording)
+                          : IconButton(
+                              key: const ValueKey('message-send'),
+                              tooltip: 'Envoyer',
+                              icon: _sending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_rounded, color: BimColors.red),
+                              onPressed: _sending ? null : _send,
+                            ),
                     ),
                   ],
                 ),
@@ -432,11 +535,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, required this.showRead, required this.onLongPress, this.asShop = false, this.otherName = ''});
+  const _Bubble({required this.message, required this.showRead, required this.onLongPress, this.asShop = false, this.inGroup = false, this.otherName = ''});
 
   final ChatMessage message;
   final String otherName;
   final bool asShop;
+  /// V1 : dans un groupe, le nom de l'auteur s'affiche au-dessus des messages reçus.
+  final bool inGroup;
   final bool showRead;
   final VoidCallback onLongPress;
 
@@ -450,9 +555,11 @@ class _Bubble extends StatelessWidget {
     final Widget content = switch (m.status) {
       'deleted' => Text('Message supprimé', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       'hidden' => Text('Message masqué par la modération', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
+      _ when m.blockedSender => Text('Message d’une personne bloquée', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       // Type à venir (cartes de commande, lot 7) : jamais de bulle vide.
       _ when !m.supported => Text('Ce message s’affiche dans une version plus récente de BIM.', key: const ValueKey('message-unsupported'), style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       _ when m.kind == 'order' => _OrderCardView(card: m.order!, fg: fg, onTap: () => context.push(asShop ? '/shop/orders/${m.order!.id}' : '/orders/${m.order!.id}')),
+      _ when m.kind == 'voice' => VoiceMessageView(key: ValueKey('voice-${m.id}'), url: m.voiceUrl, durationMs: m.durationMs, color: fg),
       _ => m.kind == 'photo'
           ? ClipRRect(
               borderRadius: BorderRadius.circular(BimRadius.chip),
@@ -468,6 +575,11 @@ class _Bubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: m.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
+          if (inGroup && !m.mine && m.senderName != null)
+            Padding(
+              padding: const EdgeInsets.only(left: BimSpacing.sm, top: BimSpacing.xs),
+              child: Text(m.senderName!, key: ValueKey('sender-${m.id}'), style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
+            ),
           GestureDetector(
             key: ValueKey('message-${m.id}'),
             onLongPress: onLongPress,
@@ -547,6 +659,20 @@ class ShopAvatar extends StatelessWidget {
         backgroundColor: BimColors.redSoft,
         foregroundImage: shop.logoUrl == null ? null : NetworkImage(shop.logoUrl!),
         child: Icon(Icons.storefront_outlined, color: BimColors.red, size: size * 0.5),
+      );
+}
+
+/// V1 — Avatar d'un groupe.
+class GroupAvatar extends StatelessWidget {
+  const GroupAvatar({super.key, this.size = 40});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+        radius: size / 2,
+        backgroundColor: BimColors.redSoft,
+        child: Icon(Icons.groups_rounded, color: BimColors.red, size: size * 0.55),
       );
 }
 

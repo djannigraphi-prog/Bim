@@ -1,13 +1,13 @@
 /// <reference types="multer" />
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AuthContext, CurrentAuth, RequireSpace } from '../auth/auth.decorators';
 import { apiBase } from '../projects/projects.controller';
-import { ReactionDto, SendMessageDto, StartConversationDto, StartShopConversationDto } from './dto';
+import { AddGroupMembersDto, CreateGroupDto, ReactionDto, RenameGroupDto, SendMessageDto, StartConversationDto, StartShopConversationDto } from './dto';
 import { MessagingService } from './messaging.service';
 
 /** Lot 6-A — Messagerie entre personnes (écran 47) ; 6-B : conversations avec une boutique, côté cliente. Espace utilisateur ; aucune notification sur le téléphone. */
@@ -55,19 +55,63 @@ export class MessagingController {
 
   @Post('conversations/:id/messages')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'photo', maxCount: 1 }, { name: 'voice', maxCount: 1 }], { limits: { fileSize: 25 * 1024 * 1024, files: 1 } }))
   @ApiConsumes('application/json', 'multipart/form-data')
-  @ApiBody({ schema: { type: 'object', properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, replyToId: { type: 'string', format: 'uuid' } } } })
-  @ApiOperation({ summary: 'Envoyer un texte ou une photo (ré-encodée sans métadonnées), en citant éventuellement un message' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, voice: { type: 'string', format: 'binary', description: 'Message vocal M4A (AAC), 2 minutes au plus' }, replyToId: { type: 'string', format: 'uuid' } },
+    },
+  })
+  @ApiOperation({ summary: 'Envoyer un texte, une photo (ré-encodée sans métadonnées) ou un message vocal, en citant éventuellement un message' })
   send(
     @CurrentAuth() a: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SendMessageDto,
-    @UploadedFile() photo: Express.Multer.File | undefined,
+    @UploadedFiles() files: { photo?: Express.Multer.File[]; voice?: Express.Multer.File[] } | undefined,
     @ReqMeta() meta: RequestMeta,
     @Req() req: Request,
   ) {
-    return this.messaging.send(a.userId, id, { text: dto.text, photo, replyToId: dto.replyToId }, meta, apiBase(req));
+    return this.messaging.send(a.userId, id, { text: dto.text, photo: files?.photo?.[0], voice: files?.voice?.[0], replyToId: dto.replyToId }, meta, apiBase(req));
+  }
+
+  @Post('conversations/groups')
+  @Throttle({ default: { limit: 10, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Créer un groupe (18 ans et plus, 32 personnes au plus) ; renvoie les personnes non ajoutées, sans motif' })
+  createGroup(@CurrentAuth() a: AuthContext, @Body() dto: CreateGroupDto, @Req() req: Request) {
+    return this.messaging.createGroup(a.userId, dto, apiBase(req));
+  }
+
+  @Get('conversations/:id/members')
+  @ApiOperation({ summary: 'Membres d’un groupe (actifs et invités)' })
+  members(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.messaging.groupMembers(a.userId, id, apiBase(req));
+  }
+
+  @Post('conversations/:id/members')
+  @Throttle({ default: { limit: 30, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Ajouter des personnes à un groupe (administrateur)' })
+  addMembers(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AddGroupMembersDto, @Req() req: Request) {
+    return this.messaging.addGroupMembers(a.userId, id, dto.usernames, apiBase(req));
+  }
+
+  @Delete('conversations/:id/members/:username')
+  @ApiOperation({ summary: 'Retirer une personne d’un groupe (administrateur)' })
+  removeMember(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Param('username') username: string) {
+    return this.messaging.leaveGroup(a.userId, id, username.slice(0, 40));
+  }
+
+  @Post('conversations/:id/leave')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Quitter un groupe' })
+  leave(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.messaging.leaveGroup(a.userId, id);
+  }
+
+  @Patch('conversations/:id')
+  @ApiOperation({ summary: 'Renommer un groupe (administrateur)' })
+  rename(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RenameGroupDto, @Req() req: Request) {
+    return this.messaging.renameGroup(a.userId, id, dto.title, apiBase(req));
   }
 
   @Post('conversations/:id/read')
