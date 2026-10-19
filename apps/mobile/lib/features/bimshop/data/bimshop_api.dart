@@ -4,8 +4,22 @@ import '../../../core/network/api_client.dart';
 
 /// Lot 5-C — BimShop (écrans 32, 33, 34, 54). Parcourir est public ; aucune commande ni paiement ici.
 
+/// V1 (19/10/2026) — Étoiles de la boutique (jamais d'un article) : moyenne affichée à partir de 3 avis.
+class ShopRating {
+  const ShopRating({required this.average, required this.reviews});
+
+  /// Nul tant que la boutique a moins de 3 avis (« Nouvelle boutique »).
+  final double? average;
+  final int reviews;
+
+  static ShopRating? fromJson(Object? j) {
+    if (j is! Map<String, dynamic>) return null;
+    return ShopRating(average: (j['average'] as num?)?.toDouble(), reviews: (j['reviews'] ?? 0) as int);
+  }
+}
+
 class ShopRef {
-  const ShopRef({required this.id, required this.name, required this.slug, required this.verified, this.city, this.commune, this.logoUrl});
+  const ShopRef({required this.id, required this.name, required this.slug, required this.verified, this.city, this.commune, this.logoUrl, this.rating});
 
   final String id;
   final String name;
@@ -14,6 +28,8 @@ class ShopRef {
   final String? city;
   final String? commune;
   final String? logoUrl;
+  /// Fiche article et profil de la boutique seulement (pas sur les cartes).
+  final ShopRating? rating;
 
   String get place => [commune, city].whereType<String>().where((s) => s.isNotEmpty).join(', ');
 
@@ -25,6 +41,7 @@ class ShopRef {
         city: j['city'] as String?,
         commune: j['commune'] as String?,
         logoUrl: j['logoUrl'] as String?,
+        rating: ShopRating.fromJson(j['rating']),
       );
 }
 

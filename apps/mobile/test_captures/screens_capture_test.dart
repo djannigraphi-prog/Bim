@@ -376,7 +376,7 @@ class _FakeBimShopApi extends BimShopApi {
         available: true,
         photos: const [null, null, null],
         variants: const [(id: 'v1', label: 'S', available: true), (id: 'v2', label: 'M', available: true), (id: 'v3', label: 'L', available: false)],
-        shop: _elegance,
+        shop: const ShopRef(id: 's1', name: 'Boutique Élégance', slug: 'boutique-elegance', verified: true, city: 'Abidjan', commune: 'Cocody', rating: ShopRating(average: 4.6, reviews: 32)),
         moreFromShop: [_cards[1]],
         counts: const ShopCounts(recommendations: 218, likes: 1600, reviews: 18),
       );

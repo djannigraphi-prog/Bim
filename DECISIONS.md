@@ -183,7 +183,7 @@ parmi trois). La devise « Beauté · Image · Motivation » passe sous le logo 
   simulé de la démo et pour un paiement hors magasin (site, F7). Dans l'app publiée, seuls les packs du magasin
   resteront proposés.
 - Badge en forme de médaille : demande retirée par le fondateur (« laisse tomber pour les badges »).
-### V1-1910-E — Étoiles de la boutique sur la fiche article (19/10/2026, 14 h) · Fondateur · **décidé** et **appliqué**
+### V1-1910-E — Étoiles de la boutique sur la fiche article (19/10/2026, 14 h 03) · Fondateur · **décidé** et **appliqué**
 
 « Les étoiles, c'est pour le marchand, pas pour les produits » : sur la fiche d'un article et sur le profil de la
 boutique, le nom de la boutique est suivi de ses étoiles (« ★ 4,6 (32 avis) »). Moyenne des notes données **à la

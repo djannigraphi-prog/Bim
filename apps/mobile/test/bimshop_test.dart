@@ -62,7 +62,7 @@ class _FakeBimShop extends BimShopApi {
         available: true,
         photos: const [null],
         variants: const [(id: 'v1', label: 'S', available: true), (id: 'v2', label: 'M', available: false)],
-        shop: _shop,
+        shop: const ShopRef(id: 's1', name: 'Maison Plumes', slug: 'maison-plumes', verified: true, city: 'Abidjan', commune: 'Cocody', rating: ShopRating(average: 4.6, reviews: 32)),
         moreFromShop: [_card('p2', 'Sac Kalia', 15000)],
         counts: const ShopCounts(recommendations: 218, likes: 1600, reviews: 18),
       );
@@ -84,7 +84,7 @@ class _FakeBimShop extends BimShopApi {
 
   @override
   Future<PublicShop> shop(String slug, {String? cursor}) async => cursor == null
-      ? PublicShop(shop: _shop, description: 'Robes de soirée', followers: 1, productCount: 2, items: [_card('p1', 'Robe Plumes', 45000)], nextCursor: 'c2')
+      ? PublicShop(shop: const ShopRef(id: 's1', name: 'Maison Plumes', slug: 'maison-plumes', verified: true, city: 'Abidjan', commune: 'Cocody', rating: ShopRating(average: null, reviews: 1)), description: 'Robes de soirée', followers: 1, productCount: 2, items: [_card('p1', 'Robe Plumes', 45000)], nextCursor: 'c2')
       : PublicShop(shop: _shop, followers: 1, productCount: 2, items: [_card('p9', 'Robe Lumière', 52000)]);
 
   @override
@@ -249,6 +249,9 @@ void main() {
     final api = _FakeBimShop();
     await _pump(tester, api, '/bimshop/products/p1');
     expect(find.text('218 recommandations'), findsOneWidget);
+    // Étoiles de la boutique (pas de l'article) à côté de son nom.
+    expect(find.text('4,6 (32 avis)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-stars')), findsOneWidget);
     expect(find.text('18 avis'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('product-recommend')));
     await tester.pumpAndSettle();
@@ -310,6 +313,7 @@ void main() {
     await _pump(tester, api, '/bimshop/shops/maison-plumes');
     expect(find.text('Maison Plumes'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const ValueKey('shop-counts'))).data, '2 articles · 1 abonné');
+    expect(find.text('Nouvelle boutique'), findsOneWidget); // moins de 3 avis : pas encore d'étoiles
     await tester.tap(find.byKey(const ValueKey('follow-shop')));
     await tester.pumpAndSettle();
     expect(api.calls, ['follow maison-plumes true']);

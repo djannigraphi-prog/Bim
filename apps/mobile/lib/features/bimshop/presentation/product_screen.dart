@@ -305,6 +305,8 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                                       if (p.shop.verified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified, size: 16, color: BimColors.red)),
                                     ],
                                   ),
+                                  // V1 : étoiles de la boutique (jamais de l'article).
+                                  if (p.shop.rating != null) ShopStars(rating: p.shop.rating!),
                                   if (p.shop.place.isNotEmpty) Text(p.shop.place, style: theme.textTheme.bodySmall),
                                 ],
                               ),

@@ -392,3 +392,33 @@ class ShopCardGrid extends StatelessWidget {
         },
       );
 }
+
+/// V1 — Étoiles de la boutique (maquette 34) : « ★ 4,6 (32 avis) », ou « Nouvelle boutique » avant 3 avis.
+class ShopStars extends StatelessWidget {
+  const ShopStars({super.key, required this.rating});
+  final ShopRating rating;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final avg = rating.average;
+    if (avg == null) {
+      return Text('Nouvelle boutique', key: const ValueKey('shop-stars-new'), style: theme.textTheme.bodySmall);
+    }
+    final label = avg.toStringAsFixed(1).replaceAll('.', ',');
+    return Semantics(
+      label: 'Boutique notée $label sur 5, ${rating.reviews} avis',
+      excludeSemantics: true,
+      child: Row(
+        key: const ValueKey('shop-stars'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 1; i <= 5; i++)
+            Icon(avg >= i - 0.25 ? Icons.star_rounded : (avg >= i - 0.75 ? Icons.star_half_rounded : Icons.star_outline_rounded), size: 16, color: BimColors.coin),
+          const SizedBox(width: 4),
+          Text('$label (${rating.reviews} avis)', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}

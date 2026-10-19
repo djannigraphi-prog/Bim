@@ -139,6 +139,7 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                             if (s.shop.verified) const Padding(padding: EdgeInsets.only(left: 4), child: Tooltip(message: 'Boutique vérifiée', child: Icon(Icons.verified, color: BimColors.red, size: 20))),
                           ],
                         ),
+                        if (s.shop.rating != null) ShopStars(rating: s.shop.rating!),
                         if (s.shop.place.isNotEmpty) Text(s.shop.place, style: theme.textTheme.bodyMedium),
                         const SizedBox(height: 2),
                         Text(
