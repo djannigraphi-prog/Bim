@@ -10,6 +10,8 @@ import '../../../core/widgets/feedback.dart';
 import '../../social/presentation/social_widgets.dart';
 import '../data/messaging_api.dart';
 import 'conversation_screen.dart' show GroupAvatar, ShopAvatar;
+import '../../projects/presentation/project_widgets.dart' show ChoiceChipBim;
+import '../../social/presentation/stories.dart' show StoriesBar;
 
 /// Ouvre (ou retrouve) la conversation avec une personne puis l'affiche.
 Future<void> openConversationWith(BuildContext context, WidgetRef ref, String username) async {
@@ -37,8 +39,8 @@ Future<void> openShopConversation(BuildContext context, WidgetRef ref, String sh
   }
 }
 
-/// Lot 6-A — Écran 47, onglet Messages : « Tous » et « Demandes ». Les onglets Clients / Marchands / Livreurs /
-/// Groupes arrivent avec les boutiques (6-B), les livraisons (lot 7) et les groupes (6-C).
+/// Lot 6-A — Écran 47, onglet Messages (maquette) : recherche, stories, filtres Tous / Personnes / Marchands /
+/// Groupes, « Demandes de messages », conversations avec leur rôle.
 class MessagesView extends ConsumerStatefulWidget {
   const MessagesView({super.key});
 
@@ -48,6 +50,15 @@ class MessagesView extends ConsumerStatefulWidget {
 
 class _MessagesViewState extends ConsumerState<MessagesView> {
   bool _requests = false;
+  /// Maquette 47 : filtres Tous, Personnes, Marchands, Groupes et recherche dans les conversations chargées.
+  String _filter = 'all';
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   Future<void> _newMessage() async {
     // V1 : un message à une personne, ou un nouveau groupe.
@@ -74,11 +85,23 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
     await openConversationWith(context, ref, username.replaceFirst('@', ''));
   }
 
+  bool _matches(ConversationSummary c) {
+    final ok = switch (_filter) {
+      'people' => !c.isGroup && c.shop == null,
+      'shops' => c.shop != null,
+      'groups' => c.isGroup,
+      _ => true,
+    };
+    final q = _search.text.trim().toLowerCase();
+    return ok && (q.isEmpty || c.title.toLowerCase().contains(q) || (c.lastPreview ?? '').toLowerCase().contains(q));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final unread = ref.watch(messagesUnreadProvider).valueOrNull;
     final async = ref.watch(conversationsProvider(_requests));
+    final requests = unread?.requests ?? 0;
     return RefreshIndicator(
       onRefresh: () async {
         ref
@@ -87,28 +110,63 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
         await ref.read(conversationsProvider(_requests).future);
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.xxl),
+        padding: const EdgeInsets.fromLTRB(0, BimSpacing.sm, 0, BimSpacing.xxl),
         children: [
-          Row(
-            children: [
-              Expanded(child: Text('Messages', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24))),
-              IconButton(key: const ValueKey('new-message'), tooltip: 'Nouveau message', icon: const Icon(Icons.edit_square), onPressed: _newMessage),
-            ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
+            child: Row(
+              children: [
+                if (_requests)
+                  IconButton(key: const ValueKey('requests-back'), tooltip: 'Retour aux messages', icon: const Icon(Icons.arrow_back_rounded), onPressed: () => setState(() => _requests = false)),
+                Expanded(child: Text(_requests ? 'Demandes' : 'Messages', style: theme.textTheme.headlineMedium)),
+                IconButton(key: const ValueKey('new-message'), tooltip: 'Nouveau message', icon: const Icon(Icons.edit_square), onPressed: _newMessage),
+              ],
+            ),
           ),
-          const SizedBox(height: BimSpacing.sm),
-          SegmentedButton<bool>(
-            segments: [
-              const ButtonSegment(value: false, label: Text('Tous')),
-              ButtonSegment(value: true, label: Text((unread?.requests ?? 0) > 0 ? 'Demandes (${unread!.requests})' : 'Demandes')),
-            ],
-            selected: {_requests},
-            showSelectedIcon: false,
-            onSelectionChanged: (s) => setState(() => _requests = s.first),
-          ),
-          const SizedBox(height: BimSpacing.md),
-          if (_requests)
+          if (!_requests) ...[
             Padding(
-              padding: const EdgeInsets.only(bottom: BimSpacing.sm),
+              padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.sm),
+              child: TextField(
+                key: const ValueKey('messages-search'),
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
+            const StoriesBar(),
+            SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
+                children: [
+                  for (final (code, label) in const [('all', 'Tous'), ('people', 'Personnes'), ('shops', 'Marchands'), ('groups', 'Groupes')]) ...[
+                    ChoiceChipBim(key: ValueKey('messages-filter-$code'), label: label, selected: _filter == code, dark: true, onTap: () => setState(() => _filter = code)),
+                    const SizedBox(width: BimSpacing.sm),
+                  ],
+                ],
+              ),
+            ),
+            // Maquette 47 : « Demandes de messages · N » (personnes que tu ne suis pas).
+            ListTile(
+              key: const ValueKey('messages-requests'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
+              leading: const Icon(Icons.inbox_outlined),
+              title: Text.rich(TextSpan(children: [
+                const TextSpan(text: 'Demandes de messages', style: TextStyle(fontWeight: FontWeight.w600)),
+                if (requests > 0) TextSpan(text: ' · $requests', style: theme.textTheme.bodyMedium),
+              ],),),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => setState(() => _requests = true),
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.sm),
               child: Text('Messages de personnes que tu ne suis pas. Elles ne savent pas si tu as lu leur demande.', style: theme.textTheme.bodySmall),
             ),
           ...async.when(
@@ -117,27 +175,39 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
               const SizedBox(height: BimSpacing.xl),
               Text(e is ApiException ? e.message : ApiException.unknown.message, textAlign: TextAlign.center),
               const SizedBox(height: BimSpacing.md),
-              BimButton(label: 'Réessayer', variant: BimButtonVariant.outline, onPressed: () => ref.invalidate(conversationsProvider(_requests))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
+                child: BimButton(label: 'Réessayer', variant: BimButtonVariant.outline, onPressed: () => ref.invalidate(conversationsProvider(_requests))),
+              ),
             ],
-            data: (page) => page.items.isEmpty
-                ? [
-                    const SizedBox(height: BimSpacing.xl),
-                    const Peni(pose: PeniPose.wave, size: 100),
-                    const SizedBox(height: BimSpacing.md),
-                    Text(_requests ? 'Aucune demande.' : 'Aucun message pour l’instant. Écris à une personne que tu suis !', textAlign: TextAlign.center),
-                  ]
-                : [
-                    for (final c in page.items)
-                      ConversationTile(
-                        conversation: c,
-                        onTap: () async {
-                          await context.push('/messages/${c.id}');
-                          ref
-                            ..invalidate(conversationsProvider)
-                            ..invalidate(messagesUnreadProvider);
-                        },
+            data: (page) {
+              final items = page.items.where(_matches).toList();
+              return items.isEmpty
+                  ? [
+                      const SizedBox(height: BimSpacing.xl),
+                      const Peni(pose: PeniPose.wave, size: 100),
+                      const SizedBox(height: BimSpacing.md),
+                      Text(
+                        _requests ? 'Aucune demande.' : (page.items.isEmpty ? 'Aucun message pour l’instant. Écris à une personne que tu suis !' : 'Aucune conversation ne correspond.'),
+                        textAlign: TextAlign.center,
                       ),
-                  ],
+                    ]
+                  : [
+                      for (final c in items)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),
+                          child: ConversationTile(
+                            conversation: c,
+                            onTap: () async {
+                              await context.push('/messages/${c.id}');
+                              ref
+                                ..invalidate(conversationsProvider)
+                                ..invalidate(messagesUnreadProvider);
+                            },
+                          ),
+                        ),
+                    ];
+            },
           ),
         ],
       ),
@@ -199,7 +269,14 @@ class ConversationTile extends StatelessWidget {
       key: ValueKey('conversation-${c.id}'),
       contentPadding: EdgeInsets.zero,
       leading: c.isGroup ? const GroupAvatar(size: 48) : (c.shop != null ? ShopAvatar(shop: c.shop!, size: 48) : (c.person != null ? PersonAvatar(person: c.person!, size: 48) : null)),
-      title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
+      title: Row(
+        children: [
+          Flexible(child: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w700))),
+          // Maquette 47 : rôle de la conversation.
+          if (c.shop != null) const _RoleBadge(icon: Icons.storefront_outlined, label: 'Marchand', color: BimColors.black)
+          else if (c.isGroup) const _RoleBadge(icon: Icons.groups_outlined, label: 'Groupe', color: Color(0xFF2F6FEB)),
+        ],
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -207,14 +284,19 @@ class ConversationTile extends StatelessWidget {
             c.lastPreview == null ? c.subtitle : '${c.lastFromMe ? 'Toi : ' : ''}${c.lastPreview}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: bold ? FontWeight.w700 : null),
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: bold ? FontWeight.w600 : null, color: bold ? theme.colorScheme.onSurface : null),
           ),
           if (trailingBadges.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Wrap(spacing: 6, children: trailingBadges)),
         ],
       ),
-      trailing: c.unread > 0
-          ? Badge(label: Text('${c.unread}'), backgroundColor: BimColors.red)
-          : (c.lastAt == null ? null : Text(_ago(c.lastAt!), style: theme.textTheme.bodySmall)),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (c.lastAt != null) Text(_ago(c.lastAt!), style: theme.textTheme.bodySmall?.copyWith(color: c.unread > 0 ? BimColors.red : null, fontWeight: c.unread > 0 ? FontWeight.w700 : null)),
+          if (c.unread > 0) ...[const SizedBox(height: 4), Badge(label: Text('${c.unread}'), backgroundColor: BimColors.red)],
+        ],
+      ),
       onTap: onTap,
       onLongPress: onLongPress,
     );
@@ -226,5 +308,26 @@ class ConversationTile extends StatelessWidget {
     if (d.inHours < 1) return '${d.inMinutes} min';
     if (d.inDays < 1) return '${d.inHours} h';
     return '${d.inDays} j';
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.icon, required this.label, required this.color});
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fg = dark && color == BimColors.black ? BimColors.white : color;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(color: fg.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(BimRadius.chip)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 13, color: fg), const SizedBox(width: 3), Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: fg))]),
+      ),
+    );
   }
 }

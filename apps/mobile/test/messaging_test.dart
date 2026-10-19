@@ -293,8 +293,19 @@ void main() {
     expect(find.text('Awa Koné'), findsOneWidget);
     expect(find.text('Salut !'), findsOneWidget);
     expect(find.text('2'), findsOneWidget); // non-lus
-    expect(find.text('Demandes (1)'), findsOneWidget);
-    await tester.tap(find.text('Demandes (1)'));
+    // Maquette 47 : filtre « Marchands » (Awa est une personne), puis recherche.
+    await tester.tap(find.byKey(const ValueKey('messages-filter-shops')));
+    await tester.pump();
+    expect(find.text('Awa Koné'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('messages-filter-all')));
+    await tester.enterText(find.byKey(const ValueKey('messages-search')), 'zzz');
+    await tester.pump();
+    expect(find.text('Aucune conversation ne correspond.'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('messages-search')), 'awa');
+    await tester.pump();
+    expect(find.text('Awa Koné'), findsOneWidget);
+    expect(find.text('Demandes de messages · 1', findRichText: true), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('messages-requests')));
     await tester.pumpAndSettle();
     expect(find.text('Bonjour, je suis coach'), findsOneWidget);
 
