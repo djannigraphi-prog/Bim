@@ -166,6 +166,14 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1910-I — Partie iPhone (19/10/2026) · Fondateur (« FAIS TOUT LE 1 ») · **appliqué**
+
+La partie iPhone (`apps/mobile/ios`) est créée par Flutter, réglée (nom « BIM », textes d'autorisation caméra, galerie,
+micro, icônes BIM) et ajoutée au dépôt. La CI `ios.yml` la compile **sans signature** sur un Mac Intel de GitHub
+(gratuit pour un dépôt public). Aucun compte Apple, aucune dépense : pour installer sur un iPhone ou publier sur
+l'App Store, un compte Apple Developer (99 $ par an) reste nécessaire, à décider par le fondateur. Identifiant
+provisoire `ci.bim.app`, le même que sur Android, à remplacer par l'identifiant définitif.
+
 ### V1-1910-S — Signature « from Generation Hybride » au démarrage (19/10/2026, 14 h 41) · Fondateur · **décidé** et **appliqué**
 
 Comme « from Meta » sur WhatsApp : en bas de l'écran de démarrage (écran 01), « from » puis le logo et le nom de

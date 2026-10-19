@@ -16,14 +16,15 @@ Dernière mise à jour : 18/10/2026 — version 1 sans dépense (voir la section
 | V1-R | **Aucun remboursement dans BIM** (règle du fondateur) ; « Signaler la boutique » depuis son profil et la commande, vu par la modération (0060) | 3 e2e modifiés, 1 e2e, 1 Flutter | fait |
 | V1-S | **BimShop comme la maquette 32** : mosaïque façon Pinterest, photos carrées ou portrait (recadrage serveur), vidéo d'1 min par article, compteurs recommandations / j'aime / avis, sans étoiles (0061) | 1 e2e (3 cas), 2 unitaires, 3 Flutter | fait |
 | V1-E | Étoiles de la **boutique** (moyenne des avis sur la boutique, dès 3 avis) sur la fiche article et le profil ; jamais sur les articles | 1 e2e, 2 Flutter | fait |
+| V1-I | **Partie iPhone** ajoutée au dépôt (`apps/mobile/ios`, nom BIM, autorisations en français, icônes, identifiant provisoire `ci.bim.app`) ; compilée sans signature sur un Mac de GitHub (gratuit, dépôt public) | CI `ios.yml` | compilée ; installation sur iPhone : compte Apple Developer (99 $/an) **non engagé** |
 | V1-H | Codes par e-mail via SMTP (`EMAIL_PROVIDER=smtp`) ; plan du lancement gratuit | 1 e2e | fait |
 
 Reste avant l'ouverture au public : comptes des magasins, hébergement, projet Firebase, fournisseur d'e-mail (actions
-du fondateur), tests sur de vrais téléphones, connexion Google, version iPhone compilée.
+du fondateur), tests sur de vrais téléphones, connexion Google, compte Apple Developer pour installer sur iPhone.
 
 ## Résumé
 
-L'analyse est validée avec corrections (`docs/ANALYSE.md`). Les fondations de l'API sont en place et testées : comptes, vérification du contact, sessions, récupération, opérations sensibles, âges (F15), récupération vérifiée (F16), espaces. L'application mobile (écrans 01 à 06 et écrans de code) est **analysée, testée et compilée en APK Android (debug)** par la CI GitHub (Flutter 3.47.7 stable) ; ses écrans ont été comparés aux maquettes. iOS n'est pas encore compilé (machine macOS nécessaire). Aucune règle financière n'est programmée.
+L'analyse est validée avec corrections (`docs/ANALYSE.md`). Les fondations de l'API sont en place et testées : comptes, vérification du contact, sessions, récupération, opérations sensibles, âges (F15), récupération vérifiée (F16), espaces. L'application mobile (écrans 01 à 06 et écrans de code) est **analysée, testée et compilée en APK Android (debug)** par la CI GitHub (Flutter 3.47.7 stable) ; ses écrans ont été comparés aux maquettes. iOS : compilé sans signature par la CI (19/10/2026, V1-I). Aucune règle financière n'est programmée.
 
 ## Légende des états
 
