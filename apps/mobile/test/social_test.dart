@@ -299,9 +299,9 @@ void main() {
     await _pump(tester, const ProfileScreen(username: 'moi'), social);
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Projets'), findsOneWidget);
-    expect(find.text('2,8 k'), findsNothing); // 2 800 < 10 000 : nombre entier
-    expect(find.text('2800'), findsOneWidget);
-    expect(find.text('Changer ma photo'), findsOneWidget);
+    expect(find.text('2,8 k'), findsOneWidget); // maquette 52 : abrégé dès 1 000
+    expect(find.text('Modifier le profil'), findsOneWidget);
+    expect(find.byKey(const ValueKey('profile-switch')), findsOneWidget);
     expect(find.text('Abidjan'), findsOneWidget);
 
     await _pump(tester, const ProfileScreen(username: 'awa.k'), social);

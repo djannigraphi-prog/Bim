@@ -375,7 +375,8 @@ String timeAgo(DateTime t, {DateTime? now}) {
 /// 950 → « 950 », 10 200 → « 10,2 k », 2 800 000 → « 2,8 M ».
 String compactCount(int n) {
   String one(double v) => (v >= 100 ? v.toStringAsFixed(0) : v.toStringAsFixed(1)).replaceAll(RegExp(r'[.,]0$'), '').replaceAll('.', ',');
-  if (n < 10000) return '$n';
+  // Maquettes 10 et 52 : abrégé dès 1 000 (« 2,8 k »).
+  if (n < 1000) return '$n';
   if (n < 1000000) return '${one(n / 1000)} k';
   return '${one(n / 1000000)} M';
 }

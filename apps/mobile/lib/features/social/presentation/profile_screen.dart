@@ -7,7 +7,9 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../account/presentation/account_security_screens.dart' show showSpacesSheet;
 import '../../messaging/presentation/messages_view.dart';
+import '../../wallet/data/wallet_api.dart' show walletProvider;
 import '../../projects/application/photo_source.dart';
 import '../application/social_providers.dart';
 import '../data/social_api.dart';
@@ -92,6 +94,8 @@ class ProfileScreen extends ConsumerWidget {
                 PopupMenuItem(value: 'block', child: Text('Bloquer')),
               ],
             ),
+          // Maquette 52 : portefeuille de pièces et menu du compte.
+          if (p != null && p.isMe) IconButton(key: const ValueKey('profile-wallet'), tooltip: 'Mes pièces', icon: const Icon(Icons.account_balance_wallet_outlined), onPressed: () => context.push('/wallet')),
           if (p != null && p.isMe) IconButton(tooltip: 'Mon compte', icon: const Icon(Icons.menu_rounded), onPressed: () => context.push('/account')),
         ],
       ),
@@ -159,6 +163,19 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (p.isMe) ...[
+                      // Maquette 52 : « Changer de profil » (utilisateur, boutiques, livreur).
+                      ActionChip(
+                        key: const ValueKey('profile-switch'),
+                        avatar: Icon(Icons.swap_horiz_rounded, size: 18, color: theme.colorScheme.surface),
+                        label: Text('Changer de profil', style: TextStyle(color: theme.colorScheme.surface, fontWeight: FontWeight.w600)),
+                        backgroundColor: theme.colorScheme.onSurface,
+                        side: BorderSide.none,
+                        shape: const StadiumBorder(),
+                        onPressed: () => showSpacesSheet(context),
+                      ),
+                      const SizedBox(height: BimSpacing.sm),
+                    ],
                     Text(p.person.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                     if (p.city != null) Text(p.city!, style: theme.textTheme.bodyMedium),
                     if (!p.isMe && p.followsMe) Text('Te suit', style: theme.textTheme.bodySmall),
@@ -166,9 +183,9 @@ class ProfileScreen extends ConsumerWidget {
                     if (p.isMe)
                       Row(
                         children: [
-                          Expanded(child: BimButton(label: 'Changer ma photo', variant: BimButtonVariant.subtle, onPressed: () => _changeAvatar(context, ref, p))),
+                          Expanded(child: BimButton(key: const ValueKey('profile-edit'), label: 'Modifier le profil', variant: BimButtonVariant.subtle, onPressed: () => _changeAvatar(context, ref, p))),
                           const SizedBox(width: BimSpacing.sm),
-                          Expanded(child: BimButton(label: 'Mes projets', variant: BimButtonVariant.subtle, onPressed: () => context.push('/projects'))),
+                          Expanded(child: _CoinsButton()),
                         ],
                       )
                     else
@@ -198,10 +215,72 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (p.isMe) const _PremiumBanner(),
               const SizedBox(height: BimSpacing.lg),
               const Divider(height: 1),
               _PostsGrid(username: username),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Maquette 52 : solde de pièces, vers le portefeuille.
+class _CoinsButton extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final w = ref.watch(walletProvider).valueOrNull;
+    return BimButton(
+      key: const ValueKey('profile-coins'),
+      label: w == null ? 'Mes pièces' : '${compactCount(w.balance.total)} pièces',
+      icon: Icons.monetization_on_rounded,
+      variant: BimButtonVariant.subtle,
+      onPressed: () => context.push('/wallet'),
+    );
+  }
+}
+
+/// Maquette 52 : bandeau Premium (seulement si la personne n'est pas encore Premium et que l'offre existe).
+class _PremiumBanner extends ConsumerWidget {
+  const _PremiumBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final w = ref.watch(walletProvider).valueOrNull;
+    if (w == null || !w.available || w.premiumActive) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.md, BimSpacing.screen, 0),
+      child: Material(
+        color: BimColors.black,
+        borderRadius: BorderRadius.circular(BimRadius.card),
+        child: InkWell(
+          key: const ValueKey('profile-premium'),
+          borderRadius: BorderRadius.circular(BimRadius.card),
+          onTap: () => context.push('/premium'),
+          child: Padding(
+            padding: const EdgeInsets.all(BimSpacing.md),
+            child: Row(
+              children: [
+                const Icon(Icons.workspace_premium_rounded, color: BimColors.coin, size: 28),
+                const SizedBox(width: BimSpacing.md),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Passe Premium', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700)),
+                      Text('Reçois des pièces, sans publicité', style: TextStyle(color: BimColors.grey400, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(BimRadius.button)),
+                  child: const Text('Voir', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
