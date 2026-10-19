@@ -115,7 +115,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           export FLUTTER_ROOT="$(dirname "$(dirname "$(command -v flutter)")")"
-          flutter test test_captures --update-goldens
+          # En cas d'échec, même relance avec le rapport JSON que pour les tests : l'écran en cause devient une annotation.
+          flutter test test_captures --update-goldens || {
+            flutter test test_captures --update-goldens --reporter json > "$RUNNER_TEMP/flutter-captures.jsonl" || true
+            python3 ../../.github/scripts/flutter-test-annotate.py "$RUNNER_TEMP/flutter-captures.jsonl"
+            exit 1
+          }
       - name: Captures transmises au job de publication (push sur main seulement)
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !cancelled() }}
         run: flutter --version | head -1 > test_captures/captures/FLUTTER_VERSION.txt
