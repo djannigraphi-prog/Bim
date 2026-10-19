@@ -166,6 +166,25 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1910-U — Barre du bas fine, mode nuit gris mat, boutons fins (19/10/2026, 20 h 03) · Fondateur · **appliqué**
+
+Maquette des 4 interfaces (Accueil, Messages, Live, BimShop) validée par le fondateur. Barre du bas : pilule fine qui
+flotte au-dessus du contenu, icônes sans texte (nom lu par le lecteur d'écran), onglet actif dans une pastille, « + »
+en petit rond rouge. Mode nuit : fond gris foncé mat `#1C1C1E` (plus de noir complet) et barre transparente, effet
+vitre (flou) ; en mode jour, barre blanche presque opaque sans flou (le flou faisait planter l'émulateur de la CI).
+Boutons en pilule (46 px les principaux, 40 px les autres), filtres de 36 px. Logo BIM en haut inchangé (demande du
+fondateur).
+
+### V1-1910-C — Badge de certification pour les comptes Premium ; Gold abandonné (19/10/2026, 18 h 02) · Fondateur · **appliqué**
+
+- Le **statut Gold est abandonné** (remplace A17 et D-1850 sur ce point).
+- Le **badge de certification** est réservé aux **comptes Premium** (abonnement en cours) : personnes et boutiques
+  (une boutique est certifiée quand son propriétaire est Premium). Visible sur les publications, commentaires, reels,
+  profils, conversations, cartes et fiches d'articles, profils de boutiques, offres et espace marchand.
+- Une boutique **Premium** montre **seulement son badge**, sans étoiles. Les autres boutiques montrent leurs
+  **étoiles grises** selon leur réputation (moyenne des avis sur la boutique, dès 3 avis ; « Nouvelle boutique » avant).
+- La validation de la boutique par l'équipe (identité contrôlée) reste enregistrée mais n'affiche plus de badge.
+
 ### V1-1910-I — Partie iPhone (19/10/2026) · Fondateur (« FAIS TOUT LE 1 ») · **appliqué**
 
 La partie iPhone (`apps/mobile/ios`) est créée par Flutter, réglée (nom « BIM », textes d'autorisation caméra, galerie,

@@ -17,6 +17,8 @@ Dernière mise à jour : 18/10/2026 — version 1 sans dépense (voir la section
 | V1-S | **BimShop comme la maquette 32** : mosaïque façon Pinterest, photos carrées ou portrait (recadrage serveur), vidéo d'1 min par article, compteurs recommandations / j'aime / avis, sans étoiles (0061) | 1 e2e (3 cas), 2 unitaires, 3 Flutter | fait |
 | V1-E | Étoiles de la **boutique** (moyenne des avis sur la boutique, dès 3 avis) sur la fiche article et le profil ; jamais sur les articles | 1 e2e, 2 Flutter | fait |
 | V1-I | **Partie iPhone** ajoutée au dépôt (`apps/mobile/ios`, nom BIM, autorisations en français, icônes, identifiant provisoire `ci.bim.app`) ; compilée sans signature sur un Mac de GitHub (gratuit, dépôt public) | CI `ios.yml` | compilée ; installation sur iPhone : compte Apple Developer (99 $/an) **non engagé** |
+| V1-C2 | **Badge de certification** pour les comptes Premium (personnes et boutiques) ; étoiles grises pour les autres boutiques ; Gold abandonné | 1 e2e, 3 Flutter | fait |
+| V1-U | **Barre du bas fine et flottante**, mode nuit gris mat avec barre effet vitre, boutons et filtres fins (maquette validée) | 2 Flutter | fait |
 | V1-H | Codes par e-mail via SMTP (`EMAIL_PROVIDER=smtp`) ; plan du lancement gratuit | 1 e2e | fait |
 
 Reste avant l'ouverture au public : comptes des magasins, hébergement, projet Firebase, fournisseur d'e-mail (actions
