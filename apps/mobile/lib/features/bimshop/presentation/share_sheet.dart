@@ -15,9 +15,11 @@ import 'bimshop_widgets.dart' show formatPriceF;
 String shareText(ShopCard c) => '${c.title} · ${formatPriceF(c.priceFcfa)} · ${c.shop.name}, à voir sur BIM';
 
 /// Partage vers les autres applications ; remplaçable dans les tests.
-final systemShareProvider = Provider<Future<void> Function(String text)>((ref) => (text) async {
-      await SharePlus.instance.share(ShareParams(text: text));
-    });
+final systemShareProvider = Provider<Future<void> Function(String text)>(
+  (ref) => (text) async {
+    await SharePlus.instance.share(ShareParams(text: text));
+  },
+);
 
 /// V1 (19/10/2026) — « Partager » un article : à quelqu'un dans BIM (une conversation) ou vers une autre application.
 Future<void> showShareProductSheet(BuildContext context, WidgetRef ref, ShopCard card) async {
