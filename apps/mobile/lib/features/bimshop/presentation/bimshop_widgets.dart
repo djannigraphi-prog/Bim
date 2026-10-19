@@ -10,6 +10,7 @@ import '../../../core/widgets/certified_badge.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../data/bimshop_api.dart';
+import 'share_sheet.dart';
 
 /// Prix comme sur la maquette 32 : « 45 000 F ».
 String formatPriceF(int amount) {
@@ -118,23 +119,29 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
                         child: Icon(favorite ? Icons.favorite : Icons.favorite_border, size: 22, color: favorite ? BimColors.red : BimColors.black),
                       ),
                     ),
-                    if (!counts.isEmpty) Positioned(left: 8, bottom: 8, right: 60, child: Align(alignment: Alignment.bottomLeft, child: _CountsPill(counts: counts))),
+                    // V1 (19/10/2026) : sur la photo, seulement les cœurs et les avis ; tout le reste est dans la fiche.
+                    if (counts.likes > 0 || counts.reviews > 0)
+                      Positioned(left: 8, bottom: 8, right: 52, child: Align(alignment: Alignment.bottomLeft, child: _CountsPill(counts: counts))),
                     Positioned(
-                      right: 8,
-                      bottom: 8,
+                      right: 4,
+                      bottom: 4,
                       child: _RoundButton(
-                        key: ValueKey('shop-card-bag-${c.id}'),
-                        tooltip: c.kind == 'service' ? 'Réserver' : 'Commander',
-                        color: BimColors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        onPressed: open,
-                        child: const Icon(Icons.shopping_bag_outlined, size: 22, color: Colors.white),
+                        key: ValueKey('shop-card-share-${c.id}'),
+                        tooltip: 'Partager',
+                        color: Colors.white.withValues(alpha: 0.85),
+                        shape: const CircleBorder(),
+                        visual: 32,
+                        onPressed: () => showShareProductSheet(context, ref, c),
+                        child: const Icon(Icons.share_outlined, size: 16, color: BimColors.black),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            // Mosaïque du BimShop : rien sous la photo (les images avant tout, décision du 19/10/2026).
+            // Nom et prix restent dans les listes hors mosaïque (articles mis de côté, offres).
+            if (widget.showShop)
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 8, 4, 0),
               child: Column(
@@ -154,8 +161,7 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
                         ),
                     ],
                   ),
-                  if (widget.showShop)
-                    Row(
+                  Row(
                       children: [
                         Flexible(child: Text(c.shop.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall)),
                         if (c.shop.certified) const Padding(padding: EdgeInsets.only(left: 2), child: CertifiedBadge(size: 14)),
@@ -185,7 +191,7 @@ class _CardImage extends StatelessWidget {
 
 /// Bouton rond ou carré posé sur la photo, avec une zone de toucher d'au moins 44 px.
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({super.key, required this.tooltip, required this.color, required this.shape, required this.onPressed, required this.child});
+  const _RoundButton({super.key, required this.tooltip, required this.color, required this.shape, required this.onPressed, required this.child, this.visual = 44});
 
   final String tooltip;
   final Color color;
@@ -193,19 +199,31 @@ class _RoundButton extends StatelessWidget {
   final VoidCallback onPressed;
   final Widget child;
 
+  /// Taille dessinée ; la zone de toucher garde 44 px.
+  final double visual;
+
   @override
   Widget build(BuildContext context) => Tooltip(
         message: tooltip,
-        child: Material(
-          color: color,
-          shape: shape,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(onTap: onPressed, child: SizedBox(width: 44, height: 44, child: Center(child: child))),
+        child: Semantics(
+          button: true,
+          label: tooltip,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onPressed,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Material(color: color, shape: shape, clipBehavior: Clip.antiAlias, child: SizedBox(width: visual, height: visual, child: Center(child: child))),
+              ),
+            ),
+          ),
         ),
       );
 }
 
-/// Pastille des compteurs (maquette 32) : recommandations, j'aime, avis ; seuls les compteurs non nuls s'affichent.
+/// Pastille des compteurs sur la photo : cœurs (j'aime) et avis ; seuls les compteurs non nuls s'affichent.
 class _CountsPill extends StatelessWidget {
   const _CountsPill({required this.counts});
   final ShopCounts counts;
@@ -230,7 +248,6 @@ class _CountsPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (counts.recommendations > 0) item(Icons.thumb_up_outlined, BimColors.black, counts.recommendations, 'count-recommendations', 'recommandations'),
             if (counts.likes > 0) item(Icons.favorite, BimColors.red, counts.likes, 'count-likes', 'j’aime'),
             if (counts.reviews > 0) item(Icons.chat_bubble_outline_rounded, BimColors.black, counts.reviews, 'count-reviews', 'avis'),
           ],

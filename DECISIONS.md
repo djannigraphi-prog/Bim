@@ -166,6 +166,16 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1910-P — BimShop : les images avant tout ; partager ; barre qui se cache (19/10/2026, 21 h 50) · Fondateur · **appliqué**
+
+- Mosaïque du BimShop : **plus rien sous les photos** (ni nom, ni prix) ; sur la photo, seulement les **cœurs** et les
+  **avis** ; le nom et le prix restent lus par le lecteur d'écran. Toucher la photo ouvre la fiche (toutes les infos,
+  « Commander » ou « Réserver »). Politique : mettre en avant la beauté et la qualité des images.
+- Le bouton panier devient une **petite icône « Partager »** : **dans BIM** (l'article part comme une carte cliquable
+  dans une conversation ; migration 0063, message de type « article ») ou vers les **autres applications** du téléphone
+  (texte : nom, prix, boutique ; pas encore de lien web, le site n'existe pas).
+- La **barre du bas se cache** quand on fait défiler vers le bas et **revient** quand on remonte.
+
 ### V1-1910-U — Barre du bas fine, mode nuit gris mat, boutons fins (19/10/2026, 20 h 03) · Fondateur · **appliqué**
 
 Maquette des 4 interfaces (Accueil, Messages, Live, BimShop) validée par le fondateur. Barre du bas : pilule fine qui

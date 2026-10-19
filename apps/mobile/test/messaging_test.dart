@@ -179,6 +179,25 @@ const _robe = ShopCard(
   shop: ShopRef(id: 's1', name: 'Boutique Élégance', slug: 'boutique-elegance', verified: true),
 );
 
+/// V1 : articles partagés dans une conversation (l'un est encore en ligne, l'autre non).
+class _SharedChat extends _FakeMessaging {
+  @override
+  Future<({List<ChatMessage> items, String? nextBefore})> messages(String conversationId, {String? before}) async => (
+        items: [
+          ChatMessage(id: 'p2', mine: false, kind: 'product', status: 'published', createdAt: DateTime(2026, 10, 19, 21, 1)),
+          ChatMessage(
+            id: 'p1',
+            mine: true,
+            kind: 'product',
+            status: 'published',
+            createdAt: DateTime(2026, 10, 19, 21),
+            product: const ShopCard(id: 'x2', kind: 'product', title: 'Sac Kalia', priceFcfa: 15000, available: true, shop: ShopRef(id: 's2', name: 'Kalia', slug: 'kalia', verified: false)),
+          ),
+        ],
+        nextBefore: null,
+      );
+}
+
 /// Côté cliente : la conversation avec une boutique, avec un message d'un type à venir (carte de commande, lot 7).
 class _FakeShopChat extends _FakeMessaging {
   @override
@@ -367,6 +386,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('order-card-o9')));
     await tester.pumpAndSettle();
     expect(find.text('commande o9'), findsOneWidget);
+  });
+
+  testWidgets('V1 : article partagé — carte cliquable vers la fiche ; article retiré : simple mention', (tester) async {
+    await _pump(tester, _SharedChat(), const ConversationScreen(conversationId: 'c1', refreshEvery: null));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Sac Kalia'), findsOneWidget);
+    expect(find.text('Article plus disponible'), findsOneWidget);
+    expect(find.byKey(const ValueKey('message-unsupported')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('shared-product-p1')));
+    await tester.pumpAndSettle();
+    expect(find.text('fiche x2'), findsOneWidget);
   });
 
   testWidgets('7-B, bandeau de l’article : « Commander » ouvre la fiche (taille, quantité, mode)', (tester) async {

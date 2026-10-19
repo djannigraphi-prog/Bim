@@ -36,6 +36,8 @@ dependencies:
   record: ^6.0.0
   # Dossier temporaire du vocal avant l'envoi.
   path_provider: ^2.1.5
+  # V1 : « Partager » un article vers les autres applications du téléphone (feuille de partage du système).
+  share_plus: ^13.2.0
 
 dev_dependencies:
   flutter_test:

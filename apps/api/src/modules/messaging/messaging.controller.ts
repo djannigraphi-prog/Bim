@@ -60,7 +60,7 @@ export class MessagingController {
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, voice: { type: 'string', format: 'binary', description: 'Message vocal M4A (AAC), 2 minutes au plus' }, replyToId: { type: 'string', format: 'uuid' } },
+      properties: { text: { type: 'string', maxLength: 2000 }, photo: { type: 'string', format: 'binary' }, voice: { type: 'string', format: 'binary', description: 'Message vocal M4A (AAC), 2 minutes au plus' }, replyToId: { type: 'string', format: 'uuid' }, productId: { type: 'string', format: 'uuid', description: 'Article du BimShop partagé' } },
     },
   })
   @ApiOperation({ summary: 'Envoyer un texte, une photo (ré-encodée sans métadonnées) ou un message vocal, en citant éventuellement un message' })
@@ -72,7 +72,7 @@ export class MessagingController {
     @ReqMeta() meta: RequestMeta,
     @Req() req: Request,
   ) {
-    return this.messaging.send(a.userId, id, { text: dto.text, photo: files?.photo?.[0], voice: files?.voice?.[0], replyToId: dto.replyToId }, meta, apiBase(req));
+    return this.messaging.send(a.userId, id, { text: dto.text, photo: files?.photo?.[0], voice: files?.voice?.[0], productId: dto.productId, replyToId: dto.replyToId }, meta, apiBase(req));
   }
 
   @Post('conversations/groups')

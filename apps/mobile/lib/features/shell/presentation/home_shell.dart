@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,6 +30,21 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _tab = 0;
   Timer? _unreadTimer;
+
+  /// Barre du bas cachée quand on descend, de retour quand on remonte (demande du fondateur, 19/10/2026).
+  bool _navHidden = false;
+
+  bool _onScroll(UserScrollNotification n) {
+    // Seulement le défilement vertical de la page (pas les rangées horizontales : stories, filtres).
+    if (n.metrics.axis != Axis.vertical) return false;
+    final hide = switch (n.direction) {
+      ScrollDirection.reverse => n.metrics.extentBefore > 40,
+      ScrollDirection.forward => false,
+      ScrollDirection.idle => _navHidden,
+    };
+    if (hide != _navHidden) setState(() => _navHidden = hide);
+    return false;
+  }
 
   @override
   void initState() {
@@ -69,7 +85,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       showVisitorGate(context, ref);
       return;
     }
-    setState(() => _tab = i);
+    setState(() {
+      _tab = i;
+      _navHidden = false;
+    });
   }
 
   @override
@@ -124,7 +143,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       // Lot 4 : l'Accueil d'une personne connectée est le fil (écran 10), avec ses projets en tête.
       // Lot 5-C : l'onglet BimShop (écran 32), visiteurs compris.
-      body: _tab == 0
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: _onScroll,
+        child: _tab == 0
           ? FeedView(visitor: session is! SessionSignedIn)
           : _tab == 1 && session is SessionSignedIn
               ? const MessagesView()
@@ -147,11 +168,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ),
       ),
-      bottomNavigationBar: BimNavBar(
-        items: [for (final t in _tabs) (icon: t.icon, active: t.active, label: t.label)],
-        current: _tab,
-        onTap: _onTap,
-        badges: {1: messagesBadge},
+      ),
+      bottomNavigationBar: AnimatedSlide(
+        key: const ValueKey('bim-nav-slide'),
+        offset: _navHidden ? const Offset(0, 1.5) : Offset.zero,
+        duration: BimDurations.fast,
+        curve: Curves.easeOut,
+        child: BimNavBar(
+          items: [for (final t in _tabs) (icon: t.icon, active: t.active, label: t.label)],
+          current: _tab,
+          onTap: _onTap,
+          badges: {1: messagesBadge},
+        ),
       ),
     );
   }

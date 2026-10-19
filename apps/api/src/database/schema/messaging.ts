@@ -106,6 +106,8 @@ export const messages = pgTable(
     mediaKey: varchar('media_key', { length: 200 }),
     /** 7-B : commande présentée par une carte (kind order). */
     orderId: uuid('order_id').references(() => orders.id),
+    /** V1 : article du BimShop partagé (kind product) ; montré seulement tant qu'il reste visible au public. */
+    productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
     mediaWidth: integer('media_width'),
     mediaHeight: integer('media_height'),
     /** V1 : durée d'un message vocal, en millisecondes. */
@@ -118,11 +120,11 @@ export const messages = pgTable(
   (t) => [
     index('messages_conversation_idx').on(t.conversationId, t.id),
     index('messages_sender_idx').on(t.senderId, t.createdAt),
-    check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo', 'order', 'voice', 'system')`),
+    check('messages_kind_ck', sql`${t.kind} IN ('text', 'photo', 'order', 'voice', 'system', 'product')`),
     check('messages_status_ck', sql`${t.status} IN ('published', 'deleted', 'hidden')`),
     check(
       'messages_content_ck',
-      sql`(${t.kind} IN ('text', 'system') AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR (${t.kind} = 'voice' AND ${t.mediaKey} IS NOT NULL AND ${t.mediaDurationMs} IS NOT NULL) OR (${t.kind} = 'order' AND ${t.orderId} IS NOT NULL) OR ${t.status} <> 'published'`,
+      sql`(${t.kind} IN ('text', 'system') AND ${t.text} IS NOT NULL) OR (${t.kind} = 'photo' AND ${t.mediaKey} IS NOT NULL) OR (${t.kind} = 'voice' AND ${t.mediaKey} IS NOT NULL AND ${t.mediaDurationMs} IS NOT NULL) OR (${t.kind} = 'order' AND ${t.orderId} IS NOT NULL) OR (${t.kind} = 'product') OR ${t.status} <> 'published'`,
     ),
   ],
 );

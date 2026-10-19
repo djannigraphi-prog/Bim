@@ -198,4 +198,25 @@ describe('BimShop en mosaïque : formats, vidéo, compteurs (e2e)', () => {
     expect(await view()).toBe(false);
     expect(JSON.stringify(await profile())).not.toMatch(/gold/i);
   });
+
+  it('V1 : partager un article à quelqu’un dans BIM (carte cliquable ; disparaît si l’article n’est plus en ligne)', async () => {
+    const s = await shop();
+    const p = await product(s);
+    const a = await person();
+    const b = await person();
+    const conv = (await h.http().post('/v1/conversations').set(a.auth).send({ username: b.body.username }).expect(201)).body.id as string;
+    const send = (body: Record<string, unknown>) => h.http().post(`/v1/conversations/${conv}/messages`).set(a.auth).send(body);
+    const sent = (await send({ productId: p.id }).expect(201)).body;
+    expect(sent).toMatchObject({ kind: 'product', text: null, product: { id: p.id, title: 'Robe soirée à plumes', shop: { slug: s.slug } } });
+    // Un article et un texte dans le même message : refusé ; un article inconnu : introuvable.
+    await send({ productId: p.id, text: 'Regarde' }).expect(400);
+    await send({ productId: uuidv7() }).expect(404);
+    const seen = (await h.http().get(`/v1/conversations/${conv}/messages`).set(b.auth).expect(200)).body.items;
+    expect(seen[0]).toMatchObject({ kind: 'product', product: { id: p.id } });
+    const list = (await h.http().get('/v1/conversations?box=requests').set(b.auth).expect(200)).body.items;
+    expect(list.find((c: { id: string }) => c.id === conv).lastMessage.preview).toBe('Article partagé');
+    // Article retiré de la vente : le message reste, sans carte.
+    await h.http().post(`/v1/shop/products/${p.id}/unpublish`).set(s.auth).expect(200);
+    expect((await h.http().get(`/v1/conversations/${conv}/messages`).set(b.auth).expect(200)).body.items[0]).toMatchObject({ kind: 'product', product: null });
+  });
 });

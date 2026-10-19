@@ -19,6 +19,7 @@ Dernière mise à jour : 18/10/2026 — version 1 sans dépense (voir la section
 | V1-I | **Partie iPhone** ajoutée au dépôt (`apps/mobile/ios`, nom BIM, autorisations en français, icônes, identifiant provisoire `ci.bim.app`) ; compilée sans signature sur un Mac de GitHub (gratuit, dépôt public) | CI `ios.yml` | compilée ; installation sur iPhone : compte Apple Developer (99 $/an) **non engagé** |
 | V1-C2 | **Badge de certification** pour les comptes Premium (personnes et boutiques) ; étoiles grises pour les autres boutiques ; Gold abandonné | 1 e2e, 3 Flutter | fait |
 | V1-U | **Barre du bas fine et flottante**, mode nuit gris mat avec barre effet vitre, boutons et filtres fins (maquette validée) | 2 Flutter | fait |
+| V1-P | **BimShop images d'abord** (rien sous les photos, cœurs et avis seulement), **Partager** dans BIM ou vers d'autres applications (0063), barre du bas qui se cache au défilement | 1 e2e, 3 Flutter | fait |
 | V1-H | Codes par e-mail via SMTP (`EMAIL_PROVIDER=smtp`) ; plan du lancement gratuit | 1 e2e | fait |
 
 Reste avant l'ouverture au public : comptes des magasins, hébergement, projet Firebase, fournisseur d'e-mail (actions

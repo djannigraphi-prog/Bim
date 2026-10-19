@@ -8,6 +8,7 @@ import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_widgets.dart';
 import 'package:bim/features/bimshop/presentation/product_screen.dart';
+import 'package:bim/features/bimshop/presentation/share_sheet.dart';
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
 import 'package:bim/features/bimshop/presentation/shop_profile_screen.dart';
@@ -123,6 +124,9 @@ class _CertifiedShop extends _FakeBimShop {
   Future<PublicShop> shop(String slug, {String? cursor}) async => PublicShop(shop: _ref, followers: 1, productCount: 1, items: [_card('p1', 'Robe Plumes', 45000)]);
 }
 
+/// Textes envoyés à la feuille de partage du téléphone (simulée).
+final _shared = <String>[];
+
 /// Mosaïque : un portrait 2:3, un carré, un paysage reçu (affiché en carré), un article sans réaction.
 class _MosaicShop extends _FakeBimShop {
   @override
@@ -193,6 +197,7 @@ Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool
       messagingApiProvider.overrideWithValue(messaging ?? _FakeMessaging()),
       ordersApiProvider.overrideWithValue(_FakeOrders()),
       sessionProvider.overrideWith(signedIn ? _SignedIn.new : _Visitor.new),
+      systemShareProvider.overrideWithValue((text) async => _shared.add(text)),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);
@@ -207,8 +212,12 @@ void main() {
     expect(find.text('BimShop'), findsOneWidget);
     expect(find.text('Pour toi'), findsOneWidget);
     expect(find.byKey(const ValueKey('shop-mosaic')), findsOneWidget);
-    expect(find.text('Robe Plumes'), findsOneWidget);
-    expect(find.text(formatPriceF(60000)), findsOneWidget);
+    // V1 (19/10/2026) : rien sous les photos de la mosaïque (nom et prix dans la fiche) ; le lecteur d'écran les lit.
+    final semantics = tester.ensureSemantics();
+    expect(find.text('Robe Plumes'), findsNothing);
+    expect(find.text(formatPriceF(60000)), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Robe Plumes')), findsOneWidget);
+    semantics.dispose();
     expect(find.text('Épuisé'), findsOneWidget);
     expect(find.textContaining('★'), findsNothing); // jamais d'étoiles sur les cartes (A17)
     expect(api.queries, ['null||recent']);
@@ -258,8 +267,8 @@ void main() {
     expect(wide.height, closeTo(wide.width, 1));
     // Deux colonnes décalées : la carte suivante va sous la plus courte.
     expect(tester.getTopLeft(find.byKey(const ValueKey('shop-card-m3'))).dx, closeTo(tester.getTopLeft(find.byKey(const ValueKey('shop-card-m2'))).dx, 0.5));
-    // Compteurs : recommandations, j'aime, avis (nombres courts) ; rien pour un article sans réaction.
-    expect(find.text('2,4 k'), findsOneWidget);
+    // Sur la photo : seulement les cœurs et les avis (les recommandations restent dans la fiche) ; rien sans réaction.
+    expect(find.text('2,4 k'), findsNothing);
     expect(find.text('986'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
     expect(find.byKey(const ValueKey('count-likes')), findsNWidgets(1));
@@ -268,8 +277,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.calls, ['favorite m1 true']);
     expect(find.text('987'), findsOneWidget);
-    // Panier : ouvre la fiche pour commander.
-    await tester.tap(find.byKey(const ValueKey('shop-card-bag-m2')));
+    // Petite icône « Partager » (à la place du panier) : dans BIM ou vers une autre application.
+    expect(find.byKey(const ValueKey('shop-card-bag-m2')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('shop-card-share-m2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('share-in-bim')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('share-system')));
+    await tester.pumpAndSettle();
+    expect(_shared.single, startsWith('Soin éclat visage · ${formatPriceF(15000)}'));
+    // Toucher la photo ouvre la fiche : toutes les infos et « Commander ».
+    await tester.tap(find.byKey(const ValueKey('shop-card-m2')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('order')), findsOneWidget);
   });
@@ -370,7 +387,7 @@ void main() {
     await tester.scrollUntilVisible(find.byKey(const ValueKey('shop-more')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('shop-more')));
     await tester.pumpAndSettle();
-    expect(find.text('Robe Lumière'), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-card-p9')), findsOneWidget);
     expect(find.byKey(const ValueKey('shop-more')), findsNothing);
   });
 

@@ -9,6 +9,7 @@ export class StartConversationDto {
 export class SendMessageDto {
   @ApiPropertyOptional({ maxLength: 2000 }) @IsOptional() @IsString() @MaxLength(2000) text?: string;
   @ApiPropertyOptional({ description: '6-C : message cité (même conversation, publié)' }) @IsOptional() @IsUUID() replyToId?: string;
+  @ApiPropertyOptional({ description: 'V1 : article du BimShop partagé (seul dans le message)' }) @IsOptional() @IsUUID() productId?: string;
 }
 
 /** 6-C — Réaction à un message (liste fermée). */

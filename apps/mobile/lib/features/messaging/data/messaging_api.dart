@@ -189,6 +189,7 @@ class ChatMessage {
     this.senderName,
     this.senderUsername,
     this.blockedSender = false,
+    this.product,
   });
 
   final String id;
@@ -216,10 +217,13 @@ class ChatMessage {
   final String? senderUsername;
   final bool blockedSender;
 
+  /// V1 : article partagé (null s'il n'est plus en ligne).
+  final ShopCard? product;
+
   bool get visible => status == 'published' && !blockedSender;
   bool get isSystem => kind == 'system';
   /// Types connus de cette version. Les types à venir s'affichent avec un texte neutre au lieu d'une bulle vide.
-  bool get supported => kind == 'text' || kind == 'photo' || kind == 'voice' || kind == 'system' || (kind == 'order' && order != null);
+  bool get supported => kind == 'text' || kind == 'photo' || kind == 'voice' || kind == 'system' || kind == 'product' || (kind == 'order' && order != null);
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
         id: j['id'] as String,
@@ -241,6 +245,7 @@ class ChatMessage {
         senderName: (j['sender'] as Map<String, dynamic>?)?['fullName'] as String?,
         senderUsername: (j['sender'] as Map<String, dynamic>?)?['username'] as String?,
         blockedSender: (j['blockedSender'] ?? false) as bool,
+        product: j['product'] == null ? null : ShopCard.fromJson(j['product'] as Map<String, dynamic>),
       );
 
   /// Aperçu court (bandeau « Réponse à »).
@@ -251,6 +256,7 @@ class ChatMessage {
             'photo' => 'Photo',
             'voice' => 'Message vocal',
             'order' => 'Proposition de commande',
+            'product' => 'Article partagé',
             _ => text ?? '',
           },
       };
@@ -309,6 +315,10 @@ class MessagingApi implements ConversationBackend {
   @override
   Future<ChatMessage> sendText(String conversationId, String text, {String? replyToId}) async =>
       ChatMessage.fromJson(await _api.post('/v1/conversations/$conversationId/messages', body: {'text': text, if (replyToId != null) 'replyToId': replyToId}));
+
+  /// V1 : partager un article du BimShop dans une conversation (carte cliquable).
+  Future<ChatMessage> sendProduct(String conversationId, String productId) async =>
+      ChatMessage.fromJson(await _api.post('/v1/conversations/$conversationId/messages', body: {'productId': productId}));
 
   @override
   Future<ChatMessage> react(String messageId, String? emoji) async => ChatMessage.fromJson(

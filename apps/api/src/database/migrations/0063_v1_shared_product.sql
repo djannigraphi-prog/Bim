@@ -1,0 +1,6 @@
+ALTER TABLE "messages" DROP CONSTRAINT "messages_kind_ck";--> statement-breakpoint
+ALTER TABLE "messages" DROP CONSTRAINT "messages_content_ck";--> statement-breakpoint
+ALTER TABLE "messages" ADD COLUMN "product_id" uuid;--> statement-breakpoint
+ALTER TABLE "messages" ADD CONSTRAINT "messages_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "messages" ADD CONSTRAINT "messages_kind_ck" CHECK ("messages"."kind" IN ('text', 'photo', 'order', 'voice', 'system', 'product'));--> statement-breakpoint
+ALTER TABLE "messages" ADD CONSTRAINT "messages_content_ck" CHECK (("messages"."kind" IN ('text', 'system') AND "messages"."text" IS NOT NULL) OR ("messages"."kind" = 'photo' AND "messages"."media_key" IS NOT NULL) OR ("messages"."kind" = 'voice' AND "messages"."media_key" IS NOT NULL AND "messages"."media_duration_ms" IS NOT NULL) OR ("messages"."kind" = 'order' AND "messages"."order_id" IS NOT NULL) OR ("messages"."kind" = 'product') OR "messages"."status" <> 'published');

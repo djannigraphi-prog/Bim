@@ -11,6 +11,8 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../../core/widgets/certified_badge.dart';
+import '../../bimshop/data/bimshop_api.dart' show ShopCard;
+import '../../bimshop/presentation/bimshop_widgets.dart' show formatPriceF;
 import '../../merchant/data/shop_api.dart';
 import '../../orders/data/orders_api.dart';
 import '../../projects/application/photo_source.dart';
@@ -591,6 +593,7 @@ class _Bubble extends StatelessWidget {
       // Type à venir (cartes de commande, lot 7) : jamais de bulle vide.
       _ when !m.supported => Text('Ce message s’affiche dans une version plus récente de BIM.', key: const ValueKey('message-unsupported'), style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
       _ when m.kind == 'order' => _OrderCardView(card: m.order!, fg: fg, onTap: () => context.push(asShop ? '/shop/orders/${m.order!.id}' : '/orders/${m.order!.id}')),
+      _ when m.kind == 'product' => _SharedProductView(key: ValueKey('shared-product-${m.id}'), card: m.product, fg: fg),
       _ when m.kind == 'voice' => VoiceMessageView(key: ValueKey('voice-${m.id}'), url: m.voiceUrl, durationMs: m.durationMs, color: fg),
       _ => m.kind == 'photo'
           ? ClipRRect(
@@ -836,6 +839,43 @@ class _QuickReplies extends ConsumerWidget {
 }
 
 /// Carte d'une proposition de commande : numéro, article(s), montant, état ; un appui ouvre la commande.
+/// V1 — Article partagé : grande photo, nom, prix ; ouvre la fiche. Article retiré : simple mention.
+class _SharedProductView extends StatelessWidget {
+  const _SharedProductView({super.key, required this.card, required this.fg});
+  final ShopCard? card;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = card;
+    if (c == null) return Text('Article plus disponible', style: TextStyle(color: fg, fontStyle: FontStyle.italic));
+    return InkWell(
+      onTap: () => context.push('/bimshop/products/${c.id}'),
+      child: SizedBox(
+        width: 200,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(BimRadius.chip),
+              child: AspectRatio(
+                aspectRatio: c.mediaAspect,
+                child: c.imageUrl == null
+                    ? ColoredBox(color: fg.withValues(alpha: 0.1), child: Icon(Icons.image_outlined, color: fg))
+                    : Image.network(c.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image_outlined, color: fg)),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(c.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+            Text('${formatPriceF(c.priceFcfa)} · ${c.shop.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _OrderCardView extends StatelessWidget {
   const _OrderCardView({required this.card, required this.fg, required this.onTap});
   final OrderCard card;

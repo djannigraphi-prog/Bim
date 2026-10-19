@@ -368,6 +368,7 @@ export class MessagingService {
     if (m.kind === 'system') return (m.text ?? '').slice(0, 120);
     if (m.kind === 'text') return (m.text ?? '').slice(0, 120);
     if (m.kind === 'order') return 'Proposition de commande';
+    if (m.kind === 'product') return 'Article partagé';
     // Types à venir (cartes de commande, lot 7) : texte neutre, jamais de contenu interne.
     return 'Nouveau message';
   }
@@ -458,6 +459,8 @@ export class MessagingService {
       read: mine ? !!otherReadId && otherReadId >= m.id : null,
       /** 7-B : carte d'une proposition de commande (l'état réel se lit dans la commande). */
       order: visible && m.kind === 'order' && m.orderId ? await this.orderCard(m.orderId) : null,
+      /** V1 : article partagé (carte de l'article ; null s'il n'est plus visible au public). */
+      product: visible && m.kind === 'product' && m.productId ? ((await this.bimshop.visibleCards([m.productId], apiBase, { rich: false }))[0] ?? null) : null,
       /** 6-C : message cité (réponse citée). */
       replyTo: visible ? await this.quoted(m.replyToId, v) : null,
       /** 6-C : réactions (aucune sur un message supprimé ou masqué). */
@@ -491,12 +494,14 @@ export class MessagingService {
    * même transaction (état de lecture, archivage). La photo est effacée du stockage si l'enregistrement échoue.
    */
   async persist(
-    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; replyToId?: string; meta: RequestMeta },
+    p: { conversationId: string; senderId: string; senderShopId: string | null; text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; productId?: string; replyToId?: string; meta: RequestMeta },
     after: (tx: Tx, id: string, now: Date) => Promise<void>,
   ): Promise<MessageRow> {
     const text = p.text?.trim();
-    if (!text && !p.photo && !p.voice) throw Errors.validation({ fields: { text: ['Écris un message, ajoute une photo ou enregistre un vocal.'] } });
-    if ([text, p.photo, p.voice].filter(Boolean).length > 1) throw Errors.validation({ fields: { text: ['Un message contient un texte, une photo ou un vocal.'] } });
+    if (!text && !p.photo && !p.voice && !p.productId) throw Errors.validation({ fields: { text: ['Écris un message, ajoute une photo ou enregistre un vocal.'] } });
+    if ([text, p.photo, p.voice, p.productId].filter(Boolean).length > 1) throw Errors.validation({ fields: { text: ['Un message contient un texte, une photo, un vocal ou un article.'] } });
+    // V1 : article partagé — seulement un article visible au public (publié, boutique ouverte).
+    if (p.productId && !(await this.bimshop.visibleCards([p.productId], '', { rich: false })).length) throw Errors.notFound('Article');
     if (text && text.length > 2000) throw Errors.validation({ fields: { text: ['2000 caractères au plus.'] } });
     if ((p.photo || p.voice) && !this.storage.available) throw Errors.notConfigured('Le stockage des fichiers');
     const voice = p.voice ? await this.checkVoice(p.voice) : null;
@@ -520,7 +525,7 @@ export class MessagingService {
       key = `messages/${p.conversationId}/${id}.m4a`;
       await this.storage.put(key, voice.data, 'audio/mp4');
     }
-    const kind = img ? 'photo' : voice ? 'voice' : 'text';
+    const kind = img ? 'photo' : voice ? 'voice' : p.productId ? 'product' : 'text';
     try {
       await this.db.transaction(async (tx) => {
         await lockUserQuota(tx, 'messages', p.senderId);
@@ -538,6 +543,7 @@ export class MessagingService {
           mediaWidth: img?.width ?? null,
           mediaHeight: img?.height ?? null,
           mediaDurationMs: voice?.durationMs ?? null,
+          productId: p.productId ?? null,
           replyToId: p.replyToId ?? null,
           createdAt: now,
         });
@@ -607,13 +613,13 @@ export class MessagingService {
     return { data: scrubMp4Metadata(f.buffer), durationMs: info.durationMs };
   }
 
-  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; replyToId?: string }, meta: RequestMeta, apiBase: string) {
+  async send(userId: string, conversationId: string, input: { text?: string; photo?: Express.Multer.File; voice?: Express.Multer.File; productId?: string; replyToId?: string }, meta: RequestMeta, apiBase: string) {
     const { conv, me, otherReadId } = await this.access(userId, conversationId);
     if (conv.kind === 'direct') {
       const other = (await this.db.select({ userId: conversationMembers.userId }).from(conversationMembers).where(eq(conversationMembers.conversationId, conversationId))).find((x) => x.userId !== userId);
       if (other) await this.minorShield(this.db, conversationId, userId, other.userId);
     }
-    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, voice: input.voice, replyToId: input.replyToId, meta }, async (tx, id, now) => {
+    const m = await this.persist({ conversationId, senderId: userId, senderShopId: null, text: input.text, photo: input.photo, voice: input.voice, productId: input.productId, replyToId: input.replyToId, meta }, async (tx, id, now) => {
       // Répondre à une demande vaut acceptation ; mon propre message est lu.
       await tx
         .update(conversationMembers)
