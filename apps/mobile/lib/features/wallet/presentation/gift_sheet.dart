@@ -337,11 +337,13 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
                         const SizedBox(width: BimSpacing.md),
                         Expanded(
                           child: Text.rich(
-                            TextSpan(children: [
-                              const TextSpan(text: 'Les pièces te servent à '),
-                              const TextSpan(text: 'encourager', style: TextStyle(fontWeight: FontWeight.w700)),
-                              const TextSpan(text: ' les créateurs et les commentaires que tu aimes. 1 pièce = 1 F ; seules les pièces reçues se retirent.'),
-                            ]),
+                            const TextSpan(
+                              children: [
+                                TextSpan(text: 'Les pièces te servent à '),
+                                TextSpan(text: 'encourager', style: TextStyle(fontWeight: FontWeight.w700)),
+                                TextSpan(text: ' les créateurs et les commentaires que tu aimes. 1 pièce = 1 F ; seules les pièces reçues se retirent.'),
+                              ],
+                            ),
                             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
                           ),
                         ),
@@ -366,14 +368,17 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
 }
 
 /// Image d'un pack (maquette 60) : pièce, pièces, porte-monnaie, petit coffre, grand coffre, coffre-fort.
-String packAsset(int coins) => giftAsset(switch (coins) {
-      < 500 => 'coin1',
-      < 1000 => 'coin5',
-      < 5000 => 'purse',
-      < 10000 => 'chest_s',
-      < 50000 => 'chest_l',
-      _ => 'safe',
-    })!;
+String packAsset(int coins) {
+  final code = switch (coins) {
+    < 500 => 'coin1',
+    < 1000 => 'coin5',
+    < 5000 => 'purse',
+    < 10000 => 'chest_s',
+    < 50000 => 'chest_l',
+    _ => 'safe',
+  };
+  return giftAsset(code)!;
+}
 
 class _PackTile extends StatelessWidget {
   const _PackTile({super.key, required this.coins, required this.popular, required this.selected, required this.onTap});
