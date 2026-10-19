@@ -223,6 +223,7 @@ void main() {
   testWidgets('audit M-8 : publier enregistre d’abord les changements du formulaire (promotion)', (tester) async {
     final api = _FakeShop()..current = _detail();
     await _pump(tester, api, '/shop/products/x1');
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-promo')), 200, scrollable: find.byType(Scrollable).first);
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '39000');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('publish-product')), 300, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('publish-product')));
@@ -271,6 +272,8 @@ void main() {
   testWidgets('L7-04 : refus du serveur (PRODUCT_CONTENT_LOCKED) affiché, rien n’est modifié', (tester) async {
     final api = _LockedShop()..current = _detail();
     await _pump(tester, api, '/shop/products/x1');
+    // V1 : la zone vidéo allonge la fiche ; le champ de promotion est amené à l'écran avant la saisie.
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('product-promo')), 200, scrollable: find.byType(Scrollable).first);
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '40000');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('save-product')), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('save-product')));
