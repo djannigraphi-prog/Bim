@@ -26,7 +26,8 @@ class BimNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final bar = dark ? const Color(0x853A3A3E) : const Color(0xE0FFFFFF);
+    // Jour : blanc presque opaque, sans flou ; nuit seulement : transparente, effet vitre (demande du fondateur).
+    final bar = dark ? const Color(0x853A3A3E) : const Color(0xF5FFFFFF);
     final border = dark ? const Color(0x1AFFFFFF) : const Color(0x0F101116);
     final icon = dark ? const Color(0xFFE6E6EA) : BimColors.grey800;
     final activeColor = dark ? const Color(0xFFFF4D6A) : BimColors.red;
@@ -45,6 +46,7 @@ class BimNavBar extends StatelessWidget {
           child: ClipRRect(
             borderRadius: radius,
             child: BackdropFilter(
+              enabled: dark,
               filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: Container(
                 key: const ValueKey('bim-nav'),
