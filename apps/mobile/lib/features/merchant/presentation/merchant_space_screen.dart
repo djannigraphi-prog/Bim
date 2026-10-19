@@ -132,24 +132,26 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                 Row(
                   children: [
                     if (d.can('products.edit'))
-                      _Action(key: const ValueKey('action-article'), icon: Icons.add_box_outlined, label: 'Article', onTap: () => context.push('/shop/products/new')),
+                      _Action(key: const ValueKey('action-article'), icon: Icons.add_rounded, label: 'Article', bg: BimColors.black, fg: BimColors.white, onTap: () => context.push('/shop/products/new')),
                     // Lot 10 : Live vente réservé au propriétaire (contrôlé aussi par le serveur).
                     if (d.isOwner)
                       _Action(
                       icon: Icons.videocam_outlined,
                       label: 'Live',
+                      bg: BimColors.red,
+                      fg: BimColors.white,
                       onTap: () async {
                         final l = await showNewLiveSheet(context, asShop: true);
                         if (l != null && context.mounted) await context.push('/lives/${l.id}');
                       },
                     ),
-                    _Action(icon: Icons.local_offer_outlined, label: 'Promo', onTap: () => showComingSoon(context, feature: 'Les promotions')),
+                    _Action(icon: Icons.local_offer_outlined, label: 'Promo', bg: const Color(0xFFFFF1D6), fg: const Color(0xFFC98A00), onTap: () => showComingSoon(context, feature: 'Les promotions')),
                     // 7-E : livreurs de la boutique (permission « paramètres de livraison »).
                     if (d.can('deliveries.settings'))
-                      _Action(key: const ValueKey('action-couriers'), icon: Icons.delivery_dining_outlined, label: 'Livreurs', onTap: () => context.push('/shop/couriers')),
+                      _Action(key: const ValueKey('action-couriers'), icon: Icons.delivery_dining_outlined, label: 'Livreurs', bg: const Color(0xFFE3F5EA), fg: BimColors.success, onTap: () => context.push('/shop/couriers')),
                     if (d.isOwner) ...[
-                      _Action(key: const ValueKey('action-requests'), icon: Icons.assignment_outlined, label: 'Demandes', onTap: () => context.push('/shop/requests')),
-                      _Action(key: const ValueKey('action-team'), icon: Icons.group_outlined, label: 'Équipe', onTap: () => context.push('/shop/team')),
+                      _Action(key: const ValueKey('action-requests'), icon: Icons.assignment_outlined, label: 'Demandes', bg: const Color(0xFFEDEBFF), fg: const Color(0xFF5B4FE0), onTap: () => context.push('/shop/requests')),
+                      _Action(key: const ValueKey('action-team'), icon: Icons.group_outlined, label: 'Équipe', bg: const Color(0xFFE6F0FF), fg: const Color(0xFF2F6FEB), onTap: () => context.push('/shop/team')),
                     ],
                   ],
                 ),
@@ -268,7 +270,7 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         CircleAvatar(
-          radius: 32,
+          radius: 26,
           backgroundColor: BimColors.redSoft,
           foregroundImage: shop.logoUrl == null ? null : NetworkImage(shop.logoUrl!),
           child: const Icon(Icons.storefront_outlined, color: BimColors.red, size: 30),
@@ -280,14 +282,22 @@ class _Header extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Flexible(child: Text(shop.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 22))),
+                  Flexible(child: Text(shop.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleLarge)),
                   if (shop.verified) ...[
                     const SizedBox(width: BimSpacing.xs),
                     const Tooltip(message: 'Boutique vérifiée', child: Icon(Icons.verified, color: BimColors.red, size: 20)),
                   ],
                 ],
               ),
-              Text(place.isEmpty ? 'Espace marchand' : 'Espace marchand · $place', style: theme.textTheme.bodyMedium),
+              // Maquette 55 : état de la boutique en vert, puis le lieu.
+              Row(
+                children: [
+                  const Icon(Icons.circle, size: 9, color: BimColors.success),
+                  const SizedBox(width: 5),
+                  const Text('Boutique ouverte', key: ValueKey('shop-open'), style: TextStyle(color: BimColors.success, fontWeight: FontWeight.w600, fontSize: 13)),
+                  if (place.isNotEmpty) Flexible(child: Text(' · $place', overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall)),
+                ],
+              ),
             ],
           ),
         ),
@@ -307,7 +317,7 @@ class _Stat extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: BimSpacing.md),
-      decoration: BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(BimRadius.card)),
+      decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
       child: Column(
         children: [
           Text('$value', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
@@ -319,11 +329,14 @@ class _Stat extends StatelessWidget {
 }
 
 class _Action extends StatelessWidget {
-  const _Action({super.key, required this.icon, required this.label, required this.onTap});
+  const _Action({super.key, required this.icon, required this.label, required this.onTap, this.bg = BimColors.redSoft, this.fg = BimColors.red});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  /// Maquette 55 : carrés arrondis de couleurs différentes (noir, rouge, jaune, violet…).
+  final Color bg;
+  final Color fg;
 
   @override
   Widget build(BuildContext context) => Expanded(
@@ -334,9 +347,15 @@ class _Action extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: BimSpacing.sm),
             child: Column(
               children: [
-                CircleAvatar(radius: 26, backgroundColor: BimColors.redSoft, child: Icon(icon, color: BimColors.red)),
-                const SizedBox(height: BimSpacing.xs),
-                Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(18)),
+                  child: Icon(icon, color: fg, size: 26),
+                ),
+                const SizedBox(height: 6),
+                // Libellé jamais coupé (« Demandes » tenait sur deux lignes).
+                FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
               ],
             ),
           ),
@@ -397,7 +416,7 @@ class _ProductTile extends StatelessWidget {
         onTap: () => context.push('/shop/products/${p.id}'),
         child: Container(
           padding: const EdgeInsets.all(BimSpacing.sm),
-          decoration: BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(BimRadius.card)),
+          decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
           child: Row(
             children: [
               ClipRRect(

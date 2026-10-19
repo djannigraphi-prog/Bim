@@ -142,7 +142,8 @@ void main() {
   testWidgets('écran 55 : boutique, compteurs réels, articles en ligne, commandes à traiter', (tester) async {
     await _pump(tester, _FakeShop(), '/shop');
     expect(find.text('Boutique Élégance'), findsOneWidget);
-    expect(find.text('Espace marchand · Cocody, Abidjan'), findsOneWidget);
+    expect(find.text('Boutique ouverte'), findsOneWidget); // maquette 55
+    expect(find.text(' · Cocody, Abidjan'), findsOneWidget);
     expect(find.text('En ligne'), findsOneWidget); // compteur
     expect(find.text('Robe soirée à plumes'), findsOneWidget);
     expect(find.text('Stock : 3'), findsOneWidget);
