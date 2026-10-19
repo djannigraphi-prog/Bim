@@ -173,16 +173,17 @@ class ChoiceChipBim extends StatelessWidget {
       button: true,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(BimRadius.chip),
+        borderRadius: BorderRadius.circular(18),
         child: AnimatedContainer(
           duration: BimDurations.fast,
-          constraints: const BoxConstraints(minHeight: kBimMinTouch),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          // Pastilles fines (maquette du 19/10/2026).
+          constraints: const BoxConstraints(minHeight: 36),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             // Filtres (dark) : pastilles grises pleines quand elles ne sont pas choisies (maquettes 17 et 47).
             color: selected ? fill : (dark ? scheme.surfaceContainerLow : scheme.surface),
-            borderRadius: BorderRadius.circular(dark ? 22 : BimRadius.chip),
-            border: Border.all(color: selected ? fill : (dark ? Colors.transparent : scheme.outline), width: 1.5),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: selected ? fill : (dark ? Colors.transparent : scheme.outline)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -192,7 +193,7 @@ class ChoiceChipBim extends StatelessWidget {
               Flexible(
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? onFill : scheme.onSurface),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: selected ? onFill : scheme.onSurface),
                 ),
               ),
             ],

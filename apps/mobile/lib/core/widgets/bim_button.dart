@@ -29,7 +29,7 @@ class BimButton extends StatelessWidget {
     final (Color bg, Color fg, BorderSide side) = switch (variant) {
       BimButtonVariant.primary => (BimColors.red, BimColors.white, BorderSide.none),
       BimButtonVariant.dark => (scheme.onSurface, scheme.surface, BorderSide.none),
-      BimButtonVariant.outline => (Colors.transparent, scheme.onSurface, BorderSide(color: scheme.outline, width: 1.5)),
+      BimButtonVariant.outline => (Colors.transparent, scheme.onSurface, BorderSide(color: scheme.outline)),
       BimButtonVariant.subtle => (scheme.surfaceContainerLow, scheme.onSurface, BorderSide.none),
     };
     final enabled = onPressed != null && !loading;
@@ -39,7 +39,8 @@ class BimButton extends StatelessWidget {
       label: label,
       child: SizedBox(
         width: double.infinity,
-        height: 52,
+        // Maquette du 19/10/2026 : boutons fins, en pilule (46 px, toujours assez grands pour le doigt).
+        height: 46,
         child: FilledButton(
           onPressed: enabled ? onPressed : null,
           style: FilledButton.styleFrom(
@@ -48,9 +49,8 @@ class BimButton extends StatelessWidget {
             disabledBackgroundColor: variant == BimButtonVariant.primary ? BimColors.grey400 : bg.withValues(alpha: 0.5),
             disabledForegroundColor: variant == BimButtonVariant.primary ? BimColors.white : fg.withValues(alpha: 0.6),
             side: side,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BimRadius.button)),
-            // Hérite de la police du thème (police de marque à venir, D-UI-02).
-            textStyle: theme.textTheme.labelLarge,
+            shape: const StadiumBorder(),
+            textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 15),
           ),
           child: AnimatedSwitcher(
             duration: BimDurations.fast,

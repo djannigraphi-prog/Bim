@@ -582,7 +582,7 @@ class _Bubble extends StatelessWidget {
     final m = message;
     // Maquette 48 : mes messages en noir, les messages reçus en blanc (fond beige de la conversation).
     final dark = theme.brightness == Brightness.dark;
-    final bg = m.mine ? (dark ? BimColors.grey800 : BimColors.black) : (dark ? BimColors.grey900 : BimColors.white);
+    final bg = m.mine ? (dark ? BimColors.nightLine : BimColors.black) : (dark ? BimColors.nightSurface : BimColors.white);
     final fg = m.mine ? Colors.white : scheme.onSurface;
     final Widget content = switch (m.status) {
       'deleted' => Text('Message supprimé', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),

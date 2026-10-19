@@ -972,7 +972,7 @@ void main() {
     final c = await _show(t, '/home');
     c.read(sessionProvider.notifier).continueAsVisitor();
     await t.pump();
-    await t.tap(find.byIcon(Icons.add).last);
+    await t.tap(find.byKey(const ValueKey('nav-2')));
     await _settle(t);
     await _capture(t, '06_visiteur');
   });
@@ -1200,7 +1200,7 @@ void main() {
   });
   testWidgets('32 BimShop', (t) async {
     await _show(t, '/home');
-    await t.tap(find.text('BimShop'));
+    await t.tap(find.byKey(const ValueKey('nav-4')));
     await _settle(t);
     await _capture(t, '32_bimshop');
   });

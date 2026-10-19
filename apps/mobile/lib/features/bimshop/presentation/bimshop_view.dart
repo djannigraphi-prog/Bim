@@ -93,7 +93,7 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
         child: ListView(
           key: const PageStorageKey('bimshop'),
           // Marges fines : les photos sont grandes, comme sur Pinterest (décision du fondateur, 19/10/2026).
-          padding: EdgeInsets.fromLTRB(12, MediaQuery.paddingOf(context).top + BimSpacing.md, 12, BimSpacing.xxl),
+          padding: EdgeInsets.fromLTRB(12, MediaQuery.paddingOf(context).top + BimSpacing.md, 12, BimSpacing.xxl + MediaQuery.paddingOf(context).bottom),
           children: [
             // Maquette 32 : « BimShop », mes commandes (camion) et articles mis de côté (sac).
             Padding(

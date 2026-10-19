@@ -21,14 +21,15 @@ abstract final class BimTheme {
         outline: BimColors.grey200,
       );
 
+  /// Mode nuit : gris foncé mat (#1C1C1E), pas un noir complet (maquette validée le 19/10/2026).
   static ThemeData dark() => _build(
         brightness: Brightness.dark,
-        background: BimColors.black,
-        surface: BimColors.grey900,
-        surfaceHigh: BimColors.grey800,
-        onBackground: BimColors.white,
-        muted: BimColors.grey400,
-        outline: BimColors.grey800,
+        background: BimColors.night,
+        surface: BimColors.nightSurface,
+        surfaceHigh: BimColors.nightHigh,
+        onBackground: const Color(0xFFF2F2F4),
+        muted: const Color(0xFFA1A1A8),
+        outline: BimColors.nightLine,
       );
 
   static ThemeData _build({
@@ -102,6 +103,31 @@ abstract final class BimTheme {
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(BimRadius.field),
           borderSide: const BorderSide(color: BimColors.red),
+        ),
+      ),
+      // Boutons fins et arrondis (maquette du 19/10/2026) : 40 px de haut, pilule, texte 14,5.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: const StadiumBorder(),
+          textStyle: const TextStyle(fontFamily: fontFamily, fontSize: 14.5, fontWeight: FontWeight.w600),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(64, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: const StadiumBorder(),
+          foregroundColor: onBackground,
+          side: BorderSide(color: outline),
+          textStyle: const TextStyle(fontFamily: fontFamily, fontSize: 14.5, fontWeight: FontWeight.w500),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: const StadiumBorder(),
+          textStyle: const TextStyle(fontFamily: fontFamily, fontSize: 14.5, fontWeight: FontWeight.w600),
         ),
       ),
       snackBarTheme: SnackBarThemeData(

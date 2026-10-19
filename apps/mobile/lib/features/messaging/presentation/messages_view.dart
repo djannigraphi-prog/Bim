@@ -110,7 +110,8 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
         await ref.read(conversationsProvider(_requests).future);
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(0, BimSpacing.sm, 0, BimSpacing.xxl),
+        // La barre du bas flotte au-dessus : marge du bas = sa hauteur (Scaffold.extendBody).
+        padding: EdgeInsets.fromLTRB(0, BimSpacing.sm, 0, BimSpacing.xxl + MediaQuery.paddingOf(context).bottom),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: BimSpacing.screen),

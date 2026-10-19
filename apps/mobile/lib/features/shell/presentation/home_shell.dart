@@ -14,6 +14,7 @@ import '../../messaging/data/messaging_api.dart';
 import '../../messaging/presentation/messages_view.dart';
 import '../../notifications/data/inbox_api.dart';
 import '../../social/presentation/feed_view.dart';
+import 'bim_nav_bar.dart';
 
 /// Barre du bas des maquettes (Q8) : Accueil · Messages · « + » (nouveau projet, Q9) · Live · BimShop.
 /// Lot 0 : la navigation et le mode visiteur sont en place ; le contenu de chaque onglet arrive avec son lot
@@ -47,9 +48,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   static const _tabs = [
     (icon: Icons.home_outlined, active: Icons.home_rounded, label: 'Accueil', lot: 'Le fil d’actualité, les stories et les Reels'),
     (icon: Icons.chat_bubble_outline_rounded, active: Icons.chat_bubble_rounded, label: 'Messages', lot: 'La messagerie'),
-    (icon: Icons.add, active: Icons.add, label: '', lot: ''),
-    (icon: Icons.radio_button_checked_outlined, active: Icons.radio_button_checked, label: 'Live', lot: 'Les Lives'),
-    (icon: Icons.storefront_outlined, active: Icons.storefront, label: 'BimShop', lot: 'Le BimShop'),
+    (icon: Icons.add_rounded, active: Icons.add_rounded, label: 'Nouveau projet', lot: ''),
+    (icon: Icons.sensors_rounded, active: Icons.sensors_rounded, label: 'Live', lot: 'Les Lives'),
+    (icon: Icons.shopping_bag_outlined, active: Icons.shopping_bag_rounded, label: 'BimShop', lot: 'Le BimShop'),
   ];
 
   bool get _visitor => ref.read(sessionProvider) is! SessionSignedIn;
@@ -74,13 +75,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
-    final scheme = Theme.of(context).colorScheme;
     final tab = _tabs[_tab];
     // Pastille de la cloche : notifications pas encore vues (lot 2, écran 17).
     final unread = session is SessionSignedIn ? (ref.watch(inboxUnreadProvider).valueOrNull ?? 0) : 0;
     final messagesUnread = session is SessionSignedIn ? ref.watch(messagesUnreadProvider).valueOrNull : null;
     final messagesBadge = (messagesUnread?.conversations ?? 0) + (messagesUnread?.requests ?? 0);
     return Scaffold(
+      // Barre du bas flottante (maquette du 19/10/2026) : le contenu défile dessous (effet vitre en mode nuit).
+      extendBody: true,
       // V1 : l'onglet BimShop a son propre en-tête (« BimShop », maquette 32).
       appBar: _tab == 4
           ? null
@@ -145,54 +147,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          height: 72,
-          decoration: BoxDecoration(border: Border(top: BorderSide(color: scheme.outline))),
-          child: Row(
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                Expanded(
-                  child: i == 2
-                      ? Center(
-                          child: Semantics(
-                            button: true,
-                            label: 'Nouveau projet',
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(BimRadius.button),
-                              onTap: () => _onTap(2),
-                              child: Container(
-                                width: 64,
-                                height: 56,
-                                decoration: BoxDecoration(color: scheme.onSurface, borderRadius: BorderRadius.circular(BimRadius.button)),
-                                child: Icon(Icons.add, size: 32, color: scheme.surface),
-                              ),
-                            ),
-                          ),
-                        )
-                      : InkWell(
-                          onTap: () => _onTap(i),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Badge(
-                                isLabelVisible: i == 1 && messagesBadge > 0,
-                                label: Text(messagesBadge > 99 ? '99+' : '$messagesBadge'),
-                                backgroundColor: BimColors.red,
-                                child: Icon(_tab == i ? _tabs[i].active : _tabs[i].icon, color: _tab == i ? BimColors.red : scheme.onSurface),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _tabs[i].label,
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _tab == i ? BimColors.red : scheme.onSurface),
-                              ),
-                            ],
-                          ),
-                        ),
-                ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: BimNavBar(
+        items: [for (final t in _tabs) (icon: t.icon, active: t.active, label: t.label)],
+        current: _tab,
+        onTap: _onTap,
+        badges: {1: messagesBadge},
       ),
     );
   }

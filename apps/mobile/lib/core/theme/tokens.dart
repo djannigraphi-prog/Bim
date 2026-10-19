@@ -19,6 +19,12 @@ abstract final class BimColors {
   static const grey800 = Color(0xFF2A2B31);
   static const grey900 = Color(0xFF1A1B21);
 
+  // Mode nuit (19/10/2026, maquette validée par le fondateur) : gris foncé mat, jamais noir complet.
+  static const night = Color(0xFF1C1C1E);
+  static const nightSurface = Color(0xFF262628);
+  static const nightHigh = Color(0xFF2E2E31);
+  static const nightLine = Color(0xFF3A3A3D);
+
   // Couleurs de progression des projets (Q30, écran 18).
   static const progressStart = red;
   static const progressAlmost = Color(0xFFFF8A1F);

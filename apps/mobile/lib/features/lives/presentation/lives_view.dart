@@ -28,7 +28,8 @@ class LivesView extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(livesListProvider),
       child: ListView(
-        padding: const EdgeInsets.all(BimSpacing.screen),
+        // La barre du bas flotte au-dessus : marge du bas = sa hauteur (Scaffold.extendBody).
+        padding: EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.screen, BimSpacing.screen, BimSpacing.screen + MediaQuery.paddingOf(context).bottom),
         children: [
           Text('Lives', style: theme.textTheme.headlineSmall),
           const SizedBox(height: BimSpacing.md),
