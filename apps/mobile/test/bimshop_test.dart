@@ -266,7 +266,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('favorite')));
     await tester.pump();
     expect(api.calls, ['favorite p1 true']);
-    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const ValueKey('favorite')), matching: find.byIcon(Icons.favorite)), findsOneWidget);
     // 7-B : sans taille choisie, rien ne part ; avec la taille S, le récapitulatif s'ouvre (aucun paiement ici).
     await tester.tap(find.byKey(const ValueKey('order')));
     await tester.pump();
