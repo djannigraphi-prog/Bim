@@ -6,12 +6,14 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
+import '../../../core/widgets/feedback.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
-/// Lot 5-C — Écran 32, onglet BimShop : recherche, rubriques, tri, grille d'articles.
-/// Visiteurs compris (lecture seule). Recherche par photo et Gold : plus tard (non prévus dans ce lot).
+/// Lot 5-C — Écran 32, onglet BimShop : recherche, rubriques, tri, articles. Visiteurs compris (lecture seule).
+/// V1 (19/10/2026) : comme la maquette 32, mosaïque façon Pinterest à grandes photos ou vidéos (carré ou portrait).
+/// Recherche par photo : plus tard.
 class BimShopView extends ConsumerStatefulWidget {
   const BimShopView({super.key, this.visitor = false});
 
@@ -32,12 +34,50 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
 
   void _setQuery(BimShopQuery q) => ref.read(bimShopQueryProvider.notifier).state = q;
 
+  /// Tri et rubriques (bouton de filtre de la maquette 32).
+  Future<void> _filters(BimShopQuery query) async {
+    const sorts = {'recent': 'Plus récents', 'price_asc': 'Prix croissant', 'price_desc': 'Prix décroissant'};
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Trier', style: TextStyle(fontWeight: FontWeight.w800))),
+            for (final e in sorts.entries)
+              ListTile(
+                key: ValueKey('sort-${e.key}'),
+                title: Text(e.value),
+                trailing: query.sort == e.key ? const Icon(Icons.check_rounded) : null,
+                onTap: () => Navigator.pop(ctx, e.key),
+              ),
+            const Divider(),
+            ListTile(
+              key: const ValueKey('rubriques'),
+              leading: const Icon(Icons.grid_view_rounded),
+              title: const Text('Toutes les rubriques'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(ctx, 'rubriques'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'rubriques') {
+      await context.push('/bimshop/categories');
+    } else {
+      _setQuery(query.copyWith(sort: choice));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final query = ref.watch(bimShopQueryProvider);
     final results = ref.watch(bimShopResultsProvider);
     final rubriques = ref.watch(rubriquesProvider).valueOrNull ?? const <Rubrique>[];
+    final saved = widget.visitor ? 0 : (ref.watch(shopFavoritesProvider).valueOrNull?.length ?? 0);
     return RefreshIndicator(
       onRefresh: () async {
         ref
@@ -52,8 +92,38 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
         },
         child: ListView(
           key: const PageStorageKey('bimshop'),
-          padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.xxl),
+          // Marges fines : les photos sont grandes, comme sur Pinterest (décision du fondateur, 19/10/2026).
+          padding: EdgeInsets.fromLTRB(12, MediaQuery.paddingOf(context).top + BimSpacing.md, 12, BimSpacing.xxl),
           children: [
+            // Maquette 32 : « BimShop », mes commandes (camion) et articles mis de côté (sac).
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Expanded(child: Text('BimShop', style: theme.textTheme.headlineLarge?.copyWith(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5))),
+                  IconButton(
+                    key: const ValueKey('bimshop-orders'),
+                    tooltip: 'Mes commandes',
+                    iconSize: 30,
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    onPressed: () => widget.visitor ? showVisitorGate(context, ref) : context.push('/orders'),
+                  ),
+                  IconButton(
+                    key: const ValueKey('bimshop-favorites'),
+                    tooltip: 'Mis de côté',
+                    iconSize: 30,
+                    icon: Badge(
+                      isLabelVisible: saved > 0,
+                      backgroundColor: BimColors.red,
+                      label: Text(saved > 99 ? '99+' : '$saved'),
+                      child: const Icon(Icons.shopping_bag_outlined),
+                    ),
+                    onPressed: () => widget.visitor ? showVisitorGate(context, ref) : context.push('/bimshop/favorites'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: BimSpacing.md),
             Row(
               children: [
                 Expanded(
@@ -63,10 +133,21 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
                     textInputAction: TextInputAction.search,
                     onSubmitted: (v) => _setQuery(query.copyWith(q: v)),
                     decoration: InputDecoration(
-                      hintText: 'Rechercher un article, une boutique…',
+                      hintText: 'Rechercher un article',
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: const BorderSide(color: BimColors.black, width: 1.5)),
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: query.q.isEmpty
-                          ? null
+                          ? IconButton(
+                              key: const ValueKey('bimshop-photo-search'),
+                              tooltip: 'Rechercher avec une photo',
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              onPressed: () => showBimSnack(context, 'La recherche avec une photo arrive dans une prochaine version.'),
+                            )
                           : IconButton(
                               tooltip: 'Effacer',
                               icon: const Icon(Icons.close),
@@ -78,82 +159,42 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
                     ),
                   ),
                 ),
-                const SizedBox(width: BimSpacing.xs),
-                IconButton(
-                  key: const ValueKey('bimshop-favorites'),
-                  tooltip: 'Mis de côté',
-                  icon: const Icon(Icons.favorite_border),
-                  onPressed: () => widget.visitor ? showVisitorGate(context, ref) : context.push('/bimshop/favorites'),
-                ),
-                // 7-B : mes commandes.
-                IconButton(
-                  key: const ValueKey('bimshop-orders'),
-                  tooltip: 'Mes commandes',
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  onPressed: () => widget.visitor ? showVisitorGate(context, ref) : context.push('/orders'),
+                const SizedBox(width: BimSpacing.sm),
+                // Filtres : tri et rubriques.
+                Material(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    key: const ValueKey('bimshop-filter'),
+                    onTap: () => _filters(query),
+                    child: const SizedBox(width: 58, height: 58, child: Tooltip(message: 'Trier et filtrer', child: Icon(Icons.tune_rounded))),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: BimSpacing.md),
+            // Rubriques en pastilles : « Pour toi » (tout), puis les rubriques.
             SizedBox(
-              height: 40,
+              height: 46,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: BimSpacing.sm),
-                    child: ActionChip(
-                      key: const ValueKey('rubriques'),
-                      avatar: const Icon(Icons.grid_view_rounded, size: 18),
-                      label: const Text('Rubriques'),
-                      onPressed: () => context.push('/bimshop/categories'),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: BimSpacing.sm),
-                    child: ChoiceChip(label: const Text('Tout'), selected: query.category == null, onSelected: (_) => _setQuery(query.copyWith(clearCategory: true))),
-                  ),
+                  _Pill(key: const ValueKey('rubrique-all'), label: 'Pour toi', selected: query.category == null, onTap: () => _setQuery(query.copyWith(clearCategory: true))),
                   for (final r in rubriques)
-                    Padding(
-                      padding: const EdgeInsets.only(right: BimSpacing.sm),
-                      child: ChoiceChip(
-                        label: Text(r.label),
-                        selected: query.category == r.code || r.children.any((c) => c.code == query.category),
-                        onSelected: (_) => _setQuery(query.copyWith(category: r.code, categoryLabel: r.label)),
-                      ),
+                    _Pill(
+                      key: ValueKey('rubrique-pill-${r.code}'),
+                      label: r.label,
+                      selected: query.category == r.code || r.children.any((c) => c.code == query.category),
+                      onTap: () => _setQuery(query.copyWith(category: r.code, categoryLabel: r.label)),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: BimSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    query.categoryLabel ?? (query.q.isEmpty ? 'Nouveautés' : 'Résultats'),
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  key: const ValueKey('bimshop-sort'),
-                  tooltip: 'Trier',
-                  initialValue: query.sort,
-                  onSelected: (s) => _setQuery(query.copyWith(sort: s)),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'recent', child: Text('Plus récents')),
-                    PopupMenuItem(value: 'price_asc', child: Text('Prix croissant')),
-                    PopupMenuItem(value: 'price_desc', child: Text('Prix décroissant')),
-                  ],
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(const {'recent': 'Plus récents', 'price_asc': 'Prix croissant', 'price_desc': 'Prix décroissant'}[query.sort] ?? ''),
-                      const Icon(Icons.expand_more),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            if (query.categoryLabel != null && !rubriques.any((r) => r.code == query.category)) ...[
+              const SizedBox(height: BimSpacing.sm),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text(query.categoryLabel!, style: theme.textTheme.titleMedium)),
+            ],
             const SizedBox(height: BimSpacing.md),
             ...results.when(
               loading: () => [const Padding(padding: EdgeInsets.all(BimSpacing.xxl), child: Center(child: CircularProgressIndicator()))],
@@ -198,6 +239,39 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
 }
 
 /// Écran 33 — Rubriques et sous-rubriques ; le choix filtre l'écran 32.
+/// Pastille de rubrique (maquette 32) : noire si choisie, grise sinon.
+class _Pill extends StatelessWidget {
+  const _Pill({super.key, required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: BimSpacing.sm),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: Material(
+          color: selected ? scheme.onSurface : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          shape: const StadiumBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Center(child: Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: selected ? scheme.surface : scheme.onSurface))),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class RubriquesScreen extends ConsumerWidget {
   const RubriquesScreen({super.key});
 

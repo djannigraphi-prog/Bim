@@ -97,3 +97,6 @@ Le `message` est en français et peut être affiché tel quel. Le `code` est sta
 | `RETRY_LIMIT` | 409 | plus de nouvelle tentative de livraison possible |
 | `INVITE_NOT_POSSIBLE` | 409 | invitation dans l’équipe d’une boutique impossible (motif volontairement non précisé, ex. âge) |
 | `INTERNAL_ERROR` | 500 | erreur inattendue (détail uniquement dans les journaux) |
+| `PRODUCT_VIDEO_TOO_LONG` | 400 | V1 : vidéo d'article de plus de 60 s ; `details.maxSeconds`, `details.durationMs` |
+| `PRODUCT_VIDEO_FORMAT` | 400 | V1 : vidéo d'article en paysage (carré ou portrait seulement) ; `details.width`, `details.height` |
+| `OWN_PRODUCT` | 409 | V1 : recommander un article de sa propre boutique |

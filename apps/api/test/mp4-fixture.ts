@@ -7,7 +7,7 @@ const box = (type: string, ...parts: Buffer[]) => {
   return Buffer.concat([head, body]);
 };
 
-export function testMp4(opts: { seconds?: number; width?: number; height?: number; gps?: string; version1?: boolean; gpsTrack?: boolean; audio?: boolean } = {}): Buffer {
+export function testMp4(opts: { seconds?: number; width?: number; height?: number; gps?: string; version1?: boolean; gpsTrack?: boolean; audio?: boolean; rotate90?: boolean } = {}): Buffer {
   const timescale = 1000;
   const duration = Math.round((opts.seconds ?? 12) * timescale);
   let mvhd: Buffer;
@@ -28,6 +28,15 @@ export function testMp4(opts: { seconds?: number; width?: number; height?: numbe
   // Son seul (message vocal) : aucune taille d'image.
   tkhd.writeUInt32BE((opts.audio ? 0 : (opts.width ?? 720)) << 16, 76);
   tkhd.writeUInt32BE((opts.audio ? 0 : (opts.height ?? 1280)) << 16, 80);
+  // Matrice : identité, ou quart de tour (vidéo de téléphone filmée en portrait, enregistrée « couchée »).
+  if (opts.rotate90) {
+    tkhd.writeInt32BE(0x10000, 44);
+    tkhd.writeInt32BE(-0x10000, 52);
+  } else {
+    tkhd.writeInt32BE(0x10000, 40);
+    tkhd.writeInt32BE(0x10000, 56);
+  }
+  tkhd.writeInt32BE(0x40000000, 72);
   const udta = box('udta', box('\xa9xyz', Buffer.from(opts.gps ?? '+05.3600-004.0083/', 'latin1')));
   const ftyp = box('ftyp', Buffer.from('isom\0\0\x02\0isomiso2mp41', 'latin1'));
   const hdlr = (type: string) => box('hdlr', Buffer.concat([Buffer.alloc(8), Buffer.from(type, 'latin1'), Buffer.alloc(13)]));

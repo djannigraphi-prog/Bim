@@ -166,6 +166,27 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1910 — BimShop façon Pinterest, vidéos d'articles, compteurs (19/10/2026, 08 h 40) · Fondateur · **décidé** et **appliqué**
+
+Demande : la marketplace doit être « exactement comme la maquette » 32, avec de grandes photos comme sur Pinterest ;
+« il n'y a que des formats carrés et portraits » ; une photo horizontale est recadrée ; des vidéos aussi, « au même
+format », d'**1 minute au plus**. Réponse sur les étoiles : « pas d'étoile sous les articles, seulement les
+recommandations, les likes et commentaires ».
+
+- **Mosaïque** à deux colonnes décalées, marges fines, grandes photos ; en-tête « BimShop », recherche, filtre (tri et
+  rubriques), rubriques en pastilles (« Pour toi »). Sur chaque carte : cœur (mettre de côté), compteurs, bouton panier
+  (ouvre la fiche pour commander), nom et prix (prix barré). Pas d'étoiles ni de note moyenne (A17 maintenue).
+- **Formats** : photo d'article recadrée par le serveur entre 2:3 (portrait) et 1:1 (carré) ; paysage → carré, centré
+  sur la partie la plus intéressante. **Vidéo** : une par article, MP4, 60 s au plus, carrée ou portrait (rotation du
+  téléphone comprise) ; une vidéo en paysage est refusée (`PRODUCT_VIDEO_FORMAT`), faute de pouvoir la recadrer sans
+  réencodage. Dans la mosaïque, la vidéo se lit sans le son, en boucle, quand elle est visible ; bouton « Vidéo » sur
+  la fiche (maquette 34).
+- **Compteurs** (choix technique, réversible) : recommandations = nouveau bouton pouce « Recommander » (une fois par
+  personne, jamais sa propre boutique) ; j'aime = les cœurs ; commentaires = les **avis** publiés des clients. Comme
+  toute la réputation (7-A), seuls ceux de la version courante de la fiche comptent. Le partage d'un article hors de
+  l'app demandera une adresse web publique des articles (plus tard).
+- Migration 0061 (`product_videos`, `product_recommendations`).
+
 ### V1-1810-R — Aucun remboursement dans BIM ; signaler la boutique (18/10/2026, 18 h 30) · Fondateur · **décidé** et **appliqué**
 
 Règle du fondateur : « dans l'application même, il n'y a pas de remboursement […] on met tout à disposition pour que

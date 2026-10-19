@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, inArray, lt, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import { DB, Database } from '../../database/database.module';
-import { inventoryMovements, productFavorites, productMedia, products, productVariants, shopCategories, shopFollows, shops, users } from '../../database/schema';
+import { inventoryMovements, productFavorites, productMedia, productRecommendations, products, productVariants, productVideos, reviews, shopCategories, shopFollows, shopMembers, shops, users } from '../../database/schema';
 import { StorageService } from '../media/storage';
 
 export type BimShopSort = 'recent' | 'price_asc' | 'price_desc';
@@ -53,13 +53,16 @@ export class BimShopService {
   async cards(rows: { p: ProductRow; s: ShopRow }[], apiBase: string) {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.p.id);
-    const [media, stock] = await Promise.all([
+    const [media, stock, videos, counts] = await Promise.all([
       this.db.select().from(productMedia).where(inArray(productMedia.productId, ids)).orderBy(asc(productMedia.position)),
       this.stockByProduct(ids),
+      this.db.select().from(productVideos).where(inArray(productVideos.productId, ids)),
+      this.counts(ids),
     ]);
     const out = [];
     for (const { p, s } of rows) {
       const first = media.find((m) => m.productId === p.id);
+      const video = videos.find((v) => v.productId === p.id);
       out.push({
         id: p.id,
         reference: p.reference,
@@ -68,10 +71,53 @@ export class BimShopService {
         ...publicPrices(p),
         categoryCode: p.categoryCode,
         imageUrl: first ? await this.url(first.storageKey, apiBase) : null,
+        /** V1 : taille de la première photo, pour la mosaïque (carré ou portrait). */
+        imageWidth: first?.width ?? null,
+        imageHeight: first?.height ?? null,
+        video: video ? await this.videoView(video, apiBase) : null,
+        counts: counts.get(p.id) ?? { recommendations: 0, likes: 0, reviews: 0 },
         available: p.kind === 'service' || (stock.get(p.id) ?? 0) > 0,
         shop: this.publicShop(s),
       });
     }
+    return out;
+  }
+
+  private async videoView(v: typeof productVideos.$inferSelect, apiBase: string) {
+    return { url: await this.url(v.storageKey, apiBase), width: v.width, height: v.height, durationMs: v.durationMs };
+  }
+
+  /**
+   * V1 — Compteurs publics d'un article (écrans 32 et 34) : recommandations, j'aime (cœurs) et avis publiés. Comme toute
+   * la réputation (7-A), seuls ceux de la version courante du contenu comptent. Jamais de note moyenne (A17).
+   */
+  async counts(ids: string[]) {
+    const out = new Map<string, { recommendations: number; likes: number; reviews: number }>();
+    if (!ids.length) return out;
+    for (const id of ids) out.set(id, { recommendations: 0, likes: 0, reviews: 0 });
+    const [recs, likes, revs] = await Promise.all([
+      this.db
+        .select({ id: productRecommendations.productId, n: count() })
+        .from(productRecommendations)
+        .innerJoin(products, and(eq(products.id, productRecommendations.productId), eq(products.contentVersion, productRecommendations.productVersion)))
+        .where(inArray(productRecommendations.productId, ids))
+        .groupBy(productRecommendations.productId),
+      this.db
+        .select({ id: productFavorites.productId, n: count() })
+        .from(productFavorites)
+        .innerJoin(products, and(eq(products.id, productFavorites.productId), eq(products.contentVersion, productFavorites.productVersion)))
+        .where(inArray(productFavorites.productId, ids))
+        .groupBy(productFavorites.productId),
+      this.db
+        .select({ id: sql<string>`${reviews.productId}`, n: count() })
+        .from(reviews)
+        .innerJoin(products, and(eq(products.id, reviews.productId), eq(products.contentVersion, reviews.contentVersion)))
+        .where(and(inArray(reviews.productId, ids), eq(reviews.kind, 'item'), eq(reviews.status, 'published')))
+        .groupBy(reviews.productId),
+    ]);
+    for (const r of recs) out.get(r.id)!.recommendations = r.n;
+    for (const r of likes) out.get(r.id)!.likes = r.n;
+    for (const r of revs) out.get(r.id)!.reviews = r.n;
     return out;
   }
 
@@ -211,6 +257,7 @@ export class BimShopService {
     const photos = [];
     for (const m of media) photos.push({ id: m.id, url: await this.url(m.storageKey, apiBase), width: m.width, height: m.height });
     const service = p.kind === 'service';
+    const [[video], counts] = await Promise.all([this.db.select().from(productVideos).where(eq(productVideos.productId, p.id)), this.counts([p.id])]);
     return {
       id: p.id,
       reference: p.reference,
@@ -221,6 +268,8 @@ export class BimShopService {
       durationMinutes: p.durationMinutes,
       category: category ? { code: category.code, label: category.label } : null,
       photos,
+      video: video ? await this.videoView(video, apiBase) : null,
+      counts: counts.get(p.id)!,
       variants: variants.map((v) => ({ id: v.id, label: v.label, available: service || v.stock > 0 })),
       available: service || variants.some((v) => v.stock > 0),
       shop: { ...this.publicShop(s), logoUrl: await this.url(s.logoKey, apiBase) },
@@ -292,7 +341,33 @@ export class BimShopService {
         .where(and(eq(productFavorites.userId, userId), eq(productFavorites.productId, id), eq(productFavorites.productVersion, p.contentVersion))),
       this.db.select({ n: count() }).from(shopFollows).where(and(eq(shopFollows.userId, userId), eq(shopFollows.shopId, s.id))),
     ]);
-    return { favorite: fav.n > 0, followingShop: follow.n > 0 };
+    const [rec] = await this.db
+      .select({ n: count() })
+      .from(productRecommendations)
+      .where(and(eq(productRecommendations.userId, userId), eq(productRecommendations.productId, id), eq(productRecommendations.productVersion, p.contentVersion)));
+    return { favorite: fav.n > 0, followingShop: follow.n > 0, recommended: rec.n > 0 };
+  }
+
+  /** V1 — Recommander un article (pouce) : une fois par personne, jamais sa propre boutique. */
+  async setRecommendation(userId: string, id: string, on: boolean) {
+    const { p, s } = await this.visibleProduct(id);
+    if (on) {
+      const [member] = await this.db
+        .select({ n: count() })
+        .from(shopMembers)
+        .where(and(eq(shopMembers.shopId, s.id), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt)));
+      if (s.ownerUserId === userId || member.n > 0) throw Errors.conflict('OWN_PRODUCT', 'Tu ne peux pas recommander un article de ta boutique.');
+      await this.db
+        .insert(productRecommendations)
+        .values({ userId, productId: id, productVersion: p.contentVersion })
+        .onConflictDoUpdate({
+          target: [productRecommendations.userId, productRecommendations.productId],
+          set: { productVersion: p.contentVersion, createdAt: new Date() },
+          where: sql`${productRecommendations.productVersion} <> ${p.contentVersion}`,
+        });
+    } else await this.db.delete(productRecommendations).where(and(eq(productRecommendations.userId, userId), eq(productRecommendations.productId, id)));
+    const counts = await this.counts([id]);
+    return { recommended: on, counts: counts.get(id)! };
   }
 
   async setFavorite(userId: string, id: string, on: boolean) {

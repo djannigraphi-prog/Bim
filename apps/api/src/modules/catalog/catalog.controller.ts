@@ -11,6 +11,9 @@ import { ProductDto, StockDto, UpdateProductDto, UpdateShopDto, VariantsDto } fr
 import { BimShopService, BimShopSort } from './bimshop.service';
 import { MAX_PRODUCT_IMAGES, MerchantCatalogService } from './merchant-catalog.service';
 
+/** V1 : la vidéo est refusée dès la réception au-delà de MEDIA_MAX_VIDEO_MB. */
+const VIDEO_UPLOAD_LIMIT = (Number(process.env.MEDIA_MAX_VIDEO_MB) || 30) * 1024 * 1024;
+
 const UPLOAD = { limits: { fileSize: 25 * 1024 * 1024 } };
 
 /** Lot 5-B — Espace marchand (écran 55) : boutique et catalogue. Espace marchand actif obligatoire. */
@@ -129,6 +132,24 @@ export class MerchantCatalogController {
     return this.catalog.addPhotos(this.shop(a), id, photos ?? [], apiBase(req));
   }
 
+  @Put('products/:id/video')
+  @RequireShopPermission('products.edit')
+  @Throttle({ default: { limit: 10, ttl: 600_000 } })
+  @UseInterceptors(FileInterceptor('video', { limits: { fileSize: VIDEO_UPLOAD_LIMIT, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['video'], properties: { video: { type: 'string', format: 'binary' } } } })
+  @ApiOperation({ summary: 'V1 : vidéo de l’article (une seule, MP4, 60 s au plus, carré ou portrait ; remplace l’ancienne). PRODUCT_VIDEO_TOO_LONG, PRODUCT_VIDEO_FORMAT' })
+  setVideo(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() video: Express.Multer.File | undefined, @Req() req: Request) {
+    return this.catalog.setVideo(this.shop(a), id, video, apiBase(req));
+  }
+
+  @Delete('products/:id/video')
+  @RequireShopPermission('products.edit')
+  @ApiOperation({ summary: 'V1 : retirer la vidéo de l’article' })
+  removeVideo(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.catalog.removeVideo(this.shop(a), id, apiBase(req));
+  }
+
   @Delete('products/:id/photos/:photoId')
   @RequireShopPermission('products.edit')
   removePhoto(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Param('photoId', ParseUUIDPipe) photoId: string, @Req() req: Request) {
@@ -221,6 +242,19 @@ export class BimShopController {
   @Delete('products/:id/favorite')
   unfavorite(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
     return this.shop.setFavorite(a.userId, id, false);
+  }
+
+  @ApiBearerAuth()
+  @Put('products/:id/recommend')
+  @ApiOperation({ summary: 'V1 : recommander un article (pouce) ; une fois par personne, pas sa propre boutique (OWN_PRODUCT)' })
+  recommend(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.shop.setRecommendation(a.userId, id, true);
+  }
+
+  @ApiBearerAuth()
+  @Delete('products/:id/recommend')
+  unrecommend(@CurrentAuth() a: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.shop.setRecommendation(a.userId, id, false);
   }
 
   @ApiBearerAuth()

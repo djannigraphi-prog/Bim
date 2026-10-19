@@ -3420,6 +3420,81 @@
         ]
       }
     },
+    "/v1/shop/products/{id}/video": {
+      "put": {
+        "operationId": "MerchantCatalogController_setVideo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "video"
+                ],
+                "properties": {
+                  "video": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "V1 : vidéo de l’article (une seule, MP4, 60 s au plus, carré ou portrait ; remplace l’ancienne). PRODUCT_VIDEO_TOO_LONG, PRODUCT_VIDEO_FORMAT",
+        "tags": [
+          "Espace marchand"
+        ]
+      },
+      "delete": {
+        "operationId": "MerchantCatalogController_removeVideo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "V1 : retirer la vidéo de l’article",
+        "tags": [
+          "Espace marchand"
+        ]
+      }
+    },
     "/v1/shop/products/{id}/photos/{photoId}": {
       "delete": {
         "operationId": "MerchantCatalogController_removePhoto",
@@ -3742,6 +3817,61 @@
       },
       "delete": {
         "operationId": "BimShopController_unfavorite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "BimShop"
+        ]
+      }
+    },
+    "/v1/bimshop/products/{id}/recommend": {
+      "put": {
+        "operationId": "BimShopController_recommend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "V1 : recommander un article (pouce) ; une fois par personne, pas sa propre boutique (OWN_PRODUCT)",
+        "tags": [
+          "BimShop"
+        ]
+      },
+      "delete": {
+        "operationId": "BimShopController_unrecommend",
         "parameters": [
           {
             "name": "id",

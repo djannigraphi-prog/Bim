@@ -330,14 +330,21 @@ class _FakeBimShopApi extends BimShopApi {
   static const _elegance = ShopRef(id: 's1', name: 'Boutique Élégance', slug: 'boutique-elegance', verified: true, city: 'Abidjan', commune: 'Cocody');
   static const _kalia = ShopRef(id: 's2', name: 'Kalia Sport', slug: 'kalia-sport', verified: false, city: 'Abidjan', commune: 'Marcory');
   static const _cards = [
-    ShopCard(id: 'x1', kind: 'product', title: 'Robe soirée à plumes', priceFcfa: 45000, compareAtFcfa: 60000, available: true, shop: _elegance),
-    ShopCard(id: 'x2', kind: 'product', title: 'Ensemble wax corporate', priceFcfa: 32000, available: true, shop: _elegance),
-    ShopCard(id: 'x4', kind: 'product', title: 'Legging de sport respirant', priceFcfa: 8500, available: true, shop: _kalia),
-    ShopCard(id: 'x5', kind: 'product', title: 'Brassière maintien fort', priceFcfa: 7000, available: false, shop: _kalia),
+    // V1 : mosaïque (formats carré et portrait) et compteurs inventés pour la démonstration.
+    ShopCard(id: 'x1', kind: 'product', title: 'Robe soirée à plumes', priceFcfa: 45000, compareAtFcfa: 60000, available: true, shop: _elegance, imageWidth: 1000, imageHeight: 1000, counts: ShopCounts(recommendations: 108, likes: 986, reviews: 14)),
+    ShopCard(id: 'x2', kind: 'product', title: 'Ensemble wax corporate', priceFcfa: 32000, available: true, shop: _elegance, imageWidth: 800, imageHeight: 1200, counts: ShopCounts(recommendations: 11, likes: 2400, reviews: 3)),
+    ShopCard(id: 'x4', kind: 'product', title: 'Legging de sport respirant', priceFcfa: 8500, available: true, shop: _kalia, imageWidth: 800, imageHeight: 1100, counts: ShopCounts(recommendations: 64, likes: 10000)),
+    ShopCard(id: 'x5', kind: 'product', title: 'Brassière maintien fort', priceFcfa: 7000, available: false, shop: _kalia, imageWidth: 900, imageHeight: 1000),
   ];
 
   @override
   Future<({List<ShopCard> items, String? nextCursor})> browse(BimShopQuery query, {String? cursor}) async => (items: _cards, nextCursor: null);
+
+  @override
+  Future<List<ShopCard>> favorites() async => _cards.sublist(0, 2);
+
+  @override
+  Future<({bool favorite, bool followingShop, bool recommended})> productState(String id) async => (favorite: true, followingShop: false, recommended: false);
 
   // Rubriques identiques à la migration 0022 ; nombres d'articles de démonstration.
   @override
@@ -371,6 +378,7 @@ class _FakeBimShopApi extends BimShopApi {
         variants: const [(id: 'v1', label: 'S', available: true), (id: 'v2', label: 'M', available: true), (id: 'v3', label: 'L', available: false)],
         shop: _elegance,
         moreFromShop: [_cards[1]],
+        counts: const ShopCounts(recommendations: 218, likes: 1600, reviews: 18),
       );
 
   @override

@@ -5,6 +5,7 @@ import 'package:bim/features/auth/application/session_controller.dart';
 import 'package:bim/features/auth/data/models.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
 import 'package:bim/features/bimshop/presentation/bimshop_view.dart';
+import 'package:bim/features/bimshop/presentation/bimshop_widgets.dart';
 import 'package:bim/features/bimshop/presentation/product_screen.dart';
 import 'package:bim/features/orders/data/orders_api.dart';
 import 'package:bim/features/orders/presentation/checkout_screen.dart';
@@ -26,8 +27,8 @@ ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () asyn
 
 const _shop = ShopRef(id: 's1', name: 'Maison Plumes', slug: 'maison-plumes', verified: true, city: 'Abidjan', commune: 'Cocody');
 
-ShopCard _card(String id, String title, int price, {int? compare, bool available = true}) =>
-    ShopCard(id: id, kind: 'product', title: title, priceFcfa: price, compareAtFcfa: compare, available: available, shop: _shop);
+ShopCard _card(String id, String title, int price, {int? compare, bool available = true, int? w, int? h, ShopCounts counts = const ShopCounts()}) =>
+    ShopCard(id: id, kind: 'product', title: title, priceFcfa: price, compareAtFcfa: compare, available: available, shop: _shop, imageWidth: w, imageHeight: h, counts: counts);
 
 /// API simulée du BimShop (les règles sont testées côté API).
 class _FakeBimShop extends BimShopApi {
@@ -63,13 +64,23 @@ class _FakeBimShop extends BimShopApi {
         variants: const [(id: 'v1', label: 'S', available: true), (id: 'v2', label: 'M', available: false)],
         shop: _shop,
         moreFromShop: [_card('p2', 'Sac Kalia', 15000)],
+        counts: const ShopCounts(recommendations: 218, likes: 1600, reviews: 18),
       );
 
   @override
-  Future<({bool favorite, bool followingShop})> productState(String id) async => (favorite: false, followingShop: false);
+  Future<({bool favorite, bool followingShop, bool recommended})> productState(String id) async => (favorite: false, followingShop: false, recommended: false);
 
   @override
   Future<void> setFavorite(String id, bool on) async => calls.add('favorite $id $on');
+
+  @override
+  Future<List<ShopCard>> favorites() async => const [];
+
+  @override
+  Future<ShopCounts> setRecommendation(String id, bool on) async {
+    calls.add('recommend $id $on');
+    return ShopCounts(recommendations: on ? 219 : 218, likes: 1600, reviews: 18);
+  }
 
   @override
   Future<PublicShop> shop(String slug, {String? cursor}) async => cursor == null
@@ -81,6 +92,20 @@ class _FakeBimShop extends BimShopApi {
 
   @override
   Future<void> setFollow(String slug, bool on) async => calls.add('follow $slug $on');
+}
+
+/// Mosaïque : un portrait 2:3, un carré, un paysage reçu (affiché en carré), un article sans réaction.
+class _MosaicShop extends _FakeBimShop {
+  @override
+  Future<({List<ShopCard> items, String? nextCursor})> browse(BimShopQuery query, {String? cursor}) async => (
+        items: [
+          _card('m1', 'Ensemble wax créatif', 32000, compare: 40000, w: 800, h: 1200, counts: const ShopCounts(recommendations: 2400, likes: 986, reviews: 12)),
+          _card('m2', 'Soin éclat visage', 15000, w: 1000, h: 1000),
+          _card('m3', 'Sac paysage', 9000, w: 1200, h: 800),
+          _card('m4', 'Robe à plumes', 45000, w: 900, h: 1200),
+        ],
+        nextCursor: null,
+      );
 }
 
 /// Messagerie simulée : « Discuter » ouvre la conversation avec la boutique (6-B).
@@ -147,13 +172,16 @@ Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool
 }
 
 void main() {
-  testWidgets('écran 32 : grille, prix barré et remise, épuisé ; recherche, tri et rubrique relancent la liste', (tester) async {
+  testWidgets('écran 32 (maquette) : en-tête BimShop, prix barré, épuisé ; recherche, tri et rubrique relancent la liste', (tester) async {
     final api = _FakeBimShop();
     await _pump(tester, api, '/home');
-    expect(find.text('Nouveautés'), findsOneWidget);
+    expect(find.text('BimShop'), findsOneWidget);
+    expect(find.text('Pour toi'), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-mosaic')), findsOneWidget);
     expect(find.text('Robe Plumes'), findsOneWidget);
-    expect(find.text('-25 %'), findsOneWidget);
+    expect(find.text(formatPriceF(60000)), findsOneWidget);
     expect(find.text('Épuisé'), findsOneWidget);
+    expect(find.textContaining('★'), findsNothing); // jamais d'étoiles sur les cartes (A17)
     expect(api.queries, ['null||recent']);
 
     await tester.enterText(find.byKey(const ValueKey('bimshop-search')), 'introuvable');
@@ -164,13 +192,18 @@ void main() {
 
     await tester.tap(find.byTooltip('Effacer'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('bimshop-sort')));
+    await tester.tap(find.byKey(const ValueKey('bimshop-filter')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Prix croissant').last);
+    await tester.tap(find.byKey(const ValueKey('sort-price_asc')));
     await tester.pumpAndSettle();
     expect(api.queries.last, 'null||price_asc');
 
-    // Écran 33 : une sous-rubrique filtre l'écran 32.
+    // Pastille de rubrique, puis écran 33 : une sous-rubrique filtre l'écran 32.
+    await tester.tap(find.byKey(const ValueKey('rubrique-pill-vetements')));
+    await tester.pumpAndSettle();
+    expect(api.queries.last, 'vetements||price_asc');
+    await tester.tap(find.byKey(const ValueKey('bimshop-filter')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('rubriques')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Vêtements').last);
@@ -179,6 +212,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.queries.last, 'vetements_soiree||price_asc');
     expect(find.text('Vêtements · Soirée'), findsOneWidget);
+  });
+
+  testWidgets('V1 mosaïque façon Pinterest : grandes photos carrées ou portrait, compteurs, cœur et panier', (tester) async {
+    final api = _MosaicShop();
+    await _pump(tester, api, '/home');
+    // Portrait (2:3) plus haut que le carré, à largeur égale ; un paysage reçu est affiché en carré.
+    final portrait = tester.getSize(find.byKey(const ValueKey('shop-card-m1')));
+    final square = tester.getSize(find.byKey(const ValueKey('shop-card-m2')));
+    final wide = tester.getSize(find.byKey(const ValueKey('shop-card-m3')));
+    expect(portrait.width, closeTo(square.width, 0.5));
+    expect(portrait.width, greaterThan(170)); // deux colonnes, marges fines : grandes photos
+    expect(portrait.height - square.height, closeTo(portrait.width / 2, 2));
+    expect(wide.height, closeTo(square.height, 0.5));
+    // Deux colonnes décalées : la carte suivante va sous la plus courte.
+    expect(tester.getTopLeft(find.byKey(const ValueKey('shop-card-m3'))).dx, closeTo(tester.getTopLeft(find.byKey(const ValueKey('shop-card-m2'))).dx, 0.5));
+    // Compteurs : recommandations, j'aime, avis (nombres courts) ; rien pour un article sans réaction.
+    expect(find.text('2,4 k'), findsOneWidget);
+    expect(find.text('986'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.byKey(const ValueKey('count-likes')), findsNWidgets(1));
+    // Cœur : mis de côté, compteur de j'aime mis à jour.
+    await tester.tap(find.byKey(const ValueKey('shop-card-favorite-m1')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['favorite m1 true']);
+    expect(find.text('987'), findsOneWidget);
+    // Panier : ouvre la fiche pour commander.
+    await tester.tap(find.byKey(const ValueKey('shop-card-bag-m2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('order')), findsOneWidget);
+  });
+
+  testWidgets('V1 écran 34 : recommandations, j’aime, avis ; recommander met à jour le compteur', (tester) async {
+    final api = _FakeBimShop();
+    await _pump(tester, api, '/bimshop/products/p1');
+    expect(find.text('218 recommandations'), findsOneWidget);
+    expect(find.text('18 avis'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('product-recommend')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['recommend p1 true']);
+    expect(find.text('219 recommandations'), findsOneWidget);
+    expect(find.text('1,6 k'), findsOneWidget);
+    expect(find.byIcon(Icons.thumb_up), findsOneWidget);
   });
 
   testWidgets('écran 34 : taille épuisée non choisissable ; cœur ; « Commander » demande la taille puis ouvre le récapitulatif', (tester) async {

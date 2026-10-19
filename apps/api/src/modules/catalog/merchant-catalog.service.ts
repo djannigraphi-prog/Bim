@@ -6,14 +6,19 @@ import { AppError, Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
-import { inventoryMovements, productFavorites, productMedia, products, productVariants, ShopPermission, shopCategories, shopFollows, shops } from '../../database/schema';
+import { inventoryMovements, productFavorites, productMedia, products, productVariants, productVideos, ShopPermission, shopCategories, shopFollows, shops } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
-import { encodePrivateImage } from '../media/private-image';
+import { inspectMp4, Mp4Error, scrubMp4Metadata } from '../media/mp4';
+import { encodePrivateImage, PRODUCT_ASPECT } from '../media/private-image';
 import { StorageService } from '../media/storage';
 import { SpacesService } from '../spaces/spaces.service';
 import { ProductDto, UpdateProductDto, UpdateShopDto } from './dto';
 
 export const MAX_PRODUCT_IMAGES = 6;
+/** V1 (19/10/2026) : une vidéo par article, 60 secondes au plus (décision du fondateur). */
+export const PRODUCT_VIDEO_MAX_SECONDS = 60;
+/** Portrait le plus haut accepté pour une vidéo : 9:16 (format des téléphones), avec une petite tolérance. */
+const VIDEO_MIN_RATIO = 9 / 16 - 0.02;
 type ProductRow = typeof products.$inferSelect;
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 
@@ -249,6 +254,8 @@ export class MerchantCatalogService {
       const media = await this.db.select({ id: productMedia.id, key: productMedia.storageKey }).from(productMedia).where(eq(productMedia.productId, p.id));
       if (media.length) await this.db.delete(productMedia).where(inArray(productMedia.id, media.map((m) => m.id)));
       for (const m of media) await this.storage.remove(m.key).catch(() => undefined);
+      const [video] = await this.db.delete(productVideos).where(eq(productVideos.productId, p.id)).returning({ key: productVideos.storageKey });
+      if (video) await this.storage.remove(video.key).catch(() => undefined);
       return null;
     }
     return this.detail(shopId, p.id, apiBase);
@@ -270,7 +277,8 @@ export class MerchantCatalogService {
     if (!files.length) throw Errors.validation({ fields: { photos: ['Ajoute au moins une photo.'] } });
     if (files.length > MAX_PRODUCT_IMAGES) throw Errors.validation({ fields: { photos: [`${MAX_PRODUCT_IMAGES} photos au plus par article.`] } });
     const images: Awaited<ReturnType<typeof encodePrivateImage>>[] = [];
-    for (const f of files) images.push(await encodePrivateImage(f, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photos'));
+    // V1 : carré ou portrait seulement ; une photo en paysage (ou trop haute) est recadrée.
+    for (const f of files) images.push(await encodePrivateImage(f, this.cfg.MEDIA_MAX_UPLOAD_MB, 'photos', PRODUCT_ASPECT));
     const stored: string[] = [];
     try {
       for (const img of images) {
@@ -296,6 +304,60 @@ export class MerchantCatalogService {
       for (const key of stored) await this.storage.remove(key).catch(() => undefined);
       throw e;
     }
+    return this.detail(shopId, p.id, apiBase);
+  }
+
+  /**
+   * V1 — Vidéo de l'article (une seule ; une nouvelle remplace l'ancienne) : MP4, 60 secondes au plus, carré ou
+   * portrait comme les photos (une vidéo en paysage est refusée : pas de recadrage sans réencodage). Métadonnées
+   * effacées (position GPS). Comme une photo, elle ne touche pas à la réputation.
+   */
+  async setVideo(shopId: string, productId: string, file: Express.Multer.File | undefined, apiBase: string) {
+    if (!this.storage.available) throw Errors.notConfigured('Le stockage des vidéos');
+    const p = await this.own(shopId, productId);
+    if (!file) throw Errors.validation({ fields: { video: ['Vidéo manquante.'] } });
+    if (file.size > this.cfg.MEDIA_MAX_VIDEO_MB * 1024 * 1024) throw Errors.validation({ fields: { video: [`Vidéo trop lourde (${this.cfg.MEDIA_MAX_VIDEO_MB} Mo au plus).`] } });
+    let info: ReturnType<typeof inspectMp4>;
+    try {
+      info = inspectMp4(file.buffer);
+    } catch (e) {
+      if (e instanceof Mp4Error) throw Errors.validation({ fields: { video: ['Format non reconnu : envoie une vidéo MP4.'] } });
+      throw e;
+    }
+    if (info.metadataTrack) throw Errors.validation({ fields: { video: ['Cette vidéo contient des données de position. Désactive la localisation de la caméra ou choisis une autre vidéo.'] } });
+    if (info.durationMs <= 0 || info.durationMs > PRODUCT_VIDEO_MAX_SECONDS * 1000 + 500) {
+      throw new AppError('PRODUCT_VIDEO_TOO_LONG', `La vidéo d’un article dure ${PRODUCT_VIDEO_MAX_SECONDS} secondes au plus.`, HttpStatus.BAD_REQUEST, { maxSeconds: PRODUCT_VIDEO_MAX_SECONDS, durationMs: info.durationMs });
+    }
+    if (!info.width || !info.height) throw Errors.validation({ fields: { video: ['Vidéo sans image.'] } });
+    const ratio = info.width / info.height;
+    if (ratio > 1.02 || ratio < VIDEO_MIN_RATIO) {
+      throw new AppError('PRODUCT_VIDEO_FORMAT', 'Filme ta vidéo en portrait ou au format carré : le BimShop n’affiche pas de vidéo en paysage.', HttpStatus.BAD_REQUEST, { width: info.width, height: info.height });
+    }
+    const key = `products/${p.id}/${uuidv7()}.mp4`;
+    await this.storage.put(key, scrubMp4Metadata(file.buffer), 'video/mp4');
+    let previous: string | undefined;
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.select({ id: products.id }).from(products).where(eq(products.id, p.id)).for('update');
+        const [old] = await tx.delete(productVideos).where(eq(productVideos.productId, p.id)).returning({ key: productVideos.storageKey });
+        previous = old?.key;
+        // Légère tolérance d'arrondi : une vidéo presque carrée est enregistrée comme carrée.
+        const width = Math.min(info.width!, info.height!);
+        await tx.insert(productVideos).values({ productId: p.id, storageKey: key, width, height: info.height!, durationMs: info.durationMs, bytes: file.size });
+      });
+    } catch (e) {
+      await this.storage.remove(key).catch(() => undefined);
+      throw e;
+    }
+    if (previous) await this.storage.remove(previous).catch(() => undefined);
+    return this.detail(shopId, p.id, apiBase);
+  }
+
+  async removeVideo(shopId: string, productId: string, apiBase: string) {
+    const p = await this.own(shopId, productId);
+    const [old] = await this.db.delete(productVideos).where(eq(productVideos.productId, p.id)).returning({ key: productVideos.storageKey });
+    if (!old) throw Errors.notFound('Vidéo');
+    await this.storage.remove(old.key).catch(() => undefined);
     return this.detail(shopId, p.id, apiBase);
   }
 
@@ -405,6 +467,7 @@ export class MerchantCatalogService {
     ]);
     const photos = [];
     for (const m of media) photos.push({ id: m.id, url: await this.url(m.storageKey, apiBase), width: m.width, height: m.height });
+    const [video] = await this.db.select().from(productVideos).where(eq(productVideos.productId, p.id));
     return {
       id: p.id,
       reference: p.reference,
@@ -412,6 +475,7 @@ export class MerchantCatalogService {
       title: p.title,
       description: p.description,
       categoryCode: p.categoryCode,
+      video: video ? { url: await this.url(video.storageKey, apiBase), width: video.width, height: video.height, durationMs: video.durationMs } : null,
       ...MerchantCatalogService.prices(p),
       durationMinutes: p.durationMinutes,
       status: p.status,

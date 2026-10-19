@@ -124,6 +124,7 @@ class ProductDetail {
     this.categoryCode,
     this.compareAtFcfa,
     this.durationMinutes,
+    this.video,
   });
 
   final String id;
@@ -131,6 +132,8 @@ class ProductDetail {
   final String title;
   final String? description;
   final String? categoryCode;
+  /// V1 : vidéo de l'article (une seule, 60 s au plus, carrée ou portrait).
+  final ({String? url, int durationMs})? video;
   final int priceFcfa;
   final int? compareAtFcfa;
   final int? durationMinutes;
@@ -170,6 +173,10 @@ class ProductDetail {
         photos: [
           for (final p in (j['photos'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) ProductPhoto(id: p['id'] as String, url: p['url'] as String?),
         ],
+        video: switch (j['video']) {
+          final Map<String, dynamic> v => (url: v['url'] as String?, durationMs: (v['durationMs'] ?? 0) as int),
+          _ => null,
+        },
         variants: [
           for (final v in (j['variants'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>())
             ProductVariant(id: v['id'] as String, label: v['label'] as String, stock: v['stock'] as int?),
@@ -259,6 +266,10 @@ class ShopApi {
   Future<void> archive(String id) => _api.delete('/v1/shop/products/$id');
   Future<ProductDetail> addPhotos(String id, List<List<int>> files) async =>
       ProductDetail.fromJson(await _api.postFiles('/v1/shop/products/$id/photos', fields: const {}, fileField: 'photos', files: files));
+  /// V1 : vidéo de l'article (MP4, 60 s au plus, carré ou portrait) ; une nouvelle remplace l'ancienne.
+  Future<ProductDetail> setVideo(String id, List<int> bytes) async =>
+      ProductDetail.fromJson(await _api.upload('/v1/shop/products/$id/video', field: 'video', bytes: bytes, filename: 'video.mp4', contentType: 'video/mp4', method: 'PUT'));
+  Future<ProductDetail> removeVideo(String id) async => ProductDetail.fromJson(await _api.delete('/v1/shop/products/$id/video'));
   Future<ProductDetail> removePhoto(String id, String photoId) async => ProductDetail.fromJson(await _api.delete('/v1/shop/products/$id/photos/$photoId'));
   /// Variantes : avant la première publication seulement (ensuite, seul l'ordre change).
   Future<ProductDetail> setVariants(String id, List<String> labels) async => ProductDetail.fromJson(await _api.put('/v1/shop/products/$id/variants', body: {'labels': labels}));

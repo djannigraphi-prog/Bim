@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
@@ -18,7 +19,7 @@ import '../../orders/presentation/order_screens.dart' show stars;
 import '../data/bimshop_api.dart';
 import 'bimshop_widgets.dart';
 
-final _productStateProvider = FutureProvider.autoDispose.family<({bool favorite, bool followingShop}), String>((ref, id) => ref.watch(bimShopApiProvider).productState(id));
+final _productStateProvider = FutureProvider.autoDispose.family<({bool favorite, bool followingShop, bool recommended}), String>((ref, id) => ref.watch(bimShopApiProvider).productState(id));
 
 /// Lot 5-C — Écran 34, fiche article : photos, prix (prix barré), tailles disponibles, boutique, autres articles.
 /// Lot 7-B : « Commander » ouvre le récapitulatif (mode, frais calculés par le serveur) ; aucun paiement dans l'app.
@@ -35,6 +36,9 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
   String? _variant;
   int _photo = 0;
   bool? _favorite;
+  bool? _recommended;
+  ShopCounts? _counts;
+  int _likesDelta = 0;
 
   bool get _signedIn => ref.read(sessionProvider) is SessionSignedIn;
 
@@ -49,14 +53,43 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
       await showVisitorGate(context, ref);
       return;
     }
-    setState(() => _favorite = !current);
+    setState(() {
+      _favorite = !current;
+      _likesDelta += current ? -1 : 1;
+    });
     try {
       await ref.read(bimShopApiProvider).setFavorite(widget.productId, !current);
       ref.invalidate(shopFavoritesProvider);
       if (mounted) showBimSnack(context, current ? 'Retiré de tes articles mis de côté' : 'Mis de côté');
     } on ApiException catch (e) {
       if (mounted) {
-        setState(() => _favorite = current);
+        setState(() {
+          _favorite = current;
+          _likesDelta += current ? 1 : -1;
+        });
+        showApiError(context, e);
+      }
+    }
+  }
+
+  /// V1 : recommander l'article (pouce) ; les compteurs viennent du serveur.
+  Future<void> _toggleRecommend(bool current) async {
+    if (!_signedIn) {
+      await showVisitorGate(context, ref);
+      return;
+    }
+    setState(() => _recommended = !current);
+    try {
+      final counts = await ref.read(bimShopApiProvider).setRecommendation(widget.productId, !current);
+      if (!mounted) return;
+      setState(() {
+        _counts = counts;
+        _likesDelta = 0;
+      });
+      showBimSnack(context, current ? 'Recommandation retirée' : 'Merci pour ta recommandation');
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _recommended = current);
         showApiError(context, e);
       }
     }
@@ -87,15 +120,17 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
               ),
             ),
           ),
-          data: (p) => _body(context, p, favorite),
+          data: (p) => _body(context, p, favorite, _recommended ?? state?.recommended ?? false),
         ),
       ),
     );
   }
 
-  Widget _body(BuildContext context, ShopProduct p, bool favorite) {
+  Widget _body(BuildContext context, ShopProduct p, bool favorite, bool recommended) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final base = _counts ?? p.counts;
+    final counts = base.copyWith(likes: (base.likes + _likesDelta).clamp(0, 1 << 31));
     final needsVariant = p.kind != 'service' && p.variants.length > 1;
     return Column(
       children: [
@@ -106,7 +141,8 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
               Stack(
                 children: [
                   AspectRatio(
-                    aspectRatio: 1,
+                    // V1 : photos carrées ou portrait, comme dans la mosaïque.
+                    aspectRatio: 4 / 5,
                     child: p.photos.isEmpty
                         ? ColoredBox(color: scheme.surfaceContainerHighest, child: const Icon(Icons.image_outlined, size: 48))
                         : PageView(
@@ -139,6 +175,18 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                       ),
                     ),
                   ),
+                  if (p.video?.url != null)
+                    Positioned(
+                      right: BimSpacing.md,
+                      bottom: BimSpacing.md,
+                      child: FilledButton.icon(
+                        key: const ValueKey('product-video'),
+                        style: FilledButton.styleFrom(backgroundColor: const Color(0xCC000000), foregroundColor: Colors.white),
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => _VideoScreen(url: p.video!.url!))),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Vidéo'),
+                      ),
+                    ),
                   if (p.photos.length > 1)
                     Positioned(
                       bottom: BimSpacing.sm,
@@ -174,6 +222,33 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                       children: [
                         Text(formatFcfa(p.priceFcfa), style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w800, fontSize: 22)),
                         if (p.compareAtFcfa != null) Text(formatFcfa(p.compareAtFcfa!), style: theme.textTheme.bodyLarge?.copyWith(decoration: TextDecoration.lineThrough)),
+                      ],
+                    ),
+                    const SizedBox(height: BimSpacing.sm),
+                    // V1 (maquette 34) : recommandations, j'aime, avis ; jamais de note moyenne (A17).
+                    Wrap(
+                      spacing: BimSpacing.lg,
+                      runSpacing: BimSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        InkWell(
+                          key: const ValueKey('product-recommend'),
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _toggleRecommend(recommended),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(recommended ? Icons.thumb_up : Icons.thumb_up_outlined, size: 22),
+                                const SizedBox(width: 6),
+                                Text('${compactCount(counts.recommendations)} recommandation${counts.recommendations > 1 ? 's' : ''}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.favorite, size: 22, color: BimColors.red), const SizedBox(width: 6), Text(compactCount(counts.likes), key: const ValueKey('product-likes'), style: const TextStyle(fontWeight: FontWeight.w600))]),
+                        Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.chat_bubble_outline_rounded, size: 22), const SizedBox(width: 6), Text('${compactCount(counts.reviews)} avis', style: const TextStyle(fontWeight: FontWeight.w600))]),
                       ],
                     ),
                     const SizedBox(height: BimSpacing.xs),
@@ -343,4 +418,57 @@ class _Reviews extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// V1 — Vidéo d'un article en plein écran (bouton « Vidéo » de la maquette 34), avec le son.
+class _VideoScreen extends StatefulWidget {
+  const _VideoScreen({required this.url});
+  final String url;
+
+  @override
+  State<_VideoScreen> createState() => _VideoScreenState();
+}
+
+class _VideoScreenState extends State<_VideoScreen> {
+  late final VideoPlayerController _c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    try {
+      await _c.initialize();
+      await _c.setLooping(true);
+      await _c.play();
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, title: const Text('Vidéo')),
+        body: Center(
+          child: _failed
+              ? const Text('Vidéo indisponible pour le moment.', style: TextStyle(color: Colors.white))
+              : !_c.value.isInitialized
+                  ? const CircularProgressIndicator()
+                  : GestureDetector(
+                      onTap: () => setState(() => _c.value.isPlaying ? _c.pause() : _c.play()),
+                      child: AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)),
+                    ),
+        ),
+      );
 }

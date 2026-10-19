@@ -178,3 +178,42 @@ export const productRevisions = pgTable(
   },
   (t) => [uniqueIndex('product_revisions_version_uq').on(t.productId, t.version)],
 );
+
+/**
+ * V1 (19/10/2026) — Vidéo d'un article : une seule, 60 secondes au plus, MP4 au format carré ou portrait (comme les
+ * photos : décision du fondateur, BimShop façon Pinterest). Métadonnées effacées, stockage privé, liens temporaires.
+ */
+export const productVideos = pgTable(
+  'product_videos',
+  {
+    productId: uuid('product_id')
+      .primaryKey()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    storageKey: varchar('storage_key', { length: 200 }).notNull().unique(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    bytes: integer('bytes').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('product_videos_format_ck', sql`${t.width} > 0 AND ${t.height} > 0 AND ${t.width} <= ${t.height}`), check('product_videos_duration_ck', sql`${t.durationMs} > 0 AND ${t.durationMs} <= 60500`)],
+);
+
+/**
+ * V1 (19/10/2026) — Recommandations d'un article (pouce, écrans 32 et 34) : une par personne ; comme les cœurs, seules
+ * celles de la version courante du contenu comptent (7-A).
+ */
+export const productRecommendations = pgTable(
+  'product_recommendations',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    productVersion: integer('product_version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.productId] }), index('product_recommendations_product_idx').on(t.productId, t.productVersion)],
+);

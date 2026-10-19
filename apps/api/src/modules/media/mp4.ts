@@ -1,7 +1,7 @@
 /**
  * Lot 11 — Lecture minimale d'un fichier MP4 / MOV (ISO BMFF), sans dépendance ni transcodage :
  *  - `inspectMp4` vérifie le format (boîte « ftyp » en tête, « moov » présente) et lit la durée (« mvhd ») et la taille
- *    de l'image (« tkhd » de la piste vidéo) ;
+ *    de l'image telle qu'affichée (« tkhd » de la piste vidéo, rotation comprise) ;
  *  - `scrubMp4Metadata` neutralise les métadonnées (« udta », « meta », « uuid » : position GPS, appareil, logiciel) en
  *    les renommant « free » et en effaçant leur contenu : même taille, donc les positions des images dans le fichier restent valables et le
  *    lecteur ignore simplement ces boîtes ; les dates de création sont remises à zéro. Une vidéo qui porte une piste de
@@ -86,8 +86,13 @@ export function inspectMp4(buf: Buffer): Mp4Info {
     const w = buf.readUInt32BE(tkhd.end - 8) >>> 16;
     const h = buf.readUInt32BE(tkhd.end - 4) >>> 16;
     if (w > 0 && h > 0 && width === null) {
-      width = w;
-      height = h;
+      // Matrice de la piste (36 octets avant la taille) : a = 0 → quart de tour (vidéo filmée en portrait par un
+      // téléphone et enregistrée « couchée ») ; la taille affichée est alors inversée.
+      const a = buf.readInt32BE(tkhd.end - 8 - 36);
+      const b = buf.readInt32BE(tkhd.end - 8 - 32);
+      const quarter = a === 0 && b !== 0;
+      width = quarter ? h : w;
+      height = quarter ? w : h;
     }
   }
   return { durationMs: Math.round((duration / timescale) * 1000), width, height, metadataTrack };

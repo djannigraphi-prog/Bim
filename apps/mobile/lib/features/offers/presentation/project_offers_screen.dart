@@ -178,7 +178,7 @@ class ProjectRecommendations extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: BimSpacing.md),
-        itemBuilder: (_, i) => SizedBox(width: 150, child: ShopCardTile(card: items[i])),
+        itemBuilder: (_, i) => SizedBox(width: 150, child: ShopCardTile(card: items[i], showShop: true, aspect: 1)),
       ),
     );
   }

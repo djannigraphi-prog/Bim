@@ -8,6 +8,11 @@ describe('MP4 (lot 11)', () => {
     expect(inspectMp4(testMp4({ seconds: 61, version1: true }))).toMatchObject({ durationMs: 61000 });
   });
 
+  it('V1 : taille affichée, rotation comprise (portrait filmé au téléphone, enregistré « couché »)', () => {
+    expect(inspectMp4(testMp4({ width: 1920, height: 1080, rotate90: true }))).toMatchObject({ width: 1080, height: 1920 });
+    expect(inspectMp4(testMp4({ width: 1920, height: 1080 }))).toMatchObject({ width: 1920, height: 1080 });
+  });
+
   it('refuse ce qui n’est pas un MP4 ou un fichier tronqué', () => {
     expect(() => inspectMp4(Buffer.from('%PDF-1.4 pas une vidéo'))).toThrow(Mp4Error);
     const f = testMp4();

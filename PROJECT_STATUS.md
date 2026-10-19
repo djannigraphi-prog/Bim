@@ -14,6 +14,7 @@ Dernière mise à jour : 18/10/2026 — version 1 sans dépense (voir la section
 | V1-F | « Pour toi » classé, personnes à suivre (jamais de mineurs) | 2 e2e, 2 Flutter | fait |
 | V1-G | Version anglaise | — | **reportée** (environ 2 000 textes dans l'app et les messages du serveur) |
 | V1-R | **Aucun remboursement dans BIM** (règle du fondateur) ; « Signaler la boutique » depuis son profil et la commande, vu par la modération (0060) | 3 e2e modifiés, 1 e2e, 1 Flutter | fait |
+| V1-S | **BimShop comme la maquette 32** : mosaïque façon Pinterest, photos carrées ou portrait (recadrage serveur), vidéo d'1 min par article, compteurs recommandations / j'aime / avis, sans étoiles (0061) | 1 e2e (3 cas), 2 unitaires, 3 Flutter | fait |
 | V1-H | Codes par e-mail via SMTP (`EMAIL_PROVIDER=smtp`) ; plan du lancement gratuit | 1 e2e | fait |
 
 Reste avant l'ouverture au public : comptes des magasins, hébergement, projet Firebase, fournisseur d'e-mail (actions

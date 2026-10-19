@@ -28,8 +28,66 @@ class ShopRef {
       );
 }
 
+/// V1 (19/10/2026) — Vidéo d'un article : 60 s au plus, carrée ou portrait.
+class ShopVideo {
+  const ShopVideo({required this.url, required this.width, required this.height, required this.durationMs});
+
+  final String? url;
+  final int width;
+  final int height;
+  final int durationMs;
+
+  static ShopVideo? fromJson(Object? j) {
+    if (j is! Map<String, dynamic>) return null;
+    return ShopVideo(url: j['url'] as String?, width: (j['width'] ?? 1) as int, height: (j['height'] ?? 1) as int, durationMs: (j['durationMs'] ?? 0) as int);
+  }
+}
+
+/// V1 — Compteurs publics d'un article : recommandations, j'aime, avis (jamais de note moyenne, A17).
+class ShopCounts {
+  const ShopCounts({this.recommendations = 0, this.likes = 0, this.reviews = 0});
+
+  final int recommendations;
+  final int likes;
+  final int reviews;
+
+  bool get isEmpty => recommendations == 0 && likes == 0 && reviews == 0;
+
+  ShopCounts copyWith({int? recommendations, int? likes, int? reviews}) =>
+      ShopCounts(recommendations: recommendations ?? this.recommendations, likes: likes ?? this.likes, reviews: reviews ?? this.reviews);
+
+  factory ShopCounts.fromJson(Object? j) {
+    if (j is! Map<String, dynamic>) return const ShopCounts();
+    return ShopCounts(recommendations: (j['recommendations'] ?? 0) as int, likes: (j['likes'] ?? 0) as int, reviews: (j['reviews'] ?? 0) as int);
+  }
+}
+
+/// Nombre court (« 986 », « 2,4 k », « 10 k »), comme sur la maquette 32.
+String compactCount(int n) {
+  if (n < 1000) return '$n';
+  if (n < 1000000) {
+    final k = n / 1000;
+    return k < 10 ? '${k.toStringAsFixed(1).replaceAll('.', ',').replaceAll(',0', '')} k' : '${k.floor()} k';
+  }
+  final m = n / 1000000;
+  return m < 10 ? '${m.toStringAsFixed(1).replaceAll('.', ',').replaceAll(',0', '')} M' : '${m.floor()} M';
+}
+
 class ShopCard {
-  const ShopCard({required this.id, required this.kind, required this.title, required this.priceFcfa, required this.available, required this.shop, this.compareAtFcfa, this.imageUrl});
+  const ShopCard({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.priceFcfa,
+    required this.available,
+    required this.shop,
+    this.compareAtFcfa,
+    this.imageUrl,
+    this.imageWidth,
+    this.imageHeight,
+    this.video,
+    this.counts = const ShopCounts(),
+  });
 
   final String id;
   final String kind;
@@ -37,8 +95,21 @@ class ShopCard {
   final int priceFcfa;
   final int? compareAtFcfa;
   final String? imageUrl;
+  /// V1 : taille de la première photo (mosaïque façon Pinterest : carré ou portrait).
+  final int? imageWidth;
+  final int? imageHeight;
+  final ShopVideo? video;
+  final ShopCounts counts;
   final bool available;
   final ShopRef shop;
+
+  /// Rapport largeur / hauteur affiché dans la mosaïque : entre 2:3 (portrait) et 1:1 (carré) ; 4:5 sans taille connue.
+  double get mediaAspect {
+    final w = video?.width ?? imageWidth;
+    final h = video?.height ?? imageHeight;
+    if (w == null || h == null || w <= 0 || h <= 0) return 4 / 5;
+    return (w / h).clamp(2 / 3, 1.0);
+  }
 
   factory ShopCard.fromJson(Map<String, dynamic> j) => ShopCard(
         id: j['id'] as String,
@@ -47,6 +118,10 @@ class ShopCard {
         priceFcfa: j['priceFcfa'] as int,
         compareAtFcfa: j['compareAtFcfa'] as int?,
         imageUrl: j['imageUrl'] as String?,
+        imageWidth: j['imageWidth'] as int?,
+        imageHeight: j['imageHeight'] as int?,
+        video: ShopVideo.fromJson(j['video']),
+        counts: ShopCounts.fromJson(j['counts']),
         available: (j['available'] ?? false) as bool,
         shop: ShopRef.fromJson(j['shop'] as Map<String, dynamic>),
       );
@@ -68,6 +143,8 @@ class ShopProduct {
     this.compareAtFcfa,
     this.durationMinutes,
     this.categoryLabel,
+    this.video,
+    this.counts = const ShopCounts(),
   });
 
   final String id;
@@ -85,6 +162,9 @@ class ShopProduct {
   final List<({String id, String label, bool available})> variants;
   final ShopRef shop;
   final List<ShopCard> moreFromShop;
+  /// V1 : vidéo de l'article (bouton « Vidéo » de la maquette 34) et compteurs.
+  final ShopVideo? video;
+  final ShopCounts counts;
 
   factory ShopProduct.fromJson(Map<String, dynamic> j) => ShopProduct(
         id: j['id'] as String,
@@ -104,6 +184,8 @@ class ShopProduct {
         ],
         shop: ShopRef.fromJson(j['shop'] as Map<String, dynamic>),
         moreFromShop: [for (final c in (j['moreFromShop'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) ShopCard.fromJson(c)],
+        video: ShopVideo.fromJson(j['video']),
+        counts: ShopCounts.fromJson(j['counts']),
       );
 }
 
@@ -192,9 +274,15 @@ class BimShopApi {
   Future<PublicShop> shop(String slug, {String? cursor}) async =>
       PublicShop.fromJson(await _api.get('/v1/bimshop/shops/$slug', query: {if (cursor != null) 'cursor': cursor}));
 
-  Future<({bool favorite, bool followingShop})> productState(String id) async {
+  Future<({bool favorite, bool followingShop, bool recommended})> productState(String id) async {
     final r = await _api.get('/v1/bimshop/products/$id/me');
-    return (favorite: (r['favorite'] ?? false) as bool, followingShop: (r['followingShop'] ?? false) as bool);
+    return (favorite: (r['favorite'] ?? false) as bool, followingShop: (r['followingShop'] ?? false) as bool, recommended: (r['recommended'] ?? false) as bool);
+  }
+
+  /// V1 : recommander un article (pouce) ; renvoie les compteurs à jour.
+  Future<ShopCounts> setRecommendation(String id, bool on) async {
+    final r = on ? await _api.put('/v1/bimshop/products/$id/recommend') : await _api.delete('/v1/bimshop/products/$id/recommend');
+    return ShopCounts.fromJson(r['counts']);
   }
 
   Future<({bool following, bool own})> shopState(String slug) async {

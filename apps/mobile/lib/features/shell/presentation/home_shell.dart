@@ -81,7 +81,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final messagesUnread = session is SessionSignedIn ? ref.watch(messagesUnreadProvider).valueOrNull : null;
     final messagesBadge = (messagesUnread?.conversations ?? 0) + (messagesUnread?.requests ?? 0);
     return Scaffold(
-      appBar: AppBar(
+      // V1 : l'onglet BimShop a son propre en-tête (« BimShop », maquette 32).
+      appBar: _tab == 4
+          ? null
+          : AppBar(
         centerTitle: false,
         titleSpacing: BimSpacing.screen,
         title: BimLogo(height: 36, color: Theme.of(context).brightness == Brightness.dark ? BimLogoColor.white : BimLogoColor.red),

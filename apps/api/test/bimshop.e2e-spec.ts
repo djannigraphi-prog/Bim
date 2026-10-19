@@ -117,7 +117,7 @@ describe('BimShop (e2e)', () => {
     await h.http().put(`/v1/bimshop/products/${robe}/favorite`).set(auth).expect(200);
     await h.http().put(`/v1/bimshop/products/${robe}/favorite`).set(auth).expect(200); // idempotent
     await h.http().put(`/v1/bimshop/shops/${m.slug}/follow`).set(auth).expect(200);
-    expect((await h.http().get(`/v1/bimshop/products/${robe}/me`).set(auth).expect(200)).body).toEqual({ favorite: true, followingShop: true });
+    expect((await h.http().get(`/v1/bimshop/products/${robe}/me`).set(auth).expect(200)).body).toEqual({ favorite: true, followingShop: true, recommended: false });
     expect((await h.http().get(`/v1/bimshop/shops/${m.slug}/me`).set(auth).expect(200)).body).toEqual({ following: true, own: false });
     expect((await h.http().get(`/v1/bimshop/shops/${m.slug}`).expect(200)).body.counts.followers).toBe(1);
     expect((await h.http().get('/v1/shop').set(m.auth).expect(200)).body.counts.followers).toBe(1);
@@ -133,6 +133,6 @@ describe('BimShop (e2e)', () => {
 
     await h.http().delete(`/v1/bimshop/products/${robe}/favorite`).set(auth).expect(200);
     await h.http().delete(`/v1/bimshop/shops/${m.slug}/follow`).set(auth).expect(200);
-    expect((await h.http().get(`/v1/bimshop/products/${robe}/me`).set(auth).expect(200)).body).toEqual({ favorite: false, followingShop: false });
+    expect((await h.http().get(`/v1/bimshop/products/${robe}/me`).set(auth).expect(200)).body).toEqual({ favorite: false, followingShop: false, recommended: false });
   });
 });

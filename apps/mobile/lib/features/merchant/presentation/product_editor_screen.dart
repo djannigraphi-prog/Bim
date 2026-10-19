@@ -10,6 +10,7 @@ import '../../../core/widgets/bim_text_field.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../projects/application/photo_source.dart';
+import '../../reels/data/reels_api.dart' show videoSourceProvider;
 import '../data/shop_api.dart';
 
 const _maxPhotos = 6;
@@ -196,6 +197,13 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
     await _act((api, p) => api.addPhotos(p.id, [bytes]));
   }
 
+  /// V1 : vidéo de l'article (galerie, 1 minute au plus, filmée en portrait ou au format carré).
+  Future<void> _pickVideo() async {
+    final bytes = await ref.read(videoSourceProvider).pick();
+    if (bytes == null || !mounted) return;
+    await _act((api, p) => api.setVideo(p.id, bytes), done: 'Vidéo ajoutée');
+  }
+
   Future<void> _archive() async {
     final p = _product!;
     final ok = await showDialog<bool>(
@@ -307,6 +315,32 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
               ),
             ),
             if (e?.fieldError('photos') != null) Text(e!.fieldError('photos')!, style: const TextStyle(color: BimColors.red)),
+            Text('Formats : carré ou portrait (une photo en paysage est recadrée).', style: theme.textTheme.bodySmall),
+            // V1 (19/10/2026) : une vidéo courte par article, au même format que les photos.
+            if (p != null) ...[
+              const SizedBox(height: BimSpacing.md),
+              Text('Vidéo (1 minute au plus)', style: theme.textTheme.titleMedium),
+              const SizedBox(height: BimSpacing.xs),
+              if (p.video == null)
+                OutlinedButton.icon(
+                  key: const ValueKey('add-video'),
+                  onPressed: _busy ? null : _pickVideo,
+                  icon: const Icon(Icons.video_call_outlined),
+                  label: const Text('Ajouter une vidéo'),
+                )
+              else
+                Row(
+                  children: [
+                    const Icon(Icons.play_circle_outline_rounded),
+                    const SizedBox(width: BimSpacing.sm),
+                    Expanded(child: Text('Vidéo de ${(p.video!.durationMs / 1000).round()} s', key: const ValueKey('video-duration'))),
+                    TextButton(onPressed: _busy ? null : _pickVideo, child: const Text('Remplacer')),
+                    TextButton(key: const ValueKey('remove-video'), onPressed: _busy ? null : () => _act((api, p) => api.removeVideo(p.id), done: 'Vidéo retirée'), child: const Text('Retirer')),
+                  ],
+                ),
+              Text('Filme en portrait ou au format carré : les vidéos en paysage sont refusées.', style: theme.textTheme.bodySmall),
+              if (e?.fieldError('video') != null) Text(e!.fieldError('video')!, style: const TextStyle(color: BimColors.red)),
+            ],
             const SizedBox(height: BimSpacing.lg),
             if (_identityLocked) ...[
               Container(

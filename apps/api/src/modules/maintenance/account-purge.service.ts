@@ -47,6 +47,7 @@ export const PURGE_BLOCKING_TABLES = [
   'inventory_movements',
   'shop_follows',
   'product_favorites',
+  'product_recommendations',
   // Lot 7-A : faire partie de l'équipe d'une boutique, modifier un article.
   'shop_member_permissions',
   'product_revisions',
