@@ -217,7 +217,7 @@ class _CountsPill extends StatelessWidget {
           child: Semantics(
             label: '$n $label',
             excludeSemantics: true,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 17, color: color), const SizedBox(width: 3), Text(compactCount(n), key: ValueKey(key), style: style)]),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 17, color: color), const SizedBox(width: 3), Text(shopCount(n), key: ValueKey(key), style: style)]),
           ),
         );
     return Container(

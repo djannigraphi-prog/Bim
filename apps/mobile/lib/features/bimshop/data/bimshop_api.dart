@@ -63,7 +63,7 @@ class ShopCounts {
 }
 
 /// Nombre court (« 986 », « 2,4 k », « 10 k »), comme sur la maquette 32.
-String compactCount(int n) {
+String shopCount(int n) {
   if (n < 1000) return '$n';
   if (n < 1000000) {
     final k = n / 1000;

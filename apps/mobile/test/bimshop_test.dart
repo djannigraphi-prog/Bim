@@ -218,13 +218,15 @@ void main() {
     final api = _MosaicShop();
     await _pump(tester, api, '/home');
     // Portrait (2:3) plus haut que le carré, à largeur égale ; un paysage reçu est affiché en carré.
-    final portrait = tester.getSize(find.byKey(const ValueKey('shop-card-m1')));
-    final square = tester.getSize(find.byKey(const ValueKey('shop-card-m2')));
-    final wide = tester.getSize(find.byKey(const ValueKey('shop-card-m3')));
+    Size media(String id) => tester.getSize(find.descendant(of: find.byKey(ValueKey('shop-card-$id')), matching: find.byType(AspectRatio)).first);
+    final portrait = media('m1');
+    final square = media('m2');
+    final wide = media('m3');
     expect(portrait.width, closeTo(square.width, 0.5));
     expect(portrait.width, greaterThan(170)); // deux colonnes, marges fines : grandes photos
-    expect(portrait.height - square.height, closeTo(portrait.width / 2, 2));
-    expect(wide.height, closeTo(square.height, 0.5));
+    expect(portrait.height, closeTo(portrait.width * 1.5, 1));
+    expect(square.height, closeTo(square.width, 1));
+    expect(wide.height, closeTo(wide.width, 1));
     // Deux colonnes décalées : la carte suivante va sous la plus courte.
     expect(tester.getTopLeft(find.byKey(const ValueKey('shop-card-m3'))).dx, closeTo(tester.getTopLeft(find.byKey(const ValueKey('shop-card-m2'))).dx, 0.5));
     // Compteurs : recommandations, j'aime, avis (nombres courts) ; rien pour un article sans réaction.
@@ -274,6 +276,9 @@ void main() {
     // Les messages temporaires (« Mis de côté », puis celui-ci) couvrent le bas de l'écran : on les retire avant de
     // toucher de nouveau « Commander ».
     ScaffoldMessenger.of(tester.element(find.byKey(const ValueKey('order')))).clearSnackBars();
+    await tester.pumpAndSettle();
+    // La fiche est plus haute (photo en portrait, compteurs) : la taille est amenée à l'écran avant d'être touchée.
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'S'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ChoiceChip, 'S'));
     await tester.pump();
