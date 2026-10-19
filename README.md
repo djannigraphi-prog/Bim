@@ -1,1 +1,1 @@
-Captures générées par la CI à partir du commit ffa0b0760e7275127b16a5d6f5bc9db8d397b74e (émulateur Android 14, API 34, rendu réel).
+Captures générées par la CI à partir du commit 90dbc580eba72eb76fa7379b8e56f68bc2ff6997 (émulateur Android 14, API 34, rendu réel).
