@@ -166,6 +166,12 @@ F15 et F16 : inchangés (sections ci-dessus), reconfirmés le 14/10/2026. Pour F
 - Architecture validée le même jour : un module Commandes unique (BimShop et messagerie), un module Livraisons distinct, un module Paiements séparé. Un paiement Mobile Money n'est jamais présenté comme techniquement vérifié sans intégration réelle avec un prestataire.
 - Règles détaillées du lot 7 : complétées et en partie décidées par L7-01 ci-dessous ; arbitrages restants A1 à A12 dans `docs/LOT7_CONCEPTION.md`. Aucun développement des commandes sans accord explicite.
 
+### V1-1910-G — Cadeaux : le Bateau pirate avant la Banque (19/10/2026, 14 h 07) · Fondateur · **décidé** et **appliqué**
+
+« Je préfère que bateau vienne avant banque, et en termes de nombre de pièces que les deux se remplacent » :
+Bateau pirate **10 000** pièces, puis Banque **100 000** pièces (avant : Banque 10 000, Bateau 100 000). Migration
+0062 (ne touche que ces deux cadeaux, et seulement s'ils avaient encore les anciennes valeurs).
+
 ### V1-1910 — BimShop façon Pinterest, vidéos d'articles, compteurs (19/10/2026, 08 h 40) · Fondateur · **décidé** et **appliqué**
 
 Demande : la marketplace doit être « exactement comme la maquette » 32, avec de grandes photos comme sur Pinterest ;

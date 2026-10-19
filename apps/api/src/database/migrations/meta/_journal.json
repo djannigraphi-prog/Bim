@@ -435,6 +435,13 @@
       "when": 1792402448467,
       "tag": "0061_v1_bimshop_mosaic",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792418863704,
+      "tag": "0062_v1_gifts_ship_before_bank",
+      "breakpoints": true
     }
   ]
 }

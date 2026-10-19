@@ -27,8 +27,8 @@ const _gifts = [
   GiftOption(code: 'chest_s', name: 'Petit coffre', coins: 100),
   GiftOption(code: 'chest_l', name: 'Grand coffre', coins: 500),
   GiftOption(code: 'safe', name: 'Coffre-fort', coins: 1000),
-  GiftOption(code: 'bank', name: 'Banque', coins: 10000),
-  GiftOption(code: 'ship', name: 'Bateau pirate', coins: 100000),
+  GiftOption(code: 'ship', name: 'Bateau pirate', coins: 10000),
+  GiftOption(code: 'bank', name: 'Banque', coins: 100000),
 ];
 
 WalletInfo _wallet({int purchased = 800, int received = 255, bool available = true}) => WalletInfo(

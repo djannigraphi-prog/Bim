@@ -67,7 +67,9 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     expect(w.packs[2]).toEqual({ coins: 1000, priceFcfa: 1000 });
     expect(w.gifts).toHaveLength(8);
     expect(w.gifts[0]).toEqual({ code: 'coin1', name: 'Pièce', coins: 1 });
-    expect(w.gifts[7]).toMatchObject({ code: 'ship', coins: 100000 });
+    // V1-1910-G : le Bateau pirate avant la Banque, valeurs échangées.
+    expect(w.gifts[6]).toMatchObject({ code: 'ship', name: 'Bateau pirate', coins: 10000 });
+    expect(w.gifts[7]).toMatchObject({ code: 'bank', name: 'Banque', coins: 100000 });
     expect(w.withdrawal).toMatchObject({ min: 5000, dailyCap: 5000000, instantMax: 100000, feePercent: 1, commissionFcfa: 0 });
     expect((await h.http().get('/v1/premium').set(u.auth).expect(200)).body).toMatchObject({ available: true, priceFcfa: 2000, periodDays: 30, active: false });
   });
@@ -108,7 +110,7 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     expect(g2).toMatchObject({ targetCoinCount: 200, balance: { total: 800, purchased: 800 } });
     expect((await h.http().get(`/v1/posts/${post.id}`).set(c.auth).expect(200)).body.coinCount).toBe(200);
     expect((await gift({ targetType: 'post', targetId: post.id, giftCode: 'coin1' }, a.auth).expect(409)).body.error.code).toBe('COINS_SELF_GIFT');
-    expect((await gift({ targetType: 'post', targetId: post.id, giftCode: 'ship' }).expect(409)).body.error.code).toBe('INSUFFICIENT_COINS');
+    expect((await gift({ targetType: 'post', targetId: post.id, giftCode: 'bank' }).expect(409)).body.error.code).toBe('INSUFFICIENT_COINS');
     await gift({ targetType: 'post', targetId: post.id, giftCode: 'inconnu' }).expect(400);
     await gift({ targetType: 'post', targetId: post.id, giftCode: 'coin1', quantity: 100 }).expect(400);
 
