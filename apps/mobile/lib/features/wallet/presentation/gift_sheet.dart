@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
+import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../orders/data/orders_api.dart' show newIdempotencyKey;
 import '../data/wallet_api.dart';
@@ -236,7 +237,9 @@ class BuyCoinsSheet extends ConsumerStatefulWidget {
 }
 
 class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
-  int? _busy;
+  /// Pack choisi (maquette 60 : on choisit une case, puis « Payer »).
+  int? _selected;
+  bool _busy = false;
 
   Future<void> _custom(int min, int max) async {
     final coins = await showDialog<int>(context: context, builder: (_) => _CustomAmountDialog(min: min, max: max));
@@ -244,7 +247,7 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
   }
 
   Future<void> _buy(int coins) async {
-    setState(() => _busy = coins);
+    setState(() => _busy = true);
     try {
       await ref.read(walletApiProvider).buy(coins, idempotencyKey: newIdempotencyKey());
       ref.invalidate(walletProvider);
@@ -253,7 +256,7 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (mounted) {
-        setState(() => _busy = null);
+        setState(() => _busy = false);
         showApiError(context, e);
       }
     }
@@ -269,41 +272,167 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
         child: async.when(
           loading: () => const SizedBox(height: 160, child: Center(child: CircularProgressIndicator())),
           error: (e, _) => Text(e is ApiException ? e.message : ApiException.unknown.message),
-          data: (w) => SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Acheter des pièces', style: theme.textTheme.titleLarge),
-                const SizedBox(height: BimSpacing.xs),
-                const Text('1 pièce = 1 F. Les pièces achetées s’envoient ; seules les pièces reçues peuvent être retirées.'),
-                const SizedBox(height: BimSpacing.sm),
-                const DemoNotice(),
-                const SizedBox(height: BimSpacing.md),
-                for (final p in w.packs)
-                  ListTile(
-                    key: ValueKey('pack-$p'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.monetization_on_rounded, color: BimColors.coin),
-                    title: Text('${coinsLabel(p)} pièces', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    trailing: _busy == p ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text('${coinsLabel(p)} F'),
-                    onTap: _busy == null ? () => _buy(p) : null,
+          data: (w) {
+            // « Populaire » : le pack de 5 000 pièces s'il existe (maquette 60), sinon le pack du milieu.
+            final popular = w.packs.contains(5000) ? 5000 : (w.packs.isEmpty ? null : w.packs[w.packs.length ~/ 2]);
+            final selected = _selected ?? popular;
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Acheter des pièces', textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
+                  const SizedBox(height: BimSpacing.sm),
+                  const DemoNotice(),
+                  const SizedBox(height: BimSpacing.lg),
+                  // Maquette 60 : cases de 3 par ligne, une image par pack.
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      const gap = 10.0;
+                      final width = (box.maxWidth - gap * 2) / 3;
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap + 6,
+                        children: [
+                          for (final p in w.packs)
+                            SizedBox(
+                              width: width,
+                              child: _PackTile(
+                                key: ValueKey('pack-$p'),
+                                coins: p,
+                                popular: p == popular,
+                                selected: p == selected,
+                                onTap: _busy ? null : () => setState(() => _selected = p),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
-                // V1 : la personne choisit elle-même le nombre de pièces.
-                if (w.customMin != null && w.customMax != null)
-                  ListTile(
-                    key: const ValueKey('pack-custom'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.edit_outlined),
-                    title: const Text('Autre montant', style: TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('De ${coinsLabel(w.customMin!)} à ${coinsLabel(w.customMax!)} pièces'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _busy == null ? () => _custom(w.customMin!, w.customMax!) : null,
+                  // V1 : la personne choisit elle-même le nombre de pièces.
+                  if (w.customMin != null && w.customMax != null) ...[
+                    const SizedBox(height: BimSpacing.md),
+                    Material(
+                      color: theme.colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(BimRadius.card),
+                      child: ListTile(
+                        key: const ValueKey('pack-custom'),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BimRadius.card)),
+                        leading: const Icon(Icons.edit_outlined),
+                        title: const Text('Autre montant', style: TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text('De ${coinsLabel(w.customMin!)} à ${coinsLabel(w.customMax!)} pièces'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: _busy ? null : () => _custom(w.customMin!, w.customMax!),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: BimSpacing.lg),
+                  // Peni (maquette 60).
+                  Container(
+                    padding: const EdgeInsets.all(BimSpacing.md),
+                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
+                    child: Row(
+                      children: [
+                        const Peni(pose: PeniPose.happy, size: 48),
+                        const SizedBox(width: BimSpacing.md),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(children: [
+                              const TextSpan(text: 'Les pièces te servent à '),
+                              const TextSpan(text: 'encourager', style: TextStyle(fontWeight: FontWeight.w700)),
+                              const TextSpan(text: ' les créateurs et les commentaires que tu aimes. 1 pièce = 1 F ; seules les pièces reçues se retirent.'),
+                            ]),
+                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-              ],
+                  const SizedBox(height: BimSpacing.lg),
+                  BimButton(
+                    key: const ValueKey('pay-coins'),
+                    label: selected == null ? 'Choisis un pack' : 'Payer ${coinsLabel(selected)} F',
+                    loading: _busy,
+                    onPressed: selected == null || _busy ? null : () => _buy(selected),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Image d'un pack (maquette 60) : pièce, pièces, porte-monnaie, petit coffre, grand coffre, coffre-fort.
+String packAsset(int coins) => giftAsset(switch (coins) {
+      < 500 => 'coin1',
+      < 1000 => 'coin5',
+      < 5000 => 'purse',
+      < 10000 => 'chest_s',
+      < 50000 => 'chest_l',
+      _ => 'safe',
+    })!;
+
+class _PackTile extends StatelessWidget {
+  const _PackTile({super.key, required this.coins, required this.popular, required this.selected, required this.onTap});
+
+  final int coins;
+  final bool popular;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: '${coinsLabel(coins)} pièces, ${coinsLabel(coins)} F${popular ? ', populaire' : ''}',
+      excludeSemantics: true,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: selected ? BimColors.redSoft.withValues(alpha: theme.brightness == Brightness.dark ? 0.15 : 0.6) : scheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(BimRadius.card),
+              side: BorderSide(color: selected ? BimColors.red : Colors.transparent, width: 2),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 6),
+                child: Column(
+                  children: [
+                    SvgPicture.asset(packAsset(coins), height: 44),
+                    const SizedBox(height: 10),
+                    FittedBox(fit: BoxFit.scaleDown, child: Text(coinsLabel(coins), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+                    const SizedBox(height: 2),
+                    Text('${coinsLabel(coins)} F', style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+          if (popular)
+            Positioned(
+              top: -10,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  key: const ValueKey('pack-popular'),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(BimRadius.chip)),
+                  child: const Text('Populaire', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

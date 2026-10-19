@@ -146,6 +146,25 @@ void main() {
     expect(result, 200);
   });
 
+  testWidgets('écran 60 (maquette) : cases avec image, « Populaire » sur 5 000, choisir puis payer', (tester) async {
+    final api = _FakeWallet(_wallet());
+    await _pump(tester, Scaffold(body: Builder(builder: (c) => TextButton(onPressed: () => showBuyCoinsSheet(c), child: const Text('acheter')))), api);
+    await tester.tap(find.text('acheter'));
+    await tester.pumpAndSettle();
+    for (final p in [100, 500, 1000, 5000, 10000, 50000]) {
+      expect(find.byKey(ValueKey('pack-$p')), findsOneWidget);
+    }
+    expect(find.descendant(of: find.byKey(const ValueKey('pack-5000')), matching: find.byKey(const ValueKey('pack-popular'))), findsOneWidget);
+    expect(find.text('Payer 5 000 F'), findsOneWidget); // le pack populaire est choisi d'avance
+    await tester.tap(find.byKey(const ValueKey('pack-1000')));
+    await tester.pump();
+    expect(find.text('Payer 1 000 F'), findsOneWidget);
+    expect(api.calls, isEmpty); // choisir ne paie rien
+    await tester.tap(find.byKey(const ValueKey('pay-coins')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['buy 1000']);
+  });
+
   testWidgets('V1 écran 60 : « Autre montant », la personne choisit le nombre de pièces (bornes contrôlées)', (tester) async {
     final api = _FakeWallet(_wallet());
     await _pump(tester, Scaffold(body: Builder(builder: (c) => TextButton(onPressed: () => showBuyCoinsSheet(c), child: const Text('acheter')))), api);
