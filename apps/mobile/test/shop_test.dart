@@ -203,6 +203,8 @@ void main() {
     refused.current = _detail();
     await _pump(tester, refused, '/shop/products/x1');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('publish-product')), 300, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.byKey(const ValueKey('publish-product')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('publish-product')));
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(find.byKey(const ValueKey('publish-error'))).data, 'Ajoute au moins une photo avant de publier.');
@@ -210,6 +212,8 @@ void main() {
     final ok = _FakeShop()..current = _detail();
     await _pump(tester, ok, '/shop/products/x1');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('publish-product')), 300, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.byKey(const ValueKey('publish-product')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('publish-product')));
     await tester.pumpAndSettle();
     expect(ok.calls, ['publish x1']);
@@ -226,6 +230,8 @@ void main() {
     await tester.scrollUntilVisible(find.byKey(const ValueKey('product-promo')), 200, scrollable: find.byType(Scrollable).first);
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('product-promo')), matching: find.byType(TextField)), '39000');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('publish-product')), 300, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.byKey(const ValueKey('publish-product')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('publish-product')));
     await tester.pumpAndSettle();
     expect(api.calls, ['update x1 promoPriceFcfa=39000 categoryCode=vetements_soiree', 'publish x1']);
