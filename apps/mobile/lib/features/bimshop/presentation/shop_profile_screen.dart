@@ -176,9 +176,10 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                       Expanded(
                         child: BimButton(
                           key: const ValueKey('shop-chat'),
-                          label: 'Écrire',
+                          // Maquette 54 : « Message » sur fond gris.
+                          label: 'Message',
                           icon: Icons.chat_bubble_outline_rounded,
-                          variant: BimButtonVariant.outline,
+                          variant: BimButtonVariant.subtle,
                           onPressed: () => ref.read(sessionProvider) is SessionSignedIn ? openShopConversation(context, ref, widget.slug) : showVisitorGate(context, ref),
                         ),
                       ),
@@ -187,7 +188,17 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                 ),
               ],
               const SizedBox(height: BimSpacing.xl),
-              Text('Articles', style: theme.textTheme.titleLarge),
+              // Maquette 54 : onglet « Boutique » souligné en rouge, avec le nombre d'articles.
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  key: const ValueKey('shop-tab'),
+                  padding: const EdgeInsets.only(bottom: 6),
+                  decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: BimColors.red, width: 3))),
+                  child: Text('Boutique · ${s.productCount}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                ),
+              ),
+              Divider(height: 1, color: theme.colorScheme.outline),
               const SizedBox(height: BimSpacing.md),
               if (s.items.isEmpty) const Text('Aucun article en ligne pour l’instant.') else ShopCardGrid(cards: [...s.items, ..._more], showShop: false),
               if ((_cursor ?? s.nextCursor ?? '').isNotEmpty)
