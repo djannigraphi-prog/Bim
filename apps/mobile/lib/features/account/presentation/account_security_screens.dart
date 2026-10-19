@@ -307,7 +307,7 @@ class _SpacesSheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Changer de profil', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            Text('Changer de profil', style: theme.textTheme.titleLarge),
             const SizedBox(height: BimSpacing.lg),
             ...async.when(
               loading: () => [const Center(child: CircularProgressIndicator())],
@@ -321,7 +321,7 @@ class _SpacesSheet extends ConsumerWidget {
               children: [
                 Expanded(
                   child: BimButton(
-                    label: 'Boutique',
+                    label: 'Nouvelle boutique',
                     icon: Icons.add_business_outlined,
                     variant: BimButtonVariant.subtle,
                     key: const ValueKey('new-shop'),
@@ -334,7 +334,7 @@ class _SpacesSheet extends ConsumerWidget {
                 const SizedBox(width: BimSpacing.sm),
                 Expanded(
                   child: BimButton(
-                    label: 'Livreur',
+                    label: 'Livreur (1 max)',
                     icon: Icons.pedal_bike,
                     variant: BimButtonVariant.subtle,
                     key: const ValueKey('new-courier'),
@@ -400,7 +400,7 @@ class _SpaceTile extends ConsumerWidget {
                   }
                 },
           child: Container(
-            padding: const EdgeInsets.all(BimSpacing.lg),
+            padding: const EdgeInsets.symmetric(horizontal: BimSpacing.lg, vertical: BimSpacing.md),
             decoration: BoxDecoration(
               color: s.active ? BimColors.redSoft.withValues(alpha: 0.4) : null,
               borderRadius: BorderRadius.circular(BimRadius.card),
@@ -417,7 +417,7 @@ class _SpaceTile extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                      Text(s.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       Text('$kind$status', style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),

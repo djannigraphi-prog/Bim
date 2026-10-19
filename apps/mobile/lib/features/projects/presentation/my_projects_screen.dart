@@ -81,7 +81,8 @@ class _ProjectsList extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
           )
         else
-          BimButton(label: 'Nouveau projet', icon: Icons.add, onPressed: () => context.push('/projects/new')),
+          // Maquette 18 : bouton flottant à droite, pas sur toute la largeur.
+          Align(alignment: Alignment.centerRight, child: SizedBox(width: 220, child: BimButton(label: 'Nouveau projet', icon: Icons.add, onPressed: () => context.push('/projects/new')))),
       ],
     );
   }
@@ -89,13 +90,52 @@ class _ProjectsList extends StatelessWidget {
 
 /// Carte sombre « Aujourd'hui » (écran 18) : le projet du jour et l'accès direct à la journée.
 class TodayCard extends StatelessWidget {
-  const TodayCard({super.key, required this.project, required this.today});
+  const TodayCard({super.key, required this.project, required this.today, this.compact = false});
 
   final ProjectSummary project;
   final String today;
+  /// Version courte en tête du fil (le premier Bim reste visible, comme sur la maquette 10).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final title = project.nextTask == null ? project.title : '${project.nextTask!.title} à ${hourFr(project.nextTask!.timeOfDay)}';
+    void open() => context.push('/projects/${project.id}/day/$today');
+    if (compact) {
+      return Material(
+        color: BimColors.black,
+        borderRadius: BorderRadius.circular(BimRadius.card),
+        child: InkWell(
+          key: const ValueKey('today-compact'),
+          borderRadius: BorderRadius.circular(BimRadius.card),
+          onTap: open,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(BimSpacing.md, BimSpacing.md, BimSpacing.md, BimSpacing.md),
+            child: Row(
+              children: [
+                const Peni(pose: PeniPose.happy, size: 40),
+                const SizedBox(width: BimSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 12.5)),
+                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: BimSpacing.sm),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(BimRadius.button)),
+                  child: const Text('Ma journée', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(BimSpacing.lg),
       decoration: BoxDecoration(color: BimColors.black, borderRadius: BorderRadius.circular(BimRadius.card)),
@@ -113,7 +153,7 @@ class TodayCard extends StatelessWidget {
                     Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 14)),
                     const SizedBox(height: 2),
                     Text(
-                      project.nextTask == null ? project.title : '${project.nextTask!.title} à ${hourFr(project.nextTask!.timeOfDay)}',
+                      title,
                       style: const TextStyle(color: BimColors.white, fontSize: 18, fontWeight: FontWeight.w700),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -132,7 +172,7 @@ class TodayCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: BimSpacing.md),
-          BimButton(label: 'Voir ma journée', onPressed: () => context.push('/projects/${project.id}/day/$today')),
+          BimButton(label: 'Voir ma journée', onPressed: open),
         ],
       ),
     );

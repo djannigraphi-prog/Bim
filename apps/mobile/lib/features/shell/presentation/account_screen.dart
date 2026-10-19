@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../account/presentation/account_security_screens.dart';
 import '../../auth/application/session_controller.dart';
@@ -34,125 +33,190 @@ class AccountScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final mode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final me = session is SessionSignedIn ? session.me : null;
+    Widget section(String label) => Padding(
+          padding: const EdgeInsets.fromLTRB(0, BimSpacing.lg, 0, BimSpacing.xs),
+          child: Text(label, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.4)),
+        );
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(BimSpacing.screen),
+          padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.xxl),
           children: [
-            const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
-            const SizedBox(height: BimSpacing.lg),
-            Text('Paramètres', style: theme.textTheme.headlineMedium),
-            const SizedBox(height: BimSpacing.lg),
-            if (me != null)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(radius: 28, child: Icon(Icons.person_outline)),
-                title: Text(me.fullName, style: theme.textTheme.titleMedium),
-                subtitle: Text('@${me.username} · compte utilisateur'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => context.push('/people/${me.username}'),
+            // Maquette 62 : retour à gauche, titre centré.
+            SizedBox(
+              height: 56,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
+                  Text('Paramètres', style: theme.textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w700)),
+                ],
               ),
-            const SizedBox(height: BimSpacing.lg),
-            Text('SÉCURITÉ ET PROFILS', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.swap_horiz),
-              title: const Text('Changer de profil'),
-              subtitle: const Text('Utilisateur, boutiques, compte livreur'),
-              onTap: () => showSpacesSheet(context),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.contact_phone_outlined),
-              title: const Text('Téléphone et e-mail'),
-              onTap: () => context.push('/account/contacts'),
+            const SizedBox(height: BimSpacing.md),
+            if (me != null)
+              Material(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(BimRadius.card),
+                child: ListTile(
+                  key: const ValueKey('account-profile'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BimRadius.card)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: BimSpacing.md, vertical: BimSpacing.sm),
+                  leading: CircleAvatar(
+                    radius: 26,
+                    backgroundColor: BimColors.redSoft,
+                    child: Text(me.fullName.isEmpty ? '?' : me.fullName.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join(), style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700)),
+                  ),
+                  title: Text(me.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  subtitle: Text('@${me.username} · compte utilisateur', style: theme.textTheme.bodySmall),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/people/${me.username}'),
+                ),
+              ),
+            section('APPARENCE'),
+            _Row(
+              icon: Icons.dark_mode_outlined,
+              title: 'Thème',
+              trailing: _ThemeSwitch(mode: mode, onChanged: (m) => _setTheme(ref, m)),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.block_rounded),
-              title: const Text('Personnes bloquées'),
-              onTap: () => context.push('/account/blocked'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.lock_outline),
-              title: const Text('Mot de passe'),
-              onTap: () => context.push('/account/password'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.devices_outlined),
-              title: const Text('Appareils connectés'),
-              onTap: () => context.push('/account/devices'),
-            ),
-            const SizedBox(height: BimSpacing.lg),
-            Text('PIÈCES ET PREMIUM', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-            ListTile(
-              key: const ValueKey('account-wallet'),
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.monetization_on_outlined),
-              title: const Text('Mes pièces'),
-              subtitle: const Text('Solde, achat, retrait'),
-              onTap: () => context.push('/wallet'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.workspace_premium_outlined),
-              title: const Text('Premium'),
-              subtitle: const Text('Recevoir des pièces, sans publicité'),
-              onTap: () => context.push('/premium'),
-            ),
-            const SizedBox(height: BimSpacing.lg),
-            Text('NOTIFICATIONS', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.notifications_none_rounded),
-              title: const Text('Rappels'),
-              subtitle: const Text('Rappels de Peni et heures calmes'),
-              onTap: () => context.push('/account/reminders'),
-            ),
-            const SizedBox(height: BimSpacing.lg),
-            Text('AIDE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.support_outlined),
-              title: const Text('Résoudre un problème'),
-              subtitle: const Text('Avec l’application, un produit ou un service'),
-              onTap: () => reportProblem(context),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.forum_outlined),
-              title: const Text('Mes signalements'),
-              subtitle: const Text('Statut et réponses de l’équipe BIM'),
-              onTap: () => context.push('/reports'),
-            ),
-            const SizedBox(height: BimSpacing.lg),
-            Text('APPARENCE', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: BimSpacing.sm),
-            SegmentedButton<ThemeMode>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text('Clair')),
-                ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text('Sombre')),
-                ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.settings_suggest_outlined), label: Text('Système')),
-              ],
-              selected: {mode},
-              onSelectionChanged: (s) => _setTheme(ref, s.first),
-            ),
-            const SizedBox(height: BimSpacing.xxl),
-            BimButton(
-              label: 'Se déconnecter',
-              variant: BimButtonVariant.subtle,
+            const _Row(icon: Icons.translate_rounded, title: 'Langue', value: 'Français'),
+            section('SÉCURITÉ ET PROFILS'),
+            _Row(icon: Icons.swap_horiz_rounded, title: 'Changer de profil', subtitle: 'Utilisateur, boutiques, compte livreur', onTap: () => showSpacesSheet(context)),
+            _Row(icon: Icons.contact_phone_outlined, title: 'Téléphone et e-mail', onTap: () => context.push('/account/contacts')),
+            _Row(icon: Icons.block_rounded, title: 'Personnes bloquées', onTap: () => context.push('/account/blocked')),
+            _Row(icon: Icons.lock_outline_rounded, title: 'Mot de passe', onTap: () => context.push('/account/password')),
+            _Row(icon: Icons.devices_outlined, title: 'Appareils connectés', onTap: () => context.push('/account/devices')),
+            section('PIÈCES ET PREMIUM'),
+            _Row(key: const ValueKey('account-wallet'), icon: Icons.monetization_on_outlined, title: 'Mes pièces', subtitle: 'Solde, achat, retrait', onTap: () => context.push('/wallet')),
+            _Row(icon: Icons.workspace_premium_outlined, title: 'Premium', subtitle: 'Recevoir des pièces, sans publicité', onTap: () => context.push('/premium')),
+            section('NOTIFICATIONS'),
+            _Row(icon: Icons.notifications_none_rounded, title: 'Rappels', subtitle: 'Rappels de Peni et heures calmes', onTap: () => context.push('/account/reminders')),
+            section('AIDE'),
+            _Row(icon: Icons.help_outline_rounded, title: 'Résoudre un problème', subtitle: 'Avec l’application, un produit ou un service', onTap: () => reportProblem(context)),
+            _Row(icon: Icons.forum_outlined, title: 'Mes signalements', subtitle: 'Statut et réponses de l’équipe BIM', onTap: () => context.push('/reports')),
+            _Row(
               icon: Icons.logout_rounded,
-              onPressed: () async {
+              iconColor: BimColors.red,
+              title: 'Se déconnecter',
+              divider: false,
+              onTap: () async {
                 await ref.read(sessionProvider.notifier).signOut();
                 if (context.mounted) context.go('/welcome');
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Ligne de la maquette 62 : icône dans un carré gris arrondi, titre, valeur ou flèche, séparateur.
+class _Row extends StatelessWidget {
+  const _Row({super.key, required this.icon, required this.title, this.subtitle, this.value, this.trailing, this.onTap, this.iconColor, this.divider = true});
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final String? value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color? iconColor;
+  final bool divider;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(BimRadius.chip),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
+                  child: Icon(icon, size: 22, color: iconColor ?? scheme.onSurface),
+                ),
+                const SizedBox(width: BimSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                      if (subtitle != null) Text(subtitle!, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                if (trailing != null) trailing!,
+                if (value != null) Text(value!, style: theme.textTheme.bodyMedium),
+                if (onTap != null && trailing == null) Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+        if (divider) Divider(height: 1, indent: 52, color: scheme.outline),
+      ],
+    );
+  }
+}
+
+/// Choix du thème compact (maquette 62 : « Clair · Sombre »), plus « Auto » (réglage du téléphone).
+class _ThemeSwitch extends StatelessWidget {
+  const _ThemeSwitch({required this.mode, required this.onChanged});
+
+  final ThemeMode mode;
+  final ValueChanged<ThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget option(ThemeMode m, IconData icon, String label) {
+      final on = mode == m;
+      return Semantics(
+        selected: on,
+        button: true,
+        child: GestureDetector(
+          key: ValueKey('theme-${m.name}'),
+          onTap: () => onChanged(m),
+          child: AnimatedContainer(
+            duration: BimDurations.fast,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: on ? scheme.surface : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: on ? const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))] : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: on ? scheme.onSurface : scheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(label, style: TextStyle(fontSize: 13, fontWeight: on ? FontWeight.w600 : FontWeight.w500, color: on ? scheme.onSurface : scheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          option(ThemeMode.light, Icons.light_mode_outlined, 'Clair'),
+          option(ThemeMode.dark, Icons.dark_mode_outlined, 'Sombre'),
+          option(ThemeMode.system, Icons.brightness_auto_outlined, 'Auto'),
+        ],
       ),
     );
   }

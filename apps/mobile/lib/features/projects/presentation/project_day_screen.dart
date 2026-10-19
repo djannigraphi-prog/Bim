@@ -100,7 +100,13 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: kBimMinTouch),
+                  // Maquette 27 : calendrier du programme (carte des jours).
+                  IconButton(
+                    key: const ValueKey('day-calendar'),
+                    tooltip: 'Calendrier du programme',
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    onPressed: () => context.push('/projects/${widget.projectId}'),
+                  ),
                 ],
               ),
             ),
@@ -217,8 +223,9 @@ class _DayBody extends StatelessWidget {
               Icon(Icons.notifications_none, size: 18, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: BimSpacing.xs),
               Expanded(
-                child: Text('Les rappels et l’alarme de Peni arrivent dans une prochaine version.', style: theme.textTheme.bodySmall),
+                child: Text('Peni te rappelle chaque tâche avant l’heure prévue.', key: const ValueKey('day-reminders'), style: theme.textTheme.bodySmall),
               ),
+              TextButton(onPressed: () => context.push('/account/reminders'), child: const Text('Régler')),
             ],
           ),
         ],
@@ -242,14 +249,22 @@ class _TaskRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: BimSpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: IntrinsicHeight(
+        child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Maquette 27 : heure, puis un trait vertical qui relie les tâches de la journée.
           SizedBox(
             width: 52,
-            child: Padding(
-              padding: const EdgeInsets.only(top: BimSpacing.lg),
-              child: Text(task.timeOfDay, style: TextStyle(fontWeight: FontWeight.w700, color: task.done ? BimColors.success : current ? BimColors.red : scheme.onSurfaceVariant)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: BimSpacing.lg),
+                  child: Text(task.timeOfDay, style: TextStyle(fontWeight: FontWeight.w700, color: task.done ? BimColors.success : current ? BimColors.red : scheme.onSurfaceVariant)),
+                ),
+                Expanded(child: Padding(padding: const EdgeInsets.only(left: 18, top: 4), child: VerticalDivider(width: 2, thickness: 2, color: scheme.outline))),
+              ],
             ),
           ),
           Expanded(
@@ -302,7 +317,8 @@ class _TaskRow extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: task.done ? BimColors.red : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: editable ? BimColors.red : scheme.outline, width: 2),
+                            // Case à cocher : rouge pour la tâche en cours ou faite, grise sinon (maquette 27).
+                            border: Border.all(color: task.done || (editable && current) ? BimColors.red : scheme.outline, width: 2),
                           ),
                           child: task.done ? const Icon(Icons.check_rounded, color: BimColors.white, size: 22) : null,
                         ),
@@ -313,6 +329,7 @@ class _TaskRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

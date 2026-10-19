@@ -46,14 +46,6 @@ class _FeedViewState extends ConsumerState<FeedView> {
             _TabPill(label: 'Pour toi', selected: _tab == 'for_you', onTap: () => setState(() => _tab = 'for_you')),
             const SizedBox(width: BimSpacing.sm),
             _TabPill(label: 'Abonnés', selected: _tab == 'following', onTap: () => setState(() => _tab = 'following')),
-            const Spacer(),
-            // Lot 11 : Reels (vidéos courtes).
-            TextButton.icon(
-              key: const ValueKey('open-reels'),
-              onPressed: () => context.push('/reels'),
-              icon: const Icon(Icons.slow_motion_video_rounded),
-              label: const Text('Reels'),
-            ),
           ],
         ),
       ),
@@ -281,19 +273,35 @@ class _MyProjectsHeader extends ConsumerWidget {
       );
     }
     final today = list.items.where((p) => !p.isCompleted && !p.isPaused).firstOrNull;
+    // Version courte (le premier Bim reste visible, comme sur la maquette 10) : la journée, puis « Mes projets ».
     return Padding(
-      padding: const EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.xl),
+      padding: const EdgeInsets.fromLTRB(BimSpacing.screen, 0, BimSpacing.screen, BimSpacing.md),
       child: Column(
         children: [
-          if (today != null) TodayCard(project: today, today: list.today),
-          ListTile(
+          if (today != null) TodayCard(project: today, today: list.today, compact: true),
+          InkWell(
             key: const ValueKey('my-projects'),
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.flag_outlined, color: BimColors.red),
-            title: Text('Mes projets', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            subtitle: Text('${list.activeCount} en cours${list.items.length > list.activeCount ? ' · ${list.items.length - list.activeCount} terminé${list.items.length - list.activeCount > 1 ? 's' : ''}' : ''}'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            borderRadius: BorderRadius.circular(BimRadius.chip),
             onTap: () => context.push('/projects'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.flag_outlined, color: BimColors.red, size: 20),
+                  const SizedBox(width: BimSpacing.sm),
+                  Text('Mes projets', style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(width: BimSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      '${list.activeCount} en cours${list.items.length > list.activeCount ? ' · ${list.items.length - list.activeCount} terminé${list.items.length - list.activeCount > 1 ? 's' : ''}' : ''}',
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, size: 20),
+                ],
+              ),
+            ),
           ),
         ],
       ),

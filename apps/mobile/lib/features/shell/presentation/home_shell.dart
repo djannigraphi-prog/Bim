@@ -89,6 +89,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         titleSpacing: BimSpacing.screen,
         title: BimLogo(height: 36, color: Theme.of(context).brightness == Brightness.dark ? BimLogoColor.white : BimLogoColor.red),
         actions: [
+          // Maquette 10 : Reels (clap), recherche, notifications.
+          if (_tab == 0)
+            IconButton(
+              key: const ValueKey('open-reels'),
+              tooltip: 'Reels',
+              icon: const Icon(Icons.movie_creation_outlined),
+              onPressed: () => context.push('/reels'),
+            ),
           IconButton(
             tooltip: 'Rechercher',
             icon: const Icon(Icons.search_rounded),
