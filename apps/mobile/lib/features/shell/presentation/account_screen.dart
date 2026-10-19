@@ -155,8 +155,10 @@ class _Row extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (trailing != null) trailing!,
-                if (value != null) Text(value!, style: theme.textTheme.bodyMedium),
+                // Écran étroit : le choix du thème ou la valeur se réduisent au lieu de déborder.
+                if (trailing != null)
+                  Flexible(child: Align(alignment: Alignment.centerRight, child: FittedBox(fit: BoxFit.scaleDown, child: trailing))),
+                if (value != null) Flexible(child: Text(value!, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: theme.textTheme.bodyMedium)),
                 if (onTap != null && trailing == null) Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
               ],
             ),
