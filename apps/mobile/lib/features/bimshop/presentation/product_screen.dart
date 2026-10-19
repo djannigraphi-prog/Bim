@@ -154,10 +154,10 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                             ],
                           ),
                   ),
-                  Positioned(
+                  const Positioned(
                     left: BimSpacing.sm,
                     top: BimSpacing.sm,
-                    child: const BimBackButton(),
+                    child: BimBackButton(),
                   ),
                   Positioned(
                     right: BimSpacing.sm,
