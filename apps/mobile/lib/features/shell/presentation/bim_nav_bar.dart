@@ -51,7 +51,11 @@ class BimNavBar extends StatelessWidget {
                 height: height,
                 padding: const EdgeInsets.symmetric(horizontal: 7),
                 decoration: BoxDecoration(color: bar, borderRadius: radius, border: Border.all(color: border)),
-                child: Row(
+                // Petit écran (320 px) : les pastilles se resserrent au lieu de déborder.
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    final itemWidth = ((box.maxWidth - 42) / (items.length - 1)).clamp(36.0, 58.0);
+                    return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     for (var i = 0; i < items.length; i++)
@@ -75,7 +79,7 @@ class BimNavBar extends StatelessWidget {
                               onTap: () => onTap(i),
                               child: AnimatedContainer(
                                 duration: BimDurations.fast,
-                                width: 58,
+                                width: itemWidth,
                                 height: 42,
                                 decoration: BoxDecoration(color: i == current ? activeBg : Colors.transparent, borderRadius: BorderRadius.circular(21)),
                                 child: Badge(
@@ -90,6 +94,8 @@ class BimNavBar extends StatelessWidget {
                               ),
                             ),
                   ],
+                    );
+                  },
                 ),
               ),
             ),

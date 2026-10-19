@@ -9,7 +9,8 @@ void main() {
     expect(BimColors.red, const Color(0xFFF20D3A));
     expect(BimColors.black, const Color(0xFF101116));
     expect(BimTheme.light().colorScheme.primary, BimColors.red);
-    expect(BimTheme.dark().scaffoldBackgroundColor, BimColors.black);
+    // Mode nuit : gris foncé mat, plus de noir complet (décision du fondateur, 19/10/2026).
+    expect(BimTheme.dark().scaffoldBackgroundColor, BimColors.night);
   });
 
   testWidgets('un bouton en chargement est désactivé (pas de double envoi)', (tester) async {
