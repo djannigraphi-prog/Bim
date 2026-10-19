@@ -209,9 +209,28 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
           data: (p) => ListView(
             padding: const EdgeInsets.all(BimSpacing.screen),
             children: [
-              Text('Espace livreur', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
-              const SizedBox(height: BimSpacing.xs),
-              Text('Tu ne vois que les missions qui te sont proposées, tes courses et ton historique.', style: theme.textTheme.bodySmall),
+              // Maquette 56 : vélo, « Espace livreur », état « En ligne » à droite.
+              Row(
+                children: [
+                  const CircleAvatar(radius: 24, backgroundColor: Color(0xFFE3F5EA), child: Icon(Icons.pedal_bike, color: BimColors.success)),
+                  const SizedBox(width: BimSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Espace livreur', style: theme.textTheme.titleLarge),
+                        Text('Tes missions, tes courses et ton historique.', style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    key: const ValueKey('courier-online-pill'),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: p.available ? const Color(0xFFE3F5EA) : theme.colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(20)),
+                    child: Text(p.available ? 'En ligne' : 'Hors ligne', style: TextStyle(color: p.available ? BimColors.success : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
               const SizedBox(height: BimSpacing.lg),
               const CourierWorkSection(),
               const Divider(height: BimSpacing.xl),

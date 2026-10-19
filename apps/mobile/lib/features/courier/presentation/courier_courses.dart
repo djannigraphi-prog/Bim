@@ -68,27 +68,56 @@ class _CourierWorkSectionState extends ConsumerState<CourierWorkSection> {
         if (missions.isEmpty)
           const Padding(padding: EdgeInsets.symmetric(vertical: BimSpacing.sm), child: Text('Aucune mission pour le moment.', key: ValueKey('missions-empty'))),
         for (final m in missions)
-          Card(
+          // Maquette 56 : carte « Nouvelle course » bordée de rouge, prix, trajet (boutique → client), boutons.
+          Container(
             key: ValueKey('mission-${m.id}'),
-            child: Padding(
-              padding: const EdgeInsets.all(BimSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_route(m), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text(_facts(m)),
-                  if (m.expiresAt != null) Text('Réponds avant ${formatDateTimeFr(m.expiresAt!)}', style: theme.textTheme.bodySmall),
-                  const SizedBox(height: BimSpacing.sm),
-                  Wrap(
-                    spacing: BimSpacing.sm,
-                    runSpacing: BimSpacing.xs,
-                    children: [
-                      FilledButton(key: ValueKey('mission-accept-${m.id}'), onPressed: _busy ? null : () => _answer(m, true), child: const Text('Accepter')),
-                      OutlinedButton(key: ValueKey('mission-decline-${m.id}'), onPressed: _busy ? null : () => _answer(m, false), child: const Text('Refuser')),
-                    ],
-                  ),
-                ],
-              ),
+            margin: const EdgeInsets.only(top: BimSpacing.sm),
+            padding: const EdgeInsets.all(BimSpacing.md),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(BimRadius.card), border: Border.all(color: BimColors.red, width: 2)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (m.mode != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(BimRadius.chip)),
+                        child: Text(deliveryModeLabel(m.mode), style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700, fontSize: 12)),
+                      ),
+                    const Spacer(),
+                    if (m.feeFcfa != null) Text(formatFcfa(m.feeFcfa!), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  ],
+                ),
+                const SizedBox(height: BimSpacing.sm),
+                _RouteLine(from: m.fromShop, fromDetail: m.fromPlace, to: m.toPlace ?? '—', toDetail: [
+                  '${m.itemsCount} article${m.itemsCount > 1 ? 's' : ''}',
+                  if (m.estimatedMinutes != null) '~${m.estimatedMinutes} min',
+                ].join(' · '),),
+                if (m.expiresAt != null) Padding(padding: const EdgeInsets.only(top: BimSpacing.xs), child: Text('Réponds avant ${formatDateTimeFr(m.expiresAt!)}', style: theme.textTheme.bodySmall)),
+                const SizedBox(height: BimSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        key: ValueKey('mission-decline-${m.id}'),
+                        style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.surfaceContainerLow, foregroundColor: theme.colorScheme.onSurface, minimumSize: const Size(0, 48)),
+                        onPressed: _busy ? null : () => _answer(m, false),
+                        child: const Text('Refuser'),
+                      ),
+                    ),
+                    const SizedBox(width: BimSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        key: ValueKey('mission-accept-${m.id}'),
+                        style: FilledButton.styleFrom(backgroundColor: BimColors.red, foregroundColor: Colors.white, minimumSize: const Size(0, 48)),
+                        onPressed: _busy ? null : () => _answer(m, true),
+                        child: const Text('Accepter'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         const SizedBox(height: BimSpacing.md),
@@ -104,6 +133,44 @@ class _CourierWorkSectionState extends ConsumerState<CourierWorkSection> {
             onTap: () => context.push('/courier/courses/${c.deliveryId}'),
           ),
         TextButton(key: const ValueKey('courier-history'), onPressed: () => context.push('/courier/history'), child: const Text('Mon historique de livraisons')),
+      ],
+    );
+  }
+}
+
+/// Trajet d'une course (maquette 56) : point noir pour la boutique, carré rouge pour le client, reliés par un trait.
+class _RouteLine extends StatelessWidget {
+  const _RouteLine({required this.from, required this.fromDetail, required this.to, required this.toDetail});
+  final String from;
+  final String? fromDetail;
+  final String to;
+  final String toDetail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget stop(Widget mark, String title, String? detail) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(padding: const EdgeInsets.only(top: 4), child: SizedBox(width: 14, child: Center(child: mark))),
+            const SizedBox(width: BimSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  if (detail != null && detail.isNotEmpty) Text(detail, style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        stop(Container(width: 12, height: 12, decoration: BoxDecoration(color: theme.colorScheme.onSurface, shape: BoxShape.circle)), from, fromDetail),
+        Padding(padding: const EdgeInsets.only(left: 6), child: SizedBox(height: 14, child: VerticalDivider(width: 2, thickness: 2, color: theme.colorScheme.outline))),
+        stop(Container(width: 12, height: 12, decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(2))), to, toDetail),
       ],
     );
   }
