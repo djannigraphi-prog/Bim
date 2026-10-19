@@ -129,4 +129,41 @@ describe('BimShop en mosaïque : formats, vidéo, compteurs (e2e)', () => {
     expect(detail.counts).toEqual({ recommendations: 1, likes: 1, reviews: 1 });
     expect(JSON.stringify(await card(p.id))).not.toMatch(/rating|average|moyenne/i);
   });
+
+  it('étoiles de la boutique (jamais d’un article) : moyenne des avis sur la boutique, à partir de 3 avis', async () => {
+    const s = await shop();
+    const p = await product(s);
+    const handedOver = async (client: { auth: Auth }) => {
+      const o = (
+        await h
+          .http()
+          .post('/v1/orders')
+          .set(client.auth)
+          .send({ shopId: s.shopId, items: [{ productId: p.id, variantId: p.variant, quantity: 1 }], deliveryMode: 'pickup', paymentMethod: 'mobile_money', expectedTotalFcfa: 20000, idempotencyKey: uuidv7().replace(/-/g, '') })
+          .expect(201)
+      ).body;
+      for (const step of ['confirm', 'prepare', 'ready']) await h.http().post(`/v1/shop/orders/${o.id}/${step}`).set(s.auth).expect(200);
+      const code = (await h.http().get(`/v1/orders/${o.id}`).set(client.auth)).body.handoverCode;
+      await h.http().post(`/v1/shop/orders/${o.id}/handover`).set(s.auth).send({ code }).expect(200);
+      return o.id as string;
+    };
+    const rating = async () => (await h.http().get(`/v1/bimshop/products/${p.id}`).expect(200)).body.shop.rating;
+    expect(await rating()).toEqual({ average: null, reviews: 0 });
+    const notes = [5, 4, 4];
+    for (const [i, n] of notes.entries()) {
+      const c = await person();
+      const orderId = await handedOver(c);
+      await h.http().post(`/v1/orders/${orderId}/reviews/shop`).set(c.auth).send({ rating: n }).expect(201);
+      // Une note sur l'article ne compte jamais pour la boutique.
+      await h.http().post(`/v1/orders/${orderId}/reviews/items/0`).set(c.auth).send({ rating: 1 }).expect(201);
+      if (i < 2) expect(await rating()).toEqual({ average: null, reviews: i + 1 });
+    }
+    expect(await rating()).toEqual({ average: 4.3, reviews: 3 });
+    expect((await h.http().get(`/v1/bimshop/shops/${s.slug}`).expect(200)).body.rating).toEqual({ average: 4.3, reviews: 3 });
+    // Un avis masqué par la modération ne compte plus.
+    await h.pool.query("update reviews set status = 'hidden' where shop_id = $1 and kind = 'shop' and rating = 5", [s.shopId]);
+    expect(await rating()).toEqual({ average: null, reviews: 2 });
+    // Aucune étoile sur la carte d'un article.
+    expect(JSON.stringify(await card(p.id))).not.toMatch(/rating|average/);
+  });
 });

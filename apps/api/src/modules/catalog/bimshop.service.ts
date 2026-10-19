@@ -7,6 +7,8 @@ import { StorageService } from '../media/storage';
 
 export type BimShopSort = 'recent' | 'price_asc' | 'price_desc';
 const PAGE = 20;
+/** Nombre d'avis sur la boutique avant d'afficher ses étoiles (décision du fondateur, 19/10/2026). */
+export const SHOP_RATING_MIN_REVIEWS = 3;
 type ProductRow = typeof products.$inferSelect;
 type ShopRow = typeof shops.$inferSelect;
 
@@ -121,6 +123,19 @@ export class BimShopService {
     for (const r of likes) out.get(r.id)!.likes = r.n;
     for (const r of revs) out.get(r.id)!.reviews = r.n;
     return out;
+  }
+
+  /**
+   * V1 (19/10/2026, décision du fondateur) — Étoiles de la **boutique** (jamais d'un article) : moyenne des notes que les
+   * clients donnent à la boutique après la remise, une par commande, avis publiés seulement. Affichée à partir de
+   * `SHOP_RATING_MIN_REVIEWS` avis ; avant, `average` est nul (« Nouvelle boutique »).
+   */
+  async shopRating(shopId: string) {
+    const [r] = await this.db
+      .select({ n: count(), avg: sql<string | null>`round(avg(${reviews.rating})::numeric, 1)` })
+      .from(reviews)
+      .where(and(eq(reviews.shopId, shopId), eq(reviews.kind, 'shop'), eq(reviews.status, 'published')));
+    return { average: r.n >= SHOP_RATING_MIN_REVIEWS && r.avg !== null ? Number(r.avg) : null, reviews: r.n };
   }
 
   private async stockByProduct(ids: string[]) {
@@ -274,7 +289,7 @@ export class BimShopService {
       counts: counts.get(p.id)!,
       variants: variants.map((v) => ({ id: v.id, label: v.label, available: service || v.stock > 0 })),
       available: service || variants.some((v) => v.stock > 0),
-      shop: { ...this.publicShop(s), logoUrl: await this.url(s.logoKey, apiBase) },
+      shop: { ...this.publicShop(s), logoUrl: await this.url(s.logoKey, apiBase), rating: await this.shopRating(s.id) },
       moreFromShop: await this.cards(more, apiBase),
     };
   }
@@ -292,13 +307,15 @@ export class BimShopService {
   /** Écran 54 : profil public d'une boutique et ses articles. */
   async shop(slug: string, apiBase: string, cursor?: string) {
     const s = await this.visibleShop(slug);
-    const [[followers], [published], page] = await Promise.all([
+    const [[followers], [published], page, rating] = await Promise.all([
       this.db.select({ n: count() }).from(shopFollows).where(eq(shopFollows.shopId, s.id)),
       this.db.select({ n: count() }).from(products).where(and(eq(products.shopId, s.id), eq(products.status, 'published'))),
       this.browse({ shopId: s.id, cursor }, apiBase),
+      this.shopRating(s.id),
     ]);
     return {
       ...this.publicShop(s),
+      rating,
       description: s.description,
       logoUrl: await this.url(s.logoKey, apiBase),
       counts: { followers: followers.n, products: published.n },
