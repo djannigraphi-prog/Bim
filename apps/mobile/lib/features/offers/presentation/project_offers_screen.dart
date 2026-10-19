@@ -114,7 +114,7 @@ class ProjectOffersScreen extends ConsumerWidget {
                         Text(o.message, style: theme.textTheme.bodyLarge),
                         if (o.products.isNotEmpty) ...[
                           const SizedBox(height: BimSpacing.md),
-                          ShopCardGrid(cards: o.products, showShop: false),
+                          ShopCardGrid(cards: o.products, details: true),
                         ],
                         const SizedBox(height: BimSpacing.md),
                         Row(

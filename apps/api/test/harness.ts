@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomInt } from 'node:crypto';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,11 +73,17 @@ export async function startHarness(extraEnv: Record<string, string> = {}): Promi
   };
 }
 
-let seq = 0;
-/** Données d'inscription valides et uniques ; chaque test peut en surcharger une partie. */
+const used = new Set<string>();
+/**
+ * Données d'inscription valides et uniques ; chaque test peut en surcharger une partie.
+ * Numéro tiré au hasard (et jamais deux fois dans un même fichier) : l'ancien calcul à partir de l'heure revenait
+ * aux mêmes numéros toutes les 16 minutes, d'où des « 409 » au hasard quand la suite complète dure plus longtemps.
+ */
 export function newUser(overrides: Record<string, unknown> = {}) {
-  seq += 1;
-  const n = `${Date.now() % 1_000_000}${seq}`.padStart(8, '0').slice(-8);
+  let n: string;
+  do n = String(randomInt(0, 100_000_000)).padStart(8, '0');
+  while (used.has(n));
+  used.add(n);
   return {
     fullName: 'Awa Koné',
     username: `awa.${n}`,

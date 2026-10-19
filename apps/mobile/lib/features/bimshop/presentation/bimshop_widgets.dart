@@ -30,13 +30,16 @@ const _mediaRadius = 22.0;
 /// portrait, cœur « mettre de côté », compteurs (recommandations, j'aime, avis), bouton panier ; nom et prix dessous.
 /// Jamais de note moyenne (A17).
 class ShopCardTile extends ConsumerStatefulWidget {
-  const ShopCardTile({super.key, required this.card, this.showShop = false, this.aspect});
+  const ShopCardTile({super.key, required this.card, this.showShop = false, this.details = false, this.aspect});
 
   final ShopCard card;
   /// Forme imposée (listes horizontales de hauteur fixe) ; sinon celle de la photo.
   final double? aspect;
   /// Nom de la boutique sous le prix (listes hors du BimShop : offres, recommandations).
   final bool showShop;
+
+  /// Nom et prix sous la photo : seulement hors de la mosaïque du BimShop (offres reçues, articles mis de côté).
+  final bool details;
 
   @override
   ConsumerState<ShopCardTile> createState() => _ShopCardTileState();
@@ -141,7 +144,7 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
             ),
             // Mosaïque du BimShop : rien sous la photo (les images avant tout, décision du 19/10/2026).
             // Nom et prix restent dans les listes hors mosaïque (articles mis de côté, offres).
-            if (widget.showShop)
+            if (widget.details || widget.showShop)
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 8, 4, 0),
               child: Column(
@@ -161,7 +164,8 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
                         ),
                     ],
                   ),
-                  Row(
+                  if (widget.showShop)
+                    Row(
                       children: [
                         Flexible(child: Text(c.shop.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall)),
                         if (c.shop.certified) const Padding(padding: EdgeInsets.only(left: 2), child: CertifiedBadge(size: 14)),
@@ -370,10 +374,12 @@ class _Badge extends StatelessWidget {
 /// Mosaïque à deux colonnes façon Pinterest (maquette 32) : chaque carte garde la forme de sa photo (carré ou
 /// portrait) et va dans la colonne la moins haute. Dans une liste qui défile déjà.
 class ShopCardGrid extends StatelessWidget {
-  const ShopCardGrid({super.key, required this.cards, this.showShop = false, this.gap = 10});
+  const ShopCardGrid({super.key, required this.cards, this.showShop = false, this.details = false, this.gap = 10});
 
   final List<ShopCard> cards;
   final bool showShop;
+  /// Nom et prix sous les photos (hors mosaïque du BimShop).
+  final bool details;
   final double gap;
 
   /// Hauteur du texte sous la photo (nom, prix et, si demandé, boutique).
@@ -400,7 +406,7 @@ class ShopCardGrid extends StatelessWidget {
                   child: Column(
                     children: [
                       for (final c in columns[i])
-                        Padding(padding: EdgeInsets.only(bottom: gap * 1.6), child: ShopCardTile(card: c, showShop: showShop)),
+                        Padding(padding: EdgeInsets.only(bottom: gap * 1.6), child: ShopCardTile(card: c, showShop: showShop, details: details)),
                     ],
                   ),
                 ),
