@@ -717,8 +717,10 @@ Le centre de notifications n'enregistre pas de copie : il lit les coffres ouvert
 ### D-UI-01 — Flutter : Riverpod 2, go_router 14, Dio 5 · Technique · décidé
 Un seul style de gestion d'état (Notifier / FutureProvider). Découpage `features/<nom>/{data,application,presentation}`.
 
-### D-UI-02 — Police · Technique · provisoire (confirmé par le fondateur le 14/10/2026)
-Le fondateur conserve provisoirement la police actuelle.
+### D-UI-02 — Police · Technique · **Inter, appliquée le 19/10/2026** (accord du fondateur : « fais tout »)
+Inter, la police des maquettes, est embarquée dans l'app (licence SIL OFL 1.1, gratuite ; fichiers limités à
+l'alphabet latin), avec l'échelle de tailles des maquettes (texte courant 15, secondaire 14, titres 16 à 30).
+Historique : le 14/10/2026, le fondateur avait conservé provisoirement la police du système.
 Police sans empattement du système (SF Pro sur iOS, Roboto sur Android) en attendant le choix d'une police de marque embarquée (ex. Inter), à valider par le fondateur.
 
 ### D-UI-03 — Écarts assumés avec les maquettes (lot 0) · Technique · validé le 14/10/2026

@@ -1,6 +1,6 @@
 // Captures des écrans du lot 0 pour les comparer aux maquettes 01 à 06 (format iPhone 390 × 844, ×3).
 // Lancé par la CI avec `flutter test test_captures --update-goldens` : ce ne sont pas des tests de non-régression,
-// seulement des images à examiner. Les polices réelles (Roboto, icônes Material) sont chargées depuis le SDK Flutter ;
+// seulement des images à examiner. Les polices réelles (Inter de l'app, Roboto, icônes Material) sont chargées ;
 // sans elles le texte serait dessiné en carrés et la comparaison n'aurait pas de sens, donc le test échoue.
 //
 // Aucune donnée fictive n'est présentée comme réelle : le serveur est remplacé par un faux qui renvoie
@@ -739,6 +739,14 @@ Future<void> _loadSdkFonts() async {
   if (r == 0 || i == 0) fail('Polices Roboto ($r) ou MaterialIcons ($i) introuvables dans ${dir.path}.');
   await roboto.load();
   await icons.load();
+  // Police de l'app (Inter, embarquée) : chargée depuis les fichiers du projet.
+  final inter = FontLoader('Inter');
+  final interFiles = Directory('assets/fonts/inter').listSync().whereType<File>().where((f) => f.path.endsWith('.otf')).toList();
+  if (interFiles.isEmpty) fail('Police Inter introuvable dans assets/fonts/inter.');
+  for (final f in interFiles) {
+    inter.addFont(Future.value(bytes(f)));
+  }
+  await inter.load();
 }
 
 final _challenge = Challenge(

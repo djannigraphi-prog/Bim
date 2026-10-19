@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'tokens.dart';
 
 /// Thèmes clair et sombre (Q1 : un bouton permet de basculer, écran 62).
-/// Police : sans empattement du système (SF Pro sur iOS, Roboto sur Android) en attendant le choix d'une police
-/// de marque embarquée (voir DECISIONS.md, D-UI-02).
+/// Police : Inter, celle des maquettes, embarquée dans l'app (D-UI-02, choisie le 19/10/2026), avec l'échelle de
+/// tailles des maquettes (texte courant 15, secondaire 14).
 abstract final class BimTheme {
+  /// Police embarquée (pubspec.yaml).
+  static const fontFamily = 'Inter';
+
   static ThemeData light() => _build(
         brightness: Brightness.light,
         background: BimColors.white,
@@ -55,25 +58,28 @@ abstract final class BimTheme {
     );
 
     final text = Typography.material2021(platform: TargetPlatform.android).black.apply(
+          fontFamily: fontFamily,
           bodyColor: onBackground,
           displayColor: onBackground,
         );
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: fontFamily,
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
       splashFactory: InkRipple.splashFactory,
       textTheme: text.copyWith(
-        headlineLarge: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8, fontSize: 32),
-        headlineMedium: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.6, fontSize: 28),
-        titleLarge: text.titleLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 20),
+        headlineLarge: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8, fontSize: 30),
+        headlineMedium: text.headlineMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.6, fontSize: 26),
+        titleLarge: text.titleLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 19, letterSpacing: -0.2),
         // Pas d'espacement entre les lettres : les maquettes n'en ont pas (Material en ajoute par défaut).
-        titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 17, letterSpacing: 0),
-        bodyLarge: text.bodyLarge?.copyWith(fontSize: 16, letterSpacing: 0),
-        bodyMedium: text.bodyMedium?.copyWith(fontSize: 15, color: muted, letterSpacing: 0),
-        labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: 0),
+        titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 16, letterSpacing: 0),
+        bodyLarge: text.bodyLarge?.copyWith(fontSize: 15, letterSpacing: 0),
+        bodyMedium: text.bodyMedium?.copyWith(fontSize: 14, color: muted, letterSpacing: 0),
+        bodySmall: text.bodySmall?.copyWith(fontSize: 12.5, color: muted, letterSpacing: 0),
+        labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w600, fontSize: 16, letterSpacing: 0),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
