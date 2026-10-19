@@ -80,12 +80,20 @@ class _CourierWorkSectionState extends ConsumerState<CourierWorkSection> {
                 Row(
                   children: [
                     if (m.mode != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(BimRadius.chip)),
-                        child: Text(deliveryModeLabel(m.mode), style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700, fontSize: 12)),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: BimColors.redSoft, borderRadius: BorderRadius.circular(BimRadius.chip)),
+                          child: Text(
+                            deliveryModeLabel(m.mode),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700, fontSize: 12),
+                          ),
+                        ),
                       ),
                     const Spacer(),
+                    const SizedBox(width: BimSpacing.sm),
                     if (m.feeFcfa != null) Text(formatFcfa(m.feeFcfa!), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   ],
                 ),
