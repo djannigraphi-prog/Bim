@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   ios:
-    runs-on: macos-latest
+    # Les Mac ARM de GitHub sont saturés (file d'attente annulée) : Mac Intel, gratuit aussi pour un dépôt public.
+    runs-on: macos-15-intel
     timeout-minutes: 60
     defaults:
       run:
