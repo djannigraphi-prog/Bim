@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { DB, Database } from '../../database/database.module';
 import { notificationInbox } from '../../database/schema';
 import { SettingsService } from '../settings/settings.service';
-import { INBOX_TEMPLATES_VERSION, InboxCategory, inboxCategory, inboxSender, inboxText, InboxType } from './inbox-messages';
+import { INBOX_TEMPLATES_VERSION, InboxCategory, inboxCategory, InboxFilter, inboxSender, inboxText, InboxType } from './inbox-messages';
 
 /** Le centre de notifications montre les 30 derniers jours. */
 export const INBOX_DAYS = 30;
@@ -110,7 +110,7 @@ export class InboxService {
     return rows[0]?.seenUntil ?? null;
   }
 
-  async list(userId: string, opts: { category?: InboxCategory; before?: Date; beforeId?: string; limit?: number }, now: Date = new Date()) {
+  async list(userId: string, opts: { category?: InboxCategory | InboxFilter; before?: Date; beforeId?: string; limit?: number }, now: Date = new Date()) {
     const since = new Date(now.getTime() - INBOX_DAYS * 86_400_000);
     const limit = Math.min(Math.max(opts.limit ?? 30, 1), INBOX_PAGE_MAX);
     const [seen, offsets, rows] = await Promise.all([
@@ -121,7 +121,11 @@ export class InboxService {
         WHERE (${opts.category ?? null}::text IS NULL
                OR (CASE WHEN x.type IN ('report_answered', 'content_hidden', 'merchant_approved', 'merchant_rejected', 'order_update') THEN 'support'
                         WHEN x.type IN ('post_liked', 'post_commented', 'new_follower', 'coins_received', 'live_started') THEN 'social'
-                        ELSE 'projects' END) = ${opts.category ?? null}::text)
+                        ELSE 'projects' END) = ${opts.category ?? null}::text
+               -- V1 (maquette 17) : filtres Pièces, Commandes, Live.
+               OR (x.type = 'coins_received' AND ${opts.category ?? null}::text = 'coins')
+               OR (x.type = 'order_update' AND ${opts.category ?? null}::text = 'orders')
+               OR (x.type = 'live_started' AND ${opts.category ?? null}::text = 'live'))
           -- Page suivante : position (date à la milliseconde, identifiant) du dernier élément vu ; aucun élément de même
           -- date n'est sauté (audit, défaut 4). Sans beforeId (anciennes versions de l'app) : comportement d'origine.
           AND (${opts.before ?? null}::timestamptz IS NULL

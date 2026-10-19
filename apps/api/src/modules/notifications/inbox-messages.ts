@@ -13,6 +13,8 @@ export const INBOX_TEMPLATES_VERSION = 'v2';
 
 export type InboxType = 'chest_opened' | 'report_answered' | 'task_reminder' | 'post_liked' | 'post_commented' | 'new_follower' | 'content_hidden' | 'merchant_approved' | 'merchant_rejected' | 'project_offer' | 'order_update' | 'coins_received' | 'live_started';
 export type InboxCategory = 'projects' | 'support' | 'social';
+/** V1 (maquette 17) : filtres supplémentaires de l'écran (types précis). */
+export type InboxFilter = 'coins' | 'orders' | 'live';
 
 export interface InboxSource {
   type: InboxType;

@@ -267,7 +267,7 @@ class _CommentsPanelState extends ConsumerState<CommentsPanel> {
                       minLines: 1,
                       maxLines: 4,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(hintText: 'Ajoute un commentaire…', counterText: ''),
+                      decoration: InputDecoration(hintText: 'Ajoute un commentaire…', counterText: '', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)),
                     ),
                   ),
                   IconButton(
@@ -322,16 +322,23 @@ class _CommentTile extends StatelessWidget {
               children: [
                 Text.rich(
                   TextSpan(children: [
-                    TextSpan(text: c.author.fullName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    TextSpan(text: c.author.fullName, style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
                     TextSpan(text: '  ${timeAgo(c.createdAt)}', style: theme.textTheme.bodySmall),
                   ],),
                 ),
                 const SizedBox(height: 2),
-                Text(c.text),
+                Text(c.text, style: theme.textTheme.bodyLarge),
+                // Maquette 12 : « Répondre » discret, puis les pièces reçues par le commentaire.
                 Row(
                   children: [
-                    TextButton(onPressed: onReply, style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)), child: const Text('Répondre')),
-                    const SizedBox(width: BimSpacing.sm),
+                    TextButton(
+                      onPressed: onReply,
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36), foregroundColor: theme.colorScheme.onSurfaceVariant, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      child: const Text('Répondre'),
+                    ),
+                    const SizedBox(width: BimSpacing.md),
+                    if (c.canGift || c.coinCount > 0)
+                      CoinButton(key: ValueKey('comment-coins-${c.id}'), count: c.coinCount, canGift: c.canGift, compact: true, onTap: c.canGift ? onCoins : null),
                     IconButton(tooltip: 'Plus d’options', icon: const Icon(Icons.more_horiz_rounded, size: 20), onPressed: onMore),
                   ],
                 ),
@@ -346,8 +353,6 @@ class _CommentTile extends StatelessWidget {
                 onPressed: onLike,
               ),
               Text(compactCount(c.likeCount), style: theme.textTheme.bodySmall),
-              if (c.canGift || c.coinCount > 0)
-                CoinButton(key: ValueKey('comment-coins-${c.id}'), count: c.coinCount, canGift: c.canGift, compact: true, onTap: c.canGift ? onCoins : null),
             ],
           ),
         ],

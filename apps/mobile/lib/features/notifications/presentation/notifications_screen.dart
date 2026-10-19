@@ -126,12 +126,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.md, BimSpacing.screen, BimSpacing.sm),
-              child: Row(
-                children: [
-                  ChoiceChipBim(label: 'Tout', selected: _category == null, dark: true, onTap: () => _select(null)),
-                  const SizedBox(width: BimSpacing.sm),
-                  ChoiceChipBim(label: 'Projets', selected: _category == 'projects', dark: true, onTap: () => _select('projects')),
-                ],
+              // Maquette 17 : Tout, Projets, Pièces, Commandes, Live (filtres du serveur).
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final (code, label) in const [(null, 'Tout'), ('projects', 'Projets'), ('coins', 'Pièces'), ('orders', 'Commandes'), ('live', 'Live')]) ...[
+                      ChoiceChipBim(key: ValueKey('notif-filter-${code ?? 'all'}'), label: label, selected: _category == code, dark: true, onTap: () => _select(code)),
+                      const SizedBox(width: BimSpacing.sm),
+                    ],
+                  ],
+                ),
               ),
             ),
             Expanded(child: _body(context, now)),
@@ -229,7 +234,7 @@ class _Tile extends StatelessWidget {
     final peni = item.sender == 'peni';
     final link = item.link;
     return Material(
-      color: item.unread ? BimColors.redSoft : Colors.transparent,
+      color: item.unread ? BimColors.redSoft.withValues(alpha: theme.brightness == Brightness.dark ? 0.12 : 0.55) : Colors.transparent,
       child: InkWell(
         key: ValueKey('inbox-${item.id}'),
         onTap: link == null ? null : () => context.push(link),

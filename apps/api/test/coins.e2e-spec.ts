@@ -151,6 +151,12 @@ describe('Pièces et Premium : prototype (e2e)', () => {
       ]),
     );
     expect(inbox.items.find((i: { type: string }) => i.type === 'coins_received')).toMatchObject({ category: 'social', link: `/posts/${post.id}` });
+    // V1 (maquette 17) : filtre « Pièces » ; « Commandes » et « Live » ne montrent pas les pièces.
+    const coinsOnly = (await h.http().get('/v1/me/notifications?category=coins').set(a.auth).expect(200)).body.items as { type: string }[];
+    expect(coinsOnly.length).toBeGreaterThan(0);
+    expect(coinsOnly.every((i) => i.type === 'coins_received')).toBe(true);
+    expect((await h.http().get('/v1/me/notifications?category=orders').set(a.auth).expect(200)).body.items.some((i: { type: string }) => i.type === 'coins_received')).toBe(false);
+    expect((await h.http().get('/v1/me/notifications?category=live').set(a.auth).expect(200)).body.items.some((i: { type: string }) => i.type === 'coins_received')).toBe(false);
 
     // Portefeuille de a : 255 pièces reçues, retirables (F8).
     let wa = await wallet(a.auth);

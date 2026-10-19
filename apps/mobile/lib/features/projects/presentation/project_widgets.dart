@@ -179,9 +179,10 @@ class ChoiceChipBim extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: kBimMinTouch),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? fill : scheme.surface,
-            borderRadius: BorderRadius.circular(BimRadius.chip),
-            border: Border.all(color: selected ? fill : scheme.outline, width: 1.5),
+            // Filtres (dark) : pastilles grises pleines quand elles ne sont pas choisies (maquettes 17 et 47).
+            color: selected ? fill : (dark ? scheme.surfaceContainerLow : scheme.surface),
+            borderRadius: BorderRadius.circular(dark ? 22 : BimRadius.chip),
+            border: Border.all(color: selected ? fill : (dark ? Colors.transparent : scheme.outline), width: 1.5),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

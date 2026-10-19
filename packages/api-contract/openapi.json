@@ -1471,7 +1471,10 @@
               "enum": [
                 "projects",
                 "support",
-                "social"
+                "social",
+                "coins",
+                "orders",
+                "live"
               ]
             }
           },
