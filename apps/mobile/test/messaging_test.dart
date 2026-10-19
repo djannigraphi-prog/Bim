@@ -316,6 +316,9 @@ void main() {
     expect(find.text('Ça va bien'), findsOneWidget);
     expect(find.text('Message supprimé'), findsOneWidget);
     expect(find.byKey(const ValueKey('message-read')), findsOneWidget);
+    // Maquette 48 : séparateur de jour et heure dans chaque bulle.
+    expect(find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('day-')), findsWidgets);
+    expect(find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('time-')), findsWidgets);
     expect(api.calls, contains('read'));
     await tester.enterText(find.byKey(const ValueKey('message-input')), 'On se voit samedi ?');
     await tester.tap(find.byKey(const ValueKey('message-send')));

@@ -37,3 +37,21 @@ String formatDateTimeFr(DateTime t) {
   final m = d.minute.toString().padLeft(2, '0');
   return '${d.day} ${_monthsShort[d.month - 1]} à ${d.hour} h $m';
 }
+
+/// Séparateur de jour d'une conversation : « Aujourd'hui », « Hier », sinon « Mardi 14 octobre » (heure d'Abidjan).
+String chatDayLabel(DateTime t, {DateTime? now}) {
+  final d = t.toUtc();
+  final n = (now ?? DateTime.now()).toUtc();
+  final day = DateTime.utc(d.year, d.month, d.day);
+  final today = DateTime.utc(n.year, n.month, n.day);
+  final diff = today.difference(day).inDays;
+  if (diff == 0) return 'Aujourd’hui';
+  if (diff == 1) return 'Hier';
+  return capitalize('${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}');
+}
+
+/// « 14:18 » (heure d'Abidjan = UTC).
+String clockFr(DateTime t) {
+  final d = t.toUtc();
+  return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+}

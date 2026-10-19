@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/util/date_fr.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
@@ -409,7 +410,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                             ),
                           ),
                         )
-                      : ListView.builder(
+                      : ColoredBox(
+                          // Maquette 48 : fond beige clair derrière les bulles.
+                          color: theme.brightness == Brightness.dark ? theme.colorScheme.surface : const Color(0xFFF2F0EC),
+                          child: ListView.builder(
                           key: const ValueKey('messages-list'),
                           reverse: true,
                           padding: const EdgeInsets.all(BimSpacing.md),
@@ -426,7 +430,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                 child: Text(m.text ?? '', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
                               );
                             }
-                            return _Bubble(
+                            final bubble = _Bubble(
                               message: m,
                               asShop: widget.asShop,
                               inGroup: c?.isGroup ?? false,
@@ -434,7 +438,22 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                               showRead: identical(m, lastMineRead) && (m.read ?? false),
                               onLongPress: () => _messageMenu(m),
                             );
+                            // Maquette 48 : séparateur de jour au-dessus du premier message de chaque journée.
+                            final older = i + 1 < _messages.length ? _messages[i + 1] : null;
+                            final newDay = older == null || chatDayLabel(older.createdAt) != chatDayLabel(m.createdAt);
+                            if (!newDay || (older == null && _older != null)) return bubble;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: BimSpacing.sm),
+                                  child: Text(chatDayLabel(m.createdAt), key: ValueKey('day-${m.id}'), textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+                                ),
+                                bubble,
+                              ],
+                            );
                           },
+                        ),
                         ),
             ),
             if (c?.isRequest ?? false)
@@ -496,7 +515,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 padding: EdgeInsets.fromLTRB(BimSpacing.sm, BimSpacing.xs, BimSpacing.sm, BimSpacing.sm + MediaQuery.viewInsetsOf(context).bottom),
                 child: Row(
                   children: [
-                    IconButton(key: const ValueKey('message-photo'), tooltip: 'Envoyer une photo', icon: const Icon(Icons.photo_outlined), onPressed: _sending ? null : _pickPhoto),
+                    IconButton(key: const ValueKey('message-photo'), tooltip: 'Envoyer une photo', icon: const Icon(Icons.add_rounded, size: 28), onPressed: _sending ? null : _pickPhoto),
                     // 7-B : la boutique propose une commande dans la conversation (vaut sa confirmation).
                     if (widget.asShop)
                       IconButton(key: const ValueKey('propose-order'), tooltip: 'Proposer une commande', icon: const Icon(Icons.receipt_long_outlined), onPressed: _sending ? null : _propose),
@@ -508,14 +527,23 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                         maxLines: 4,
                         maxLength: 2000,
                         textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(hintText: 'Message…', counterText: ''),
+                        decoration: InputDecoration(hintText: 'Message', counterText: '', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)),
                       ),
                     ),
                     // V1 : champ vide → micro (message vocal, 2 minutes au plus), à côté du bouton d'envoi.
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _input,
                       builder: (_, value, __) => value.text.trim().isEmpty && !_sending
-                          ? IconButton(key: const ValueKey('voice-record'), tooltip: 'Enregistrer un vocal', icon: const Icon(Icons.mic_none_rounded, color: BimColors.red), onPressed: _startRecording)
+                          ? Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: IconButton.filled(
+                                key: const ValueKey('voice-record'),
+                                tooltip: 'Enregistrer un vocal',
+                                style: IconButton.styleFrom(backgroundColor: BimColors.red, foregroundColor: Colors.white),
+                                icon: const Icon(Icons.mic_rounded),
+                                onPressed: _startRecording,
+                              ),
+                            )
                           : const SizedBox.shrink(),
                     ),
                     IconButton(
@@ -551,7 +579,9 @@ class _Bubble extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final m = message;
-    final bg = m.mine ? BimColors.red : scheme.surfaceContainerHighest;
+    // Maquette 48 : mes messages en noir, les messages reçus en blanc (fond beige de la conversation).
+    final dark = theme.brightness == Brightness.dark;
+    final bg = m.mine ? (dark ? BimColors.grey800 : BimColors.black) : (dark ? BimColors.grey900 : BimColors.white);
     final fg = m.mine ? Colors.white : scheme.onSurface;
     final Widget content = switch (m.status) {
       'deleted' => Text('Message supprimé', style: TextStyle(color: fg, fontStyle: FontStyle.italic)),
@@ -588,9 +618,13 @@ class _Bubble extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 280),
               margin: const EdgeInsets.symmetric(vertical: 3),
               padding: m.kind == 'photo' && m.visible ? const EdgeInsets.all(4) : const EdgeInsets.symmetric(horizontal: BimSpacing.md, vertical: BimSpacing.sm),
-              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(BimRadius.card)),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(BimRadius.card),
+                boxShadow: m.mine ? null : const [BoxShadow(color: Color(0x0F000000), blurRadius: 3, offset: Offset(0, 1))],
+              ),
               child: q == null
-                  ? content
+                  ? _withTime(content, m, fg)
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -618,7 +652,7 @@ class _Bubble extends StatelessWidget {
                             ],
                           ),
                         ),
-                        content,
+                        _withTime(content, m, fg),
                       ],
                     ),
             ),
@@ -645,6 +679,32 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Heure du message en bas à droite de la bulle (maquette 48), avec ✓✓ pour mes messages.
+Widget _withTime(Widget content, ChatMessage m, Color fg) {
+  if (!m.visible || m.kind == 'order') return content;
+  return Wrap(
+    alignment: WrapAlignment.end,
+    crossAxisAlignment: WrapCrossAlignment.end,
+    spacing: 8,
+    children: [
+      content,
+      Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(clockFr(m.createdAt), key: ValueKey('time-${m.id}'), style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 11)),
+            if (m.mine) ...[
+              const SizedBox(width: 3),
+              Icon(Icons.done_all_rounded, size: 14, color: (m.read ?? false) ? const Color(0xFF4FC3F7) : fg.withValues(alpha: 0.6)),
+            ],
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 /// Avatar d'une boutique (logo, sinon icône).
