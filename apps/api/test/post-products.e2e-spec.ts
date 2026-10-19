@@ -60,7 +60,7 @@ describe('Produits et services utilisés (e2e)', () => {
     const post = await bim(a, { productIds: [robe, robe, tapis] });
     expect(post.usedProducts.map((p: { id: string }) => p.id)).toEqual([robe, tapis]); // doublon retiré, ordre gardé
     const seen = (await detail(b.auth, post.id)).usedProducts;
-    expect(seen[0]).toEqual({ id: robe, kind: 'product', title: 'Robe de sport', imageUrl: expect.any(String), available: false, shop: { name: 'Boutique Élégance', slug: expect.any(String), verified: false } });
+    expect(seen[0]).toEqual({ id: robe, kind: 'product', title: 'Robe de sport', imageUrl: expect.any(String), available: false, shop: { name: 'Boutique Élégance', slug: expect.any(String), verified: false, certified: false } });
     // Aucun prix, aucune action d'achat dans la publication (E2).
     expect(JSON.stringify(seen)).not.toMatch(/price|Fcfa|order|buy/i);
     // Fil (Accueil) : aucune fiche, aucun lien d'achat.

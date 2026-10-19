@@ -7,6 +7,7 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
@@ -136,10 +137,10 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                         Row(
                           children: [
                             Flexible(child: Text(s.shop.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 22))),
-                            if (s.shop.verified) const Padding(padding: EdgeInsets.only(left: 4), child: Tooltip(message: 'Boutique vérifiée', child: Icon(Icons.verified, color: BimColors.red, size: 20))),
+                            if (s.shop.certified) const Padding(padding: EdgeInsets.only(left: 4), child: CertifiedBadge(size: 20)),
                           ],
                         ),
-                        if (s.shop.rating != null) ShopStars(rating: s.shop.rating!),
+                        if (!s.shop.certified && s.shop.rating != null) ShopStars(rating: s.shop.rating!),
                         if (s.shop.place.isNotEmpty) Text(s.shop.place, style: theme.textTheme.bodyMedium),
                         const SizedBox(height: 2),
                         Text(

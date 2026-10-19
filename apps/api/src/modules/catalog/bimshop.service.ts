@@ -4,6 +4,7 @@ import { Errors } from '../../common/errors';
 import { DB, Database } from '../../database/database.module';
 import { inventoryMovements, productFavorites, productMedia, productRecommendations, products, productVariants, productVideos, reviews, shopCategories, shopFollows, shopMembers, shops, users } from '../../database/schema';
 import { StorageService } from '../media/storage';
+import { certifiedShopIds } from '../wallet/premium';
 
 export type BimShopSort = 'recent' | 'price_asc' | 'price_desc';
 const PAGE = 20;
@@ -47,8 +48,12 @@ export class BimShopService {
     return and(eq(products.status, 'published'), eq(shops.status, 'active'), eq(users.status, 'active'))!;
   }
 
-  private publicShop(s: ShopRow) {
-    return { id: s.id, name: s.name, slug: s.slug, city: s.city, commune: s.commune, verified: !!s.verifiedAt };
+  /**
+   * `verified` : boutique validée par l'équipe (identité contrôlée), plus affiché comme badge.
+   * `certified` : badge de certification, réservé aux boutiques dont le propriétaire est Premium (V1-1910-C).
+   */
+  private publicShop(s: ShopRow, certified: Set<string>) {
+    return { id: s.id, name: s.name, slug: s.slug, city: s.city, commune: s.commune, verified: !!s.verifiedAt, certified: certified.has(s.id) };
   }
 
   /** Résumés publics : première photo, disponibilité (articles), boutique. */
@@ -57,11 +62,12 @@ export class BimShopService {
     if (!rows.length) return [];
     const rich = opts.rich !== false;
     const ids = rows.map((r) => r.p.id);
-    const [media, stock, videos, counts] = await Promise.all([
+    const [media, stock, videos, counts, certified] = await Promise.all([
       this.db.select().from(productMedia).where(inArray(productMedia.productId, ids)).orderBy(asc(productMedia.position)),
       this.stockByProduct(ids),
       rich ? this.db.select().from(productVideos).where(inArray(productVideos.productId, ids)) : Promise.resolve([] as (typeof productVideos.$inferSelect)[]),
       rich ? this.counts(ids) : Promise.resolve(new Map<string, { recommendations: number; likes: number; reviews: number }>()),
+      certifiedShopIds(this.db, rows.map((r) => r.s.id)),
     ]);
     const out = [];
     for (const { p, s } of rows) {
@@ -81,7 +87,7 @@ export class BimShopService {
         video: video ? await this.videoView(video, apiBase) : null,
         counts: counts.get(p.id) ?? { recommendations: 0, likes: 0, reviews: 0 },
         available: p.kind === 'service' || (stock.get(p.id) ?? 0) > 0,
-        shop: this.publicShop(s),
+        shop: this.publicShop(s, certified),
       });
     }
     return out;
@@ -289,7 +295,7 @@ export class BimShopService {
       counts: counts.get(p.id)!,
       variants: variants.map((v) => ({ id: v.id, label: v.label, available: service || v.stock > 0 })),
       available: service || variants.some((v) => v.stock > 0),
-      shop: { ...this.publicShop(s), logoUrl: await this.url(s.logoKey, apiBase), rating: await this.shopRating(s.id) },
+      shop: { ...this.publicShop(s, await certifiedShopIds(this.db, [s.id])), logoUrl: await this.url(s.logoKey, apiBase), rating: await this.shopRating(s.id) },
       moreFromShop: await this.cards(more, apiBase),
     };
   }
@@ -307,14 +313,15 @@ export class BimShopService {
   /** Écran 54 : profil public d'une boutique et ses articles. */
   async shop(slug: string, apiBase: string, cursor?: string) {
     const s = await this.visibleShop(slug);
-    const [[followers], [published], page, rating] = await Promise.all([
+    const [[followers], [published], page, rating, certified] = await Promise.all([
       this.db.select({ n: count() }).from(shopFollows).where(eq(shopFollows.shopId, s.id)),
       this.db.select({ n: count() }).from(products).where(and(eq(products.shopId, s.id), eq(products.status, 'published'))),
       this.browse({ shopId: s.id, cursor }, apiBase),
       this.shopRating(s.id),
+      certifiedShopIds(this.db, [s.id]),
     ]);
     return {
-      ...this.publicShop(s),
+      ...this.publicShop(s, certified),
       rating,
       description: s.description,
       logoUrl: await this.url(s.logoKey, apiBase),

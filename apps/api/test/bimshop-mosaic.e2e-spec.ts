@@ -166,4 +166,36 @@ describe('BimShop en mosaïque : formats, vidéo, compteurs (e2e)', () => {
     // Aucune étoile sur la carte d'un article.
     expect(JSON.stringify(await card(p.id))).not.toMatch(/rating|average/);
   });
+
+  it('V1-1910-C : badge de certification seulement pour les comptes Premium (boutique : son propriétaire), plus de Gold', async () => {
+    const s = await shop();
+    const p = await product(s);
+    const premium = (userId: string, end: string) =>
+      h.pool.query(`insert into subscriptions (id, user_id, plan, channel, price_fcfa, started_at, current_period_end) values ($1, $2, 'user_premium', 'demo', 2000, now(), now() + $3::interval)`, [uuidv7(), userId, end]);
+    const detail = async () => (await h.http().get(`/v1/bimshop/products/${p.id}`).expect(200)).body.shop;
+    const profile = async () => (await h.http().get(`/v1/bimshop/shops/${s.slug}`).expect(200)).body;
+    // Boutique ouverte sans Premium : pas de badge (ses étoiles grises s'affichent dans l'app).
+    expect(await detail()).toMatchObject({ certified: false });
+    expect((await card(p.id)).shop.certified).toBe(false);
+    expect((await profile()).certified).toBe(false);
+    expect((await h.http().get('/v1/shop').set(s.auth).expect(200)).body.certified).toBe(false);
+    // Le propriétaire passe Premium : la boutique est certifiée partout.
+    await premium(s.owner.userId, '30 days');
+    expect(await detail()).toMatchObject({ certified: true });
+    expect((await card(p.id)).shop.certified).toBe(true);
+    expect((await profile()).certified).toBe(true);
+    expect((await h.http().get('/v1/shop').set(s.auth).expect(200)).body.certified).toBe(true);
+    // Une personne Premium a le badge sur son profil et ses publications ; un abonnement terminé ne compte plus.
+    const u = await person();
+    const me = { username: u.body.username as string };
+    const view = async () => (await h.http().get(`/v1/people/${me.username}`).set(s.owner.auth).expect(200)).body.certified;
+    expect(await view()).toBe(false);
+    await premium(u.userId, '30 days');
+    expect(await view()).toBe(true);
+    const post = (await h.http().post('/v1/posts').set(u.auth).field('text', 'Badge').field('visibility', 'public').expect(201)).body;
+    expect((await h.http().get(`/v1/posts/${post.id}`).set(s.owner.auth).expect(200)).body.author.certified).toBe(true);
+    await h.pool.query(`update subscriptions set current_period_end = now() - interval '1 minute' where user_id = $1`, [u.userId]);
+    expect(await view()).toBe(false);
+    expect(JSON.stringify(await profile())).not.toMatch(/gold/i);
+  });
 });

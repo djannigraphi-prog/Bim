@@ -4,6 +4,7 @@ import { Errors } from '../../common/errors';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
+import { certifiedShopIds } from '../wallet/premium';
 import { privacySettings, products, projectCategories, projectCategoryRubriques, projectGoals, projectOfferProducts, projectOffers, projects, shopCategories, shops, users } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { BimShopService } from '../catalog/bimshop.service';
@@ -234,13 +235,14 @@ export class OffersService {
           .orderBy(asc(projectOfferProducts.position))
       : [];
     const items = [];
+    const certified = await certifiedShopIds(this.db, rows.map((r) => r.s.id));
     for (const { o, s } of rows) {
       const ids = links.filter((l) => l.offerId === o.id).map((l) => l.productId);
       items.push({
         id: o.id,
         message: o.message,
         createdAt: o.createdAt,
-        shop: { id: s.id, name: s.name, slug: s.slug, city: s.city, commune: s.commune, verified: !!s.verifiedAt },
+        shop: { id: s.id, name: s.name, slug: s.slug, city: s.city, commune: s.commune, verified: !!s.verifiedAt, certified: certified.has(s.id) },
         products: await this.bimshop.visibleCards(ids, apiBase),
       });
     }

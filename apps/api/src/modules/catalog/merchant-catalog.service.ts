@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { inspectMp4, Mp4Error, scrubMp4Metadata } from '../media/mp4';
 import { encodePrivateImage, PRODUCT_ASPECT } from '../media/private-image';
 import { StorageService } from '../media/storage';
+import { certifiedShopIds } from '../wallet/premium';
 import { SpacesService } from '../spaces/spaces.service';
 import { ProductDto, UpdateProductDto, UpdateShopDto } from './dto';
 
@@ -66,6 +67,8 @@ export class MerchantCatalogService {
       city: shop.city,
       commune: shop.commune,
       verified: !!shop.verifiedAt,
+      /** V1-1910-C : badge de certification (propriétaire Premium). */
+      certified: (await certifiedShopIds(this.db, [shop.id])).has(shop.id),
       logoUrl: await this.url(shop.logoKey, apiBase),
       counts: { published: published.n, drafts: drafts.n, hidden: hidden.n, followers: followers.n },
       /** 7-A : mon rôle et mes permissions dans cette boutique (l'app adapte ses boutons ; le serveur contrôle). */

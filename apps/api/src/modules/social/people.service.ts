@@ -10,6 +10,7 @@ import { contentReports, follows, postComments, posts, privacySettings, projects
 import { AuditService } from '../audit/audit.service';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
+import { premiumUserIds } from '../wallet/premium';
 import { notBlockedBetween, commentParentPublished } from './access';
 import { ReportContentDto } from './dto';
 import { PostsService } from './posts.service';
@@ -67,6 +68,8 @@ export class PeopleService {
       fullName: u.fullName,
       city: isMe || privacy?.cityPublic ? u.city : null,
       avatarUrl: await this.posts.avatarUrl(u.avatarKey, apiBase),
+      /** V1-1910-C : badge de certification des comptes Premium. */
+      certified: (await premiumUserIds(this.db, [u.id])).has(u.id),
       counts: { bims: bims.n, followers: followers.n, following: following.n, projects: mine ? mine.n : null },
       isMe,
       followedByMe: !!followedByMe,

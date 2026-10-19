@@ -9,6 +9,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../social/presentation/moderation_sheets.dart';
 import '../../social/data/social_models.dart' show compactCount;
 import '../../wallet/presentation/gift_sheet.dart';
@@ -223,7 +224,7 @@ class _ReelOverlay extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: () => context.push('/people/${reel.author.username}'),
-                  child: Text('@${reel.author.username}', style: const TextStyle(color: BimColors.white, fontWeight: FontWeight.w800, shadows: shadow)),
+                  child: NameWithBadge(certified: reel.author.certified, name: Text('@${reel.author.username}', style: const TextStyle(color: BimColors.white, fontWeight: FontWeight.w800, shadows: shadow))),
                 ),
                 if ((reel.caption ?? '').isNotEmpty)
                   Text(reel.caption!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.white, shadows: shadow)),

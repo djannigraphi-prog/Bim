@@ -16,6 +16,7 @@ import { BimShopService } from '../catalog/bimshop.service';
 import { Mp4Error, inspectMp4, scrubMp4Metadata } from '../media/mp4';
 import { encodePrivateImage } from '../media/private-image';
 import { StorageService } from '../media/storage';
+import { certifiedShopIds, premiumUserIds } from '../wallet/premium';
 import { SettingsService } from '../settings/settings.service';
 
 const PAGE = 30;
@@ -281,8 +282,9 @@ export class MessagingService {
     return product || offer ? { product: product ?? null, offer } : null;
   }
 
-  shopRef(s: ShopRow, logoUrl: string | null) {
-    return { id: s.id, name: s.name, slug: s.slug, logoUrl, verified: !!s.verifiedAt };
+  /** `certified` : badge de certification (propriétaire Premium, V1-1910-C). */
+  shopRef(s: ShopRow, logoUrl: string | null, certified = false) {
+    return { id: s.id, name: s.name, slug: s.slug, logoUrl, verified: !!s.verifiedAt, certified };
   }
 
   /** Liste « Tous » (inbox) ou « Demandes » (requests), conversation la plus récente d'abord. */
@@ -340,8 +342,10 @@ export class MessagingService {
       status: me.status,
       /** Ma demande n'a pas encore été acceptée (l'autre personne ne me suit pas) : je peux écrire, elle choisira. */
       pendingForOther: other?.status === 'request' || other?.status === 'withheld',
-      person: otherUser ? this.person(otherUser, await this.url(otherUser.avatarKey, apiBase)) : null,
-      shop: shop ? this.shopRef(shop, await this.url(shop.logoKey, apiBase)) : null,
+      person: otherUser
+        ? { ...this.person(otherUser, await this.url(otherUser.avatarKey, apiBase)), certified: (await premiumUserIds(this.db, [otherUser.id])).has(otherUser.id) }
+        : null,
+      shop: shop ? this.shopRef(shop, await this.url(shop.logoKey, apiBase), (await certifiedShopIds(this.db, [shop.id])).has(shop.id)) : null,
       context: await this.context(conv, apiBase),
       /** V1 : groupe (nom, nombre de membres, mon rôle). */
       group: conv.kind === 'group' ? await this.groupInfo(conv, me) : null,

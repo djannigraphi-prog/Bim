@@ -7,6 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../application/social_providers.dart';
 import '../data/social_api.dart';
 import '../data/social_models.dart';
@@ -100,7 +101,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(post.author.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        NameWithBadge(certified: post.author.certified, name: Text(post.author.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
                         Text(
                           [post.isBim ? 'a fait son BIM' : 'a publié', if (journey != null && journey.subject.isNotEmpty) journey.subject, timeAgo(post.createdAt)].join(' · '),
                           style: theme.textTheme.bodySmall,

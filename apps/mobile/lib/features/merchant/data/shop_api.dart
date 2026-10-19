@@ -10,6 +10,7 @@ class ShopDashboard {
     required this.name,
     required this.status,
     required this.verified,
+    this.certified = false,
     required this.published,
     required this.drafts,
     required this.followers,
@@ -26,6 +27,9 @@ class ShopDashboard {
   final String name;
   final String status;
   final bool verified;
+
+  /// V1-1910-C : badge de certification (propriétaire Premium).
+  final bool certified;
   final String? city;
   final String? commune;
   final String? description;
@@ -50,6 +54,7 @@ class ShopDashboard {
       name: j['name'] as String,
       status: j['status'] as String,
       verified: (j['verified'] ?? false) as bool,
+      certified: (j['certified'] ?? false) as bool,
       city: j['city'] as String?,
       commune: j['commune'] as String?,
       description: j['description'] as String?,

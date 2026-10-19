@@ -7,6 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../account/presentation/account_security_screens.dart' show showSpacesSheet;
 import '../../messaging/presentation/messages_view.dart';
 import '../../wallet/data/wallet_api.dart' show walletProvider;
@@ -176,7 +177,7 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: BimSpacing.sm),
                     ],
-                    Text(p.person.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    NameWithBadge(certified: p.person.certified, name: Text(p.person.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
                     if (p.city != null) Text(p.city!, style: theme.textTheme.bodyMedium),
                     if (!p.isMe && p.followsMe) Text('Te suit', style: theme.textTheme.bodySmall),
                     const SizedBox(height: BimSpacing.md),

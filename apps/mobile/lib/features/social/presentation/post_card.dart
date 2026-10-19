@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../data/social_api.dart';
 import '../../wallet/presentation/gift_sheet.dart';
 import '../data/social_models.dart';
@@ -86,7 +87,10 @@ class PostCard extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(post.author.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        NameWithBadge(
+                          certified: post.author.certified,
+                          name: Text(post.author.fullName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
                         Text(
                           '${post.isBim ? 'a partagé un Bim' : 'a publié'} · ${timeAgo(post.createdAt)}${post.visibility == 'public' ? '' : ' · ${visibilityLabel(post.visibility)}'}',
                           style: theme.textTheme.bodySmall,

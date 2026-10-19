@@ -129,7 +129,7 @@ export class ReelsService {
         caption: r.caption,
         visibility: r.visibility,
         createdAt: r.createdAt,
-        author: { id: author.id, username: author.username, fullName: author.fullName, avatarUrl: avatar },
+        author: { id: author.id, username: author.username, fullName: author.fullName, avatarUrl: avatar, certified: premium.has(author.id) },
         video: { url: video.url, expiresAt: video.expiresAt, durationMs: r.durationMs, width: r.width, height: r.height },
         likeCount: r.likeCount,
         likedByMe: likedSet.has(r.id),

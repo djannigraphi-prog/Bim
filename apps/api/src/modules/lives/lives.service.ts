@@ -96,7 +96,7 @@ export class LivesService {
         scheduledAt: l.scheduledAt,
         startedAt: l.startedAt,
         endedAt: l.endedAt,
-        host: hosts.find((h) => h.id === l.hostUserId) ?? null,
+        host: ((h) => (h ? { ...h, certified: premium.has(h.id) } : null))(hosts.find((x) => x.id === l.hostUserId)),
         shop: shopRows.find((s) => s.id === l.shopId) ?? null,
         pinnedProduct: p && p.status === 'published' ? { id: p.id, title: p.title, priceFcfa: p.priceFcfa, promoPriceFcfa: p.promoPriceFcfa } : null,
         heartCount: l.heartCount,

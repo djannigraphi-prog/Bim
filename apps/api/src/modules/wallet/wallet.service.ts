@@ -14,7 +14,8 @@ import { SettingsService } from '../settings/settings.service';
 import { SimulatorStore, StorePlatform, StoreUnavailableError, StoreVerifier } from './store';
 import { commentParentPublished, notBlockedBetween, postVisibleTo, reelVisibleTo } from '../social/access';
 
-export const PREMIUM_PLAN = 'user_premium';
+import { PREMIUM_PLAN } from './premium';
+export { PREMIUM_PLAN };
 export const PREMIUM_PERIOD_DAYS = 30;
 export const GIFT_MAX_QUANTITY = 99;
 export const WITHDRAWAL_OPERATORS = ['orange', 'mtn', 'moov', 'wave'] as const;

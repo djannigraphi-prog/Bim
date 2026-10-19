@@ -10,6 +10,7 @@ import '../../../core/util/date_fr.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../merchant/data/shop_api.dart';
 import '../../orders/data/orders_api.dart';
 import '../../projects/application/photo_source.dart';
@@ -370,7 +371,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                           Row(
                             children: [
                               Flexible(child: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium)),
-                              if (c.shop?.verified ?? false) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified, size: 16, color: BimColors.red)),
+                              if (c.shop?.certified ?? c.person?.certified ?? false) const Padding(padding: EdgeInsets.only(left: 4), child: CertifiedBadge()),
                             ],
                           ),
                           Text(widget.asShop ? 'Client · @${c.person?.username ?? ''}' : c.subtitle, style: theme.textTheme.bodySmall),

@@ -9,7 +9,7 @@ import '../../social/data/social_models.dart' show PersonRef;
 
 /// Boutique dans une conversation (6-B).
 class ChatShop {
-  const ChatShop({required this.id, required this.name, required this.slug, this.logoUrl, this.verified = false});
+  const ChatShop({required this.id, required this.name, required this.slug, this.logoUrl, this.verified = false, this.certified = false});
 
   final String id;
   final String name;
@@ -17,12 +17,16 @@ class ChatShop {
   final String? logoUrl;
   final bool verified;
 
+  /// V1-1910-C : badge de certification (propriétaire Premium).
+  final bool certified;
+
   factory ChatShop.fromJson(Map<String, dynamic> j) => ChatShop(
         id: j['id'] as String,
         name: (j['name'] ?? '') as String,
         slug: (j['slug'] ?? '') as String,
         logoUrl: j['logoUrl'] as String?,
         verified: (j['verified'] ?? false) as bool,
+        certified: (j['certified'] ?? false) as bool,
       );
 }
 

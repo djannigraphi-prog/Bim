@@ -8,6 +8,7 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../bimshop/presentation/bimshop_widgets.dart';
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
 import '../data/offers_api.dart';
@@ -99,7 +100,7 @@ class ProjectOffersScreen extends ConsumerWidget {
                                     Row(
                                       children: [
                                         Flexible(child: Text(o.shop.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
-                                        if (o.shop.verified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified, size: 16, color: BimColors.red)),
+                                        if (o.shop.certified) const Padding(padding: EdgeInsets.only(left: 4), child: CertifiedBadge()),
                                       ],
                                     ),
                                     if (o.shop.place.isNotEmpty) Text(o.shop.place, style: theme.textTheme.bodySmall),

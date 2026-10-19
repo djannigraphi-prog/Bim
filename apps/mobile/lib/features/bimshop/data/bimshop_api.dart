@@ -19,12 +19,16 @@ class ShopRating {
 }
 
 class ShopRef {
-  const ShopRef({required this.id, required this.name, required this.slug, required this.verified, this.city, this.commune, this.logoUrl, this.rating});
+  const ShopRef({required this.id, required this.name, required this.slug, required this.verified, this.certified = false, this.city, this.commune, this.logoUrl, this.rating});
 
   final String id;
   final String name;
   final String slug;
+  /// Boutique validée par l'équipe (identité contrôlée) : plus affiché comme badge.
   final bool verified;
+
+  /// V1-1910-C : propriétaire Premium → badge de certification (et pas d'étoiles).
+  final bool certified;
   final String? city;
   final String? commune;
   final String? logoUrl;
@@ -38,6 +42,7 @@ class ShopRef {
         name: j['name'] as String,
         slug: j['slug'] as String,
         verified: (j['verified'] ?? false) as bool,
+        certified: (j['certified'] ?? false) as bool,
         city: j['city'] as String?,
         commune: j['commune'] as String?,
         logoUrl: j['logoUrl'] as String?,

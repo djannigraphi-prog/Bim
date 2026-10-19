@@ -9,6 +9,7 @@ import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
@@ -321,11 +322,11 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                                   Row(
                                     children: [
                                       Flexible(child: Text(p.shop.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
-                                      if (p.shop.verified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified, size: 16, color: BimColors.red)),
+                                      if (p.shop.certified) const Padding(padding: EdgeInsets.only(left: 4), child: CertifiedBadge()),
                                     ],
                                   ),
-                                  // V1 : étoiles de la boutique (jamais de l'article).
-                                  if (p.shop.rating != null) ShopStars(rating: p.shop.rating!),
+                                  // V1-1910-C : étoiles grises de la boutique (jamais de l'article) ; une boutique Premium a son badge à la place.
+                                  if (!p.shop.certified && p.shop.rating != null) ShopStars(rating: p.shop.rating!),
                                   if (p.shop.place.isNotEmpty) Text(p.shop.place, style: theme.textTheme.bodySmall),
                                 ],
                               ),

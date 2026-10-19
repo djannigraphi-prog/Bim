@@ -1,6 +1,7 @@
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
+import 'package:bim/core/theme/tokens.dart';
 import 'package:bim/features/auth/application/session_controller.dart';
 import 'package:bim/features/auth/data/models.dart';
 import 'package:bim/features/bimshop/data/bimshop_api.dart';
@@ -92,6 +93,34 @@ class _FakeBimShop extends BimShopApi {
 
   @override
   Future<void> setFollow(String slug, bool on) async => calls.add('follow $slug $on');
+}
+
+/// V1-1910-C : boutique dont le propriétaire est Premium.
+class _CertifiedShop extends _FakeBimShop {
+  static const _ref = ShopRef(id: 's1', name: 'Maison Plumes', slug: 'maison-plumes', verified: true, certified: true, city: 'Abidjan', commune: 'Cocody', rating: ShopRating(average: 4.6, reviews: 32));
+
+  @override
+  Future<ShopProduct> product(String id) async {
+    final p = await super.product(id);
+    return ShopProduct(
+      id: p.id,
+      kind: p.kind,
+      title: p.title,
+      description: p.description,
+      priceFcfa: p.priceFcfa,
+      compareAtFcfa: p.compareAtFcfa,
+      categoryLabel: p.categoryLabel,
+      available: p.available,
+      photos: p.photos,
+      variants: p.variants,
+      shop: _ref,
+      moreFromShop: p.moreFromShop,
+      counts: p.counts,
+    );
+  }
+
+  @override
+  Future<PublicShop> shop(String slug, {String? cursor}) async => PublicShop(shop: _ref, followers: 1, productCount: 1, items: [_card('p1', 'Robe Plumes', 45000)]);
 }
 
 /// Mosaïque : un portrait 2:3, un carré, un paysage reçu (affiché en carré), un article sans réaction.
@@ -252,6 +281,10 @@ void main() {
     // Étoiles de la boutique (pas de l'article) à côté de son nom.
     expect(find.text('4,6 (32 avis)'), findsOneWidget);
     expect(find.byKey(const ValueKey('shop-stars')), findsOneWidget);
+    // V1-1910-C : boutique non Premium → étoiles grises, pas de badge.
+    final star = tester.widget<Icon>(find.descendant(of: find.byKey(const ValueKey('shop-stars')), matching: find.byIcon(Icons.star_rounded)).first);
+    expect(star.color, BimColors.grey600);
+    expect(find.byKey(const ValueKey('certified-badge')), findsNothing);
     expect(find.text('18 avis'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('product-recommend')));
     await tester.pumpAndSettle();
@@ -259,6 +292,20 @@ void main() {
     expect(find.text('219 recommandations'), findsOneWidget);
     expect(find.text('1,6 k'), findsOneWidget);
     expect(find.byIcon(Icons.thumb_up), findsOneWidget);
+  });
+
+  testWidgets('V1-1910-C : boutique Premium → badge de certification, sans étoiles (fiche et profil)', (tester) async {
+    final api = _CertifiedShop();
+    await _pump(tester, api, '/bimshop/products/p1');
+    expect(find.byKey(const ValueKey('certified-badge')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-stars')), findsNothing);
+  });
+
+  testWidgets('V1-1910-C : profil d’une boutique Premium → badge, sans étoiles ni « Nouvelle boutique »', (tester) async {
+    await _pump(tester, _CertifiedShop(), '/bimshop/shops/maison-plumes');
+    expect(find.byKey(const ValueKey('certified-badge')), findsWidgets);
+    expect(find.byKey(const ValueKey('shop-stars')), findsNothing);
+    expect(find.text('Nouvelle boutique'), findsNothing);
   });
 
   testWidgets('écran 34 : taille épuisée non choisissable ; cœur ; « Commander » demande la taille puis ouvre le récapitulatif', (tester) async {

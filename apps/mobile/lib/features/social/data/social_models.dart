@@ -2,18 +2,22 @@
 library;
 
 class PersonRef {
-  const PersonRef({required this.id, required this.username, required this.fullName, this.avatarUrl});
+  const PersonRef({required this.id, required this.username, required this.fullName, this.avatarUrl, this.certified = false});
 
   final String id;
   final String username;
   final String fullName;
   final String? avatarUrl;
 
+  /// V1-1910-C : compte Premium, badge de certification.
+  final bool certified;
+
   factory PersonRef.fromJson(Map<String, dynamic> j) => PersonRef(
         id: j['id'] as String,
         username: (j['username'] ?? '') as String,
         fullName: (j['fullName'] ?? '') as String,
         avatarUrl: j['avatarUrl'] as String?,
+        certified: (j['certified'] ?? false) as bool,
       );
 
   /// Initiales affichées quand la personne n'a pas de photo.

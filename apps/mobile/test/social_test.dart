@@ -26,7 +26,8 @@ class _NoTokens extends TokenStorage {
 
 ApiClient _client() => ApiClient(storage: _NoTokens(), onSessionExpired: () async {}, baseUrl: 'http://127.0.0.1:9');
 
-const _awa = PersonRef(id: 'u1', username: 'awa.k', fullName: 'Awa Koné');
+// V1-1910-C : Awa est Premium (badge de certification).
+const _awa = PersonRef(id: 'u1', username: 'awa.k', fullName: 'Awa Koné', certified: true);
 const _me = PersonRef(id: 'u0', username: 'moi', fullName: 'Yannick Doho');
 
 FeedPost _post(String id, {String kind = 'post', String? text, bool mine = false, int likes = 0, bool liked = false, List<PostMedia> media = const [], Journey? journey, List<UsedProduct> used = const []}) => FeedPost(
@@ -229,6 +230,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Nouveau projet'), findsOneWidget);
     expect(find.text('Awa Koné'), findsOneWidget);
     expect(find.text('9'), findsOneWidget);
+    expect(find.byKey(const ValueKey('certified-badge')), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('like-p1')));
     await tester.pump();

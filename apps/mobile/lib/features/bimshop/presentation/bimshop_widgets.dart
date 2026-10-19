@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
 import '../data/bimshop_api.dart';
@@ -157,7 +158,7 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
                     Row(
                       children: [
                         Flexible(child: Text(c.shop.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall)),
-                        if (c.shop.verified) const Padding(padding: EdgeInsets.only(left: 2), child: Icon(Icons.verified, size: 14, color: BimColors.red)),
+                        if (c.shop.certified) const Padding(padding: EdgeInsets.only(left: 2), child: CertifiedBadge(size: 14)),
                       ],
                     ),
                 ],
@@ -393,7 +394,8 @@ class ShopCardGrid extends StatelessWidget {
       );
 }
 
-/// V1 — Étoiles de la boutique (maquette 34) : « ★ 4,6 (32 avis) », ou « Nouvelle boutique » avant 3 avis.
+/// V1 — Étoiles grises de la boutique (V1-1910-C) : « ★ 4,6 (32 avis) », ou « Nouvelle boutique » avant 3 avis.
+/// Jamais pour une boutique certifiée (Premium) : elle a son badge à la place.
 class ShopStars extends StatelessWidget {
   const ShopStars({super.key, required this.rating});
   final ShopRating rating;
@@ -418,7 +420,7 @@ class ShopStars extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 1; i <= 5; i++)
-            Icon(avg >= i - 0.25 ? Icons.star_rounded : (avg >= i - 0.75 ? Icons.star_half_rounded : Icons.star_outline_rounded), size: 16, color: BimColors.coin),
+            Icon(avg >= i - 0.25 ? Icons.star_rounded : (avg >= i - 0.75 ? Icons.star_half_rounded : Icons.star_outline_rounded), size: 16, color: BimColors.grey600),
           const SizedBox(width: 4),
           Text('$label (${rating.reviews} avis)', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
         ],

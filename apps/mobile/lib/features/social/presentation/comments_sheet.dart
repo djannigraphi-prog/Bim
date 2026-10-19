@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../data/social_api.dart';
 import '../../wallet/presentation/gift_sheet.dart';
 import '../data/social_models.dart';
@@ -323,6 +324,7 @@ class _CommentTile extends StatelessWidget {
                 Text.rich(
                   TextSpan(children: [
                     TextSpan(text: c.author.fullName, style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface)),
+                    if (c.author.certified) const WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: EdgeInsets.only(left: 4), child: CertifiedBadge(size: 14))),
                     TextSpan(text: '  ${timeAgo(c.createdAt)}', style: theme.textTheme.bodySmall),
                   ],),
                 ),

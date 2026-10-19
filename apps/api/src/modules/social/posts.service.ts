@@ -226,7 +226,7 @@ export class PostsService {
     const reachable = await this.reachableShopIds(viewerId, [...new Set(cards.map((c) => c.shop.id))]);
     return cards
       .filter((c) => reachable.has(c.shop.id))
-      .map((c) => ({ id: c.id, kind: c.kind, title: c.title, imageUrl: c.imageUrl, available: c.available, shop: { name: c.shop.name, slug: c.shop.slug, verified: c.shop.verified } }));
+      .map((c) => ({ id: c.id, kind: c.kind, title: c.title, imageUrl: c.imageUrl, available: c.available, shop: { name: c.shop.name, slug: c.shop.slug, verified: c.shop.verified, certified: c.shop.certified } }));
   }
 
   /** L'auteur remplace la liste des produits et services utilisés de son « J'ai fait mon BIM » (5 au plus). */
@@ -383,7 +383,7 @@ export class PostsService {
         text: p.text,
         visibility: p.visibility,
         createdAt: p.createdAt,
-        author: { id: author.id, username: author.username, fullName: author.fullName, avatarUrl: avatars.get(author.id) ?? null },
+        author: { id: author.id, username: author.username, fullName: author.fullName, avatarUrl: avatars.get(author.id) ?? null, certified: premium.has(author.id) },
         media: items,
         journey:
           p.kind === 'bim'
@@ -458,7 +458,7 @@ export class PostsService {
         parentId: r.c.parentId,
         text: r.c.text,
         createdAt: r.c.createdAt,
-        author: { id: r.author.id, username: r.author.username, fullName: r.author.fullName, avatarUrl: avatars.get(r.author.id) ?? null },
+        author: { id: r.author.id, username: r.author.username, fullName: r.author.fullName, avatarUrl: avatars.get(r.author.id) ?? null, certified: premium.has(r.author.id) },
         likeCount: r.c.likeCount,
         likedByMe: likedSet.has(r.c.id),
         coinCount: r.c.coinCount,
@@ -516,7 +516,7 @@ export class PostsService {
       parentId: dto.parentId ?? null,
       text,
       createdAt: now,
-      author: { id: me.id, username: me.username, fullName: me.fullName, avatarUrl: await this.avatarUrl(me.avatarKey, apiBase) },
+      author: { id: me.id, username: me.username, fullName: me.fullName, avatarUrl: await this.avatarUrl(me.avatarKey, apiBase), certified: (await this.wallet.premiumUsers([me.id])).has(me.id) },
       likeCount: 0,
       likedByMe: false,
       coinCount: 0,

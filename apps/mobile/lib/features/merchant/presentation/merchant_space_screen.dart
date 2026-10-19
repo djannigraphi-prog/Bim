@@ -10,6 +10,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
+import '../../../core/widgets/certified_badge.dart';
 import '../../account/data/account_api.dart';
 import '../../lives/presentation/lives_view.dart';
 import '../../auth/application/session_controller.dart';
@@ -283,9 +284,9 @@ class _Header extends StatelessWidget {
               Row(
                 children: [
                   Flexible(child: Text(shop.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleLarge)),
-                  if (shop.verified) ...[
+                  if (shop.certified) ...[
                     const SizedBox(width: BimSpacing.xs),
-                    const Tooltip(message: 'Boutique vérifiée', child: Icon(Icons.verified, color: BimColors.red, size: 20)),
+                    const CertifiedBadge(size: 20),
                   ],
                 ],
               ),
