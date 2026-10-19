@@ -11,7 +11,6 @@ import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
-import '../../merchant/data/shop_api.dart' show formatFcfa;
 import '../../messaging/presentation/messages_view.dart' show openShopConversation;
 import '../../orders/data/orders_api.dart';
 import '../../orders/presentation/checkout_screen.dart';
@@ -158,15 +157,16 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                   Positioned(
                     left: BimSpacing.sm,
                     top: BimSpacing.sm,
-                    child: CircleAvatar(backgroundColor: scheme.surface, child: const BimBackButton()),
+                    child: const BimBackButton(),
                   ),
                   Positioned(
                     right: BimSpacing.sm,
                     top: BimSpacing.sm,
                     // Le bouton garde sa taille de toucher (48 px) : un cercle de 40 px le masquait.
+                    // Maquette 34 : bouton carré arrondi, comme le retour.
                     child: Material(
                       color: scheme.surface,
-                      shape: const CircleBorder(),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       child: IconButton(
                         key: const ValueKey('favorite'),
                         tooltip: favorite ? 'Retirer des articles mis de côté' : 'Mettre de côté',
@@ -213,15 +213,29 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (p.categoryLabel != null) Text(p.categoryLabel!, style: theme.textTheme.bodySmall),
-                    Text(p.title, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: Text(p.title, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24))),
+                        // Maquette 34 : remise en pourcentage.
+                        if (p.compareAtFcfa != null)
+                          Container(
+                            key: const ValueKey('product-discount'),
+                            margin: const EdgeInsets.only(left: BimSpacing.sm, top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(BimRadius.chip)),
+                            child: Text('– ${(100 - p.priceFcfa * 100 / p.compareAtFcfa!).round()} %', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                          ),
+                      ],
+                    ),
                     if (p.reference.isNotEmpty) Text('Réf. ${p.reference}', key: const ValueKey('product-reference'), style: theme.textTheme.bodySmall),
                     const SizedBox(height: BimSpacing.xs),
                     Wrap(
                       spacing: BimSpacing.sm,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(formatFcfa(p.priceFcfa), style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w800, fontSize: 22)),
-                        if (p.compareAtFcfa != null) Text(formatFcfa(p.compareAtFcfa!), style: theme.textTheme.bodyLarge?.copyWith(decoration: TextDecoration.lineThrough)),
+                        Text(formatPriceF(p.priceFcfa), key: const ValueKey('product-price'), style: theme.textTheme.headlineMedium?.copyWith(fontSize: 28, fontWeight: FontWeight.w800)),
+                        if (p.compareAtFcfa != null) Text(formatPriceF(p.compareAtFcfa!), style: theme.textTheme.bodyLarge?.copyWith(decoration: TextDecoration.lineThrough, color: scheme.onSurfaceVariant)),
                       ],
                     ),
                     const SizedBox(height: BimSpacing.sm),
@@ -267,9 +281,14 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                         runSpacing: BimSpacing.sm,
                         children: [
                           for (final v in p.variants)
+                            // Maquette 34 : pastilles arrondies, la taille choisie en noir.
                             ChoiceChip(
-                              label: Text(v.label, style: v.available ? null : const TextStyle(decoration: TextDecoration.lineThrough)),
+                              label: Text(v.label, style: TextStyle(decoration: v.available ? null : TextDecoration.lineThrough, fontWeight: FontWeight.w600, color: _variant == v.id ? scheme.surface : null)),
                               selected: _variant == v.id,
+                              showCheckmark: false,
+                              selectedColor: scheme.onSurface,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              side: BorderSide(color: scheme.outline, width: 1.5),
                               onSelected: v.available ? (_) => setState(() => _variant = v.id) : null,
                             ),
                         ],
@@ -286,7 +305,7 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                       onTap: () => context.push('/bimshop/shops/${p.shop.slug}'),
                       child: Container(
                         padding: const EdgeInsets.all(BimSpacing.md),
-                        decoration: BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(BimRadius.card)),
+                        decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
                         child: Row(
                           children: [
                             CircleAvatar(
@@ -311,12 +330,30 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.chevron_right),
+                            // Maquette 34 : « Contacter » la boutique à propos de cet article (6-B).
+                            if (!_merchantSpace)
+                              OutlinedButton(
+                                key: const ValueKey('product-chat'),
+                                style: OutlinedButton.styleFrom(backgroundColor: scheme.surface, side: BorderSide(color: scheme.outline), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                                onPressed: () => _signedIn ? openShopConversation(context, ref, p.shop.slug, productId: p.id) : showVisitorGate(context, ref),
+                                child: const Text('Contacter'),
+                              )
+                            else
+                              const Icon(Icons.chevron_right),
                           ],
                         ),
                       ),
                     ),
-                    // 7-H : avis des clients (notes individuelles ; aucune moyenne tant que A17 n'est pas tranché).
+                    const SizedBox(height: BimSpacing.md),
+                    // Maquette 34 : rappel du paiement (aucun paiement dans l'app avant la remise).
+                    Row(
+                      children: [
+                        const Icon(Icons.local_shipping_outlined, color: BimColors.success, size: 22),
+                        const SizedBox(width: BimSpacing.sm),
+                        Expanded(child: Text(p.kind == 'service' ? 'Paiement sur place, après la prestation' : 'Livraison ou retrait · paiement à la réception', key: const ValueKey('product-delivery'), style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface))),
+                      ],
+                    ),
+                    // 7-H : avis des clients (notes individuelles ; aucune moyenne d'article, A17).
                     _Reviews(productId: p.id),
                     if (p.moreFromShop.isNotEmpty) ...[
                       const SizedBox(height: BimSpacing.xl),
@@ -334,19 +371,6 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
           padding: const EdgeInsets.fromLTRB(BimSpacing.screen, BimSpacing.sm, BimSpacing.screen, BimSpacing.md),
           child: Row(
             children: [
-              // 6-B : écrire à la boutique à propos de cet article (visiteurs : invitation à créer un compte).
-              if (!_merchantSpace) ...[
-                Expanded(
-                  child: BimButton(
-                    key: const ValueKey('product-chat'),
-                    label: 'Discuter',
-                    icon: Icons.chat_bubble_outline_rounded,
-                    variant: BimButtonVariant.outline,
-                    onPressed: () => _signedIn ? openShopConversation(context, ref, p.shop.slug, productId: p.id) : showVisitorGate(context, ref),
-                  ),
-                ),
-                const SizedBox(width: BimSpacing.sm),
-              ],
               Expanded(
                 child: BimButton(
                   key: const ValueKey('order'),

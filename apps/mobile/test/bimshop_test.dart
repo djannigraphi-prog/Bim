@@ -331,6 +331,9 @@ void main() {
     final api = _FakeBimShop();
     final messaging = _FakeMessaging();
     await _pump(tester, api, '/bimshop/products/p1', messaging: messaging);
+    // Maquette 34 : « Contacter » est dans la carte de la boutique, plus bas sur la fiche.
+    await tester.ensureVisible(find.byKey(const ValueKey('product-chat')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('product-chat')));
     await tester.pumpAndSettle();
     expect(messaging.started, ['maison-plumes|p1|null']);
@@ -349,6 +352,9 @@ void main() {
   testWidgets('6-B : visiteur, « Discuter » invite à créer un compte sans rien envoyer', (tester) async {
     final messaging = _FakeMessaging();
     await _pump(tester, _FakeBimShop(), '/bimshop/products/p1', signedIn: false, messaging: messaging);
+    // Maquette 34 : « Contacter » est dans la carte de la boutique, plus bas sur la fiche.
+    await tester.ensureVisible(find.byKey(const ValueKey('product-chat')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('product-chat')));
     await tester.pumpAndSettle();
     expect(find.text('Rejoins BIM pour réagir'), findsOneWidget);
