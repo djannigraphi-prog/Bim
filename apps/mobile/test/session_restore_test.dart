@@ -104,6 +104,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const ValueKey('splash-unreachable')), findsOneWidget);
     expect(find.byKey(const ValueKey('splash-retry')), findsOneWidget);
+    // Signature discrète de l'éditeur (proposition A du 19/10/2026), toujours visible, même hors connexion.
+    expect(find.text('from'), findsOneWidget);
+    expect(find.text('Generation Hybride'), findsOneWidget);
+    expect(find.bySemanticsLabel('Logo Generation Hybride'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('Generation Hybride')).style?.fontWeight, FontWeight.w400);
     await tester.tap(find.byKey(const ValueKey('splash-sign-out')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
