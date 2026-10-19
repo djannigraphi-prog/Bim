@@ -9,7 +9,7 @@ export class SubscribePremiumDto {
 }
 
 export class BuyCoinsDto {
-  @ApiProperty({ description: 'Pack choisi, en pièces (1 pièce = 1 F)' }) @IsInt() @Min(1) coins!: number;
+  @ApiProperty({ description: 'Pack choisi ou « Autre montant » entre customAmount.min et customAmount.max, en pièces (1 pièce = 1 F)' }) @IsInt() @Min(1) coins!: number;
   @ApiProperty({ enum: ['demo'] }) @IsIn(['demo']) channel!: 'demo';
   @ApiProperty({ description: 'Clé anti-doublon générée par l’app' }) @IsString() @Matches(IDEM) idempotencyKey!: string;
 }

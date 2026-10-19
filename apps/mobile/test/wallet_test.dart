@@ -27,8 +27,8 @@ const _gifts = [
   GiftOption(code: 'chest_s', name: 'Petit coffre', coins: 100),
   GiftOption(code: 'chest_l', name: 'Grand coffre', coins: 500),
   GiftOption(code: 'safe', name: 'Coffre-fort', coins: 1000),
-  GiftOption(code: 'ship', name: 'Bateau pirate', coins: 10000),
-  GiftOption(code: 'bank', name: 'Banque', coins: 100000),
+  GiftOption(code: 'ship', name: 'Bateau pirate', coins: 100000),
+  GiftOption(code: 'bank', name: 'Banque', coins: 200000),
 ];
 
 WalletInfo _wallet({int purchased = 800, int received = 255, bool available = true}) => WalletInfo(
@@ -42,6 +42,8 @@ WalletInfo _wallet({int purchased = 800, int received = 255, bool available = tr
       gifts: _gifts,
       rules: const WithdrawalRules(min: 5000, dailyCap: 5000000, instantMax: 100000, feePercent: 1, operators: ['orange', 'mtn', 'moov', 'wave']),
       history: [LedgerLine(id: 'l1', kind: 'gift_received', delta: 200, at: DateTime(2026, 10, 18))],
+      customMin: 100,
+      customMax: 1000000,
     );
 
 /// API simulée : garde les appels ; les règles (Premium, soldes, plafonds) sont testées côté API.
@@ -142,6 +144,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.calls, ['gift post p1 chest_s x2 anonymous=false']);
     expect(result, 200);
+  });
+
+  testWidgets('V1 écran 60 : « Autre montant », la personne choisit le nombre de pièces (bornes contrôlées)', (tester) async {
+    final api = _FakeWallet(_wallet());
+    await _pump(tester, Scaffold(body: Builder(builder: (c) => TextButton(onPressed: () => showBuyCoinsSheet(c), child: const Text('acheter')))), api);
+    await tester.tap(find.text('acheter'));
+    await tester.pumpAndSettle();
+    expect(find.text('De 100 à 1 000 000 pièces'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pack-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('custom-coins')), '50');
+    await tester.pump();
+    expect(tester.widget<TextButton>(find.byKey(const ValueKey('custom-buy'))).onPressed, isNull);
+    await tester.enterText(find.byKey(const ValueKey('custom-coins')), '2500');
+    await tester.pump();
+    expect(find.text('Prix : 2 500 F'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('custom-buy')));
+    await tester.pumpAndSettle();
+    expect(api.calls, ['buy 2500']);
+    expect(find.text('2 500 pièces ajoutées (démo, rien n’a été payé).'), findsOneWidget);
   });
 
   testWidgets('solde insuffisant : on propose d’acheter des pièces au lieu d’envoyer', (tester) async {

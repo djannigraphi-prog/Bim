@@ -108,9 +108,14 @@ class WalletInfo {
     this.premiumUntil,
     this.history = const [],
     this.withdrawals = const [],
+    this.customMin,
+    this.customMax,
   });
 
   final bool available;
+  /// V1 : « Autre montant » (la personne choisit le nombre de pièces) ; nul : seulement les packs.
+  final int? customMin;
+  final int? customMax;
   final bool demo;
   final WalletBalance balance;
   final bool premiumActive;
@@ -139,6 +144,8 @@ class WalletInfo {
       rules: WithdrawalRules.fromJson(j['withdrawal'] is Map<String, dynamic> ? j['withdrawal'] as Map<String, dynamic> : const {}),
       history: [for (final l in _list(j['history'])) LedgerLine.fromJson(l)],
       withdrawals: [for (final w in _list(j['withdrawals'])) WithdrawalItem.fromJson(w)],
+      customMin: (j['customAmount'] as Map<String, dynamic>?)?['min'] as int?,
+      customMax: (j['customAmount'] as Map<String, dynamic>?)?['max'] as int?,
     );
   }
 }

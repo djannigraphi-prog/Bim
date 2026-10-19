@@ -29,6 +29,8 @@ export interface Gift {
 }
 
 const DEFAULT_GIFTS: Gift[] = [];
+/** 100000 → « 100 000 ». */
+const spaced = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const conflict = (code: string, message: string, details?: Record<string, unknown>) => new AppError(code, message, HttpStatus.CONFLICT, details);
 
 /**
@@ -77,6 +79,12 @@ export class WalletService {
   async packs(): Promise<number[]> {
     const s = await this.settings.get<number[]>('coins.packs');
     return Array.isArray(s?.value) ? s.value : [];
+  }
+
+  /** V1 : bornes de « Autre montant » (la personne choisit le nombre de pièces). */
+  async customRange() {
+    const [min, max] = await Promise.all([this.num('coins.custom_min', 100), this.num('coins.custom_max', 1_000_000)]);
+    return { min, max: Math.max(min, max) };
   }
 
   private async withdrawRules() {
@@ -179,10 +187,11 @@ export class WalletService {
   }
 
   async wallet(userId: string) {
-    const [b, gifts, packs, rules, premium, ledger, recent, stats] = await Promise.all([
+    const [b, gifts, packs, custom, rules, premium, ledger, recent, stats] = await Promise.all([
       this.balances(userId),
       this.gifts(),
       this.packs(),
+      this.customRange(),
       this.withdrawRules(),
       this.current(userId),
       this.db.select().from(coinLedger).where(eq(coinLedger.userId, userId)).orderBy(desc(coinLedger.createdAt), desc(coinLedger.id)).limit(30),
@@ -202,6 +211,8 @@ export class WalletService {
       premium: { active: premium !== null, until: premium?.currentPeriodEnd ?? null },
       stats: { receivedTotal: stats.rows[0]?.received ?? 0, sentTotal: stats.rows[0]?.sent ?? 0 },
       packs: packs.map((coins) => ({ coins, priceFcfa: coins })),
+      /** V1 : « Autre montant » (achat simulé de la démo ; les magasins n'acceptent que des packs fixes). */
+      customAmount: custom,
       gifts,
       withdrawal: { ...rules, operators: WITHDRAWAL_OPERATORS, commissionFcfa: 0 },
       history: ledger.map((l) => ({ id: l.id, kind: l.kind, bucket: l.bucket, delta: l.delta, at: l.createdAt })),
@@ -229,7 +240,13 @@ export class WalletService {
     this.assertDemo('L’achat de pièces');
     const [u] = await this.db.select({ birthDate: users.birthDate }).from(users).where(eq(users.id, userId));
     await this.agePolicy.assert('coins_purchase', u.birthDate);
-    if (!(await this.packs()).includes(coins)) throw Errors.validation({ fields: { coins: ['Choisis un des packs proposés.'] } });
+    // Un pack proposé, ou « Autre montant » entre les bornes réglées (V1-1910-G).
+    if (!(await this.packs()).includes(coins)) {
+      const { min, max } = await this.customRange();
+      if (!Number.isInteger(coins) || coins < min || coins > max) {
+        throw Errors.validation({ fields: { coins: [`Choisis un nombre de pièces entre ${spaced(min)} et ${spaced(max)}.`] } });
+      }
+    }
     const done = async () => {
       const [p] = await this.db.select().from(coinPurchases).where(and(eq(coinPurchases.userId, userId), eq(coinPurchases.idempotencyKey, idempotencyKey)));
       return p ?? null;

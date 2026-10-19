@@ -12028,7 +12028,7 @@
         "properties": {
           "coins": {
             "type": "number",
-            "description": "Pack choisi, en pièces (1 pièce = 1 F)"
+            "description": "Pack choisi ou « Autre montant » entre customAmount.min et customAmount.max, en pièces (1 pièce = 1 F)"
           },
           "channel": {
             "type": "string",

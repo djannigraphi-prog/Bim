@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -237,6 +238,11 @@ class BuyCoinsSheet extends ConsumerStatefulWidget {
 class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
   int? _busy;
 
+  Future<void> _custom(int min, int max) async {
+    final coins = await showDialog<int>(context: context, builder: (_) => _CustomAmountDialog(min: min, max: max));
+    if (coins != null && mounted) await _buy(coins);
+  }
+
   Future<void> _buy(int coins) async {
     setState(() => _busy = coins);
     try {
@@ -282,6 +288,17 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
                     title: Text('${coinsLabel(p)} pièces', style: const TextStyle(fontWeight: FontWeight.w700)),
                     trailing: _busy == p ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text('${coinsLabel(p)} F'),
                     onTap: _busy == null ? () => _buy(p) : null,
+                  ),
+                // V1 : la personne choisit elle-même le nombre de pièces.
+                if (w.customMin != null && w.customMax != null)
+                  ListTile(
+                    key: const ValueKey('pack-custom'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Autre montant', style: TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text('De ${coinsLabel(w.customMin!)} à ${coinsLabel(w.customMax!)} pièces'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _busy == null ? () => _custom(w.customMin!, w.customMax!) : null,
                   ),
               ],
             ),
@@ -338,4 +355,53 @@ class _DonorsSheet extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// V1 — « Autre montant » : nombre de pièces choisi par la personne (1 pièce = 1 F), dans les bornes réglées.
+class _CustomAmountDialog extends StatefulWidget {
+  const _CustomAmountDialog({required this.min, required this.max});
+  final int min;
+  final int max;
+
+  @override
+  State<_CustomAmountDialog> createState() => _CustomAmountDialogState();
+}
+
+class _CustomAmountDialogState extends State<_CustomAmountDialog> {
+  final _controller = TextEditingController();
+
+  int? get _value => int.tryParse(_controller.text.replaceAll(RegExp(r'\s'), ''));
+  bool get _valid => _value != null && _value! >= widget.min && _value! <= widget.max;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Autre montant'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              key: const ValueKey('custom-coins'),
+              controller: _controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(labelText: 'Nombre de pièces', helperText: 'Entre ${coinsLabel(widget.min)} et ${coinsLabel(widget.max)}'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: BimSpacing.sm),
+            Text(_value == null ? '1 pièce = 1 F' : 'Prix : ${coinsLabel(_value!)} F', key: const ValueKey('custom-price')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(key: const ValueKey('custom-buy'), onPressed: _valid ? () => Navigator.pop(context, _value) : null, child: const Text('Acheter')),
+        ],
+      );
 }

@@ -100,12 +100,14 @@ const RULES: Array<[RegExp, Rule]> = [
       new Set(v.map((g) => (g as { code?: unknown })?.code)).size === v.length &&
       v.every((g) => {
         const x = g as Record<string, unknown>;
-        return x && /^[a-z0-9_]{2,20}$/.test(String(x.code)) && typeof x.name === 'string' && x.name.trim().length >= 1 && x.name.length <= 40 && Number.isInteger(x.coins) && (x.coins as number) >= 1 && (x.coins as number) <= 1_000_000;
+        return x && /^[a-z0-9_]{2,20}$/.test(String(x.code)) && typeof x.name === 'string' && x.name.trim().length >= 1 && x.name.length <= 40 && Number.isInteger(x.coins) && (x.coins as number) >= 1 && (x.coins as number) <= 10_000_000;
       })
         ? null
         : 'Liste de 1 à 12 cadeaux {"code", "name", "coins"} aux codes distincts.',
   ],
   [/^coins\.withdraw_min$/, intIn(100, 1_000_000)],
+  // V1 : « Autre montant » à l'achat de pièces.
+  [/^coins\.custom_(min|max)$/, intIn(1, 10_000_000)],
   [/^reels\.max_seconds$/, intIn(5, 180)],
   [/^reels\.daily_limit$/, intIn(1, 100)],
   [/^coins\.withdraw_daily_cap$/, intIn(1_000, 100_000_000)],

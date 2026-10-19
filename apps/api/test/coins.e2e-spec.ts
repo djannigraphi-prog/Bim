@@ -59,7 +59,7 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     await h.http().get('/demo').expect(404);
   });
 
-  it('valeurs provisoires : 6 packs, 8 cadeaux de 1 à 100 000, commission 0, frais opérateur 1 %', async () => {
+  it('valeurs provisoires : 6 packs, 8 cadeaux de 1 à 200 000, commission 0, frais opérateur 1 %', async () => {
     const u = await user();
     const w = await wallet(u.auth);
     expect(w).toMatchObject({ available: true, demo: true, coinValueFcfa: 1, premium: { active: false } });
@@ -67,11 +67,21 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     expect(w.packs[2]).toEqual({ coins: 1000, priceFcfa: 1000 });
     expect(w.gifts).toHaveLength(8);
     expect(w.gifts[0]).toEqual({ code: 'coin1', name: 'Pièce', coins: 1 });
-    // V1-1910-G : le Bateau pirate avant la Banque, valeurs échangées.
-    expect(w.gifts[6]).toMatchObject({ code: 'ship', name: 'Bateau pirate', coins: 10000 });
-    expect(w.gifts[7]).toMatchObject({ code: 'bank', name: 'Banque', coins: 100000 });
+    // V1-1910-G : le Bateau pirate (100 000) avant la Banque (200 000) ; « Autre montant » de 100 à 1 000 000.
+    expect(w.gifts[6]).toMatchObject({ code: 'ship', name: 'Bateau pirate', coins: 100000 });
+    expect(w.gifts[7]).toMatchObject({ code: 'bank', name: 'Banque', coins: 200000 });
+    expect(w.customAmount).toEqual({ min: 100, max: 1000000 });
     expect(w.withdrawal).toMatchObject({ min: 5000, dailyCap: 5000000, instantMax: 100000, feePercent: 1, commissionFcfa: 0 });
     expect((await h.http().get('/v1/premium').set(u.auth).expect(200)).body).toMatchObject({ available: true, priceFcfa: 2000, periodDays: 30, active: false });
+  });
+
+  it('V1 : « Autre montant » — la personne choisit le nombre de pièces, dans les bornes réglées', async () => {
+    const u = await user();
+    const buy = (coins: number) => h.http().post('/v1/wallet/purchases').set(u.auth).send({ coins, channel: 'demo', idempotencyKey: key() });
+    expect((await buy(1234).expect(201)).body).toMatchObject({ purchase: { coins: 1234, priceFcfa: 1234 }, balance: { total: 1234, purchased: 1234, withdrawable: 0 } });
+    expect((await buy(1_000_000).expect(201)).body.balance.total).toBe(1_001_234);
+    await buy(1_000_001).expect(400);
+    await buy(12.5).expect(400);
   });
 
   it('achat, Premium, envois sur publication et commentaire, donateurs, notification, retraits vérifiés par l’équipe', async () => {
@@ -85,7 +95,9 @@ describe('Pièces et Premium : prototype (e2e)', () => {
     const p2 = (await h.http().post('/v1/wallet/purchases').set(b.auth).send({ coins: 1000, channel: 'demo', idempotencyKey: buyKey }).expect(201)).body;
     expect(p2.purchase.id).toBe(p1.purchase.id);
     expect(p2.balance).toEqual({ total: 1000, purchased: 1000, received: 0, withdrawable: 0 });
-    await h.http().post('/v1/wallet/purchases').set(b.auth).send({ coins: 1234, channel: 'demo', idempotencyKey: key() }).expect(400);
+    // Hors des packs : « Autre montant » seulement entre 100 et 1 000 000 pièces (V1-1910-G).
+    expect((await h.http().post('/v1/wallet/purchases').set(b.auth).send({ coins: 99, channel: 'demo', idempotencyKey: key() }).expect(400)).body.error.details.fields.coins[0]).toBe('Choisis un nombre de pièces entre 100 et 1 000 000.');
+    await h.http().post('/v1/wallet/purchases').set(b.auth).send({ coins: 1_000_001, channel: 'demo', idempotencyKey: key() }).expect(400);
     expect((await h.http().post('/v1/wallet/purchases').set(b.auth).send({ coins: 500, channel: 'demo', idempotencyKey: buyKey }).expect(409)).body.error.code).toBe('IDEMPOTENCY_KEY_REUSED');
 
     // Sans Premium, a ne peut pas recevoir de pièces (F9).
