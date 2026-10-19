@@ -338,7 +338,9 @@ export class MerchantCatalogService {
     let previous: string | undefined;
     try {
       await this.db.transaction(async (tx) => {
-        await tx.select({ id: products.id }).from(products).where(eq(products.id, p.id)).for('update');
+        // Verrou de l'article : une suppression simultanée de l'article ne laisse pas de vidéo orpheline.
+        const [cur] = await tx.select({ status: products.status }).from(products).where(eq(products.id, p.id)).for('update');
+        if (!cur || cur.status === 'archived') throw Errors.notFound('Article');
         const [old] = await tx.delete(productVideos).where(eq(productVideos.productId, p.id)).returning({ key: productVideos.storageKey });
         previous = old?.key;
         // Légère tolérance d'arrondi : une vidéo presque carrée est enregistrée comme carrée.

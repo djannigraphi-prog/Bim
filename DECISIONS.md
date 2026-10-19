@@ -182,8 +182,9 @@ recommandations, les likes et commentaires ».
   réencodage. Dans la mosaïque, la vidéo se lit sans le son, en boucle, quand elle est visible ; bouton « Vidéo » sur
   la fiche (maquette 34).
 - **Compteurs** (choix technique, réversible) : recommandations = nouveau bouton pouce « Recommander » (une fois par
-  personne, jamais sa propre boutique) ; j'aime = les cœurs ; commentaires = les **avis** publiés des clients. Comme
-  toute la réputation (7-A), seuls ceux de la version courante de la fiche comptent. Le partage d'un article hors de
+  personne, jamais sa propre boutique ni par son équipe) ; j'aime = les cœurs ; commentaires = les **avis** publiés
+  des clients. Recommandations et j'aime : seuls ceux de la version courante de la fiche comptent (7-A) ; avis : tous
+  ceux publiés, comme la liste de la fiche (les anciens y sont signalés). Le partage d'un article hors de
   l'app demandera une adresse web publique des articles (plus tard).
 - Migration 0061 (`product_videos`, `product_recommendations`).
 

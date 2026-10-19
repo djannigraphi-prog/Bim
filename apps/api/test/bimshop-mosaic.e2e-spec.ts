@@ -103,6 +103,11 @@ describe('BimShop en mosaïque : formats, vidéo, compteurs (e2e)', () => {
     await h.http().put(`/v1/bimshop/products/${p.id}/recommend`).set(a.auth).expect(200);
     await h.http().put(`/v1/bimshop/products/${p.id}/recommend`).set(b.auth).expect(200);
     expect((await h.http().put(`/v1/bimshop/products/${p.id}/recommend`).set(s.owner.auth).expect(409)).body.error.code).toBe('OWN_PRODUCT');
+    // Une invitation dans l'équipe pas encore acceptée ne fait pas partie de la boutique : la recommandation compte.
+    const invited = await person();
+    await h.pool.query("insert into shop_members (shop_id, user_id, role, accepted_at) values ($1, $2, 'staff', null)", [s.shopId, invited.userId]);
+    await h.http().put(`/v1/bimshop/products/${p.id}/recommend`).set(invited.auth).expect(200);
+    await h.http().delete(`/v1/bimshop/products/${p.id}/recommend`).set(invited.auth).expect(200);
     await h.http().put(`/v1/bimshop/products/${p.id}/favorite`).set(a.auth).expect(200);
     expect((await h.http().get(`/v1/bimshop/products/${p.id}/me`).set(a.auth).expect(200)).body).toMatchObject({ favorite: true, recommended: true });
     expect((await card(p.id)).counts).toEqual({ recommendations: 2, likes: 1, reviews: 0 });

@@ -239,8 +239,9 @@ class _CountsPill extends StatelessWidget {
   }
 }
 
-/// Vidéo d'un article dans la mosaïque : muette, en boucle, lue seulement quand elle est bien visible à l'écran
-/// (économie de données et de batterie) ; la photo reste dessous tant que la vidéo n'est pas prête.
+/// Vidéo d'un article dans la mosaïque : muette, en boucle, lue seulement quand elle est bien visible à l'écran et que
+/// sa page est au premier plan. Hors de l'écran, le lecteur est libéré (mémoire et décodeurs du téléphone) ; la photo
+/// reste dessous tant que la vidéo n'est pas prête.
 class _CardVideo extends StatefulWidget {
   const _CardVideo({super.key, required this.url});
   final String url;
@@ -251,60 +252,77 @@ class _CardVideo extends StatefulWidget {
 
 class _CardVideoState extends State<_CardVideo> {
   VideoPlayerController? _controller;
-  ScrollPosition? _position;
+  final _positions = <ScrollPosition>[];
   bool _visible = false;
+  bool _routeCurrent = true;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final position = Scrollable.maybeOf(context)?.position;
-    if (position != _position) {
-      _position?.removeListener(_check);
-      _position = position?..addListener(_check);
+    // Toutes les listes qui défilent autour (verticale et, pour une rangée horizontale, horizontale).
+    for (final p in _positions) {
+      p.removeListener(_check);
     }
+    _positions.clear();
+    var state = Scrollable.maybeOf(context);
+    while (state != null) {
+      _positions.add(state.position..addListener(_check));
+      state = Scrollable.maybeOf(state.context);
+    }
+    // Une autre page ouverte par-dessus (fiche article…) : la vidéo s'arrête.
+    _routeCurrent = ModalRoute.of(context)?.isCurrent ?? true;
     WidgetsBinding.instance.addPostFrameCallback((_) => _check());
   }
 
   void _check() {
     if (!mounted) return;
     final box = context.findRenderObject() as RenderBox?;
-    final viewport = _position == null ? null : Scrollable.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize || !box.attached) return;
-    var visible = true;
-    if (viewport != null && viewport.hasSize) {
-      final top = box.localToGlobal(Offset.zero, ancestor: viewport).dy;
-      final shown = (top + box.size.height).clamp(0.0, viewport.size.height) - top.clamp(0.0, viewport.size.height);
-      visible = shown >= box.size.height * 0.6;
+    var visible = _routeCurrent;
+    if (visible) {
+      final rect = box.localToGlobal(Offset.zero) & box.size;
+      final screen = Offset.zero & MediaQuery.sizeOf(context);
+      final shown = rect.intersect(screen);
+      visible = !shown.isEmpty && shown.width * shown.height >= rect.width * rect.height * 0.6;
     }
     if (visible == _visible) return;
     _visible = visible;
     if (visible) {
       _play();
     } else {
-      _controller?.pause();
+      _release();
     }
   }
 
   Future<void> _play() async {
-    if (_controller == null) {
-      final c = VideoPlayerController.networkUrl(Uri.parse(widget.url), videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
-      _controller = c;
-      try {
-        await c.initialize();
-        await c.setVolume(0);
-        await c.setLooping(true);
-      } catch (_) {
-        return; // la photo reste affichée
-      }
-      if (!mounted) return;
+    if (_controller != null) return;
+    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url), videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
+    _controller = c;
+    try {
+      await c.initialize();
+      await c.setVolume(0);
+      await c.setLooping(true);
+      if (!mounted || _controller != c || !_visible) return;
+      await c.play();
       setState(() {});
+    } catch (_) {
+      // La photo reste affichée.
     }
-    if (_visible) await _controller!.play();
+  }
+
+  void _release() {
+    final c = _controller;
+    if (c == null) return;
+    _controller = null;
+    if (mounted) setState(() {});
+    c.dispose();
   }
 
   @override
   void dispose() {
-    _position?.removeListener(_check);
+    for (final p in _positions) {
+      p.removeListener(_check);
+    }
     _controller?.dispose();
     super.dispose();
   }
@@ -364,7 +382,7 @@ class ShopCardGrid extends StatelessWidget {
                   child: Column(
                     children: [
                       for (final c in columns[i])
-                        Padding(padding: EdgeInsets.only(bottom: gap * 1.6), child: ShopCardTile(key: ValueKey('tile-${c.id}'), card: c, showShop: showShop)),
+                        Padding(padding: EdgeInsets.only(bottom: gap * 1.6), child: ShopCardTile(card: c, showShop: showShop)),
                     ],
                   ),
                 ),

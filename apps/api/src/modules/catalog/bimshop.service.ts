@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
 import { DB, Database } from '../../database/database.module';
 import { inventoryMovements, productFavorites, productMedia, productRecommendations, products, productVariants, productVideos, reviews, shopCategories, shopFollows, shopMembers, shops, users } from '../../database/schema';
@@ -50,14 +50,16 @@ export class BimShopService {
   }
 
   /** Résumés publics : première photo, disponibilité (articles), boutique. */
-  async cards(rows: { p: ProductRow; s: ShopRow }[], apiBase: string) {
+  /** `rich: false` : sans vidéo ni compteurs (articles cités dans une publication ou une conversation). */
+  async cards(rows: { p: ProductRow; s: ShopRow }[], apiBase: string, opts: { rich?: boolean } = {}) {
     if (!rows.length) return [];
+    const rich = opts.rich !== false;
     const ids = rows.map((r) => r.p.id);
     const [media, stock, videos, counts] = await Promise.all([
       this.db.select().from(productMedia).where(inArray(productMedia.productId, ids)).orderBy(asc(productMedia.position)),
       this.stockByProduct(ids),
-      this.db.select().from(productVideos).where(inArray(productVideos.productId, ids)),
-      this.counts(ids),
+      rich ? this.db.select().from(productVideos).where(inArray(productVideos.productId, ids)) : Promise.resolve([] as (typeof productVideos.$inferSelect)[]),
+      rich ? this.counts(ids) : Promise.resolve(new Map<string, { recommendations: number; likes: number; reviews: number }>()),
     ]);
     const out = [];
     for (const { p, s } of rows) {
@@ -88,8 +90,8 @@ export class BimShopService {
   }
 
   /**
-   * V1 — Compteurs publics d'un article (écrans 32 et 34) : recommandations, j'aime (cœurs) et avis publiés. Comme toute
-   * la réputation (7-A), seuls ceux de la version courante du contenu comptent. Jamais de note moyenne (A17).
+   * V1 — Compteurs publics d'un article (écrans 32 et 34) : recommandations et j'aime (cœurs) de la version courante du
+   * contenu (7-A) ; avis : tous ceux publiés, comme la liste de la fiche. Jamais de note moyenne (A17).
    */
   async counts(ids: string[]) {
     const out = new Map<string, { recommendations: number; likes: number; reviews: number }>();
@@ -108,10 +110,10 @@ export class BimShopService {
         .innerJoin(products, and(eq(products.id, productFavorites.productId), eq(products.contentVersion, productFavorites.productVersion)))
         .where(inArray(productFavorites.productId, ids))
         .groupBy(productFavorites.productId),
+      // Avis : tous ceux publiés pour l'article, comme la liste affichée sur la fiche (les anciens y sont signalés).
       this.db
         .select({ id: sql<string>`${reviews.productId}`, n: count() })
         .from(reviews)
-        .innerJoin(products, and(eq(products.id, reviews.productId), eq(products.contentVersion, reviews.contentVersion)))
         .where(and(inArray(reviews.productId, ids), eq(reviews.kind, 'item'), eq(reviews.status, 'published')))
         .groupBy(reviews.productId),
     ]);
@@ -188,7 +190,7 @@ export class BimShopService {
   }
 
   /** Articles visibles parmi `ids`, dans l'ordre donné (offres de projet, lot 5-D). */
-  async visibleCards(ids: string[], apiBase: string) {
+  async visibleCards(ids: string[], apiBase: string, opts: { rich?: boolean } = {}) {
     if (!ids.length) return [];
     const rows = await this.db
       .select({ p: products, s: shops })
@@ -197,7 +199,7 @@ export class BimShopService {
       .innerJoin(users, eq(users.id, shops.ownerUserId))
       .where(and(inArray(products.id, ids), this.visible()));
     rows.sort((a, b) => ids.indexOf(a.p.id) - ids.indexOf(b.p.id));
-    return this.cards(rows, apiBase);
+    return this.cards(rows, apiBase, opts);
   }
 
   /** Recommandations : articles en ligne des rubriques données (et de leurs sous-rubriques), les plus récents. */
@@ -355,7 +357,7 @@ export class BimShopService {
       const [member] = await this.db
         .select({ n: count() })
         .from(shopMembers)
-        .where(and(eq(shopMembers.shopId, s.id), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt)));
+        .where(and(eq(shopMembers.shopId, s.id), eq(shopMembers.userId, userId), isNull(shopMembers.revokedAt), isNotNull(shopMembers.acceptedAt)));
       if (s.ownerUserId === userId || member.n > 0) throw Errors.conflict('OWN_PRODUCT', 'Tu ne peux pas recommander un article de ta boutique.');
       await this.db
         .insert(productRecommendations)

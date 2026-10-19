@@ -42,7 +42,9 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
       final page = await ref.read(bimShopApiProvider).shop(widget.slug, cursor: cursor);
       if (!mounted) return;
       setState(() {
-        _more.addAll(page.items);
+        // Jamais deux fois le même article dans la mosaïque.
+        final seen = {for (final c in [...?ref.read(publicShopProvider(widget.slug)).valueOrNull?.items, ..._more]) c.id};
+        _more.addAll(page.items.where((c) => seen.add(c.id)));
         _cursor = page.nextCursor ?? '';
       });
     } on ApiException catch (e) {
@@ -220,7 +222,7 @@ class ShopFavoritesScreen extends ConsumerWidget {
                   child: Text('Touche le cœur d’un article pour le retrouver ici.', textAlign: TextAlign.center),
                 ),
               )
-            : ListView(padding: const EdgeInsets.all(BimSpacing.screen), children: [ShopCardGrid(cards: items)]),
+            : ListView(padding: const EdgeInsets.all(BimSpacing.screen), children: [ShopCardGrid(cards: items, showShop: true)]),
       ),
     );
   }

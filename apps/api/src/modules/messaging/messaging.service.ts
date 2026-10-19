@@ -220,7 +220,7 @@ export class MessagingService {
     let contextProductId: string | null = null;
     let contextOfferId: string | null = null;
     if (input.productId) {
-      const [card] = await this.bimshop.visibleCards([input.productId], apiBase);
+      const [card] = await this.bimshop.visibleCards([input.productId], apiBase, { rich: false });
       if (!card || card.shop.id !== shop.id) throw Errors.notFound('Article');
       contextProductId = card.id;
     }
@@ -265,7 +265,7 @@ export class MessagingService {
   /** Bandeau d'une conversation avec une boutique : l'article (disponible ou non, jamais le stock) ou l'offre. */
   async context(conv: ConversationRow, apiBase: string) {
     if (conv.kind !== 'shop') return null;
-    const [product] = conv.contextProductId ? await this.bimshop.visibleCards([conv.contextProductId], apiBase) : [];
+    const [product] = conv.contextProductId ? await this.bimshop.visibleCards([conv.contextProductId], apiBase, { rich: false }) : [];
     let offer: { id: string; projectTitle: string } | null = null;
     if (conv.contextOfferId) {
       // Jamais le titre saisi par la personne : la boutique le verrait (audit, E-1) ; titre recomposé comme les offres.

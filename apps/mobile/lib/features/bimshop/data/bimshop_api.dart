@@ -145,6 +145,7 @@ class ShopProduct {
     this.categoryLabel,
     this.video,
     this.counts = const ShopCounts(),
+    this.photoAspect = 4 / 5,
   });
 
   final String id;
@@ -159,6 +160,8 @@ class ShopProduct {
   final String? categoryLabel;
   final bool available;
   final List<String?> photos;
+  /// V1 : forme de la première photo (carré ou portrait), pour la galerie de la fiche.
+  final double photoAspect;
   final List<({String id, String label, bool available})> variants;
   final ShopRef shop;
   final List<ShopCard> moreFromShop;
@@ -186,6 +189,10 @@ class ShopProduct {
         moreFromShop: [for (final c in (j['moreFromShop'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>()) ShopCard.fromJson(c)],
         video: ShopVideo.fromJson(j['video']),
         counts: ShopCounts.fromJson(j['counts']),
+        photoAspect: switch ((j['photos'] as List<dynamic>? ?? const []).firstOrNull) {
+          {'width': final int w, 'height': final int h} when w > 0 && h > 0 => (w / h).clamp(2 / 3, 1.0),
+          _ => 4 / 5,
+        },
       );
 }
 
@@ -332,7 +339,9 @@ class BimShopController extends AutoDisposeAsyncNotifier<BimShopPage> {
     state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor, loadingMore: true));
     try {
       final page = await ref.read(bimShopApiProvider).browse(ref.read(bimShopQueryProvider), cursor: s.nextCursor);
-      state = AsyncData(BimShopPage(items: [...s.items, ...page.items], nextCursor: page.nextCursor));
+      // Un article peut revenir sur la page suivante (prix changé entre deux pages) : jamais en double.
+      final seen = {for (final c in s.items) c.id};
+      state = AsyncData(BimShopPage(items: [...s.items, ...page.items.where((c) => seen.add(c.id))], nextCursor: page.nextCursor));
     } catch (_) {
       state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor, pageError: true));
     }

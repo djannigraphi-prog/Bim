@@ -188,7 +188,7 @@ export class PostsService {
     const unique = [...new Set(ids)];
     if (unique.length > MAX_POST_PRODUCTS) throw Errors.validation({ fields: { productIds: [`${MAX_POST_PRODUCTS} articles au plus.`] } });
     if (!unique.length) return [];
-    const cards = await this.bimshop.visibleCards(unique, '');
+    const cards = await this.bimshop.visibleCards(unique, '', { rich: false });
     const reachable = await this.reachableShopIds(userId, [...new Set(cards.map((c) => c.shop.id))]);
     const ok = new Set(cards.filter((c) => reachable.has(c.shop.id)).map((c) => c.id));
     if (unique.some((x) => !ok.has(x))) throw Errors.validation({ fields: { productIds: ['Un article n’est pas disponible dans le BimShop.'] } });
@@ -221,6 +221,7 @@ export class PostsService {
     const cards = await this.bimshop.visibleCards(
       rows.map((r) => r.productId),
       apiBase,
+      { rich: false },
     );
     const reachable = await this.reachableShopIds(viewerId, [...new Set(cards.map((c) => c.shop.id))]);
     return cards

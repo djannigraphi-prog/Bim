@@ -173,7 +173,8 @@ class ProjectRecommendations extends ConsumerWidget {
       );
     }
     return SizedBox(
-      height: 250,
+      // Photo carrée de 150 px, nom, prix (prix barré) et boutique, avec de la marge pour un texte agrandi.
+      height: 300,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,

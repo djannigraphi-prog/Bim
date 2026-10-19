@@ -141,8 +141,8 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
               Stack(
                 children: [
                   AspectRatio(
-                    // V1 : photos carrées ou portrait, comme dans la mosaïque.
-                    aspectRatio: 4 / 5,
+                    // V1 : photos carrées ou portrait, affichées dans leur forme (comme dans la mosaïque).
+                    aspectRatio: p.photoAspect,
                     child: p.photos.isEmpty
                         ? ColoredBox(color: scheme.surfaceContainerHighest, child: const Icon(Icons.image_outlined, size: 48))
                         : PageView(
