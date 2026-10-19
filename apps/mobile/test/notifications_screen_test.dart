@@ -104,10 +104,11 @@ void main() {
     expect(_rich('Coffre de la semaine 1'), findsOneWidget);
     expect(find.text('il y a 5 min'), findsOneWidget);
     expect(find.text('il y a 2 h'), findsOneWidget);
-    // Seulement les filtres des fonctions existantes (Pièces, Commandes, Live : lots suivants).
+    // Maquette 17 : Tout, Projets, Pièces, Commandes, Live (filtres du serveur).
     expect(find.text('Tout'), findsOneWidget);
     expect(find.text('Projets'), findsOneWidget);
-    expect(find.text('Pièces'), findsNothing);
+    expect(find.text('Pièces'), findsOneWidget);
+    expect(find.text('Commandes'), findsOneWidget);
     expect(api.calls, ['page tout', 'seen']);
 
     await tester.tap(find.text('Projets'));

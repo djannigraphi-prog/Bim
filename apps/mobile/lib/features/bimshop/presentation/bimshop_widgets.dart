@@ -409,7 +409,11 @@ class ShopStars extends StatelessWidget {
     return Semantics(
       label: 'Boutique notée $label sur 5, ${rating.reviews} avis',
       excludeSemantics: true,
-      child: Row(
+      // Réduit plutôt que de déborder quand la place manque (carte de la boutique avec « Contacter »).
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
         key: const ValueKey('shop-stars'),
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -418,6 +422,7 @@ class ShopStars extends StatelessWidget {
           const SizedBox(width: 4),
           Text('$label (${rating.reviews} avis)', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
         ],
+      ),
       ),
     );
   }
