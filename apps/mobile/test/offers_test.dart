@@ -96,6 +96,9 @@ void main() {
     expect(find.text('Kalia Sport'), findsOneWidget);
     expect(find.text('Nos leggings tiennent bien pendant les séances.'), findsOneWidget);
     expect(find.text('Legging respirant'), findsOneWidget);
+    // V1 : les articles s'affichent en grandes photos (mosaïque) ; le bouton est amené à l'écran avant d'être touché.
+    await tester.ensureVisible(find.byKey(const ValueKey('decline-o1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('decline-o1')));
     await tester.pumpAndSettle();
     expect(api.calls, ['decline p1 o1']);

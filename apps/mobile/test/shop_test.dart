@@ -283,6 +283,9 @@ void main() {
     final api = _FakeShop()..current = _detail(status: 'published', everPublished: true, hearts: 2, photos: const [ProductPhoto(id: 'm1', url: null)]);
     await _pump(tester, api, '/shop/products/x1');
     await tester.scrollUntilVisible(find.byKey(const ValueKey('product-visibility')), 300, scrollable: find.byType(Scrollable).first);
+    // V1 : la fiche est plus longue (vidéo) ; l'interrupteur est amené entièrement à l'écran.
+    await tester.ensureVisible(find.byKey(const ValueKey('product-visibility')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('product-visibility')));
     await tester.pumpAndSettle();
     expect(find.text('Visible par moi uniquement'), findsOneWidget);
