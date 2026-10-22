@@ -108,6 +108,22 @@ describe('Authentification (e2e)', () => {
       expect(bad.body.error.code).toBe('INVALID_CREDENTIALS');
     });
 
+    it('V1 : numéro collé avec sa mise en forme reconnu ; numéro mal saisi signalé clairement', async () => {
+      const a = await registerAndActivate(h);
+      const p = a.body.phone as string;
+      const pretty = `\u202a(+225) ${p.match(/../g)!.join(' ')}\u202c`;
+      const res = await h.http().post('/v1/auth/login').send({ identifier: pretty, password: a.body.password }).expect(200);
+      expect(res.body.me.username).toBe(a.body.username);
+      await h.http().post('/v1/auth/login').send({ identifier: p.match(/../g)!.join('.'), password: a.body.password }).expect(200);
+      // Chiffres en nombre insuffisant : pas « identifiant incorrect », mais le format attendu.
+      const bad = await h.http().post('/v1/auth/login').send({ identifier: '07 07 12 34', password: a.body.password }).expect(400);
+      expect(bad.body.error).toMatchObject({ code: 'VALIDATION_FAILED', message: 'Numéro invalide : 10 chiffres (ex. 07 07 12 34 56).', details: { fields: { identifier: [expect.any(String)] } } });
+      expect((await h.http().post('/v1/auth/password/forgot').send({ identifier: '0707123' }).expect(400)).body.error.code).toBe('VALIDATION_FAILED');
+      // Un nom d'utilisateur fait de chiffres qui existe reste utilisable.
+      const digits = await registerAndActivate(h, { username: String(Date.now()).slice(-9) });
+      await h.http().post('/v1/auth/login').send({ identifier: digits.body.username, password: digits.body.password }).expect(200);
+    });
+
     it('un compte non vérifié reçoit un nouveau code au lieu d’une session', async () => {
       const body = newUser();
       await h.http().post('/v1/auth/register').send(body).expect(201);

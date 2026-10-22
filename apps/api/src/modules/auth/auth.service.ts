@@ -23,7 +23,7 @@ import { SettingsService } from '../settings/settings.service';
 import { UsersService } from '../users/users.service';
 import { StepUpScope } from './auth.decorators';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto, VerifyCodeDto } from './dto';
-import { classifyIdentifier, normalizeEmail, normalizePhone, normalizeUsername, usernameProblem } from './identifiers';
+import { classifyIdentifier, INVALID_PHONE_MESSAGE, looksLikePhone, normalizeEmail, normalizePhone, normalizeUsername, usernameProblem } from './identifiers';
 import { PasswordService } from './password.service';
 import { SessionService, TokenPair } from './session.service';
 import { StepUpService } from './step-up.service';
@@ -181,6 +181,7 @@ export class AuthService {
   async login(dto: LoginDto, meta: RequestMeta): Promise<TokenPair & { userId: string }> {
     const identifier = classifyIdentifier(dto.identifier, this.cfg.DEFAULT_PHONE_REGION);
     const user = identifier ? await this.findUserForLogin(identifier) : null;
+    this.assertPhoneWellFormed(dto.identifier, identifier, !!user);
     // Les essais sont comptés par COMPTE (quel que soit l'identifiant utilisé : @nom, téléphone, e-mail),
     // ou par identifiant brut si aucun compte ne correspond. Empreinte HMAC : non réversible sans le secret serveur.
     const identifierHash = this.attemptKey(user ? `user:${user.id}` : `raw:${identifier?.value ?? dto.identifier.trim().toLowerCase()}`);
@@ -207,6 +208,16 @@ export class AuthService {
     return { ...pair, userId: user.id };
   }
 
+  /**
+   * V1 — Identifiant qui a la forme d'un numéro (chiffres, « + », espaces, parenthèses…) mais n'est pas un numéro
+   * valide : message clair plutôt que « identifiant incorrect ». Ne dépend que de la saisie (rien n'est révélé sur
+   * les comptes), sauf un nom d'utilisateur fait de chiffres qui existe : il reste utilisable.
+   */
+  private assertPhoneWellFormed(raw: string, identifier: ReturnType<typeof classifyIdentifier>, userFound: boolean) {
+    if (userFound || identifier?.kind === 'phone' || identifier?.kind === 'email' || !looksLikePhone(raw)) return;
+    throw new AppError('VALIDATION_FAILED', INVALID_PHONE_MESSAGE, HttpStatus.BAD_REQUEST, { fields: { identifier: [INVALID_PHONE_MESSAGE] } });
+  }
+
   refresh(refreshToken: string, meta: RequestMeta): Promise<TokenPair> {
     return this.sessions.refresh(refreshToken, { ip: meta.ip, userAgent: meta.userAgent });
   }
@@ -227,6 +238,7 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto, meta: RequestMeta) {
     const identifier = classifyIdentifier(dto.identifier, this.cfg.DEFAULT_PHONE_REGION);
     const user = identifier ? await this.findUserForLogin(identifier) : null;
+    this.assertPhoneWellFormed(dto.identifier, identifier, !!user);
     const message = 'Si un compte correspond, un code de réinitialisation vient d’être envoyé.';
     const byUsername = !identifier || identifier.kind === 'username';
     const visibility = { revealDestination: false, revealChannel: !byUsername };

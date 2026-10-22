@@ -1,7 +1,7 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, HttpException, HttpStatus, Logger, PayloadTooLargeException } from '@nestjs/common';
 import type { Response } from 'express';
 import { ThrottlerException } from '@nestjs/throttler';
-import { AppError } from './errors';
+import { AppError, Errors } from './errors';
 
 /** Format unique des erreurs : { error: { code, message, details? } }. Les erreurs inattendues ne divulguent rien. */
 @Catch()
@@ -10,6 +10,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<Response>();
+    exception = uploadError(exception) ?? exception;
 
     if (exception instanceof AppError) {
       res.status(exception.status).json({
@@ -37,6 +38,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error: { code: 'INTERNAL_ERROR', message: 'Une erreur est survenue. Réessaie plus tard.' },
     });
   }
+}
+
+/**
+ * Erreurs de réception des fichiers (Multer, traduites par Nest en anglais) : fichier au-delà de la limite (413
+ * « File too large ») ou envoyé dans un champ inattendu / en trop (« Unexpected field », « Too many files »).
+ */
+function uploadError(exception: unknown): AppError | undefined {
+  if (exception instanceof PayloadTooLargeException) return Errors.fileTooLarge();
+  if (exception instanceof BadRequestException) {
+    const reason = (exception.getResponse() as { message?: unknown })?.message;
+    // Multer ajoute parfois le nom du champ (« Unexpected field - photo »).
+    if (typeof reason === 'string' && /^(Unexpected (file )?field|Too many files|Too many parts)( - .*)?$/.test(reason)) {
+      return new AppError('UNEXPECTED_FILE', 'Fichier inattendu : envoie un seul fichier, dans le champ prévu.', HttpStatus.BAD_REQUEST);
+    }
+  }
+  return undefined;
 }
 
 /**

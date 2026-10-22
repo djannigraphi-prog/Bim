@@ -88,10 +88,17 @@ const schema = z
      */
     MEDIA_STORAGE: z.enum(['local', 's3', 'none']).default('none'),
     MEDIA_LOCAL_DIR: z.string().default('./.media'),
-    MEDIA_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+    /**
+     * Validité d'un lien de lecture (photo, vidéo, vocal). Le lien d'un fichier reste le même pendant une tranche de
+     * cette durée (l'app le garde en cache) et vaut entre 1 et 2 fois cette durée.
+     */
+    MEDIA_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(3600),
     MEDIA_MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(25).default(10),
-    /** Lot 11 : taille maximale d'un Reel (vidéo MP4), en Mo. */
-    MEDIA_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(100).default(30),
+    /**
+     * Taille maximale d'une vidéo (Reel, vidéo d'article), en Mo : refusée dès la réception au-delà. 100 Mo par défaut
+     * (une minute filmée par un téléphone récent) ; le fichier est gardé en mémoire pendant l'envoi.
+     */
+    MEDIA_MAX_VIDEO_MB: z.coerce.number().int().min(1).max(100).default(100),
     S3_BUCKET: z.string().default(''),
     S3_REGION: z.string().default('eu-west-3'),
     /** Uniquement pour un stockage compatible S3 (ex. MinIO en test) ; vide pour AWS. */

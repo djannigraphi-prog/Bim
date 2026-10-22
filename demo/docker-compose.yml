@@ -34,6 +34,9 @@ services:
       MEDIA_STORAGE: local
       MEDIA_LOCAL_DIR: /data/media
       LOG_LEVEL: warn
+      # Tous les téléphones de la démo arrivent par la même adresse (réseau Docker) : la limite par adresse IP les
+      # bloquerait ensemble. Accepté uniquement en développement (NODE_ENV=development ci-dessus), refusé en production.
+      HTTP_THROTTLE_ENABLED: "false"
     volumes:
       - bim-demo-data:/data
 volumes:

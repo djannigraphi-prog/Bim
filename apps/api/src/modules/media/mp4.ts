@@ -5,19 +5,27 @@
  *  - `scrubMp4Metadata` neutralise les métadonnées (« udta », « meta », « uuid » : position GPS, appareil, logiciel) en
  *    les renommant « free » et en effaçant leur contenu : même taille, donc les positions des images dans le fichier restent valables et le
  *    lecteur ignore simplement ces boîtes ; les dates de création sont remises à zéro. Une vidéo qui porte une piste de
- *    données de capteurs (GPS minuté) est refusée par le service, faute de pouvoir l'effacer sans transcodage.
+ *    données de capteurs (GPS minuté des caméras d'action) est refusée par le service, faute de pouvoir l'effacer sans
+ *    transcodage ; les pistes minutées des iPhone (« mebx » : orientation, mise au point) sont acceptées.
  */
 
 export interface Mp4Info {
   durationMs: number;
   width: number | null;
   height: number | null;
-  /** Piste de métadonnées minutées (GPS des caméras d'action, capteurs…) : refusée, elle ne peut pas être effacée sans transcodage. */
+  /** Piste de données de capteurs (GPS des caméras d'action…) : refusée, elle ne peut pas être effacée sans transcodage. */
   metadataTrack: boolean;
 }
 
-/** Types de pistes qui transportent des données de capteurs (dont la position) dans les échantillons eux-mêmes. */
+/** Types de pistes de métadonnées minutées (leurs échantillons sont dans « mdat », pas dans une boîte effaçable). */
 const METADATA_HANDLERS = new Set(['meta', 'camm']);
+/** Formats d'échantillons connus pour transporter des données de capteurs : GoPro (« gpmd »), caméras 360 (« camm »). */
+const SENSOR_SAMPLE_ENTRIES = new Set(['gpmd', 'camm']);
+/**
+ * Indices de position dans la description d'une piste de métadonnées (clés « mebx » d'Apple, type MIME ou espace de
+ * noms de « mett » / « metx ») : ex. « com.apple.quicktime.location.ISO6709 ».
+ */
+const LOCATION_HINT = /location|gps|iso6709|latitude|longitude/i;
 
 interface Box {
   type: string;
@@ -76,11 +84,21 @@ export function inspectMp4(buf: Buffer): Mp4Info {
   let width: number | null = null;
   let height: number | null = null;
   let metadataTrack = false;
+  /** Pistes : identifiant, échelle de temps (« mdhd ») et nature, pour la durée d'un MP4 fragmenté. */
+  const tracks: { id: number; timescale: number; video: boolean }[] = [];
   for (const trak of [...boxes(buf, moov.body, moov.end)].filter((b) => b.type === 'trak')) {
     const mdia = child(buf, trak, 'mdia');
     const hdlr = mdia ? child(buf, mdia, 'hdlr') : undefined;
-    if (hdlr && hdlr.body + 12 <= hdlr.end && METADATA_HANDLERS.has(buf.toString('latin1', hdlr.body + 8, hdlr.body + 12))) metadataTrack = true;
+    const handler = hdlr && hdlr.body + 12 <= hdlr.end ? buf.toString('latin1', hdlr.body + 8, hdlr.body + 12) : '';
+    if (METADATA_HANDLERS.has(handler) && sensorTrack(buf, mdia!, handler)) metadataTrack = true;
     const tkhd = child(buf, trak, 'tkhd');
+    const mdhd = mdia ? child(buf, mdia, 'mdhd') : undefined;
+    if (tkhd && mdhd) {
+      const v1 = (box: Box) => box.body < box.end && buf.readUInt8(box.body) === 1;
+      const idAt = tkhd.body + (v1(tkhd) ? 20 : 12);
+      const tsAt = mdhd.body + (v1(mdhd) ? 20 : 12);
+      if (idAt + 4 <= tkhd.end && tsAt + 4 <= mdhd.end) tracks.push({ id: buf.readUInt32BE(idAt), timescale: buf.readUInt32BE(tsAt), video: handler === 'vide' });
+    }
     if (!tkhd || tkhd.end - tkhd.body < 84) continue;
     // Largeur et hauteur : les 8 derniers octets de « tkhd », en virgule fixe 16.16.
     const w = buf.readUInt32BE(tkhd.end - 8) >>> 16;
@@ -95,7 +113,78 @@ export function inspectMp4(buf: Buffer): Mp4Info {
       height = quarter ? w : h;
     }
   }
-  return { durationMs: Math.round((duration / timescale) * 1000), width, height, metadataTrack };
+  let durationMs = Math.round((duration / timescale) * 1000);
+  // MP4 fragmenté (enregistrement en continu) : « mvhd » ne donne pas la durée ; elle est dans « mvex/mehd » ou, à
+  // défaut, se calcule à partir des durées d'échantillons des fragments (« moof »). 0 si elle reste introuvable.
+  if (durationMs === 0) durationMs = fragmentedDurationMs(buf, top, moov, timescale, tracks);
+  return { durationMs, width, height, metadataTrack };
+}
+
+/**
+ * Piste de métadonnées minutées qui peut transporter des données de capteurs (position…) : refusée, faute de pouvoir
+ * l'effacer sans transcodage. Les pistes minutées des iPhone (« mebx » : orientation, mise au point, Live Photo) sont
+ * acceptées, sauf si leur description annonce une position. Une description illisible est refusée par prudence.
+ */
+function sensorTrack(buf: Buffer, mdia: Box, handler: string): boolean {
+  if (handler === 'camm') return true;
+  const minf = child(buf, mdia, 'minf');
+  const stbl = minf ? child(buf, minf, 'stbl') : undefined;
+  const stsd = stbl ? child(buf, stbl, 'stsd') : undefined;
+  // « stsd » : version et drapeaux (4), nombre d'entrées (4), puis les descriptions (taille 4 + format 4…).
+  if (!stsd || stsd.body + 16 > stsd.end) return true;
+  const entries = [...boxes(buf, stsd.body + 8, stsd.end)];
+  if (!entries.length) return true;
+  return entries.some((e) => SENSOR_SAMPLE_ENTRIES.has(e.type) || LOCATION_HINT.test(buf.toString('latin1', e.body, e.end)));
+}
+
+/** Durée d'un MP4 fragmenté, en millisecondes (0 si elle ne peut pas être lue simplement). */
+function fragmentedDurationMs(buf: Buffer, top: Box[], moov: Box, movieTimescale: number, tracks: { id: number; timescale: number; video: boolean }[]): number {
+  const mvex = child(buf, moov, 'mvex');
+  if (!mvex) return 0;
+  const mehd = child(buf, mvex, 'mehd');
+  if (mehd && mehd.body + 8 <= mehd.end) {
+    const wide = buf.readUInt8(mehd.body) === 1;
+    const d = wide ? (mehd.body + 12 <= mehd.end ? Number(buf.readBigUInt64BE(mehd.body + 4)) : 0) : buf.readUInt32BE(mehd.body + 4);
+    if (d > 0) return Math.round((d / movieTimescale) * 1000);
+  }
+  const track = tracks.find((t) => t.video) ?? tracks[0];
+  if (!track?.timescale) return 0;
+  // Durée par défaut des échantillons de la piste (« trex »).
+  let trexDuration = 0;
+  for (const trex of boxes(buf, mvex.body, mvex.end)) {
+    if (trex.type === 'trex' && trex.body + 16 <= trex.end && buf.readUInt32BE(trex.body + 4) === track.id) trexDuration = buf.readUInt32BE(trex.body + 12);
+  }
+  let total = 0;
+  for (const moof of top.filter((b) => b.type === 'moof')) {
+    for (const traf of boxes(buf, moof.body, moof.end)) {
+      if (traf.type !== 'traf') continue;
+      const tfhd = child(buf, traf, 'tfhd');
+      if (!tfhd || tfhd.body + 8 > tfhd.end || buf.readUInt32BE(tfhd.body + 4) !== track.id) continue;
+      const tf = buf.readUInt32BE(tfhd.body) & 0xffffff;
+      // Champs facultatifs de « tfhd », dans l'ordre : base_data_offset (8), sample_description_index (4), default_sample_duration (4).
+      const at = tfhd.body + 8 + (tf & 0x01 ? 8 : 0) + (tf & 0x02 ? 4 : 0);
+      let defaultDuration = trexDuration;
+      if (tf & 0x08) {
+        if (at + 4 > tfhd.end) return 0;
+        defaultDuration = buf.readUInt32BE(at);
+      }
+      for (const trun of boxes(buf, traf.body, traf.end)) {
+        if (trun.type !== 'trun' || trun.body + 8 > trun.end) continue;
+        const f = buf.readUInt32BE(trun.body) & 0xffffff;
+        const n = buf.readUInt32BE(trun.body + 4);
+        if (!(f & 0x100)) {
+          total += n * defaultDuration;
+          continue;
+        }
+        // Une valeur de 4 octets par champ présent : durée (0x100), taille (0x200), drapeaux (0x400), décalage (0x800).
+        const stride = 4 * [0x100, 0x200, 0x400, 0x800].filter((x) => f & x).length;
+        let p = trun.body + 8 + (f & 0x01 ? 4 : 0) + (f & 0x04 ? 4 : 0);
+        if (p + n * stride > trun.end) return 0;
+        for (let i = 0; i < n; i++, p += stride) total += buf.readUInt32BE(p);
+      }
+    }
+  }
+  return Math.round((total / track.timescale) * 1000);
 }
 
 const SCRUB = new Set(['udta', 'meta', 'uuid']);

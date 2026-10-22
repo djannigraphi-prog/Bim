@@ -27,3 +27,18 @@ describe('Photos d’articles : carré ou portrait (V1, 19/10/2026)', () => {
     expect(await encodePrivateImage(await file(1200, 800), 10, 'photo')).toMatchObject({ width: 1200, height: 800 });
   });
 });
+
+describe('Images privées : transparence et très grandes images (V1)', () => {
+  it('pose la transparence sur du blanc (PNG détouré), jamais sur du noir', async () => {
+    const buffer = await sharp({ create: { width: 200, height: 200, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
+    const out = await encodePrivateImage({ buffer, size: buffer.length, mimetype: 'image/png' } as Express.Multer.File, 10, 'photo');
+    const [r, g, b] = await sharp(out.data).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
+    expect(Math.min(r, g, b)).toBeGreaterThan(245);
+  });
+
+  it('au-delà de 50 mégapixels : « Image trop grande », pas « Image illisible »', async () => {
+    const buffer = await sharp({ create: { width: 8192, height: 6144, channels: 3, background: 'teal' } }).jpeg({ quality: 50 }).toBuffer();
+    const err = await encodePrivateImage({ buffer, size: buffer.length, mimetype: 'image/jpeg' } as Express.Multer.File, 25, 'photo').catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'VALIDATION_FAILED', details: { fields: { photo: [expect.stringMatching(/^Image trop grande/)] } } });
+  });
+});

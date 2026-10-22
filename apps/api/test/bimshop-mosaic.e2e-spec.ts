@@ -71,6 +71,12 @@ describe('BimShop en mosaïque : formats, vidéo, compteurs (e2e)', () => {
     const put = (buf: Buffer, auth: Auth = s.auth) => h.http().put(`/v1/shop/products/${p.id}/video`).set(auth).attach('video', buf, { filename: 'v.mp4', contentType: 'video/mp4' });
     expect((await put(testMp4({ seconds: 20, width: 1920, height: 1080 })).expect(400)).body.error.code).toBe('PRODUCT_VIDEO_FORMAT');
     expect((await put(testMp4({ seconds: 61, width: 720, height: 1280 })).expect(400)).body.error.code).toBe('PRODUCT_VIDEO_TOO_LONG');
+    // V1 : portrait 9:20 des téléphones récents (1080 × 2400) accepté ; plus étroit, refusé sans parler de paysage.
+    expect((await put(testMp4({ seconds: 12, width: 1080, height: 2400 })).expect(200)).body.video).toMatchObject({ width: 1080, height: 2400 });
+    const narrow = (await put(testMp4({ seconds: 12, width: 1080, height: 2700 })).expect(400)).body.error;
+    expect(narrow.code).toBe('PRODUCT_VIDEO_FORMAT');
+    expect(narrow.message).not.toMatch(/paysage/);
+    expect((await put(testMp4({ seconds: 20, width: 1920, height: 1080 })).expect(400)).body.error.message).toMatch(/paysage/);
     // Filmée en portrait au téléphone, enregistrée « couchée » avec un quart de tour : acceptée en portrait.
     const first = (await put(testMp4({ seconds: 15, width: 1920, height: 1080, rotate90: true })).expect(200)).body;
     expect(first.video).toMatchObject({ width: 1080, height: 1920, durationMs: 15000, url: expect.any(String) });

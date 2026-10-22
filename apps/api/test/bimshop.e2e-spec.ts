@@ -51,6 +51,10 @@ describe('BimShop (e2e)', () => {
     expect((await h.http().get('/v1/bimshop/products?category=inconnue').expect(200)).body.items).toEqual([]);
     // Caractères spéciaux de recherche sans effet de joker.
     expect((await h.http().get('/v1/bimshop/products?q=%25').expect(200)).body.items).toEqual([]);
+    // V1 : sans accents ni casse (« zephyr » trouve « Zéphyr »), même saisi en caractères décomposés.
+    expect((await h.http().get('/v1/bimshop/products').query({ q: 'zephyr' }).expect(200)).body.items.map((p: { id: string }) => p.id).sort()).toEqual([robe, sac].sort());
+    expect((await h.http().get('/v1/bimshop/products').query({ q: 'ZE\u0301PHYR' }).expect(200)).body.items).toHaveLength(2);
+    expect((await h.http().get('/v1/bimshop/products').query({ q: 'maison plumes' }).expect(200)).body.items).toHaveLength(2);
 
     const d = (await h.http().get(`/v1/bimshop/products/${robe}`).expect(200)).body;
     expect(d).toMatchObject({ title: 'Robe Plumes Zéphyr', available: true, category: { code: 'vetements_soiree', label: 'Soirée' }, variants: [{ label: 'Unique', available: true }] });

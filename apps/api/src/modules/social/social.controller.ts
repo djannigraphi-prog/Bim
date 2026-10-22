@@ -5,6 +5,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Errors } from '../../common/errors';
+import { VideoFileInterceptor } from '../../common/upload';
 import { ReqMeta, RequestMeta } from '../../common/request-meta';
 import { AdminContext, AdminRoute, CurrentAdmin } from '../admin/admin.decorators';
 import { AuthContext, CurrentAuth, Public } from '../auth/auth.decorators';
@@ -17,8 +18,6 @@ import { ReelsService } from './reels.service';
 import { StoriesService } from './stories.service';
 
 const UPLOAD_LIMIT = 25 * 1024 * 1024; // taille réelle contrôlée par le service (MEDIA_MAX_UPLOAD_MB), message clair
-/** Lot 11 : la vidéo est refusée dès la réception au-delà de MEDIA_MAX_VIDEO_MB (pas de gros fichier gardé en mémoire). */
-const VIDEO_UPLOAD_LIMIT = (Number(process.env.MEDIA_MAX_VIDEO_MB) || 30) * 1024 * 1024;
 
 /** Lot 4 — Social : fil, publications, « J'ai fait mon BIM », j'aime, commentaires, profils, abonnements, blocages. */
 @ApiTags('Social')
@@ -43,7 +42,7 @@ export class SocialController {
 
   @Post('reels')
   @Throttle({ default: { limit: 10, ttl: 600_000 } })
-  @UseInterceptors(FileInterceptor('video', { limits: { fileSize: VIDEO_UPLOAD_LIMIT, files: 1 } }))
+  @UseInterceptors(VideoFileInterceptor('video'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', required: ['video'], properties: { video: { type: 'string', format: 'binary' }, caption: { type: 'string' }, visibility: { type: 'string', enum: ['public', 'followers'] } } } })
   @ApiOperation({ summary: 'Publier un Reel (vidéo MP4, 60 s au plus ; métadonnées et position effacées)' })

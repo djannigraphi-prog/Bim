@@ -1,6 +1,7 @@
 /// <reference types="multer" />
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { VideoFileInterceptor } from '../../common/upload';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -10,9 +11,6 @@ import { apiBase } from '../projects/projects.controller';
 import { ProductDto, StockDto, UpdateProductDto, UpdateShopDto, VariantsDto } from './dto';
 import { BimShopService, BimShopSort } from './bimshop.service';
 import { MAX_PRODUCT_IMAGES, MerchantCatalogService } from './merchant-catalog.service';
-
-/** V1 : la vidéo est refusée dès la réception au-delà de MEDIA_MAX_VIDEO_MB. */
-const VIDEO_UPLOAD_LIMIT = (Number(process.env.MEDIA_MAX_VIDEO_MB) || 30) * 1024 * 1024;
 
 const UPLOAD = { limits: { fileSize: 25 * 1024 * 1024 } };
 
@@ -135,7 +133,7 @@ export class MerchantCatalogController {
   @Put('products/:id/video')
   @RequireShopPermission('products.edit')
   @Throttle({ default: { limit: 10, ttl: 600_000 } })
-  @UseInterceptors(FileInterceptor('video', { limits: { fileSize: VIDEO_UPLOAD_LIMIT, files: 1 } }))
+  @UseInterceptors(VideoFileInterceptor('video'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', required: ['video'], properties: { video: { type: 'string', format: 'binary' } } } })
   @ApiOperation({ summary: 'V1 : vidéo de l’article (une seule, MP4, 60 s au plus, carré ou portrait ; remplace l’ancienne). PRODUCT_VIDEO_TOO_LONG, PRODUCT_VIDEO_FORMAT' })

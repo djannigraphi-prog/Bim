@@ -6,13 +6,20 @@ import { bearer, Harness, registerAndActivate, startHarness } from './harness';
 describe('Achats dans l’app (e2e)', () => {
   let h: Harness;
   let store: SimulatorStore;
+  let previous: { value: unknown; decision_status: string } | undefined;
   beforeAll(async () => {
     h = await startHarness({ STORE_PROVIDER: 'simulator' });
+    // Réglage partagé par toute la base de test : remis à sa valeur d'origine à la fin (sinon l'ordre des fichiers
+    // change le résultat d'autres tests, ex. « abonnement payant : provisoire » dans auth.e2e-spec.ts).
+    previous = (await h.pool.query("select value, decision_status from app_settings where key = 'age.min_paid_subscription'")).rows[0];
     await h.pool.query("update app_settings set value = '18', decision_status = 'decided' where key = 'age.min_paid_subscription'");
     h.settings.invalidate();
     store = h.app.get(WalletService).store as SimulatorStore;
   });
-  afterAll(async () => h.close());
+  afterAll(async () => {
+    if (previous) await h.pool.query("update app_settings set value = $1, decision_status = $2 where key = 'age.min_paid_subscription'", [JSON.stringify(previous.value), previous.decision_status]);
+    await h.close();
+  });
 
   const user = async () => {
     const u = await registerAndActivate(h);

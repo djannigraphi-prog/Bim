@@ -606,6 +606,7 @@ export class MessagingService {
     }
     if (info.width !== null || info.metadataTrack) throw Errors.validation({ fields: { voice: ['Un message vocal ne contient que du son.'] } });
     const maxSeconds = await this.limit('messages.voice_max_seconds', 120);
+    if (info.durationMs === 0) throw Errors.validation({ fields: { voice: ['Durée du message vocal illisible : enregistre-le à nouveau.'] } });
     if (info.durationMs < 300) throw Errors.validation({ fields: { voice: ['Message vocal trop court.'] } });
     if (info.durationMs > maxSeconds * 1000 + 500) {
       throw new AppError('VOICE_TOO_LONG', `Un message vocal dure ${Math.round(maxSeconds / 60)} minutes au plus.`, HttpStatus.BAD_REQUEST, { maxSeconds });

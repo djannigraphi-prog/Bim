@@ -40,6 +40,9 @@ describe('Messagerie : vocaux et groupes (e2e)', () => {
     expect((await voice(a, c.id, testMp4({ audio: true, seconds: 125 }), 400)).body.error).toMatchObject({ code: 'VOICE_TOO_LONG', details: { maxSeconds: 120 } });
     await voice(a, c.id, testMp4({ seconds: 10 }), 400);
     await voice(a, c.id, Buffer.from('pas un fichier audio'), 400);
+    // V1 : vocal fragmenté (enregistrement en continu) : durée lue dans les fragments, ou message clair.
+    expect((await voice(a, c.id, testMp4({ audio: true, seconds: 6, fragmented: 'trun' }))).body.durationMs).toBe(6000);
+    expect((await voice(a, c.id, testMp4({ audio: true, seconds: 6, fragmented: 'none' }), 400)).body.error.details.fields.voice[0]).toMatch(/^Durée du message vocal illisible/);
     await h.http().post(`/v1/conversations/${c.id}/messages`).set(a.auth).field('text', 'coucou').attach('voice', testMp4({ audio: true, seconds: 3 }), { filename: 'v.m4a', contentType: 'audio/mp4' }).expect(400);
     // Supprimé par son auteur : fichier effacé.
     await h.http().delete(`/v1/messages/${m.id}`).set(a.auth).expect(204);

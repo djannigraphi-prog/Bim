@@ -26,6 +26,9 @@ const endpoint = process.env.S3_TEST_ENDPOINT;
     const up = (await h.http().post(`/v1/projects/${p.id}/photos?kind=before`).set(auth).attach('photo', img, { filename: 'a.jpg', contentType: 'image/jpeg' }).expect(201)).body;
     const url = up.items[0].url as string;
     expect(url).toContain('X-Amz-Signature');
+    // V1 : même lien présigné pendant toute une tranche de temps (cache de l'app).
+    const again = (await h.http().get(`/v1/projects/${p.id}/photos`).set(auth).expect(200)).body;
+    expect(again.items[0].url).toBe(url);
     const res = await fetch(url);
     expect(res.status).toBe(200);
     expect((await sharp(Buffer.from(await res.arrayBuffer())).metadata()).width).toBe(800);

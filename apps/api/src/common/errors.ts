@@ -25,6 +25,9 @@ export const Errors = {
   conflict: (code: string, message: string) => new AppError(code, message, HttpStatus.CONFLICT),
   tooMany: (message = 'Trop de tentatives. Réessaie dans quelques minutes.', details?: Record<string, unknown>) =>
     new AppError('TOO_MANY_ATTEMPTS', message, HttpStatus.TOO_MANY_REQUESTS, details),
+  /** Fichier envoyé au-delà de la limite de réception (413) ; `limitMb` quand elle est connue. */
+  fileTooLarge: (limitMb?: number) =>
+    new AppError('FILE_TOO_LARGE', limitMb ? `Fichier trop lourd : ${limitMb} Mo au plus.` : 'Fichier trop lourd.', HttpStatus.PAYLOAD_TOO_LARGE, limitMb ? { limitMb } : undefined),
   notConfigured: (what: string) =>
     new AppError('NOT_CONFIGURED', `${what} n'est pas encore disponible.`, HttpStatus.SERVICE_UNAVAILABLE),
   ruleNotDecided: (rule: string) =>

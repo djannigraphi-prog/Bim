@@ -194,6 +194,11 @@ describe('Social (e2e)', () => {
     const found = (await h.http().get(`/v1/people?q=@${a.username}`).set(b.auth).expect(200)).body.items;
     expect(found[0]).toMatchObject({ username: a.username, followedByMe: true }); // nom exact en premier
     expect((await h.http().get('/v1/people?q=a').set(b.auth).expect(200)).body.items).toEqual([]);
+    // V1 : recherche sans accents (« kone » trouve « Koné »).
+    const accented = await registerAndActivate(h, { fullName: 'Aïcha Zélékoué' });
+    for (const q of ['zelekoue', 'ZÉLÉKOUÉ', 'aicha zelek']) {
+      expect((await h.http().get('/v1/people').query({ q }).set(b.auth).expect(200)).body.items.map((x: { username: string }) => x.username)).toContain(accented.me.username);
+    }
 
     const av = (await h.http().put('/v1/me/avatar').set(a.auth).attach('photo', await jpeg(), { filename: 'a.jpg', contentType: 'image/jpeg' }).expect(200)).body;
     expect(av.avatarUrl).toContain('/v1/media/');

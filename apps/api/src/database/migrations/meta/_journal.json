@@ -449,6 +449,13 @@
       "when": 1792447078173,
       "tag": "0063_v1_shared_product",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1792675611593,
+      "tag": "0064_v1_unaccent_search",
+      "breakpoints": true
     }
   ]
 }

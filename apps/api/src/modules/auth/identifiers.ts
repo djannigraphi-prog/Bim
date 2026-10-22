@@ -34,16 +34,38 @@ export function normalizeEmail(raw: string): string | null {
 
 export type Identifier = { kind: 'email' | 'phone' | 'username'; value: string };
 
+/**
+ * Caractères de mise en forme d'un numéro collé ou saisi : caractères invisibles de direction du texte (\p{Cf}, ajoutés
+ * par les répertoires et le copier-coller), espaces (dont insécables), parenthèses, points et tirets.
+ */
+const PHONE_FORMATTING = /[\p{Cf}\s().\-]/gu;
+
+/** Numéro sans sa mise en forme : « (+225) 07 07 12 34 56 » → « +2250707123456 ». */
+export function stripPhoneFormatting(raw: string): string {
+  return raw.replace(PHONE_FORMATTING, '');
+}
+
+/**
+ * L'identifiant a la forme d'un numéro (chiffres, avec « + » éventuel, une fois la mise en forme retirée) : s'il
+ * n'est pas un numéro valide, la personne doit le savoir plutôt que de voir « identifiant incorrect ».
+ */
+export function looksLikePhone(raw: string): boolean {
+  return /^\+?\d{4,}$/.test(stripPhoneFormatting(raw));
+}
+
+/** Message affiché pour un numéro mal saisi (format ivoirien, région par défaut). */
+export const INVALID_PHONE_MESSAGE = 'Numéro invalide : 10 chiffres (ex. 07 07 12 34 56).';
+
 /** Un même champ « identifiant » accepte e-mail, téléphone ou @nom d'utilisateur (écran 03, Q12). */
 export function classifyIdentifier(raw: string, defaultRegion: string): Identifier | null {
-  const input = raw.trim();
+  const input = raw.replace(/\p{Cf}/gu, '').trim();
   if (!input) return null;
   if (input.includes('@') && !input.startsWith('@')) {
     const email = normalizeEmail(input);
     return email ? { kind: 'email', value: email } : null;
   }
-  if (/^[+\d][\d\s().-]{5,}$/.test(input)) {
-    const phone = normalizePhone(input, defaultRegion);
+  if (looksLikePhone(input)) {
+    const phone = normalizePhone(stripPhoneFormatting(input), defaultRegion);
     if (phone) return { kind: 'phone', value: phone };
   }
   const username = normalizeUsername(input);

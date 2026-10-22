@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { Errors } from '../../common/errors';
+import { foldedILike, searchText } from '../../common/search';
 import { DB, Database } from '../../database/database.module';
 import { inventoryMovements, productFavorites, productMedia, productRecommendations, products, productVariants, productVideos, reviews, shopCategories, shopFollows, shopMembers, shops, users } from '../../database/schema';
 import { StorageService } from '../media/storage';
@@ -175,10 +176,11 @@ export class BimShopService {
       if (!codes.length) return { items: [], nextCursor: null };
       conds.push(inArray(products.categoryCode, codes));
     }
-    const text = q.q?.trim();
+    const text = q.q === undefined ? undefined : searchText(q.q);
     if (text) {
       if (text.length > 80) throw Errors.validation({ fields: { q: ['80 caractères au plus.'] } });
-      conds.push(or(sql`${products.title} ILIKE ${like(text)}`, sql`${products.description} ILIKE ${like(text)}`, sql`${shops.name} ILIKE ${like(text)}`)!);
+            // Sans accents ni casse : « creme » trouve « Crème ».
+      conds.push(or(foldedILike(products.title, like(text)), foldedILike(products.description, like(text)), foldedILike(shops.name, like(text)))!);
     }
     const c = this.decodeCursor(q.cursor);
     if (c) {

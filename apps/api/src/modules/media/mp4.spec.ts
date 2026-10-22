@@ -30,4 +30,21 @@ describe('MP4 (lot 11)', () => {
     expect(inspectMp4(out)).toEqual(inspectMp4(f));
     expect(f.includes(Buffer.from('udta'))).toBe(true); // l'original n'est pas modifié
   });
+
+  it('V1 : piste minutée d’iPhone (« mebx ») acceptée ; GPS (« gpmd », « camm », clé de position) refusé', () => {
+    expect(inspectMp4(testMp4({ metaTrack: { entry: 'mebx' } })).metadataTrack).toBe(false);
+    expect(inspectMp4(testMp4({ metaTrack: { entry: 'gpmd' } })).metadataTrack).toBe(true);
+    expect(inspectMp4(testMp4({ metaTrack: { entry: 'camm' } })).metadataTrack).toBe(true);
+    expect(inspectMp4(testMp4({ metaTrack: { entry: 'mebx', keys: 'mdtacom.apple.quicktime.location.ISO6709' } })).metadataTrack).toBe(true);
+    expect(inspectMp4(testMp4({ metaTrack: { entry: 'mett', keys: 'application/gps\0' } })).metadataTrack).toBe(true);
+    // Description illisible : refusée par prudence.
+    expect(inspectMp4(testMp4({ gpsTrack: true })).metadataTrack).toBe(true);
+  });
+
+  it('V1 : durée d’un MP4 fragmenté (« mehd », durées des fragments) ; 0 si introuvable', () => {
+    expect(inspectMp4(testMp4({ seconds: 10, fragmented: 'mehd' })).durationMs).toBe(10000);
+    expect(inspectMp4(testMp4({ seconds: 10, fragmented: 'trun' })).durationMs).toBe(10000);
+    expect(inspectMp4(testMp4({ seconds: 8, fragmented: 'tfhd' })).durationMs).toBe(8000);
+    expect(inspectMp4(testMp4({ seconds: 8, fragmented: 'none' })).durationMs).toBe(0);
+  });
 });

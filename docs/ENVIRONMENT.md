@@ -10,7 +10,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `LOG_LEVEL` | info | niveau des journaux JSON | |
 | `TRUST_PROXY` | 0 | **nombre** de proxys de confiance devant l'API | `1` derrière l'ALB AWS ; jamais `true` (le client pourrait choisir son IP via X-Forwarded-For). **Obligatoire (≥ 1) hors développement** : l'API refuse de démarrer sinon (audit du 16/10/2026) |
 | `CORS_ORIGINS` | (vide) | origines web autorisées, séparées par des virgules | admin web uniquement |
-| `HTTP_THROTTLE_ENABLED` | true | limitation de débit HTTP | `false` refusé en staging/production |
+| `HTTP_THROTTLE_ENABLED` | true | limitation de débit HTTP (les liens de lecture `/v1/media` n'y sont jamais soumis) | `false` refusé en staging/production ; `false` dans la démonstration Docker (tous les téléphones arrivent par la même adresse) |
 | `DATABASE_URL` | — | connexion PostgreSQL | obligatoire |
 | `DATABASE_POOL_MAX` | 10 | connexions max par instance | |
 | `JWT_ACCESS_SECRET` | — | signature des jetons d'accès | ≥ 32 caractères, différent de `OTP_SECRET` |
@@ -30,7 +30,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `DEFAULT_PHONE_REGION` | CI | région pour lire un numéro sans indicatif | |
 | `MEDIA_STORAGE` | none | stockage des photos privées : `local` (développement/tests), `s3`, `none` (fonction fermée) | `local` refusé hors development/test |
 | `MEDIA_LOCAL_DIR` | ./.media | dossier du stockage local | |
-| `MEDIA_URL_TTL_SECONDS` | 300 | durée de validité d'un lien de photo | 30 à 3600 |
+| `MEDIA_URL_TTL_SECONDS` | 3600 | validité d'un lien de lecture (photo, vidéo, vocal) : le lien d'un fichier reste le même pendant une tranche de cette durée (cache de l'app) et vaut entre 1 et 2 fois cette durée | 30 à 3600 |
 | `MEDIA_MAX_UPLOAD_MB` | 10 | taille maximale d'une photo envoyée | 1 à 25 |
 | `KYC_ENCRYPTION_KEY` | (vide) | clé de chiffrement des pièces d'identité des marchands (lot 5), 32 octets en base64 | Différente de `ADMIN_TOTP_ENCRYPTION_KEY` ; sans elle, l'ouverture des boutiques répond « non configurée ». En production : AWS Secrets Manager, jamais dans Git |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | — , eu-west-3, — | compartiment privé (S3_ENDPOINT seulement pour un stockage compatible, ex. MinIO en test) ; identifiants par le rôle IAM de la tâche ECS | `S3_BUCKET` obligatoire si `s3` |
@@ -41,7 +41,7 @@ Développement : fichier `apps/api/.env` (copié de `.env.example`, jamais commi
 | `WORKER_MODE` | off | rappels (lot 2) : `off` (aucun envoi), `embedded` (dans le processus de l'API), `standalone` (service séparé `npm run start:worker`) | `PUSH_PROVIDER` obligatoire si différent de `off` ; le réglage `notifications.reminders_enabled` reste un second interrupteur |
 | `WORKER_HEALTH_PORT` | 3100 | port du contrôle de santé `/health` du worker séparé (200 = ok/dégradé/désactivé, 503 = arrêté) | |
 | `PUSH_PROVIDER` | none | envoi des notifications : `none`, `fcm` (Firebase), `test` (mémoire) | `test` refusé hors development/test |
-| `MEDIA_MAX_VIDEO_MB` | 30 | taille maximale d'un Reel (MP4), en Mo (1 à 100) | |
+| `MEDIA_MAX_VIDEO_MB` | 100 | taille maximale d'une vidéo (Reel, vidéo d'article), en Mo (1 à 100) ; refusée dès la réception au-delà (`FILE_TOO_LARGE`) | le fichier est gardé en mémoire pendant l'envoi : baisser la valeur si la mémoire des tâches est juste |
 | `DEMO_PUBLIC_URL` | (vide) | démonstration sur un ordinateur : adresse affichée sur la page `/demo` (page active seulement avec `NODE_ENV=development` et `DEMO_MODE`) | |
 | `DEMO_MODE` | false | prototype (P-0018) : Premium, pièces, retraits et Lives **simulés**, aucun argent réel ni service payant | refusé en production ; à couper avant l'ouverture au public |
 | `PAYMENT_PROVIDER` | none | paiement en ligne (lot 8) : `none` (fermé), `simulator` (tests) ou `paystack` (clé de test seulement) ; aucun prestataire réel sans autorisation du fondateur | `simulator` refusé hors development/test ; le réglage `payments.online_enabled` reste un second interrupteur |

@@ -4,6 +4,8 @@ import { Errors } from '../../common/errors';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 const REAL_FORMATS = ['jpeg', 'png', 'webp'];
+/** Taille maximale d'une image à décoder (protection de la mémoire du serveur) : 50 mégapixels. */
+const MAX_PIXELS = 50_000_000;
 
 export interface PrivateImage {
   data: Buffer;
@@ -43,26 +45,33 @@ export async function encodePrivateImage(file: Express.Multer.File | undefined, 
   // Le type annoncé vient du client : on vérifie le contenu réel avant tout décodage (pas de SVG, TIFF… audit A-14).
   let format: string | undefined;
   let meta: Metadata;
+  // Image au-delà de la limite de pixels : « trop grande », et non « illisible » (sharp la refuse dès l'en-tête).
+  const tooBig = () => Errors.validation({ fields: { [field]: [`Image trop grande (${MAX_PIXELS / 1_000_000} mégapixels au plus).`] } });
   try {
-    meta = await sharp(file.buffer, { limitInputPixels: 50_000_000 }).metadata();
+    meta = await sharp(file.buffer, { limitInputPixels: MAX_PIXELS }).metadata();
     format = meta.format;
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && /pixel limit/i.test(e.message)) throw tooBig();
     throw Errors.validation({ fields: { [field]: ['Image illisible.'] } });
   }
   if (!format || !REAL_FORMATS.includes(format)) throw Errors.validation({ fields: { [field]: ['Formats acceptés : JPEG, PNG, WebP.'] } });
+  if ((meta.width ?? 0) * (meta.height ?? 0) > MAX_PIXELS) throw tooBig();
   let out: { data: Buffer; info: OutputInfo };
   // Dimensions telles qu'affichées (orientation EXIF 5 à 8 : image tournée d'un quart de tour).
   const turned = (meta.orientation ?? 1) >= 5;
   const shown = { width: (turned ? meta.height : meta.width) ?? 0, height: (turned ? meta.width : meta.height) ?? 0 };
   const target = aspect && shown.width > 0 && shown.height > 0 ? cropTarget(shown.width, shown.height, aspect) : null;
   try {
-    out = await sharp(file.buffer, { failOn: 'error', limitInputPixels: 50_000_000 })
+    out = await sharp(file.buffer, { failOn: 'error', limitInputPixels: MAX_PIXELS })
       .rotate()
       // Recadrage centré sur la partie la plus intéressante de l'image (« attention » : visages, contrastes).
       .resize(target?.cropped ? { width: target.width, height: target.height, fit: 'cover', position: sharp.strategy.attention } : { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      // Transparence (PNG détouré, capture) posée sur du blanc : le JPEG n'a pas de transparence et la rendrait noire.
+      .flatten({ background: '#ffffff' })
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer({ resolveWithObject: true });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && /pixel limit/i.test(e.message)) throw tooBig();
     throw Errors.validation({ fields: { [field]: ['Image illisible.'] } });
   }
   return { data: out.data, width: out.info.width, height: out.info.height, bytes: out.data.length };

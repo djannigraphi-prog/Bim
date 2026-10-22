@@ -7,7 +7,7 @@
 | API | ECS Fargate derrière un Application Load Balancer (HTTPS, ACM) | 2 tâches (0,5 vCPU / 1 Go) |
 | Worker des rappels (lot 2, **activation soumise à l'accord du fondateur**) | ECS Fargate, même image que l'API, commande `node dist/worker.js`, `WORKER_MODE=standalone`, `PUSH_PROVIDER=fcm` ; **aucune entrée publique** ; contrôle de santé du conteneur : `GET http://localhost:3100/health` (503 = arrêté) ; sortie Internet vers Firebase par le NAT de l'API ou une adresse publique par tâche (à choisir avec le plan réseau) | 2 tâches ARM (0,25 vCPU / 0,5 Go), montée en charge 2 à 6 ; coût détaillé : `docs/LOT2_RAPPELS_ETUDE.md`, section 10 |
 | Base | RDS PostgreSQL 16 | db.t4g.small, 50 Go gp3, sauvegardes 14 jours, Multi-AZ en production |
-| Photos privées (avant / après) | S3 privé, chiffrement au repos, accès bloqué au public, liens présignés de 5 min ; rôle IAM de l'API limité au compartiment | lot 1 (code prêt et testé avec MinIO) |
+| Photos privées (avant / après) | S3 privé, chiffrement au repos, accès bloqué au public, liens présignés stables pendant une heure (valables 1 à 2 h, `MEDIA_URL_TTL_SECONDS`, T-020) ; rôle IAM de l'API limité au compartiment | lot 1 (code prêt et testé avec MinIO) |
 | Fichiers publics (publications) | S3 + CloudFront | lot 4 |
 | Secrets | Secrets Manager (secrets de l'API) ; Parameter Store chiffré pour la clé Firebase `FCM_SERVICE_ACCOUNT_JSON`, lisible par le seul rôle du worker | une entrée par environnement |
 | Journaux, métriques, alertes | CloudWatch | alarmes 5xx, latence, CPU, connexions base ; rappels : worker arrêté, rappels en retard, échecs, manqués (filtres sur `reminders.metrics`, voir l'étude, section 11) |

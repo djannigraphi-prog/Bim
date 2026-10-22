@@ -64,9 +64,11 @@ export class ReelsService {
       throw e;
     }
     if (info.metadataTrack) {
-      throw new AppError('REEL_LOCATION_TRACK', 'Cette vidéo contient des données de position. Désactive la localisation de la caméra ou choisis une autre vidéo.', HttpStatus.BAD_REQUEST);
+      throw new AppError('REEL_LOCATION_TRACK', 'Cette vidéo contient des données de capteurs qui ne peuvent pas être effacées.', HttpStatus.BAD_REQUEST);
     }
-    if (info.durationMs <= 0 || info.durationMs > maxSeconds * 1000 + 500) {
+    // MP4 fragmenté dont la durée ne peut pas être lue : message clair plutôt que « trop long ».
+    if (info.durationMs <= 0) throw Errors.validation({ fields: { video: ['Durée de la vidéo illisible : enregistre-la à nouveau ou choisis une autre vidéo.'] } });
+    if (info.durationMs > maxSeconds * 1000 + 500) {
       throw new AppError('REEL_TOO_LONG', `Un Reel dure ${maxSeconds} secondes au plus.`, HttpStatus.BAD_REQUEST, { maxSeconds, durationMs: info.durationMs });
     }
     const now = this.clock.now();

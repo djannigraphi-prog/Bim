@@ -1,7 +1,7 @@
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable } from '@nestjs/common';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, normalize } from 'node:path';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { hmacSha256, safeEqualHex } from '../../common/crypto';
@@ -69,16 +69,23 @@ export class StorageService {
     await rm(this.localPath(key), { force: true });
   }
 
-  /** Lien de lecture temporaire. `apiBaseUrl` sert au stockage local (lien servi par l'API). */
+  /**
+   * Lien de lecture temporaire. `apiBaseUrl` sert au stockage local (lien servi par l'API).
+   * Le lien est le même pour un fichier donné pendant toute une tranche de temps (MEDIA_URL_TTL_SECONDS) : l'app peut
+   * garder l'image ou la vidéo en cache au lieu de la retélécharger à chaque actualisation. Il reste valable au moins
+   * une durée complète (fin de la tranche suivante : entre 1 et 2 fois MEDIA_URL_TTL_SECONDS).
+   */
   async temporaryUrl(key: string, apiBaseUrl: string): Promise<{ url: string; expiresAt: string }> {
     this.assertAvailable();
     const ttl = this.cfg.MEDIA_URL_TTL_SECONDS;
-    const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
+    const bucketStart = Math.floor(Date.now() / 1000 / ttl) * ttl;
+    const exp = bucketStart + 2 * ttl;
+    const expiresAt = new Date(exp * 1000).toISOString();
     if (this.s3) {
-      const url = await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.cfg.S3_BUCKET, Key: key }), { expiresIn: ttl });
+      // Signature datée du début de la tranche : même URL présignée pendant toute la tranche (mêmes identifiants).
+      const url = await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.cfg.S3_BUCKET, Key: key }), { expiresIn: 2 * ttl, signingDate: new Date(bucketStart * 1000) });
       return { url, expiresAt };
     }
-    const exp = Math.floor(Date.now() / 1000) + ttl;
     const token = Buffer.from(`${key}|${exp}|${this.sign(key, exp)}`).toString('base64url');
     return { url: `${apiBaseUrl}/v1/media/${token}`, expiresAt };
   }
@@ -94,12 +101,28 @@ export class StorageService {
 
   /** Lecture d'un lien signé avec le type du fichier (lot 11 : vidéos « .mp4 » ; V1 : vocaux « .m4a »). */
   async readSignedFile(token: string): Promise<{ body: Buffer; contentType: string }> {
+    const f = await this.openSignedFile(token);
+    try {
+      return { body: await readFile(f.path), contentType: f.contentType };
+    } catch {
+      throw Errors.notFound('Fichier');
+    }
+  }
+
+  /**
+   * Fichier désigné par un lien signé (stockage local uniquement), sans le lire : chemin, taille et type. Sert à la
+   * lecture par morceaux (en-tête « Range ») des vidéos et des vocaux.
+   */
+  async openSignedFile(token: string): Promise<{ path: string; size: number; contentType: string }> {
     if (this.cfg.MEDIA_STORAGE !== 'local') throw Errors.notFound('Fichier');
     const [key, expRaw, sig] = Buffer.from(token, 'base64url').toString('utf8').split('|');
     const exp = Number(expRaw);
     if (!key || !sig || !Number.isFinite(exp) || exp < Date.now() / 1000 || !safeEqualHex(sig, this.sign(key, exp))) throw Errors.notFound('Fichier');
+    const path = this.localPath(key);
     try {
-      return { body: await readFile(this.localPath(key)), contentType: key.endsWith('.mp4') ? 'video/mp4' : key.endsWith('.m4a') ? 'audio/mp4' : 'image/jpeg' };
+      const st = await stat(path);
+      if (!st.isFile()) throw new Error('not_file');
+      return { path, size: st.size, contentType: key.endsWith('.mp4') ? 'video/mp4' : key.endsWith('.m4a') ? 'audio/mp4' : 'image/jpeg' };
     } catch {
       throw Errors.notFound('Fichier');
     }

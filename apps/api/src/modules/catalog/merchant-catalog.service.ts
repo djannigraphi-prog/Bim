@@ -18,8 +18,11 @@ import { ProductDto, UpdateProductDto, UpdateShopDto } from './dto';
 export const MAX_PRODUCT_IMAGES = 6;
 /** V1 (19/10/2026) : une vidéo par article, 60 secondes au plus (décision du fondateur). */
 export const PRODUCT_VIDEO_MAX_SECONDS = 60;
-/** Portrait le plus haut accepté pour une vidéo : 9:16 (format des téléphones), avec une petite tolérance. */
-const VIDEO_MIN_RATIO = 9 / 16 - 0.02;
+/**
+ * Portrait le plus haut accepté pour une vidéo : 9:20 (0,45 ; écrans 1080 × 2400 des téléphones récents) avec une petite
+ * tolérance ; 9:16 et les formats intermédiaires passent aussi.
+ */
+const VIDEO_MIN_RATIO = 0.44;
 type ProductRow = typeof products.$inferSelect;
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 
@@ -327,14 +330,18 @@ export class MerchantCatalogService {
       if (e instanceof Mp4Error) throw Errors.validation({ fields: { video: ['Format non reconnu : envoie une vidéo MP4.'] } });
       throw e;
     }
-    if (info.metadataTrack) throw Errors.validation({ fields: { video: ['Cette vidéo contient des données de position. Désactive la localisation de la caméra ou choisis une autre vidéo.'] } });
-    if (info.durationMs <= 0 || info.durationMs > PRODUCT_VIDEO_MAX_SECONDS * 1000 + 500) {
+    if (info.metadataTrack) throw Errors.validation({ fields: { video: ['Cette vidéo contient des données de capteurs qui ne peuvent pas être effacées.'] } });
+    if (info.durationMs <= 0) throw Errors.validation({ fields: { video: ['Durée de la vidéo illisible : enregistre-la à nouveau ou choisis une autre vidéo.'] } });
+    if (info.durationMs > PRODUCT_VIDEO_MAX_SECONDS * 1000 + 500) {
       throw new AppError('PRODUCT_VIDEO_TOO_LONG', `La vidéo d’un article dure ${PRODUCT_VIDEO_MAX_SECONDS} secondes au plus.`, HttpStatus.BAD_REQUEST, { maxSeconds: PRODUCT_VIDEO_MAX_SECONDS, durationMs: info.durationMs });
     }
     if (!info.width || !info.height) throw Errors.validation({ fields: { video: ['Vidéo sans image.'] } });
     const ratio = info.width / info.height;
-    if (ratio > 1.02 || ratio < VIDEO_MIN_RATIO) {
+    if (ratio > 1.02) {
       throw new AppError('PRODUCT_VIDEO_FORMAT', 'Filme ta vidéo en portrait ou au format carré : le BimShop n’affiche pas de vidéo en paysage.', HttpStatus.BAD_REQUEST, { width: info.width, height: info.height });
+    }
+    if (ratio < VIDEO_MIN_RATIO) {
+      throw new AppError('PRODUCT_VIDEO_FORMAT', 'Vidéo trop étroite : filme en portrait (9:16 ou 9:20) ou au format carré.', HttpStatus.BAD_REQUEST, { width: info.width, height: info.height });
     }
     const key = `products/${p.id}/${uuidv7()}.mp4`;
     await this.storage.put(key, scrubMp4Metadata(file.buffer), 'video/mp4');

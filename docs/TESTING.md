@@ -47,7 +47,8 @@ Règle : un test n'est déclaré réussi que s'il a été exécuté. Les résult
 ## Lot 1, suite — programmes, signalements, mesures, photos
 
 - `apps/api/test/projects-lot1b.e2e-spec.ts` : programme type choisi selon le mode (économique / Premium), brouillons jamais utilisés, habitude du jour seulement si validée ; prochaine tâche ; catégories et objectifs administrables ; signalement → réponse du support ; mesures (départ, variation) ; photos (métadonnées et GPS supprimés, lien temporaire, remplacement, suppression, purge avec le projet, accès d'un autre compte refusé).
-- `apps/api/test/media-s3.e2e-spec.ts` : même code sur un vrai stockage S3 (en CI : Versity S3 Gateway réglé sur eu-west-3, `.github/scripts/start-s3-test.sh` ; les images MinIO ne sont plus téléchargeables) : lien présigné, lecture refusée sans signature, effacement.
+- `apps/api/test/media-s3.e2e-spec.ts` : même code sur un vrai stockage S3 (en CI : Versity S3 Gateway réglé sur eu-west-3, `.github/scripts/start-s3-test.sh` ; les images MinIO ne sont plus téléchargeables) : lien présigné (identique pendant une tranche de temps), lecture refusée sans signature, effacement.
+- `apps/api/test/media.e2e-spec.ts` (V1) : lecture par morceaux des liens locaux (206, `Content-Range`, 416), lien stable pendant une tranche de temps, vidéo trop lourde (`FILE_TOO_LARGE` avec la limite) et champ inattendu (`UNEXPECTED_FILE`), piste minutée d'iPhone (« mebx ») acceptée et piste GPS refusée, MP4 fragmenté, PNG transparent posé sur du blanc.
 - Android (`auth_flow_test.dart`) : photo « avant » à la création, photo « après », comparaison, signalement et suivi.
 - Navigateur (`apps/admin/e2e/admin.spec.ts`) : catégories et objectifs, signalements, mode et habitudes du jour des programmes.
 

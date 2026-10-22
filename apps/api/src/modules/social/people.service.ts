@@ -1,8 +1,9 @@
 /// <reference types="multer" />
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { APP_CONFIG, AppConfig } from '../../config/config';
 import { Errors } from '../../common/errors';
+import { foldedILike, searchText } from '../../common/search';
 import type { RequestMeta } from '../../common/request-meta';
 import { uuidv7 } from '../../common/uuid';
 import { DB, Database } from '../../database/database.module';
@@ -80,12 +81,12 @@ export class PeopleService {
 
   /** Recherche de personnes par nom d'utilisateur ou nom complet (loupe de l'écran 10). */
   async search(viewerId: string, q: string, apiBase: string) {
-    const term = q.trim().replace(/^@/, '').replace(/[%_\\]/g, '');
+    const term = searchText(q).replace(/^@/, '').replace(/[%_\\]/g, '');
     if (term.length < 2) return { items: [] };
     const rows = await this.db
       .select({ id: users.id, username: users.username, fullName: users.fullName, avatarKey: users.avatarKey })
       .from(users)
-      .where(and(eq(users.status, 'active'), ne(users.id, viewerId), notBlockedBetween(viewerId, users.id), or(ilike(users.username, `${term}%`), ilike(users.fullName, `%${term}%`))))
+      .where(and(eq(users.status, 'active'), ne(users.id, viewerId), notBlockedBetween(viewerId, users.id), or(foldedILike(users.username, `${term}%`), foldedILike(users.fullName, `%${term}%`))))
       // Nom d'utilisateur exact en premier, puis ceux qui commencent par la recherche, puis l'ordre alphabétique.
       .orderBy(sql`(${users.username} = ${term.toLowerCase()}) DESC`, sql`(${users.username} LIKE ${term.toLowerCase() + '%'}) DESC`, users.username)
       .limit(20);
