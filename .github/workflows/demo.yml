@@ -71,6 +71,21 @@ jobs:
         with:
           path: ${{ steps.android-pkgs.outputs.ndk_path }}
           key: ${{ steps.android-pkgs.outputs.ndk_key }}
+      # Même clé de signature d'une version de démo à l'autre : la nouvelle app s'installe par-dessus l'ancienne
+      # (sinon Android refuse : « Application non installée »). Clé de démonstration seulement, gardée dans le cache
+      # de GitHub (jamais dans le dépôt) ; la clé de publication sur le Play Store sera une autre clé.
+      - name: Clé de signature de la démo (cache)
+        id: demo-key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: bim-demo-signing-key-v1
+      - name: Clé de signature de la démo (création la première fois)
+        if: steps.demo-key.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.android
+          [ -f ~/.android/debug.keystore ] || keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=BIM demo,O=BIM,C=CI"
       - name: Compilation de l'app de démonstration
         env:
           BIM_DEMO: "true"
