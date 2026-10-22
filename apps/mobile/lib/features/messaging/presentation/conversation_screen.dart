@@ -124,7 +124,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       await rec.cancel();
       return;
     }
-    final bytes = await rec.stop();
+    List<int>? bytes;
+    try {
+      bytes = await rec.stop();
+    } catch (_) {
+      if (mounted) showBimSnack(context, 'Le vocal n’a pas pu être enregistré. Réessaie.');
+      return;
+    }
     if (bytes == null || bytes.isEmpty || _recElapsed < const Duration(seconds: 1)) {
       if (mounted) showBimSnack(context, 'Vocal trop court : garde le micro au moins une seconde.');
       return;
@@ -216,6 +222,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       ref.invalidate(widget.asShop ? shopInboxProvider : conversationsProvider);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
+    } catch (_) {
+      // Jamais d'échec silencieux : le message n'est pas parti, on le dit.
+      if (mounted) showBimSnack(context, 'Le message n’a pas pu être envoyé. Réessaie.');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -342,6 +351,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Garde l'enregistreur en vie tant que la conversation est ouverte : lu sans être écouté, il était libéré juste
+    // après le démarrage et le vocal ne partait jamais (essai sur téléphone du 22/10/2026).
+    ref.watch(voiceRecorderProvider);
     final theme = Theme.of(context);
     final c = _conversation;
     final lastMineRead = _messages.where((m) => m.mine && m.visible).firstOrNull;

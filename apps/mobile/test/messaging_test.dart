@@ -111,8 +111,12 @@ class _FakeRecorder implements VoiceRecorder {
     return allowed;
   }
 
+  /// Comme le vrai : un enregistreur libéré ne peut plus rien rendre.
+  bool disposed = false;
+
   @override
   Future<List<int>?> stop() async {
+    if (disposed) throw StateError('enregistreur libéré');
     calls.add('stop');
     return List<int>.filled(2000, 1);
   }
@@ -121,7 +125,7 @@ class _FakeRecorder implements VoiceRecorder {
   Future<void> cancel() async => calls.add('cancel');
 
   @override
-  void dispose() {}
+  void dispose() => disposed = true;
 }
 
 /// V1 : un groupe, avec un message système, un message d'une autre personne et un message d'une personne bloquée.
@@ -297,7 +301,13 @@ Future<void> _pump(WidgetTester tester, _FakeMessaging api, Widget home, {_FakeS
       apiClientProvider.overrideWithValue(_client()),
       messagingApiProvider.overrideWithValue(api),
       shopInboxApiProvider.overrideWithValue(inbox ?? _FakeShopInbox()),
-      voiceRecorderProvider.overrideWithValue(recorder ?? _FakeRecorder()),
+      // Même cycle de vie que l'app (le vrai fournisseur libère l'enregistreur quand plus personne ne l'écoute) :
+      // reproduit le défaut du 22/10/2026 où le vocal ne partait jamais.
+      voiceRecorderProvider.overrideWith((ref) {
+        final r = recorder ?? _FakeRecorder();
+        ref.onDispose(r.dispose);
+        return r;
+      }),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);
