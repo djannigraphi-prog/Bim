@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/network/api_exception.dart';
 import 'package:bim/core/storage/token_storage.dart';
@@ -224,6 +226,17 @@ class _FakeShopOrders extends ShopOrdersApi {
   }
 }
 
+/// Récapitulatif lent pour 2 articles (réseau lent) : sa réponse arrive après celle pour 3 articles.
+class _SlowPreview extends _FakeOrders {
+  final slow = Completer<void>();
+
+  @override
+  Future<OrderPreview> preview(String shopId, List<OrderLine> lines, Fulfilment f) async {
+    if (lines.single.quantity == 2) await slow.future;
+    return super.preview(shopId, lines, f);
+  }
+}
+
 Future<void> _pump(WidgetTester tester, Widget home, {_FakeOrders? orders, _FakeShopOrders? shop, List<Uri>? opened}) async {
   tester.view.physicalSize = const Size(1170, 3600);
   tester.view.devicePixelRatio = 3;
@@ -258,6 +271,20 @@ const _args = CheckoutArgs(
 String _total(WidgetTester t) => t.widget<Text>(find.byKey(const ValueKey('checkout-total'))).data!;
 
 void main() {
+  testWidgets('récapitulatif : une réponse ancienne arrivée en retard n’écrase pas le total du panier actuel', (tester) async {
+    final api = _SlowPreview();
+    await _pump(tester, const CheckoutScreen(args: _args), orders: api);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('qty-plus-0')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('qty-plus-0')));
+    await tester.pumpAndSettle();
+    expect(_total(tester), formatFcfa(60000));
+    api.slow.complete();
+    await tester.pumpAndSettle();
+    expect(_total(tester), formatFcfa(60000));
+  });
+
   testWidgets('7-B récapitulatif : retrait, quantité, total du serveur ; confirmation avec le montant affiché et une clé anti-doublon', (tester) async {
     final api = _FakeOrders();
     await _pump(tester, const CheckoutScreen(args: _args), orders: api);
