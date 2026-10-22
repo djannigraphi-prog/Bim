@@ -20,6 +20,7 @@ Dernière mise à jour : 18/10/2026 — version 1 sans dépense (voir la section
 | V1-C2 | **Badge de certification** pour les comptes Premium (personnes et boutiques) ; étoiles grises pour les autres boutiques ; Gold abandonné | 1 e2e, 3 Flutter | fait |
 | V1-U | **Barre du bas fine et flottante**, mode nuit gris mat avec barre effet vitre, boutons et filtres fins (maquette validée) | 2 Flutter | fait |
 | V1-P | **BimShop images d'abord** (rien sous les photos, cœurs et avis seulement), **Partager** dans BIM ou vers d'autres applications (0063), barre du bas qui se cache au défilement | 1 e2e, 3 Flutter | fait |
+| V1-T | **Essai sur téléphone (22/10/2026)** : vocal corrigé (enregistreur libéré trop tôt) ; vérification complète de ce que les tests avec des faux ne voient pas : 10 corrections serveur (vidéos de téléphone et d'iPhone, lecture par morceaux, liens des médias stables 1 h, messages d'erreur clairs, recherche sans accents, numéros saisis avec espaces ou parenthèses ; migration 0064) et 18 corrections app (démarrage bloqué, envois après expiration de session, erreurs de l'appareil photo, reels, stories, écrans fermés pendant une attente, portrait, démo) ; même clé de signature pour l'app de démo | e2e, unitaires, Flutter | fait ; reste : photo perdue si Android ferme l'app pendant l'appareil photo, compression des vidéos |
 | V1-H | Codes par e-mail via SMTP (`EMAIL_PROVIDER=smtp`) ; plan du lancement gratuit | 1 e2e | fait |
 
 Reste avant l'ouverture au public : comptes des magasins, hébergement, projet Firebase, fournisseur d'e-mail (actions
