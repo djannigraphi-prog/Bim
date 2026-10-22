@@ -27,7 +27,9 @@ abstract class VoiceRecorder {
 }
 
 class DeviceVoiceRecorder implements VoiceRecorder {
-  final _rec = AudioRecorder();
+  /// Créé au premier enregistrement seulement : ouvrir une conversation n'occupe pas le micro.
+  AudioRecorder? _created;
+  AudioRecorder get _rec => _created ??= AudioRecorder();
 
   @override
   Future<bool> start() async {
@@ -40,7 +42,9 @@ class DeviceVoiceRecorder implements VoiceRecorder {
 
   @override
   Future<List<int>?> stop() async {
-    final path = await _rec.stop();
+    final rec = _created;
+    if (rec == null) return null;
+    final path = await rec.stop();
     if (path == null) return null;
     final f = File(path);
     if (!f.existsSync()) return null;
@@ -50,10 +54,13 @@ class DeviceVoiceRecorder implements VoiceRecorder {
   }
 
   @override
-  Future<void> cancel() => _rec.cancel();
+  Future<void> cancel() async => _created?.cancel();
 
   @override
-  void dispose() => unawaited(_rec.dispose());
+  void dispose() {
+    final rec = _created;
+    if (rec != null) unawaited(rec.dispose());
+  }
 }
 
 final voiceRecorderProvider = Provider.autoDispose<VoiceRecorder>((ref) {
