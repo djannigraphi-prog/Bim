@@ -88,18 +88,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   bool get _ready => _total != null && (_mode == 'pickup' || (_commune != null && _address.text.trim().length >= 5 && (_quote(_mode)?.available ?? false)));
 
+  /// Numéro de la dernière demande de récapitulatif : une réponse plus ancienne arrivée en retard (quantité ou mode
+  /// changés entre-temps) est ignorée, sinon elle afficherait un total qui ne correspond plus au panier.
+  int _refreshSeq = 0;
+
   Future<void> _refresh() async {
+    final mine = ++_refreshSeq;
     final api = ref.read(ordersApiProvider);
     _error = null;
     try {
-      if (_commune != null) _quotes = await api.quote(a.shopId, _commune!);
+      if (_commune != null) {
+        final quotes = await api.quote(a.shopId, _commune!);
+        if (mine != _refreshSeq) return;
+        _quotes = quotes;
+      }
       if (!_cashAllowed) _payment = 'mobile_money';
       if (!a.isProposal && (_mode == 'pickup' || (_quote(_mode)?.available ?? false))) {
-        _preview = await api.preview(a.shopId, _lines, _fulfilment);
+        final preview = await api.preview(a.shopId, _lines, _fulfilment);
+        if (mine != _refreshSeq) return;
+        _preview = preview;
       } else if (!a.isProposal) {
         _preview = null;
       }
     } on ApiException catch (e) {
+      if (mine != _refreshSeq) return;
       _preview = null;
       _error = e;
     }
@@ -127,17 +139,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _error = null;
     });
     final api = ref.read(ordersApiProvider);
+    // Conteneur capturé avant l'attente : « Mes commandes » est rafraîchi même si l'écran a été fermé entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final o = a.isProposal
           ? await api.accept(a.proposalId!, _fulfilment, expectedTotalFcfa: total)
           : await api.create(a.shopId, _lines, _fulfilment, expectedTotalFcfa: total, idempotencyKey: _key);
-      ref.invalidate(myOrdersProvider);
+      container.invalidate(myOrdersProvider);
       if (!mounted) return;
       showBimSnack(context, a.isProposal ? 'Proposition acceptée' : 'Commande envoyée à la boutique');
       context.pushReplacement('/orders/${o.id}');
     } on ApiException catch (e) {
       // Montant changé entre-temps : on recharge le récapitulatif et on le montre avant toute nouvelle confirmation.
-      if (e.code == 'PRICE_CHANGED') await _refresh();
+      if (e.code == 'PRICE_CHANGED' && mounted) await _refresh();
       if (mounted) setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _busy = false);

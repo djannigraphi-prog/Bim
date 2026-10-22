@@ -10,7 +10,7 @@ import '../../../core/widgets/bim_text_field.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../../core/widgets/step_header.dart';
 import '../../projects/application/photo_source.dart';
-import '../../reels/data/reels_api.dart' show videoSourceProvider;
+import '../../reels/data/reels_api.dart' show checkVideoSize, videoSourceProvider;
 import '../data/shop_api.dart';
 
 const _maxPhotos = 6;
@@ -65,7 +65,8 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
   Future<void> _load(String id) async {
     setState(() => _loading = true);
     try {
-      _apply(await ref.read(shopApiProvider).product(id));
+      final p = await ref.read(shopApiProvider).product(id);
+      if (mounted) _apply(p);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
@@ -74,6 +75,8 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
   }
 
   void _apply(ProductDetail p) {
+    // Écran fermé pendant l'attente : ses champs n'existent plus.
+    if (!mounted) return;
     _product = p;
     _kind = p.kind;
     _category = p.categoryCode;
@@ -105,12 +108,15 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
       _busy = true;
       _error = null;
     });
+    // Conteneur capturé avant l'attente : les listes de la boutique sont rafraîchies même si l'écran a été fermé.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final p = await action(ref.read(shopApiProvider));
-      if (p != null) _apply(p);
-      ref
+      container
         ..invalidate(shopDashboardProvider)
         ..invalidate(shopProductsProvider);
+      if (!mounted) return;
+      if (p != null) _apply(p);
       if (done != null && mounted) showBimSnack(context, done);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e);
@@ -186,8 +192,8 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
         ),
       ),
     );
-    if (camera == null) return;
-    final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
+    if (camera == null || !mounted) return;
+    final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: camera));
     if (bytes == null || !mounted) return;
     final p = _product;
     if (p == null) {
@@ -199,7 +205,12 @@ class _ProductEditorScreenState extends ConsumerState<ProductEditorScreen> {
 
   /// V1 : vidéo de l'article (galerie, 1 minute au plus, filmée en portrait ou au format carré).
   Future<void> _pickVideo() async {
-    final bytes = await ref.read(videoSourceProvider).pick();
+    final bytes = await pickWithFeedback(context, () async {
+      final b = await ref.read(videoSourceProvider).pick();
+      // Vidéo trop lourde : refusée tout de suite, sans attendre un long envoi que le serveur rejetterait.
+      if (b != null) checkVideoSize(b.length);
+      return b;
+    });
     if (bytes == null || !mounted) return;
     await _act((api, p) => api.setVideo(p.id, bytes), done: 'Vidéo ajoutée');
   }

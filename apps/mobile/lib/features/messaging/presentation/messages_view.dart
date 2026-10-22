@@ -15,10 +15,12 @@ import '../../social/presentation/stories.dart' show StoriesBar;
 
 /// Ouvre (ou retrouve) la conversation avec une personne puis l'affiche.
 Future<void> openConversationWith(BuildContext context, WidgetRef ref, String username) async {
+  // Conteneur capturé avant les attentes : l'écran d'origine a pu être fermé pendant la conversation.
+  final container = ProviderScope.containerOf(context, listen: false);
   try {
-    final c = await ref.read(messagingApiProvider).start(username);
+    final c = await container.read(messagingApiProvider).start(username);
     if (context.mounted) await context.push('/messages/${c.id}');
-    ref
+    container
       ..invalidate(conversationsProvider)
       ..invalidate(messagesUnreadProvider);
   } on ApiException catch (e) {
@@ -28,10 +30,12 @@ Future<void> openConversationWith(BuildContext context, WidgetRef ref, String us
 
 /// Lot 6-B — « Discuter » avec une boutique (article, offre de projet ou profil de la boutique).
 Future<void> openShopConversation(BuildContext context, WidgetRef ref, String shopSlug, {String? productId, String? offerId}) async {
+  // Conteneur capturé avant les attentes : l'écran d'origine a pu être fermé pendant la conversation.
+  final container = ProviderScope.containerOf(context, listen: false);
   try {
-    final c = await ref.read(messagingApiProvider).startWithShop(shopSlug, productId: productId, offerId: offerId);
+    final c = await container.read(messagingApiProvider).startWithShop(shopSlug, productId: productId, offerId: offerId);
     if (context.mounted) await context.push('/messages/${c.id}');
-    ref
+    container
       ..invalidate(conversationsProvider)
       ..invalidate(messagesUnreadProvider);
   } on ApiException catch (e) {
@@ -77,7 +81,7 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
     if (choice == null || !mounted) return;
     if (choice == 'group') {
       await context.push('/messages/new-group');
-      ref.invalidate(conversationsProvider);
+      if (mounted) ref.invalidate(conversationsProvider);
       return;
     }
     final username = await showDialog<String>(context: context, builder: (_) => const _NewMessageDialog());
@@ -201,6 +205,7 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
                             conversation: c,
                             onTap: () async {
                               await context.push('/messages/${c.id}');
+                              if (!context.mounted) return;
                               ref
                                 ..invalidate(conversationsProvider)
                                 ..invalidate(messagesUnreadProvider);

@@ -348,8 +348,13 @@ class BimShopPage {
 }
 
 class BimShopController extends AutoDisposeAsyncNotifier<BimShopPage> {
+  /// Change à chaque nouvelle recherche (filtres, actualisation) : une page suivante demandée pour l'ancienne
+  /// recherche et arrivée en retard est ignorée au lieu d'écraser les nouveaux résultats.
+  int _generation = 0;
+
   @override
   Future<BimShopPage> build() async {
+    ref.onDispose(() => _generation++);
     final page = await ref.watch(bimShopApiProvider).browse(ref.watch(bimShopQueryProvider));
     return BimShopPage(items: page.items, nextCursor: page.nextCursor);
   }
@@ -358,13 +363,16 @@ class BimShopController extends AutoDisposeAsyncNotifier<BimShopPage> {
   Future<void> loadMore({bool retry = false}) async {
     final s = state.valueOrNull;
     if (s == null || !s.hasMore || s.loadingMore || (s.pageError && !retry)) return;
+    final generation = _generation;
     state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor, loadingMore: true));
     try {
       final page = await ref.read(bimShopApiProvider).browse(ref.read(bimShopQueryProvider), cursor: s.nextCursor);
+      if (generation != _generation) return;
       // Un article peut revenir sur la page suivante (prix changé entre deux pages) : jamais en double.
       final seen = {for (final c in s.items) c.id};
       state = AsyncData(BimShopPage(items: [...s.items, ...page.items.where((c) => seen.add(c.id))], nextCursor: page.nextCursor));
     } catch (_) {
+      if (generation != _generation) return;
       state = AsyncData(BimShopPage(items: s.items, nextCursor: s.nextCursor, pageError: true));
     }
   }

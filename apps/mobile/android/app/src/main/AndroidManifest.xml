@@ -5,13 +5,19 @@
          notifications (Android 13 et plus) est déclarée par la bibliothèque et demandée à la personne quand elle active
          ses rappels. Pas d'alarme exacte en version 1 (décision du 15/10/2026) : ni SCHEDULE_EXACT_ALARM ni USE_EXACT_ALARM. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Notifications (Android 13 et plus) : déclarée ici explicitement, sans dépendre de la fusion des bibliothèques. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- V1 : messages vocaux. L'autorisation est demandée au premier enregistrement, jamais avant. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="BIM"
         android:usesCleartextTraffic="${bimCleartext}"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+        <!-- Pas de sauvegarde ni de transfert des données de l'app : les jetons du trousseau (Keystore) ne seraient plus
+             lisibles sur un autre téléphone ou après une restauration, et l'app resterait bloquée au démarrage. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

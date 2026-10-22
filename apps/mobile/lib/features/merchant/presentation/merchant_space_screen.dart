@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/util/app_foreground.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
@@ -38,7 +39,8 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
     super.initState();
     // 6-B : pas de notification sur le téléphone ; la pastille Messages de la boutique est mise à jour régulièrement.
     _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (ref.read(shopDashboardProvider).valueOrNull?.can('messages.reply') ?? false) ref.invalidate(shopInboxUnreadProvider);
+      // App en arrière-plan : pas de lecture inutile (batterie, forfait).
+      if (appInForeground && (ref.read(shopDashboardProvider).valueOrNull?.can('messages.reply') ?? false)) ref.invalidate(shopInboxUnreadProvider);
     });
   }
 
@@ -198,7 +200,7 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   key: const ValueKey('shop-messages'),
                   onTap: () async {
                     await context.push('/shop/messages');
-                    ref.invalidate(shopInboxUnreadProvider);
+                    if (mounted) ref.invalidate(shopInboxUnreadProvider);
                   },
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

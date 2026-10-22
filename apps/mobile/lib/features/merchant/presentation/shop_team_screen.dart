@@ -32,7 +32,7 @@ class _ShopTeamScreenState extends ConsumerState<ShopTeamScreen> {
     setState(() => _busy = true);
     try {
       await action(ref.read(shopTeamApiProvider));
-      ref.invalidate(shopTeamProvider);
+      if (mounted) ref.invalidate(shopTeamProvider);
       if (done != null && mounted) showBimSnack(context, done);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
@@ -206,7 +206,7 @@ class ShopInvitationsList extends ConsumerWidget {
     Future<void> answer(String shopId, bool accept) async {
       try {
         await ref.read(shopTeamApiProvider).answer(shopId, accept: accept);
-        ref.invalidate(shopInvitationsProvider);
+        if (context.mounted) ref.invalidate(shopInvitationsProvider);
         if (accept) onJoined?.call();
         if (context.mounted) showBimSnack(context, accept ? 'Tu fais partie de l’équipe : la boutique est dans tes profils.' : 'Invitation refusée');
       } on ApiException catch (e) {

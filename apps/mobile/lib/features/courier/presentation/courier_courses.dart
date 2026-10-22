@@ -283,7 +283,7 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
     setState(() => _busy = true);
     try {
       await ref.read(courierApiProvider).release(widget.deliveryId, reason);
-      ref.invalidate(coursesProvider);
+      if (mounted) ref.invalidate(coursesProvider);
       if (mounted) setState(() => _released = true);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
@@ -297,8 +297,8 @@ class _CourseScreenState extends ConsumerState<CourseScreen> {
     setState(() => _busy = true);
     try {
       await ref.read(courierApiProvider).answerReassign(widget.deliveryId, accept);
-      ref.invalidate(coursesProvider);
       if (!mounted) return;
+      ref.invalidate(coursesProvider);
       if (accept) {
         setState(() => _released = true);
       } else {

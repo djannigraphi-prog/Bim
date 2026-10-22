@@ -59,7 +59,7 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
     });
     try {
       await ref.read(bimShopApiProvider).setFavorite(widget.productId, !current);
-      ref.invalidate(shopFavoritesProvider);
+      if (mounted) ref.invalidate(shopFavoritesProvider);
       if (mounted) showBimSnack(context, current ? 'Retiré de tes articles mis de côté' : 'Mis de côté');
     } on ApiException catch (e) {
       if (mounted) {

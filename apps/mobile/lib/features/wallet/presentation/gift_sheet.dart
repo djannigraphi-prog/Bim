@@ -103,18 +103,20 @@ class _GiftSheetState extends ConsumerState<GiftSheet> {
 
   Future<void> _send(GiftOption g) async {
     setState(() => _busy = true);
+    // Conteneur capturé avant l'attente : le solde est rafraîchi même si la feuille a été fermée entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final r = await ref.read(walletApiProvider).gift(targetType: widget.targetType, targetId: widget.targetId, giftCode: g.code, quantity: _qty, anonymous: _anonymous, idempotencyKey: _key);
-      ref.invalidate(walletProvider);
+      container.invalidate(walletProvider);
       if (!mounted) return;
       showBimSnack(context, '${coinsLabel(g.coins * _qty)} pièces envoyées à ${widget.recipientName}. Merci !');
       Navigator.of(context).pop(r.targetCoinCount);
     } on ApiException catch (e) {
       // Même clé conservée : si la réponse s'est perdue alors que l'envoi a réussi, le nouvel essai ne paie pas deux fois.
-      if (mounted) {
-        setState(() => _busy = false);
-        showApiError(context, e);
-      }
+      if (mounted) showApiError(context, e);
+    } finally {
+      // Réponse inattendue comprise : le bouton ne reste jamais bloqué.
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -201,7 +203,7 @@ class _GiftSheetState extends ConsumerState<GiftSheet> {
                       variant: BimButtonVariant.outline,
                       onPressed: () async {
                         await showBuyCoinsSheet(context);
-                        ref.invalidate(walletProvider);
+                        if (context.mounted) ref.invalidate(walletProvider);
                       },
                     ),
                   ] else
@@ -248,17 +250,19 @@ class _BuyCoinsSheetState extends ConsumerState<BuyCoinsSheet> {
 
   Future<void> _buy(int coins) async {
     setState(() => _busy = true);
+    // Conteneur capturé avant l'attente : le solde est rafraîchi même si la feuille a été fermée entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(walletApiProvider).buy(coins, idempotencyKey: newIdempotencyKey());
-      ref.invalidate(walletProvider);
+      container.invalidate(walletProvider);
       if (!mounted) return;
       showBimSnack(context, '${coinsLabel(coins)} pièces ajoutées (démo, rien n’a été payé).');
       Navigator.of(context).pop();
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        showApiError(context, e);
-      }
+      if (mounted) showApiError(context, e);
+    } finally {
+      // Réponse inattendue comprise : le bouton ne reste jamais bloqué.
+      if (mounted) setState(() => _busy = false);
     }
   }
 

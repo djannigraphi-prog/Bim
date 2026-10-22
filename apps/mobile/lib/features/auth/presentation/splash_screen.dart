@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/brand.dart';
+import '../../demo/demo_server.dart';
 import '../application/session_controller.dart';
 
 /// Écran 01 — logo rouge sur fond blanc, devise dessous ; en bas, discrètement, « from Generation Hybride »
@@ -62,6 +63,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 onPressed: () => ref.read(sessionProvider.notifier).signOut(),
                 child: const Text('Se déconnecter', style: TextStyle(color: BimColors.grey600)),
               ),
+              // Version de démonstration seulement : l'adresse du serveur (ordinateur du même Wi-Fi) a pu changer ;
+              // on la corrige ici sans se déconnecter, puis « Réessayer ».
+              const DemoServerButton(),
               const SizedBox(height: BimSpacing.lg),
             ],
             // Signature de l'éditeur, comme « from Meta » : écriture fine et grise, logo réduit.

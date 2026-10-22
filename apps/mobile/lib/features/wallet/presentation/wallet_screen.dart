@@ -193,18 +193,20 @@ class _WithdrawSheetState extends ConsumerState<WithdrawSheet> {
     final token = await requestStepUp(context, ref, StepUpScope.withdrawal);
     if (token == null || !mounted) return;
     setState(() => _busy = true);
+    // Conteneur capturé avant l'attente : le solde est rafraîchi même si la feuille a été fermée entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final r = await ref.read(walletApiProvider).withdraw(coins, operator: _operator, idempotencyKey: _key, stepUpToken: token);
-      ref.invalidate(walletProvider);
+      container.invalidate(walletProvider);
       if (!mounted) return;
       showBimSnack(context, r.status == 'review' ? 'Demande envoyée : l’équipe BIM la vérifie.' : 'Retrait enregistré (démo : rien n’est versé).');
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       // Même clé conservée : si la réponse s'est perdue alors que l'envoi a réussi, le nouvel essai ne paie pas deux fois.
-      if (mounted) {
-        setState(() => _busy = false);
-        showApiError(context, e);
-      }
+      if (mounted) showApiError(context, e);
+    } finally {
+      // Réponse inattendue comprise : le bouton ne reste jamais bloqué.
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -276,9 +278,10 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 
   Future<void> _run(Future<PremiumInfo> Function() call, String done) async {
     setState(() => _busy = true);
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await call();
-      ref
+      container
         ..invalidate(premiumProvider)
         ..invalidate(walletProvider);
       if (mounted) showBimSnack(context, done);

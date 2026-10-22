@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/util/app_foreground.dart';
 import '../../../core/widgets/brand.dart';
 import '../../auth/application/session_controller.dart';
 import '../../auth/presentation/visitor_gate_sheet.dart';
@@ -51,7 +52,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.initState();
     // Lot 6-A : pas de notification sur le téléphone ; la pastille Messages est mise à jour régulièrement.
     _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (ref.read(sessionProvider) is SessionSignedIn) ref.invalidate(messagesUnreadProvider);
+      // App en arrière-plan : pas de lecture inutile (batterie, forfait).
+      if (appInForeground && ref.read(sessionProvider) is SessionSignedIn) ref.invalidate(messagesUnreadProvider);
     });
   }
 

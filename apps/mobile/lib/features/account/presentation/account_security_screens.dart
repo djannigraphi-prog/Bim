@@ -262,7 +262,7 @@ class DevicesScreen extends ConsumerWidget {
                         onPressed: () async {
                           try {
                             await ref.read(accountApiProvider).revokeSession(s.id);
-                            ref.invalidate(_sessionsProvider);
+                            if (context.mounted) ref.invalidate(_sessionsProvider);
                           } on ApiException catch (e) {
                             if (context.mounted) showApiError(context, e);
                           }
@@ -385,12 +385,14 @@ class _SpaceTile extends ConsumerWidget {
                       context.push(s.type == 'merchant' ? '/merchant/apply' : '/courier/apply');
                     }
                   : () async {
+                  // Conteneur capturé avant les attentes : le changement d'espace va au bout même si la feuille se ferme.
+                  final container = ProviderScope.containerOf(context, listen: false);
                   try {
-                    final token = await ref.read(accountApiProvider).switchSpace(s.type, s.id);
-                    await ref.read(tokenStorageProvider).saveAccess(token);
-                    ref.invalidate(_spacesProvider);
+                    final token = await container.read(accountApiProvider).switchSpace(s.type, s.id);
+                    await container.read(tokenStorageProvider).saveAccess(token);
+                    container.invalidate(_spacesProvider);
                     // Lot 5-B : l'espace actif décide de l'accueil (espace marchand ou accueil utilisateur).
-                    await ref.read(sessionProvider.notifier).refreshMe();
+                    await container.read(sessionProvider.notifier).refreshMe();
                     if (context.mounted) {
                       Navigator.pop(context);
                       context.go(switch (s.type) { 'merchant' => '/shop', 'courier' => '/courier', _ => '/home' });

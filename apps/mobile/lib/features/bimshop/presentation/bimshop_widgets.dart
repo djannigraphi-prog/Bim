@@ -65,7 +65,7 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
     });
     try {
       await ref.read(bimShopApiProvider).setFavorite(widget.card.id, !current);
-      ref.invalidate(shopFavoritesProvider);
+      if (mounted) ref.invalidate(shopFavoritesProvider);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -128,14 +128,17 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
                     Positioned(
                       right: 4,
                       bottom: 4,
-                      child: _RoundButton(
-                        key: ValueKey('shop-card-share-${c.id}'),
-                        tooltip: 'Partager',
-                        color: Colors.white.withValues(alpha: 0.85),
-                        shape: const CircleBorder(),
-                        visual: 32,
-                        onPressed: () => showShareProductSheet(context, ref, c),
-                        child: const Icon(Icons.share_outlined, size: 16, color: BimColors.black),
+                      child: Builder(
+                        // Contexte du bouton lui-même : la feuille de partage de l'iPad s'ouvre au-dessus de lui.
+                        builder: (button) => _RoundButton(
+                          key: ValueKey('shop-card-share-${c.id}'),
+                          tooltip: 'Partager',
+                          color: Colors.white.withValues(alpha: 0.85),
+                          shape: const CircleBorder(),
+                          visual: 32,
+                          onPressed: () => showShareProductSheet(context, ref, c, origin: shareOrigin(button)),
+                          child: const Icon(Icons.share_outlined, size: 16, color: BimColors.black),
+                        ),
                       ),
                     ),
                   ],

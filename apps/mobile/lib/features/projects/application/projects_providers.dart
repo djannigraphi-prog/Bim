@@ -35,3 +35,12 @@ void refreshProject(WidgetRef ref, String id) {
     ..invalidate(projectDetailProvider(id));
   ref.read(projectsRevisionProvider.notifier).state++;
 }
+
+/// Même chose depuis le conteneur capturé avant une attente (l'écran a pu être fermé entre-temps :
+/// « ref » ne serait plus utilisable).
+void refreshProjectIn(ProviderContainer container, String id) {
+  container
+    ..invalidate(myProjectsProvider)
+    ..invalidate(projectDetailProvider(id));
+  container.read(projectsRevisionProvider.notifier).state++;
+}

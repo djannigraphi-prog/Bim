@@ -62,7 +62,7 @@ class ApiClient {
       _run(() => dio.request<dynamic>(
             path,
             data: FormData.fromMap({field: MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(contentType))}),
-            options: Options(method: method, contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
+            options: Options(method: method, contentType: 'multipart/form-data', sendTimeout: uploadTimeout(bytes.length)),
           ),);
 
   /// Formulaire multipart : champs texte et, si fourni, un fichier (signalement avec image).
@@ -73,7 +73,7 @@ class ApiClient {
               ...fields,
               if (fileField != null && bytes != null) fileField: MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(contentType!)),
             }),
-            options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 60)),
+            options: Options(contentType: 'multipart/form-data', sendTimeout: uploadTimeout(bytes?.length ?? 0)),
           ),);
 
   /// Formulaire multipart avec plusieurs fichiers dans le même champ (publication avec photos, lot 4).
@@ -87,8 +87,15 @@ class ApiClient {
                   MultipartFile.fromBytes(b, filename: _isPng(b) ? 'photo$i.png' : 'photo$i.jpg', contentType: DioMediaType.parse(_isPng(b) ? 'image/png' : 'image/jpeg')),
               ],
             }),
-            options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(seconds: 90)),
+            options: Options(contentType: 'multipart/form-data', sendTimeout: uploadTimeout(files.fold<int>(0, (n, f) => n + f.length), base: 90)),
           ),);
+
+  /// Délai d'envoi d'un fichier selon sa taille : [base] secondes + 1 s par 100 Ko, 10 minutes au plus
+  /// (une vidéo de 100 Mo sur une connexion mobile lente ne doit pas être coupée au bout d'une minute).
+  static Duration uploadTimeout(int bytes, {int base = 60}) {
+    final seconds = base + bytes ~/ (100 * 1024);
+    return Duration(seconds: seconds > 600 ? 600 : seconds);
+  }
 
   static bool _isPng(List<int> b) => b.length > 4 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47;
 
@@ -101,7 +108,12 @@ class ApiClient {
     try {
       final res = await call();
       final data = res.data;
-      return data is Map<String, dynamic> ? data : <String, dynamic>{};
+      if (data is Map<String, dynamic>) return data;
+      // Réponse vide (204, ou corps vide) : rien à lire, l'appelant n'attend rien.
+      if (data == null || (data is String && data.trim().isEmpty)) return <String, dynamic>{};
+      // Corps inattendu (page HTML d'un portail Wi-Fi ou d'un proxy, liste…) : erreur claire plutôt qu'une
+      // TypeError qui échapperait aux `on ApiException` des écrans (bouton bloqué sur « chargement »).
+      throw ApiException.unexpected;
     } on DioException catch (e) {
       final err = _map(e);
       if (err.code == 'APP_UPDATE_REQUIRED') onUpdateRequired?.call();
@@ -120,16 +132,20 @@ class ApiClient {
         break;
     }
     final data = e.response?.data;
+    final status = e.response?.statusCode;
     if (data is Map && data['error'] is Map) {
       final err = data['error'] as Map<String, dynamic>;
       final details = err['details'];
       return ApiException(
         code: (err['code'] ?? 'UNKNOWN').toString(),
         message: (err['message'] ?? ApiException.unknown.message).toString(),
-        status: e.response?.statusCode,
+        status: status,
         details: details is Map<String, dynamic> ? details : const {},
       );
     }
+    // Fichier refusé par un intermédiaire (proxy) avant même d'atteindre l'API : même message que l'API.
+    if (status == 413) return ApiException.fileTooLarge;
+    if (data is String && data.trim().isNotEmpty && status != null && status < 500) return ApiException.unexpected;
     return ApiException.unknown;
   }
 }

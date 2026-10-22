@@ -208,7 +208,7 @@ class _QuickRepliesSheetState extends ConsumerState<_QuickRepliesSheet> {
     setState(() => _busy = true);
     try {
       await action();
-      ref.invalidate(shopQuickRepliesProvider);
+      if (mounted) ref.invalidate(shopQuickRepliesProvider);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {

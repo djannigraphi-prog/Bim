@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/util/picker_guard.dart';
 import '../../auth/data/models.dart';
 
 /// Demande d'ouverture de boutique (lot 5-A, écrans 07 à 09).
@@ -136,19 +137,23 @@ class DeviceKycPhotoSource implements KycPhotoSource {
   final _picker = ImagePicker();
 
   @override
-  Future<List<int>?> document({required bool camera}) async =>
-      (await _picker.pickImage(source: camera ? ImageSource.camera : ImageSource.gallery, maxWidth: 2000, maxHeight: 2000, imageQuality: 88, requestFullMetadata: false))?.readAsBytes();
+  Future<List<int>?> document({required bool camera}) => guardPicker(
+        () async => (await _picker.pickImage(source: camera ? ImageSource.camera : ImageSource.gallery, maxWidth: 2000, maxHeight: 2000, imageQuality: 88, requestFullMetadata: false))
+            ?.readAsBytes(),
+      );
 
   @override
-  Future<List<int>?> selfie() async => (await _picker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 88,
-        requestFullMetadata: false,
-      ))
-          ?.readAsBytes();
+  Future<List<int>?> selfie() => guardPicker(
+        () async => (await _picker.pickImage(
+          source: ImageSource.camera,
+          preferredCameraDevice: CameraDevice.front,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 88,
+          requestFullMetadata: false,
+        ))
+            ?.readAsBytes(),
+      );
 }
 
 final kycPhotoSourceProvider = Provider<KycPhotoSource>((ref) => DeviceKycPhotoSource());

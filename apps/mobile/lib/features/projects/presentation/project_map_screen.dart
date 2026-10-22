@@ -49,6 +49,8 @@ class _Map extends ConsumerWidget {
   Future<void> _onMenu(BuildContext context, WidgetRef ref, _MenuAction a) async {
     final s = project.summary;
     final api = ref.read(projectsApiProvider);
+    // Conteneur capturé avant les attentes : « ref » n'est plus utilisable si l'écran est fermé entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       switch (a) {
         case _MenuAction.program:
@@ -57,13 +59,13 @@ class _Map extends ConsumerWidget {
           final choice = await askMode(context, mode: s.mode, budget: project.budget);
           if (choice == null) return;
           await api.update(s.id, mode: choice.mode, budget: choice.budget);
-          refreshProject(ref, s.id);
+          refreshProjectIn(container, s.id);
         case _MenuAction.measure:
           final m = project.measurement!;
           final v = await askMeasurement(context, unit: m.unit, last: m.latest);
           if (v == null) return;
           await api.addMeasurement(s.id, v);
-          refreshProject(ref, s.id);
+          refreshProjectIn(container, s.id);
           if (context.mounted) showBimSnack(context, 'Mesure enregistrée.');
         case _MenuAction.photos:
           await context.push('/projects/${s.id}/transformation');
@@ -73,14 +75,14 @@ class _Map extends ConsumerWidget {
           final days = await askPause(context, title: s.title, plannedEndDate: s.plannedEndDate);
           if (days == null) return;
           await api.pause(s.id, days);
-          refreshProject(ref, s.id);
+          refreshProjectIn(container, s.id);
         case _MenuAction.resume:
           await api.resume(s.id);
-          refreshProject(ref, s.id);
+          refreshProjectIn(container, s.id);
         case _MenuAction.delete:
           if (!await confirmAbandon(context, s.title)) return;
           await api.abandon(s.id);
-          ref.invalidate(myProjectsProvider);
+          container.invalidate(myProjectsProvider);
           if (context.mounted) context.go('/home');
       }
     } on ApiException catch (e) {

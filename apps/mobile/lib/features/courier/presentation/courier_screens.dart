@@ -63,7 +63,7 @@ class _CourierApplyScreenState extends ConsumerState<CourierApplyScreen> {
   }
 
   Future<void> _photo(String kind) async {
-    final bytes = await ref.read(photoSourceProvider).pick(camera: kind == 'selfie');
+    final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: kind == 'selfie'));
     if (bytes == null || !mounted) return;
     await _run((api) => api.upload(kind, bytes));
   }
@@ -161,6 +161,7 @@ class _CourierSpaceScreenState extends ConsumerState<CourierSpaceScreen> {
     setState(() => _busy = true);
     try {
       await f(ref.read(courierApiProvider));
+      if (!mounted) return;
       ref
         ..invalidate(courierProfileProvider)
         ..invalidate(missionsProvider);
@@ -377,7 +378,7 @@ class _ShopCouriersScreenState extends ConsumerState<ShopCouriersScreen> {
     setState(() => _busy = true);
     try {
       await f(ref.read(shopCouriersApiProvider));
-      ref.invalidate(shopCouriersProvider);
+      if (mounted) ref.invalidate(shopCouriersProvider);
       if (done != null && mounted) showBimSnack(context, done);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);

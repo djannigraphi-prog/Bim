@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:io' show File;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/util/picker_guard.dart';
 import '../../social/data/social_models.dart';
 
 /// Lot 11 (prototype) — Reels : vidéos verticales courtes rangées dans le stockage privé de BIM (aucun service vidéo
@@ -116,13 +122,46 @@ abstract class VideoSource {
   Future<List<int>?> pick();
 }
 
+/// Taille maximale d'une vidéo acceptée par l'API (Reels, vidéo d'article).
+const kMaxVideoBytes = 100 * 1024 * 1024;
+
+/// Durée maximale d'une vidéo (Reels, vidéo d'article).
+const kMaxVideoDuration = Duration(seconds: 60);
+
+const videoTooLarge = ApiException(code: 'FILE_TOO_LARGE', message: 'Vidéo trop lourde : 100 Mo au plus. Raccourcis-la ou filme en qualité plus basse.');
+const videoTooLong = ApiException(code: 'VIDEO_TOO_LONG', message: 'Vidéo trop longue : 60 secondes au plus. Raccourcis-la puis réessaie.');
+
+/// Vérifie la taille d'une vidéo avant l'envoi (avant même d'arriver au serveur, qui la refuserait).
+void checkVideoSize(int bytes) {
+  if (bytes > kMaxVideoBytes) throw videoTooLarge;
+}
+
 class DeviceVideoSource implements VideoSource {
   final _picker = ImagePicker();
 
   @override
   Future<List<int>?> pick() async {
-    final file = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 60));
-    return file?.readAsBytes();
+    final file = await guardPicker(() => _picker.pickVideo(source: ImageSource.gallery, maxDuration: kMaxVideoDuration));
+    if (file == null) return null;
+    // Taille vérifiée AVANT de charger la vidéo en mémoire (une vidéo de plusieurs centaines de Mo ferait planter l'app).
+    checkVideoSize(await file.length());
+    // maxDuration ne s'applique qu'à l'appareil photo : la durée d'une vidéo de la galerie est lue ici.
+    final duration = await _duration(file.path);
+    if (duration != null && duration > kMaxVideoDuration + const Duration(milliseconds: 900)) throw videoTooLong;
+    return file.readAsBytes();
+  }
+
+  /// Durée lue par le lecteur vidéo du téléphone ; null si illisible (le serveur vérifiera).
+  static Future<Duration?> _duration(String path) async {
+    final c = VideoPlayerController.file(File(path));
+    try {
+      await c.initialize().timeout(const Duration(seconds: 5));
+      return c.value.duration;
+    } catch (_) {
+      return null;
+    } finally {
+      unawaited(c.dispose().catchError((Object _) {}));
+    }
   }
 }
 

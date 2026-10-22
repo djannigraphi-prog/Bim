@@ -89,25 +89,54 @@ class _VoiceMessageViewState extends State<VoiceMessageView> {
   bool _failed = false;
 
   @override
+  void didUpdateWidget(VoiceMessageView old) {
+    super.didUpdateWidget(old);
+    // Nouveau lien (lien temporaire renouvelé, ou bulle réutilisée pour un autre message) : lecteur recréé au prochain appui.
+    if (old.url != widget.url) {
+      _release();
+      _failed = false;
+      _loading = false;
+    }
+  }
+
+  void _release() {
+    final p = _player;
+    _player = null;
+    if (p != null) {
+      p.removeListener(_tick);
+      unawaited(p.dispose());
+    }
+  }
+
+  @override
   void dispose() {
-    _player?.removeListener(_tick);
-    unawaited(_player?.dispose());
+    _release();
     super.dispose();
   }
 
   void _tick() {
-    if (!mounted) return;
-    final v = _player!.value;
-    if (v.isInitialized && !v.isPlaying && v.position >= v.duration) unawaited(_player!.seekTo(Duration.zero));
+    final p = _player;
+    if (!mounted || p == null) return;
+    final v = p.value;
+    if (v.hasError) {
+      // Lien expiré ou réseau coupé pendant l'écoute : un nouvel appui réessaie.
+      _release();
+      setState(() => _failed = true);
+      return;
+    }
+    if (v.isInitialized && !v.isPlaying && v.position >= v.duration) unawaited(p.seekTo(Duration.zero));
     setState(() {});
   }
 
   Future<void> _toggle() async {
     final url = widget.url;
-    if (url == null) return;
+    if (url == null || _loading) return;
     var p = _player;
     if (p == null) {
-      setState(() => _loading = true);
+      setState(() {
+        _loading = true;
+        _failed = false;
+      });
       p = VideoPlayerController.networkUrl(Uri.parse(url));
       try {
         await p.initialize();
@@ -121,8 +150,10 @@ class _VoiceMessageViewState extends State<VoiceMessageView> {
         }
         return;
       }
-      if (!mounted) {
+      if (!mounted || widget.url != url) {
+        // Écran fermé ou lien changé pendant le chargement.
         await p.dispose();
+        if (mounted) setState(() => _loading = false);
         return;
       }
       p.addListener(_tick);
@@ -147,8 +178,9 @@ class _VoiceMessageViewState extends State<VoiceMessageView> {
         children: [
           IconButton(
             key: const ValueKey('voice-play'),
-            tooltip: playing ? 'Pause' : 'Écouter',
-            onPressed: _failed || widget.url == null ? null : _toggle,
+            tooltip: _failed ? 'Réessayer' : (playing ? 'Pause' : 'Écouter'),
+            // Après un échec, l'icône d'erreur reste touchable : un nouvel appui réessaie.
+            onPressed: widget.url == null ? null : _toggle,
             icon: _loading
                 ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: widget.color))
                 : Icon(_failed ? Icons.error_outline : (playing ? Icons.pause_rounded : Icons.play_arrow_rounded), color: widget.color),

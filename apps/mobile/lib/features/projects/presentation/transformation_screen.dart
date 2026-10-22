@@ -31,12 +31,15 @@ Future<bool> captureProjectPhoto(BuildContext context, WidgetRef ref, String pro
       ),
     ),
   );
-  if (camera == null) return false;
-  final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
+  if (camera == null || !context.mounted) return false;
+  // Conteneur capturé avant les attentes : l'écran appelant peut être fermé pendant l'envoi
+  // (« ref » ne serait alors plus utilisable), la liste des photos doit quand même être rafraîchie.
+  final container = ProviderScope.containerOf(context, listen: false);
+  final bytes = await pickWithFeedback(context, () => container.read(photoSourceProvider).pick(camera: camera));
   if (bytes == null) return false;
   try {
-    await ref.read(projectsApiProvider).uploadPhoto(projectId, kind, bytes);
-    ref.invalidate(projectPhotosProvider(projectId));
+    await container.read(projectsApiProvider).uploadPhoto(projectId, kind, bytes);
+    container.invalidate(projectPhotosProvider(projectId));
     return true;
   } on ApiException catch (e) {
     if (context.mounted) showApiError(context, e);

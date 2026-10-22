@@ -24,6 +24,7 @@ class ProjectOffersScreen extends ConsumerWidget {
   Future<void> _run(BuildContext context, WidgetRef ref, Future<void> Function(OffersApi api) action, {String? done}) async {
     try {
       await action(ref.read(offersApiProvider));
+      if (!context.mounted) return;
       ref.invalidate(projectOffersProvider(projectId));
       if (done != null && context.mounted) showBimSnack(context, done);
     } on ApiException catch (e) {

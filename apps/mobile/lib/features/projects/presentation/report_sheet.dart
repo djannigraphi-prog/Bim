@@ -87,8 +87,8 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
         ),
       ),
     );
-    if (camera == null) return;
-    final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
+    if (camera == null || !mounted) return;
+    final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: camera));
     if (bytes == null || !mounted) return;
     setState(() {
       _image = Uint8List.fromList(bytes);
@@ -129,6 +129,9 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
           _error = e.message;
         }
       });
+    } finally {
+      // Réponse inattendue : le bouton « Envoyer » ne reste jamais bloqué.
+      if (mounted && _sending) setState(() => _sending = false);
     }
   }
 

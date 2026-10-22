@@ -124,7 +124,11 @@ class AuthInterceptor extends QueuedInterceptor {
   }
 
   Future<Response<dynamic>> _retry(RequestOptions request, String token) {
+    // Un FormData déjà envoyé est « finalisé » et Dio refuse de le renvoyer : on rejoue une copie (envoi de photo
+    // ou de vidéo dont le jeton avait expiré).
+    final data = request.data;
     final options = request.copyWith(
+      data: data is FormData ? data.clone() : data,
       headers: {...request.headers, 'Authorization': 'Bearer $token'},
       extra: {...request.extra, _retriedKey: true},
     );

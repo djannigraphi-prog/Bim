@@ -60,11 +60,13 @@ class _VerifyCodeScreenState extends ConsumerState<VerifyCodeScreen> {
       _loading = true;
       _error = null;
     });
+    // Conteneur capturé avant les attentes : l'inscription est effacée même si l'écran a été fermé entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final result = await ref.read(authApiProvider).verifySignup(_challenge.challengeId, _code.text);
-      await ref.read(sessionProvider.notifier).completeSignIn(result);
-      ref.read(registrationProvider.notifier).reset();
-      ref.read(registrationErrorsProvider.notifier).clear();
+      await container.read(sessionProvider.notifier).completeSignIn(result);
+      container.read(registrationProvider.notifier).reset();
+      container.read(registrationErrorsProvider.notifier).clear();
       if (mounted) context.go('/home');
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);

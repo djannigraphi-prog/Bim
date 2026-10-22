@@ -43,9 +43,11 @@ class _Program extends ConsumerWidget {
   final ProjectDetail project;
 
   Future<void> _run(BuildContext context, WidgetRef ref, Future<void> Function(ProjectsApi api) action) async {
+    // Conteneur capturé avant l'attente : le projet est rafraîchi même si l'écran a été fermé entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await action(ref.read(projectsApiProvider));
-      refreshProject(ref, project.summary.id);
+      refreshProjectIn(container, project.summary.id);
     } on ApiException catch (e) {
       if (context.mounted) showApiError(context, e);
     }

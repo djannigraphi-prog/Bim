@@ -50,10 +50,10 @@ class ProfileScreen extends ConsumerWidget {
         await ref.read(socialApiProvider).removeAvatar();
       } else {
         final bytes = await ref.read(photoSourceProvider).pick(camera: action == 'camera');
-        if (bytes == null) return;
+        if (bytes == null || !context.mounted) return;
         await ref.read(socialApiProvider).setAvatar(bytes);
       }
-      ref.invalidate(profileProvider(username));
+      if (context.mounted) ref.invalidate(profileProvider(username));
     } on ApiException catch (e) {
       if (context.mounted) showApiError(context, e);
     }
@@ -62,6 +62,7 @@ class ProfileScreen extends ConsumerWidget {
   Future<void> _toggleFollow(BuildContext context, WidgetRef ref, PublicProfile p) async {
     try {
       await ref.read(socialApiProvider).follow(p.person.username, on: !p.followedByMe);
+      if (!context.mounted) return;
       ref.invalidate(profileProvider(username));
       ref.invalidate(personPostsProvider(username));
     } on ApiException catch (e) {
@@ -494,7 +495,7 @@ class _BlockedPeopleScreenState extends ConsumerState<BlockedPeopleScreen> {
                     onPressed: () async {
                       try {
                         await ref.read(socialApiProvider).block(p.username, on: false);
-                        setState(() => _future = ref.read(socialApiProvider).blocked());
+                        if (mounted) setState(() => _future = ref.read(socialApiProvider).blocked());
                       } on ApiException catch (e) {
                         if (context.mounted) showApiError(context, e);
                       }

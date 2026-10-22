@@ -116,9 +116,10 @@ class _OfferSheetState extends ConsumerState<_OfferSheet> {
       _sending = true;
       _error = null;
     });
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(offersApiProvider).sendOffer(widget.request.id, message: _message.text.trim(), productIds: _selected.toList());
-      ref.invalidate(projectRequestsProvider);
+      container.invalidate(projectRequestsProvider);
       if (mounted) {
         Navigator.pop(context);
         showBimSnack(context, 'Offre envoyée');

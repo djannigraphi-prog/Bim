@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
@@ -5,6 +7,7 @@ import 'package:bim/features/reels/data/reels_api.dart';
 import 'package:bim/features/reels/presentation/reels_screen.dart';
 import 'package:bim/features/social/data/social_models.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -61,7 +64,30 @@ class _FakeVideo implements VideoSource {
   Future<List<int>?> pick() async => List<int>.filled(2048, 1);
 }
 
-Future<void> _pump(WidgetTester tester, _FakeReels api) async {
+/// Comme le vrai sélecteur quand l'accès à la galerie a été refusé.
+class _DeniedVideo implements VideoSource {
+  @override
+  Future<List<int>?> pick() async => throw const PlatformException(code: 'photo_access_denied', message: 'The user did not allow photo access.');
+}
+
+/// Vidéo de plus de 100 Mo (sans allouer 100 Mo en mémoire).
+class _HugeBytes extends ListBase<int> {
+  @override
+  int get length => kMaxVideoBytes + 1;
+  @override
+  set length(int _) => throw UnsupportedError('fixe');
+  @override
+  int operator [](int i) => 0;
+  @override
+  void operator []=(int i, int v) => throw UnsupportedError('fixe');
+}
+
+class _HugeVideo implements VideoSource {
+  @override
+  Future<List<int>?> pick() async => _HugeBytes();
+}
+
+Future<void> _pump(WidgetTester tester, _FakeReels api, {VideoSource? video}) async {
   tester.view.physicalSize = const Size(1080, 2340);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -74,7 +100,7 @@ Future<void> _pump(WidgetTester tester, _FakeReels api) async {
     overrides: [
       apiClientProvider.overrideWithValue(_client()),
       reelsApiProvider.overrideWithValue(api),
-      videoSourceProvider.overrideWithValue(_FakeVideo()),
+      videoSourceProvider.overrideWithValue(video ?? _FakeVideo()),
       reelPlayerBuilderProvider.overrideWithValue((context, reel, active) => ColoredBox(color: Colors.black, child: Text('lecteur ${reel.id} ${active ? 'actif' : 'pause'}'))),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
@@ -121,7 +147,42 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('reel-publish')));
     await tester.pumpAndSettle();
     expect(api.calls.last, 'upload 2048 "Ma routine" followers');
-    // Retour aux Reels : le nouveau est en tête.
+    // Retour aux Reels : le nouveau est en tête, avec son propre lecteur, lu.
     expect(find.text('Ma routine new'), findsOneWidget);
+    expect(find.text('lecteur new actif'), findsOneWidget);
+  });
+
+  testWidgets('un autre écran par-dessus les Reels : la vidéo se met en pause, puis reprend au retour', (tester) async {
+    await _pump(tester, _FakeReels());
+    expect(find.text('lecteur r1 actif'), findsOneWidget);
+    await tester.tap(find.text('@awa.k'));
+    await tester.pumpAndSettle();
+    expect(find.text('profil awa.k'), findsOneWidget);
+    expect(find.text('lecteur r1 pause', skipOffstage: false), findsOneWidget);
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('lecteur r1 actif'), findsOneWidget);
+  });
+
+  testWidgets('galerie refusée : message clair, rien n’est choisi', (tester) async {
+    await _pump(tester, _FakeReels(), video: _DeniedVideo());
+    await tester.tap(find.byKey(const ValueKey('reel-new')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reel-pick')));
+    await tester.pump();
+    expect(find.text('Autorise l’appareil photo et la galerie dans les réglages du téléphone.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('reel-picked')), findsNothing);
+  });
+
+  testWidgets('vidéo de plus de 100 Mo : refusée avant l’envoi, avec la marche à suivre', (tester) async {
+    final api = _FakeReels();
+    await _pump(tester, api, video: _HugeVideo());
+    await tester.tap(find.byKey(const ValueKey('reel-new')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reel-pick')));
+    await tester.pump();
+    expect(find.text('Vidéo trop lourde : 100 Mo au plus. Raccourcis-la ou filme en qualité plus basse.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('reel-picked')), findsNothing);
+    expect(api.calls.where((c) => c.startsWith('upload')), isEmpty);
   });
 }

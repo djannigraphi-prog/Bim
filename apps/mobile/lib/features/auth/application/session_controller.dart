@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../data/auth_api.dart';
 import '../data/models.dart';
@@ -38,37 +39,71 @@ class SessionController extends Notifier<SessionState> {
   /// Au démarrage : une session enregistrée est revalidée par le serveur (le jeton peut avoir été révoqué).
   Future<void> restore() async {
     final storage = ref.read(tokenStorageProvider);
-    if (await storage.refreshToken() == null) {
-      state = const SessionSignedOut();
-      return;
-    }
-    if (state is SessionUnknown) state = const SessionUnknown();
     try {
+      // Lecture du trousseau dans le try : un stockage illisible (clé Keystore perdue après une restauration)
+      // ne doit jamais bloquer l'app sur l'écran d'accueil.
+      if (await storage.refreshToken() == null) {
+        state = const SessionSignedOut();
+        return;
+      }
+      if (state is SessionUnknown) state = const SessionUnknown();
       _signedIn(await _api.me());
     } on ApiException catch (e) {
       // Seul un refus explicite de la session déconnecte. Le rafraîchissement refusé efface déjà les jetons ;
       // une coupure réseau, une erreur serveur ou une limite atteinte gardent la session et proposent de réessayer.
       // « Momentané » : réseau, erreur serveur (5xx), limite atteinte (429), ou 401 alors que le rafraîchissement n'a
       // pas pu aboutir (jetons encore présents). Toute autre réponse (403, 404…) déconnecte comme avant.
-      final stillStored = await storage.refreshToken() != null;
+      final stillStored = await _hasRefreshToken(storage);
       final status = e.status ?? 0;
       final transient = e.isNetwork || status >= 500 || status == 429 || (status == 401 && e.code != 'SESSION_INVALID' && stillStored);
       if (transient && stillStored) {
         state = const SessionUnknown(unreachable: true);
         return;
       }
-      await storage.clear();
+      await _clearQuietly(storage);
       state = const SessionSignedOut();
     } catch (_) {
       // Réponse inattendue ou stockage illisible : on repart d'un état propre plutôt que de rester bloqué au démarrage.
+      await _clearQuietly(storage);
       state = const SessionSignedOut();
     }
   }
 
+  static Future<bool> _hasRefreshToken(TokenStorage storage) async {
+    try {
+      return await storage.refreshToken() != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Efface les jetons sans jamais lever d'erreur (stockage du téléphone défaillant).
+  static Future<void> _clearQuietly(TokenStorage storage) async {
+    try {
+      await storage.clear();
+    } catch (_) {
+      // Rien de plus à faire : l'état « déconnecté » suffit.
+    }
+  }
+
   Future<void> completeSignIn(({Tokens tokens, Me me}) result) async {
-    await ref.read(tokenStorageProvider).save(accessToken: result.tokens.accessToken, refreshToken: result.tokens.refreshToken);
+    final storage = ref.read(tokenStorageProvider);
+    try {
+      await storage.save(accessToken: result.tokens.accessToken, refreshToken: result.tokens.refreshToken);
+    } catch (_) {
+      // Trousseau du téléphone inutilisable : la session ne pourrait pas être gardée ; on le dit clairement.
+      await _clearQuietly(storage);
+      state = const SessionSignedOut();
+      throw storageFailure;
+    }
     _signedIn(result.me);
   }
+
+  /// Erreur affichée quand le stockage sécurisé du téléphone refuse d'enregistrer la session.
+  static const storageFailure = ApiException(
+    code: 'STORAGE',
+    message: 'Impossible d’enregistrer ta session sur ce téléphone. Redémarre l’application et réessaie.',
+  );
 
   /// Profil mis à jour par le serveur (ex. après l'ajout d'une coordonnée).
   void updateMe(Me me) {
@@ -89,7 +124,7 @@ class SessionController extends Notifier<SessionState> {
     } on ApiException {
       // La session locale est effacée même si le serveur est injoignable.
     }
-    await ref.read(tokenStorageProvider).clear();
+    await _clearQuietly(ref.read(tokenStorageProvider));
     state = const SessionSignedOut();
   }
 

@@ -49,13 +49,24 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
     }
   }
 
+  /// Projet chargé pour les boîtes de dialogue ; une erreur réseau est affichée (jamais un bouton qui ne fait rien).
+  Future<ProjectDetail?> _detail() async {
+    try {
+      return await ref.read(projectDetailProvider(widget.projectId).future);
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+      return null;
+    }
+  }
+
   Future<void> _pause() async {
-    final detail = await ref.read(projectDetailProvider(widget.projectId).future);
-    if (!mounted) return;
+    final detail = await _detail();
+    if (detail == null || !mounted) return;
     final days = await askPause(context, title: detail.summary.title, plannedEndDate: detail.summary.plannedEndDate);
-    if (days == null) return;
+    if (days == null || !mounted) return;
     try {
       await ref.read(projectsApiProvider).pause(widget.projectId, days);
+      if (!mounted) return;
       refreshProject(ref, widget.projectId);
       ref.invalidate(projectDayProvider(_key));
       setState(() => _local = null);
@@ -67,11 +78,14 @@ class _ProjectDayScreenState extends ConsumerState<ProjectDayScreen> {
   Future<void> _report(DayPlan plan) => reportProblem(context, projectId: widget.projectId, day: widget.day, tasks: plan.tasks);
 
   Future<void> _delete() async {
-    final detail = await ref.read(projectDetailProvider(widget.projectId).future);
-    if (!mounted || !await confirmAbandon(context, detail.summary.title)) return;
+    final detail = await _detail();
+    if (detail == null || !mounted || !await confirmAbandon(context, detail.summary.title)) return;
+    if (!mounted) return;
+    // Conteneur capturé avant l'attente : la liste des projets est rafraîchie même si l'écran a été fermé.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(projectsApiProvider).abandon(widget.projectId);
-      ref.invalidate(myProjectsProvider);
+      container.invalidate(myProjectsProvider);
       if (mounted) context.go('/home');
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);

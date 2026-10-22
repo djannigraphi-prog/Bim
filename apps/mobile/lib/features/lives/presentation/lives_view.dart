@@ -53,6 +53,7 @@ class LivesView extends ConsumerWidget {
                       icon: Icons.videocam_outlined,
                       onPressed: () async {
                         final l = await showNewLiveSheet(context);
+                        if (!context.mounted) return;
                         ref.invalidate(livesListProvider);
                         if (l != null && context.mounted) await context.push('/lives/${l.id}');
                       },
@@ -158,10 +159,10 @@ class _NewLiveSheetState extends ConsumerState<NewLiveSheet> {
       showBimSnack(context, _later ? 'Live programmé. Tes abonnés le verront dans « Programmés ».' : 'Tu es en direct (mode démo).');
       Navigator.of(context).pop(l);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        showApiError(context, e);
-      }
+      if (mounted) showApiError(context, e);
+    } finally {
+      // Réponse inattendue comprise : le bouton n'est jamais bloqué.
+      if (mounted) setState(() => _busy = false);
     }
   }
 

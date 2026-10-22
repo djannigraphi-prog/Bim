@@ -62,7 +62,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         // Un échec ici ne doit pas masquer la liste déjà affichée (audit, M-11) : on réessaiera à la prochaine ouverture.
         try {
           await _api.markSeen();
-          ref.invalidate(inboxUnreadProvider);
+          if (mounted) ref.invalidate(inboxUnreadProvider);
         } catch (_) {
           _markedSeen = false;
         }

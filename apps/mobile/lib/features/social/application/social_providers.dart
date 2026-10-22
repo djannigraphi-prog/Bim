@@ -25,8 +25,12 @@ class FeedState {
 
 /// Fil « Pour toi » (`for_you`) ou « Abonnés » (`following`), écran 10.
 class FeedController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
+  /// Change à chaque actualisation du fil : une page suivante de l'ancien fil arrivée en retard est ignorée.
+  int _generation = 0;
+
   @override
   Future<FeedState> build(String tab) async {
+    ref.onDispose(() => _generation++);
     final page = await ref.watch(socialApiProvider).feed(tab: tab);
     return FeedState(items: page.items, nextCursor: page.nextCursor);
   }
@@ -35,14 +39,19 @@ class FeedController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
   Future<void> loadMore({bool retry = false}) async {
     final s = state.valueOrNull;
     if (s == null || !s.hasMore || s.loadingMore || (s.pageError && !retry)) return;
+    final generation = _generation;
     state = AsyncData(s.copyWith(loadingMore: true, pageError: false));
     try {
       final page = await ref.read(socialApiProvider).feed(tab: arg, cursor: s.nextCursor);
+      if (generation != _generation) return;
+      // Publications modifiées ou retirées pendant le chargement : on part de l'état actuel.
+      final current = state.valueOrNull?.items ?? s.items;
       // « Pour toi » est classé (V1) : une publication déjà affichée n'est jamais répétée.
-      final known = {for (final p in s.items) p.id};
-      state = AsyncData(FeedState(items: [...s.items, ...page.items.where((p) => !known.contains(p.id))], nextCursor: page.nextCursor));
+      final known = {for (final p in current) p.id};
+      state = AsyncData(FeedState(items: [...current, ...page.items.where((p) => !known.contains(p.id))], nextCursor: page.nextCursor));
     } catch (_) {
-      state = AsyncData(s.copyWith(loadingMore: false, pageError: true));
+      if (generation != _generation) return;
+      state = AsyncData((state.valueOrNull ?? s).copyWith(loadingMore: false, pageError: true));
     }
   }
 
@@ -79,8 +88,12 @@ final profileProvider = FutureProvider.autoDispose.family<PublicProfile, String>
 
 /// Publications d'un profil, page par page (« Voir plus », audit du 18/10).
 class PersonPostsController extends AutoDisposeFamilyAsyncNotifier<FeedState, String> {
+  /// Change à chaque actualisation : une page suivante de l'ancienne liste arrivée en retard est ignorée.
+  int _generation = 0;
+
   @override
   Future<FeedState> build(String username) async {
+    ref.onDispose(() => _generation++);
     final page = await ref.watch(socialApiProvider).personPosts(username);
     return FeedState(items: page.items, nextCursor: page.nextCursor);
   }
@@ -88,13 +101,17 @@ class PersonPostsController extends AutoDisposeFamilyAsyncNotifier<FeedState, St
   Future<void> loadMore() async {
     final s = state.valueOrNull;
     if (s == null || !s.hasMore || s.loadingMore) return;
+    final generation = _generation;
     state = AsyncData(s.copyWith(loadingMore: true, pageError: false));
     try {
       final page = await ref.read(socialApiProvider).personPosts(arg, cursor: s.nextCursor);
-      final known = {for (final p in s.items) p.id};
-      state = AsyncData(FeedState(items: [...s.items, ...page.items.where((p) => !known.contains(p.id))], nextCursor: page.nextCursor));
+      if (generation != _generation) return;
+      final current = state.valueOrNull?.items ?? s.items;
+      final known = {for (final p in current) p.id};
+      state = AsyncData(FeedState(items: [...current, ...page.items.where((p) => !known.contains(p.id))], nextCursor: page.nextCursor));
     } catch (_) {
-      state = AsyncData(s.copyWith(loadingMore: false, pageError: true));
+      if (generation != _generation) return;
+      state = AsyncData((state.valueOrNull ?? s).copyWith(loadingMore: false, pageError: true));
     }
   }
 }

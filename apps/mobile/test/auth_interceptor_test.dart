@@ -43,8 +43,18 @@ class _Server implements HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(RequestOptions o, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
     calls.add('${o.method} ${o.path} ${o.headers['Authorization'] ?? ''}'.trim());
+    // Comme un vrai serveur : le corps (formulaire multipart compris) est lu en entier.
+    if (requestStream != null) {
+      final body = <int>[];
+      await for (final chunk in requestStream) {
+        body.addAll(chunk);
+      }
+      bodies.add(utf8.decode(body, allowMalformed: true));
+    }
     return respond(o);
   }
+
+  final bodies = <String>[];
 
   @override
   void close({bool force = false}) {}
@@ -98,6 +108,25 @@ void main() {
     await expectLater(dio.post<Map<String, dynamic>>('/v1/auth/step-up', data: {'password': 'x'}), throwsA(isA<DioException>()));
     expect(server.calls, hasLength(1));
     expect(tokens.refresh, 'r1');
+  });
+
+  test('envoi d’une photo (multipart) avec un jeton expiré : rafraîchi puis renvoyé avec une copie du formulaire', () async {
+    final (dio, server, _, _) = _client(_MemoryTokens(_jwt('user', 'u1'), 'r1'), (o) {
+      if (o.path == '/v1/auth/refresh') return _json(200, {'tokens': {'accessToken': userNew, 'refreshToken': 'r2'}});
+      if (o.headers['Authorization'] == 'Bearer $userNew') return _json(201, {'ok': true});
+      return _json(401, {'error': {'code': 'UNAUTHENTICATED', 'message': 'Connecte-toi.'}});
+    });
+    final form = FormData.fromMap({
+      'caption': 'Ma routine',
+      'video': MultipartFile.fromBytes(List<int>.filled(64, 7), filename: 'reel.mp4', contentType: DioMediaType.parse('video/mp4')),
+    });
+    final res = await dio.post<Map<String, dynamic>>('/v1/reels', data: form);
+    expect(res.data, {'ok': true});
+    expect(server.calls.map((c) => c.split(' ').take(2).join(' ')), ['POST /v1/reels', 'POST /v1/auth/refresh', 'POST /v1/reels']);
+    // Le formulaire renvoyé est complet (champ texte et fichier), pas vide ni refusé par Dio.
+    final uploads = server.bodies.where((b) => b.contains('reel.mp4')).toList();
+    expect(uploads, hasLength(2));
+    expect(uploads.last, contains('Ma routine'));
   });
 
   test('rafraîchissement en erreur serveur : la session est gardée ; refusé (401) : elle est effacée', () async {

@@ -121,7 +121,7 @@ class _SuggestionsState extends ConsumerState<_Suggestions> {
     setState(() => _followed.add(s.person.username));
     try {
       await ref.read(socialApiProvider).follow(s.person.username, on: true);
-      ref.invalidate(feedProvider('following'));
+      if (mounted) ref.invalidate(feedProvider('following'));
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _followed.remove(s.person.username));

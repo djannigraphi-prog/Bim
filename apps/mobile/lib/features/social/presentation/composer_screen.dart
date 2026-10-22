@@ -10,6 +10,7 @@ import '../../../core/widgets/feedback.dart';
 import '../../auth/application/session_controller.dart';
 import '../../projects/application/photo_source.dart';
 import '../../projects/application/projects_providers.dart';
+import '../../projects/data/projects_models.dart';
 import '../application/social_providers.dart';
 import '../data/social_api.dart';
 import '../data/social_models.dart';
@@ -66,13 +67,19 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
         ),
       ),
     );
-    if (camera == null) return;
-    final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
+    if (camera == null || !mounted) return;
+    final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: camera));
     if (bytes != null && mounted) setState(() => _images.add(Uint8List.fromList(bytes)));
   }
 
   Future<void> _pickProject() async {
-    final list = await ref.read(myProjectsProvider.future);
+    final ProjectList list;
+    try {
+      list = await ref.read(myProjectsProvider.future);
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+      return;
+    }
     if (!mounted) return;
     if (list.items.isEmpty) {
       showBimSnack(context, 'Tu n’as pas encore de projet à lier.');
@@ -102,11 +109,13 @@ class _ComposerScreenState extends ConsumerState<ComposerScreen> {
   Future<void> _publish() async {
     setState(() => _sending = true);
     final api = ref.read(socialApiProvider);
+    // Conteneur capturé avant l'attente : le fil est rafraîchi même si l'écran a été fermé pendant l'envoi.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final FeedPost post = _linked
           ? await api.createBim(projectId: _projectId!, text: _text.text, visibility: _visibility)
           : await api.create(text: _text.text, visibility: _visibility, images: _images);
-      ref
+      container
         ..invalidate(feedProvider('for_you'))
         ..invalidate(feedProvider('following'));
       if (!mounted) return;

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
@@ -20,6 +22,8 @@ Future<void> main() async {
 /// car le sélecteur de photos du système ne peut pas être piloté par un test automatique).
 void runBim({List<Override> overrides = const [], String? baseUrl}) {
   WidgetsFlutterBinding.ensureInitialized();
+  // App pensée pour le portrait (Reels, lives, formulaires) : l'écran ne tourne pas.
+  unawaited(SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]));
   runApp(
     ProviderScope(
       overrides: [

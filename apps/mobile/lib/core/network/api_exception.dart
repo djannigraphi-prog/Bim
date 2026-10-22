@@ -23,6 +23,12 @@ class ApiException implements Exception {
     message: 'Connexion impossible. Vérifie ta connexion internet et réessaie.',
   );
 
+  /// Réponse du serveur illisible (pas du JSON attendu) : portail Wi-Fi, proxy, serveur de démo mal configuré.
+  static const unexpected = ApiException(code: 'UNEXPECTED_RESPONSE', message: 'Réponse inattendue du serveur. Réessaie dans un instant.');
+
+  /// Fichier trop lourd (413), message aligné sur celui de l'API (code FILE_TOO_LARGE).
+  static const fileTooLarge = ApiException(code: 'FILE_TOO_LARGE', message: 'Fichier trop lourd : 100 Mo au plus.', status: 413);
+
   static const unknown = ApiException(code: 'UNKNOWN', message: 'Une erreur est survenue. Réessaie plus tard.');
 
   @override

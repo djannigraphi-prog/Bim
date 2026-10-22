@@ -197,7 +197,7 @@ Future<void> _pump(WidgetTester tester, _FakeBimShop api, String location, {bool
       messagingApiProvider.overrideWithValue(messaging ?? _FakeMessaging()),
       ordersApiProvider.overrideWithValue(_FakeOrders()),
       sessionProvider.overrideWith(signedIn ? _SignedIn.new : _Visitor.new),
-      systemShareProvider.overrideWithValue((text) async => _shared.add(text)),
+      systemShareProvider.overrideWithValue((text, _) async => _shared.add(text)),
     ],
     child: MaterialApp.router(theme: BimTheme.light(), routerConfig: router),
   ),);

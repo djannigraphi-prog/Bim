@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/util/app_foreground.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/feedback.dart';
 import '../../wallet/data/wallet_api.dart' show coinsLabel;
@@ -57,7 +58,18 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
     super.dispose();
   }
 
+  void _schedule(Duration d) {
+    if (!mounted) return;
+    _poll?.cancel();
+    _poll = Timer(d, () => unawaited(_refresh()));
+  }
+
   Future<void> _refresh() async {
+    // App en arrière-plan : pas de lecture (batterie, forfait) ; reprise au tour suivant une fois revenue.
+    if (!appInForeground) {
+      _schedule(widget.pollEvery ?? const Duration(seconds: 5));
+      return;
+    }
     try {
       final s = await ref.read(livesApiProvider).state(widget.liveId, after: _after, giftsAfter: _giftsAfter);
       if (!mounted) return;
@@ -72,14 +84,13 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
         final fresh = s.gifts.where((g) => _seenGifts.add(g.id)).toList();
         if (fresh.isNotEmpty) _showGift(fresh.last);
       });
-      _poll?.cancel();
-      _poll = Timer(widget.pollEvery ?? Duration(seconds: s.pollSeconds), () => unawaited(_refresh()));
-    } on ApiException catch (e) {
+      _schedule(widget.pollEvery ?? Duration(seconds: s.pollSeconds));
+    } catch (e) {
       if (!mounted) return;
       setState(() => _error = e);
-      // Une erreur passagère (réseau, trop de lectures) n'arrête pas le Live : nouvel essai un peu plus tard.
-      _poll?.cancel();
-      _poll = Timer(widget.pollEvery ?? const Duration(seconds: 5), () => unawaited(_refresh()));
+      // Une erreur passagère (réseau, trop de lectures, réponse inattendue) n'arrête pas le Live : nouvel essai
+      // un peu plus tard.
+      _schedule(widget.pollEvery ?? const Duration(seconds: 5));
     }
   }
 
@@ -98,6 +109,7 @@ class _LiveRoomScreenState extends ConsumerState<LiveRoomScreen> {
     setState(() => _sending = true);
     try {
       await ref.read(livesApiProvider).comment(widget.liveId, text);
+      if (!mounted) return;
       _input.clear();
       await _refresh();
     } on ApiException catch (e) {

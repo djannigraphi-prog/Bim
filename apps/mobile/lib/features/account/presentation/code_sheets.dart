@@ -57,7 +57,13 @@ class _CodeSheetState extends State<_CodeSheet> {
       _busy = true;
       _error = null;
     });
-    final err = await widget.submit(_code.text);
+    String? err;
+    try {
+      err = await widget.submit(_code.text);
+    } catch (e) {
+      // Erreur inattendue : affichée sous le champ, le bouton n'est jamais bloqué.
+      err = e is ApiException ? e.message : ApiException.unknown.message;
+    }
     if (!mounted) return;
     if (err == null) {
       Navigator.pop(context, true);
@@ -165,12 +171,10 @@ class _PasswordSheetState extends State<_PasswordSheet> {
       final c = await widget.api.startStepUp(widget.scope, _password.text);
       if (mounted) Navigator.pop(context, c);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = e.message;
-        });
-      }
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      // Réponse inattendue comprise : le bouton n'est jamais bloqué.
+      if (mounted) setState(() => _busy = false);
     }
   }
 

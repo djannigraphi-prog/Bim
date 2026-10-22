@@ -107,7 +107,7 @@ class _ShopFormState extends ConsumerState<_ShopForm> {
     });
     try {
       await ref.read(merchantApiProvider).create(name: _name.text.trim(), city: _city.text.trim(), commune: _commune.text.trim(), description: _description.text.trim());
-      ref.invalidate(myApplicationProvider);
+      if (mounted) ref.invalidate(myApplicationProvider);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
@@ -172,7 +172,7 @@ class _ChecklistState extends ConsumerState<_Checklist> {
     setState(() => _busy = true);
     try {
       await job();
-      ref.invalidate(myApplicationProvider);
+      if (mounted) ref.invalidate(myApplicationProvider);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {

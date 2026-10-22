@@ -43,7 +43,7 @@ class ReportsScreen extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       await reportProblem(context);
-                      ref.invalidate(projectReportsProvider(_key));
+                      if (context.mounted) ref.invalidate(projectReportsProvider(_key));
                     },
                     icon: const Icon(Icons.support_outlined),
                     label: const Text('Signaler un nouveau problème'),

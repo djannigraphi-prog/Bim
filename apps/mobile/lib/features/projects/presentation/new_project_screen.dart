@@ -111,10 +111,12 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
       _error = null;
       _fieldErrors = {};
     });
+    // Conteneur capturé avant l'attente : « ref » n'est plus utilisable si l'écran est fermé pendant la création.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final api = ref.read(projectsApiProvider);
       final project = await api.create(draft);
-      ref.invalidate(myProjectsProvider);
+      container.invalidate(myProjectsProvider);
       if (_beforePhoto != null) {
         try {
           await api.uploadPhoto(project.summary.id, 'before', _beforePhoto!);
@@ -130,6 +132,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
         final m = e.fieldError(f);
         if (m != null) fields[f] = m;
       }
+      if (!mounted) return;
       setState(() {
         _fieldErrors = fields;
         _error = fields.isEmpty ? e.message : fields.values.first;
@@ -185,7 +188,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                     4 => _PhotoStep(
                         photo: _beforePhoto,
                         onPick: (camera) async {
-                          final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
+                          final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: camera));
                           if (bytes != null && mounted) setState(() => _beforePhoto = bytes);
                         },
                         onClear: () => setState(() => _beforePhoto = null),

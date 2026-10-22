@@ -14,15 +14,24 @@ import 'bimshop_widgets.dart' show formatPriceF;
 /// Texte envoyé aux autres applications (pas encore de site web : nom, prix et boutique).
 String shareText(ShopCard c) => '${c.title} · ${formatPriceF(c.priceFcfa)} · ${c.shop.name}, à voir sur BIM';
 
-/// Partage vers les autres applications ; remplaçable dans les tests.
-final systemShareProvider = Provider<Future<void> Function(String text)>(
-  (ref) => (text) async {
-    await SharePlus.instance.share(ShareParams(text: text));
+/// Partage vers les autres applications ; remplaçable dans les tests. [origin] : zone du bouton « Partager »,
+/// obligatoire sur iPad (la feuille de partage s'y ouvre en bulle au-dessus du bouton, sinon l'app plante).
+final systemShareProvider = Provider<Future<void> Function(String text, Rect? origin)>(
+  (ref) => (text, origin) async {
+    await SharePlus.instance.share(ShareParams(text: text, sharePositionOrigin: origin));
   },
 );
 
+/// Zone à l'écran du widget [context] (bouton « Partager »), pour placer la feuille de partage sur iPad.
+Rect? shareOrigin(BuildContext context) {
+  final box = context.findRenderObject();
+  if (box is! RenderBox || !box.hasSize) return null;
+  return box.localToGlobal(Offset.zero) & box.size;
+}
+
 /// V1 (19/10/2026) — « Partager » un article : à quelqu'un dans BIM (une conversation) ou vers une autre application.
-Future<void> showShareProductSheet(BuildContext context, WidgetRef ref, ShopCard card) async {
+Future<void> showShareProductSheet(BuildContext context, WidgetRef ref, ShopCard card, {Rect? origin}) async {
+  final anchor = origin ?? shareOrigin(context);
   final choice = await showModalBottomSheet<String>(
     context: context,
     builder: (ctx) => SafeArea(
@@ -49,7 +58,11 @@ Future<void> showShareProductSheet(BuildContext context, WidgetRef ref, ShopCard
   );
   if (!context.mounted || choice == null) return;
   if (choice == 'system') {
-    await ref.read(systemShareProvider)(shareText(card));
+    try {
+      await ref.read(systemShareProvider)(shareText(card), anchor);
+    } catch (_) {
+      if (context.mounted) showBimSnack(context, 'Impossible d’ouvrir le partage. Réessaie.');
+    }
     return;
   }
   if (ref.read(sessionProvider) is! SessionSignedIn) {
@@ -62,9 +75,10 @@ Future<void> showShareProductSheet(BuildContext context, WidgetRef ref, ShopCard
     builder: (_) => const _PickConversation(),
   );
   if (!context.mounted || picked == null) return;
+  final container = ProviderScope.containerOf(context, listen: false);
   try {
-    await ref.read(messagingApiProvider).sendProduct(picked.id, card.id);
-    ref.invalidate(conversationsProvider);
+    await container.read(messagingApiProvider).sendProduct(picked.id, card.id);
+    container.invalidate(conversationsProvider);
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Envoyé à ${picked.title}')));
   } on ApiException catch (e) {
     if (context.mounted) showApiError(context, e);

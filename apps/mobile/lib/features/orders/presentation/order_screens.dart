@@ -478,8 +478,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
-      ref.invalidate(_orderProvider(o.id));
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(_orderProvider(o.id));
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -494,8 +496,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
-      ref.invalidate(_orderProvider(o.id));
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(_orderProvider(o.id));
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -505,13 +509,27 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     try {
       final r = await ref.read(ordersApiProvider).startOnlinePayment(o.id);
       final url = r.redirectUrl == null ? null : Uri.tryParse(r.redirectUrl!);
-      if (url != null && url.scheme == 'https') await ref.read(urlOpenerProvider)(url);
+      if (url != null && url.scheme == 'https') {
+        // Navigateur absent ou refusé : on le dit, au lieu d'inviter à valider un paiement jamais affiché.
+        bool opened;
+        try {
+          opened = await ref.read(urlOpenerProvider)(url);
+        } catch (_) {
+          opened = false;
+        }
+        if (!opened) {
+          if (mounted) showBimSnack(context, 'Impossible d’ouvrir la page de paiement.');
+          return;
+        }
+      }
       if (mounted) showBimSnack(context, 'Valide le paiement, puis reviens ici et touche « Vérifier mon paiement ».');
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
-      ref.invalidate(_orderProvider(o.id));
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(_orderProvider(o.id));
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -526,8 +544,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
-      ref.invalidate(_orderProvider(o.id));
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(_orderProvider(o.id));
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -569,8 +589,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
-      ref.invalidate(_orderProvider(o.id));
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(_orderProvider(o.id));
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -579,14 +601,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final reason = await _askReason(context, title: proposal ? 'Refuser cette proposition ?' : 'Annuler la commande ?', action: proposal ? 'Refuser' : 'Annuler la commande', required: false);
     if (reason == null || !mounted) return;
     setState(() => _busy = true);
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(ordersApiProvider).cancel(o.id, reason: reason.isEmpty ? null : reason);
-      ref
+      container
         ..invalidate(_orderProvider(o.id))
         ..invalidate(myOrdersProvider);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
-      ref.invalidate(_orderProvider(o.id));
+      container.invalidate(_orderProvider(o.id));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -618,7 +641,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
               o: o,
               onSupport: (id) => _call(o, (api) => api.incidentToSupport(id), done: 'Dossier transmis au support'),
               onAddPhoto: (id) async {
-                final bytes = await ref.read(photoSourceProvider).pick(camera: false);
+                final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: false));
                 if (bytes != null && mounted) await _call(o, (api) => api.addIncidentPhoto(id, bytes), done: 'Photo ajoutée');
               },
               top: [
@@ -835,11 +858,15 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
       _busy = true;
       _codeError = null;
     });
+    // Conteneur capturé avant l'attente : les listes de commandes sont rafraîchies même si l'écran a été fermé.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(shopOrdersApiProvider).act(widget.orderId, action, reason: reason, code: code, amountFcfa: amountFcfa);
-      if (done != null && mounted) showBimSnack(context, done);
+      if (!mounted) return;
+      if (done != null) showBimSnack(context, done);
       _code.clear();
     } on ApiException catch (e) {
+      if (!mounted) return;
       if (action == 'handover' && (e.code == 'HANDOVER_CODE_INVALID' || e.code == 'HANDOVER_CODE_BLOCKED')) {
         final left = e.details['remaining'];
         setState(() => _codeError = e.code == 'HANDOVER_CODE_INVALID' && left is int ? '${e.message} Essais restants : $left.' : e.message);
@@ -847,7 +874,7 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
         showApiError(context, e);
       }
     } finally {
-      ref
+      container
         ..invalidate(_shopOrderProvider(widget.orderId))
         ..invalidate(shopOrdersProvider)
         ..invalidate(shopOrderCountsProvider);
@@ -872,13 +899,16 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
-      ref.invalidate(_shopOrderProvider(widget.orderId));
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(_shopOrderProvider(widget.orderId));
+        setState(() => _busy = false);
+      }
     }
   }
 
   Future<void> _selectCourier(OrderDetail o) async {
     final done = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, builder: (_) => _CandidatesSheet(orderId: o.id));
+    if (!mounted) return;
     ref.invalidate(_shopOrderProvider(widget.orderId));
     if (done == true && mounted) showBimSnack(context, 'Livreur sollicité : il doit accepter la mission.');
   }
@@ -898,7 +928,7 @@ class _ShopOrderScreenState extends ConsumerState<ShopOrderScreen> {
               asShop: true,
               onSupport: (id) => _call(() => ref.read(shopOrdersApiProvider).incidentToSupport(id), done: 'Dossier transmis au support'),
               onAddPhoto: (id) async {
-                final bytes = await ref.read(photoSourceProvider).pick(camera: false);
+                final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: false));
                 if (bytes != null && mounted) await _call(() => ref.read(shopOrdersApiProvider).addIncidentPhoto(id, bytes), done: 'Photo ajoutée');
               },
               top: [
@@ -1010,10 +1040,12 @@ class _CandidatesSheetState extends ConsumerState<_CandidatesSheet> {
       if (mounted) {
         setState(() {
           _error = e.message;
-          _busy = false;
           _list = ref.read(shopOrdersApiProvider).candidates(widget.orderId);
         });
       }
+    } finally {
+      // Réponse inattendue comprise : les boutons ne restent jamais bloqués.
+      if (mounted && _busy) setState(() => _busy = false);
     }
   }
 

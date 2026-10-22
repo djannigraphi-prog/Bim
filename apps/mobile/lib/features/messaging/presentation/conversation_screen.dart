@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/util/app_foreground.dart';
 import '../../../core/util/date_fr.dart';
 import '../../../core/widgets/bim_button.dart';
 import '../../../core/widgets/feedback.dart';
@@ -83,22 +84,33 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   void dispose() {
     _timer?.cancel();
     _recTimer?.cancel();
-    if (_recorder != null) unawaited(_recorder!.cancel());
+    if (_recorder != null) unawaited(_recorder!.cancel().catchError((Object _) {}));
     _input.dispose();
     super.dispose();
   }
 
   // ------------------------------------------------------------------ V1 : messages vocaux
 
+  /// Démarrage du micro en cours : un double appui ne lance pas deux enregistrements.
+  bool _starting = false;
+
   Future<void> _startRecording() async {
+    if (_starting || _recorder != null) return;
+    _starting = true;
     final rec = ref.read(voiceRecorderProvider);
     bool ok;
     try {
       ok = await rec.start();
     } catch (_) {
       ok = false;
+    } finally {
+      _starting = false;
     }
-    if (!mounted) return;
+    if (!mounted) {
+      // Écran fermé pendant le démarrage : le micro est relâché.
+      if (ok) unawaited(rec.cancel().catchError((Object _) {}));
+      return;
+    }
     if (!ok) {
       showBimSnack(context, 'Autorise le micro dans les réglages du téléphone pour envoyer un vocal.');
       return;
@@ -107,6 +119,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       _recorder = rec;
       _recElapsed = Duration.zero;
     });
+    _recTimer?.cancel();
     _recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => _recElapsed += const Duration(seconds: 1));
@@ -164,7 +177,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   /// Nouveaux messages et statuts « Vu » ; erreurs silencieuses (nouvel essai au tour suivant).
   Future<void> _refresh() async {
-    if (_loading || _sending) return;
+    if (_loading || _sending || !appInForeground) return;
     try {
       final page = await _api.messages(widget.conversationId);
       if (!mounted) return;
@@ -178,6 +191,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (_conversation?.isRequest ?? false) return; // lire une demande ne prévient pas son auteur
     try {
       await _api.read(widget.conversationId);
+      if (!mounted) return;
       ref.invalidate(widget.asShop ? shopInboxUnreadProvider : messagesUnreadProvider);
     } catch (_) {}
   }
@@ -219,7 +233,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         final updated = await _api.conversation(widget.conversationId);
         if (mounted) setState(() => _conversation = updated);
       }
-      ref.invalidate(widget.asShop ? shopInboxProvider : conversationsProvider);
+      if (mounted) ref.invalidate(widget.asShop ? shopInboxProvider : conversationsProvider);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     } catch (_) {
@@ -243,8 +257,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final bytes = await ref.read(photoSourceProvider).pick(camera: false);
-    if (bytes != null) await _send(photo: bytes);
+    final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: false));
+    if (bytes != null && mounted) await _send(photo: bytes);
   }
 
   Future<void> _answerRequest(bool accept) async {
@@ -255,9 +269,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         await _load();
       } else {
         await api.decline(widget.conversationId);
-        if (mounted) context.canPop() ? context.pop() : context.go('/home');
+        if (!mounted) return;
+        _invalidateLists();
+        context.canPop() ? context.pop() : context.go('/home');
+        return;
       }
-      _invalidateLists();
+      if (mounted) _invalidateLists();
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);
     }

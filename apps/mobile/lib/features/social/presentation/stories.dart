@@ -32,12 +32,14 @@ class StoriesBar extends ConsumerWidget {
         ),
       ),
     );
-    if (camera == null) return;
-    final bytes = await ref.read(photoSourceProvider).pick(camera: camera);
-    if (bytes == null) return;
+    if (camera == null || !context.mounted) return;
+    final bytes = await pickWithFeedback(context, () => ref.read(photoSourceProvider).pick(camera: camera));
+    if (bytes == null || !context.mounted) return;
+    // Conteneur capturé avant l'envoi : la liste des stories est rafraîchie même si l'écran a changé entre-temps.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
-      await ref.read(socialApiProvider).createStory(bytes);
-      ref.invalidate(storiesProvider);
+      await container.read(socialApiProvider).createStory(bytes);
+      container.invalidate(storiesProvider);
       if (context.mounted) showBimSnack(context, 'Ta story est en ligne pour 24 heures.');
     } on ApiException catch (e) {
       if (context.mounted) showApiError(context, e);
@@ -46,7 +48,7 @@ class StoriesBar extends ConsumerWidget {
 
   Future<void> _open(BuildContext context, WidgetRef ref, List<StoryGroup> groups, int index) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => StoryViewer(groups: groups, initialGroup: index)));
-    ref.invalidate(storiesProvider);
+    if (context.mounted) ref.invalidate(storiesProvider);
   }
 
   @override
@@ -152,10 +154,14 @@ class _Bubble extends StatelessWidget {
 
 /// Lecteur de stories plein écran : 5 secondes par photo, toucher à droite pour avancer, à gauche pour revenir.
 class StoryViewer extends ConsumerStatefulWidget {
-  const StoryViewer({super.key, required this.groups, this.initialGroup = 0});
+  const StoryViewer({super.key, required this.groups, this.initialGroup = 0, this.imageFor = networkStoryImage});
 
   final List<StoryGroup> groups;
   final int initialGroup;
+  /// Image d'une story (remplaçable dans les tests, où le réseau n'existe pas).
+  final ImageProvider Function(String url) imageFor;
+
+  static ImageProvider networkStoryImage(String url) => NetworkImage(url);
 
   @override
   ConsumerState<StoryViewer> createState() => _StoryViewerState();
@@ -178,10 +184,13 @@ class _StoryViewerState extends ConsumerState<StoryViewer> with SingleTickerProv
     return s is SessionSignedIn && s.me.id == _group.author.id;
   }
 
+  /// Story dont la photo est affichée et le minuteur lancé (null : photo en cours de chargement).
+  String? _startedFor;
+
   @override
   void initState() {
     super.initState();
-    _show();
+    _progress.value = 0;
   }
 
   @override
@@ -190,10 +199,26 @@ class _StoryViewerState extends ConsumerState<StoryViewer> with SingleTickerProv
     super.dispose();
   }
 
+  /// Nouvelle story : le minuteur attend que la photo soit affichée (réseau lent : pas 5 secondes d'écran noir).
   void _show() {
-    _progress.forward(from: 0);
-    if (!_mine && !_item.seen) unawaited(_markSeen(_item.id));
+    _progress
+      ..stop()
+      ..value = 0;
+    setState(() => _startedFor = null);
   }
+
+  /// Photo affichée (ou en erreur) : le minuteur démarre ; la « vue » n'est enregistrée que si la photo a été vue.
+  void _onImage(String id, {required bool loaded}) {
+    if (_startedFor == id) return;
+    _startedFor = id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _item.id != id) return;
+      unawaited(_progress.forward(from: 0));
+      if (loaded && !_mine && !_item.seen) unawaited(_markSeen(id));
+    });
+  }
+
+  bool get _running => _startedFor == _item.id;
 
   /// « Vue » enregistrée sans gêner la lecture : une erreur réseau est sans conséquence.
   Future<void> _markSeen(String id) async {
@@ -271,7 +296,7 @@ class _StoryViewerState extends ConsumerState<StoryViewer> with SingleTickerProv
           return;
         }
     }
-    if (mounted) unawaited(_progress.forward());
+    if (mounted && _running) unawaited(_progress.forward());
   }
 
   @override
@@ -284,16 +309,25 @@ class _StoryViewerState extends ConsumerState<StoryViewer> with SingleTickerProv
           behavior: HitTestBehavior.opaque,
           onTapUp: (d) => d.localPosition.dx > MediaQuery.sizeOf(context).width / 3 ? _next() : _previous(),
           onLongPressStart: (_) => _progress.stop(),
-          onLongPressEnd: (_) => _progress.forward(),
+          onLongPressEnd: (_) {
+            if (_running) unawaited(_progress.forward());
+          },
           child: Stack(
             fit: StackFit.expand,
             children: [
               Center(
-                child: Image.network(
-                  _item.url,
+                child: Image(
+                  image: widget.imageFor(_item.url),
                   key: ValueKey(_item.id),
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: BimColors.grey400, size: 48),
+                  frameBuilder: (_, child, frame, sync) {
+                    if (frame != null || sync) _onImage(_item.id, loaded: true);
+                    return frame != null || sync ? child : const Center(child: CircularProgressIndicator(color: BimColors.white));
+                  },
+                  errorBuilder: (_, __, ___) {
+                    _onImage(_item.id, loaded: false);
+                    return const Icon(Icons.broken_image_outlined, color: BimColors.grey400, size: 48);
+                  },
                 ),
               ),
               Positioned(

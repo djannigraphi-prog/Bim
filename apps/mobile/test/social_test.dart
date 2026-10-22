@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
 import 'package:bim/core/theme/app_theme.dart';
@@ -205,7 +208,40 @@ Future<GoRouter> _pump(WidgetTester tester, Widget screen, _FakeSocial social, {
   return router;
 }
 
+/// Fil dont la page suivante arrive en retard (réseau lent), après une actualisation.
+class _SlowNextPage extends SocialApi {
+  _SlowNextPage() : super(_client());
+  int builds = 0;
+  final nextPage = Completer<FeedPage>();
+
+  @override
+  Future<FeedPage> feed({required String tab, String? cursor}) {
+    if (cursor != null) return nextPage.future;
+    builds++;
+    return Future.value(FeedPage(items: [_post('fresh$builds')], nextCursor: 'c$builds'));
+  }
+}
+
 void main() {
+  test('page suivante de l’ancien fil arrivée après une actualisation : ignorée (n’écrase pas le fil actualisé)', () async {
+    final api = _SlowNextPage();
+    final c = ProviderContainer(overrides: [socialApiProvider.overrideWithValue(api)]);
+    addTearDown(c.dispose);
+    final sub = c.listen(feedProvider('for_you'), (_, __) {});
+    addTearDown(sub.close);
+    await c.read(feedProvider('for_you').future);
+    final more = c.read(feedProvider('for_you').notifier).loadMore();
+    c.invalidate(feedProvider('for_you'));
+    await c.read(feedProvider('for_you').future);
+    expect(api.builds, 2);
+    api.nextPage.complete(FeedPage(items: [_post('old-page-2')], nextCursor: 'old'));
+    await more;
+    final s = c.read(feedProvider('for_you')).requireValue;
+    expect(s.items.map((p) => p.id), ['fresh2']);
+    expect(s.nextCursor, 'c2');
+    expect(s.loadingMore, isFalse);
+  });
+
   test('compteurs abrégés, durée écoulée et résumé du parcours', () {
     expect(compactCount(950), '950');
     expect(compactCount(10200), '10,2 k');
@@ -361,6 +397,8 @@ void main() {
 
   testWidgets('lecteur de stories : auteur, avancée au toucher, vue enregistrée, fermeture à la fin', (tester) async {
     final social = _FakeSocial();
+    // Photo réelle (1 × 1 pixel) : le minuteur et la « vue » attendent qu'elle soit affichée.
+    final photo = MemoryImage(base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='));
     final groups = [
       StoryGroup(author: _awa, allSeen: false, items: [
         StoryItem(id: 's1', url: 'http://127.0.0.1:9/s1.jpg', createdAt: DateTime.now().subtract(const Duration(hours: 2)), seen: false),
@@ -372,7 +410,7 @@ void main() {
       Builder(
         builder: (context) => Scaffold(
           body: TextButton(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryViewer(groups: groups))),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryViewer(groups: groups, imageFor: (_) => photo))),
             child: const Text('ouvrir'),
           ),
         ),
@@ -383,6 +421,14 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.textContaining('Awa Koné · il y a 2 h'), findsOneWidget);
+    // Photo pas encore chargée : ni minuteur ni « vue » (réseau lent).
+    expect(social.calls, isEmpty);
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.textContaining('Awa Koné · il y a 2 h'), findsOneWidget);
+    // Photo affichée : la vue est enregistrée et le minuteur démarre.
+    await tester.runAsync(() => precacheImage(photo, tester.element(find.byType(StoryViewer))));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(social.calls, ['view s1']);
     await tester.tapAt(const Offset(700, 300)); // à droite : story suivante (déjà vue : rien n'est renvoyé)
     await tester.pump();

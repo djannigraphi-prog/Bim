@@ -36,9 +36,11 @@ class _NewGroupScreenState extends ConsumerState<NewGroupScreen> {
 
   Future<void> _create() async {
     setState(() => _busy = true);
+    // Conteneur capturé avant l'attente : la liste des conversations est rafraîchie même si l'écran a été fermé.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final r = await ref.read(messagingApiProvider).createGroup(_title.text.trim(), parseUsernames(_people.text));
-      ref.invalidate(conversationsProvider);
+      container.invalidate(conversationsProvider);
       if (!mounted) return;
       if (r.notAdded.isNotEmpty) showBimSnack(context, 'Pas ajouté·es : ${r.notAdded.map((u) => '@$u').join(', ')}');
       context.pushReplacement('/messages/${r.conversation.id}');
@@ -188,10 +190,11 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(messagingApiProvider).leaveGroup(widget.conversationId);
-      ref.invalidate(conversationsProvider);
+      container.invalidate(conversationsProvider);
       if (mounted) context.pop(true);
     } on ApiException catch (e) {
       if (mounted) showApiError(context, e);

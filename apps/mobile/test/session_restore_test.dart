@@ -6,6 +6,7 @@ import 'package:bim/features/auth/data/auth_api.dart';
 import 'package:bim/features/auth/data/models.dart';
 import 'package:bim/features/auth/presentation/splash_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,6 +26,18 @@ class _MemoryTokens extends TokenStorage {
 
   @override
   Future<void> clear() async => access = refresh = null;
+}
+
+/// Trousseau du téléphone illisible (clé Keystore perdue après une restauration de sauvegarde) : tout lève une erreur.
+class _BrokenTokens extends TokenStorage {
+  @override
+  Future<String?> accessToken() async => throw const PlatformException(code: 'Exception', message: 'BadPaddingException');
+  @override
+  Future<String?> refreshToken() async => throw const PlatformException(code: 'Exception', message: 'BadPaddingException');
+  @override
+  Future<void> save({required String accessToken, required String refreshToken}) async => throw const PlatformException(code: 'Exception', message: 'KeyStoreException');
+  @override
+  Future<void> clear() async => throw const PlatformException(code: 'Exception', message: 'KeyStoreException');
 }
 
 /// Serveur simulé : /v1/me répond par l'erreur donnée (ou un profil), /v1/auth/logout réussit.
@@ -91,6 +104,35 @@ void main() {
       await c.read(sessionProvider.notifier).restore();
       expect(c.read(sessionProvider), isA<SessionSignedIn>());
       expect(api.meCalls, 2);
+    });
+  });
+
+  group('trousseau du téléphone illisible : jamais bloqué sur l’écran d’accueil', () {
+    test('au démarrage : déconnecté proprement', () async {
+      final api = _FakeAuth(null);
+      final c = ProviderContainer(overrides: [tokenStorageProvider.overrideWithValue(_BrokenTokens()), authApiProvider.overrideWithValue(api)]);
+      addTearDown(c.dispose);
+      await c.read(sessionProvider.notifier).restore();
+      expect(c.read(sessionProvider), isA<SessionSignedOut>());
+      expect(api.meCalls, 0);
+    });
+
+    test('à la connexion : erreur claire, pas de session à moitié enregistrée', () async {
+      final c = ProviderContainer(overrides: [tokenStorageProvider.overrideWithValue(_BrokenTokens()), authApiProvider.overrideWithValue(_FakeAuth(null))]);
+      addTearDown(c.dispose);
+      final me = Me.fromJson(const {'id': 'u1', 'fullName': 'Awa Koné', 'username': 'awa.kone', 'city': 'Cocody', 'contacts': <dynamic>[]});
+      await expectLater(
+        c.read(sessionProvider.notifier).completeSignIn((tokens: const Tokens(accessToken: 'a', refreshToken: 'r'), me: me)),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'STORAGE')),
+      );
+      expect(c.read(sessionProvider), isA<SessionSignedOut>());
+    });
+
+    test('se déconnecter : toujours possible', () async {
+      final c = ProviderContainer(overrides: [tokenStorageProvider.overrideWithValue(_BrokenTokens()), authApiProvider.overrideWithValue(_FakeAuth(null))]);
+      addTearDown(c.dispose);
+      await c.read(sessionProvider.notifier).signOut();
+      expect(c.read(sessionProvider), isA<SessionSignedOut>());
     });
   });
 
