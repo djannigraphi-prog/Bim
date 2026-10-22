@@ -111,7 +111,7 @@ void main() {
   });
 
   test('envoi d’une photo (multipart) avec un jeton expiré : rafraîchi puis renvoyé avec une copie du formulaire', () async {
-    final (dio, server, _, _) = _client(_MemoryTokens(_jwt('user', 'u1'), 'r1'), (o) {
+    final (dio, server, _, _) = _client(_MemoryTokens(_jwt('user', 'u1').replaceFirst('.sig', '.old'), 'r1'), (o) {
       if (o.path == '/v1/auth/refresh') return _json(200, {'tokens': {'accessToken': userNew, 'refreshToken': 'r2'}});
       if (o.headers['Authorization'] == 'Bearer $userNew') return _json(201, {'ok': true});
       return _json(401, {'error': {'code': 'UNAUTHENTICATED', 'message': 'Connecte-toi.'}});

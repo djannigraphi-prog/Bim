@@ -67,7 +67,7 @@ class _FakeVideo implements VideoSource {
 /// Comme le vrai sélecteur quand l'accès à la galerie a été refusé.
 class _DeniedVideo implements VideoSource {
   @override
-  Future<List<int>?> pick() async => throw const PlatformException(code: 'photo_access_denied', message: 'The user did not allow photo access.');
+  Future<List<int>?> pick() async => throw PlatformException(code: 'photo_access_denied', message: 'The user did not allow photo access.');
 }
 
 /// Vidéo de plus de 100 Mo (sans allouer 100 Mo en mémoire).

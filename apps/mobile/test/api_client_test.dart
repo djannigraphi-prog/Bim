@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/network/api_exception.dart';
@@ -88,21 +87,21 @@ void main() {
   group('sélecteur de photos du téléphone : erreurs traduites', () {
     test('autorisation refusée', () async {
       await expectLater(
-        guardPicker<List<int>>(() => throw const PlatformException(code: 'photo_access_denied', message: 'denied')),
+        guardPicker<List<int>>(() => throw PlatformException(code: 'photo_access_denied', message: 'denied')),
         throwsA(isA<ApiException>().having((e) => e.message, 'message', 'Autorise l’appareil photo et la galerie dans les réglages du téléphone.')),
       );
-      await expectLater(guardPicker<List<int>>(() => throw const PlatformException(code: 'camera_access_denied')), throwsA(same(pickerDenied)));
+      await expectLater(guardPicker<List<int>>(() => throw PlatformException(code: 'camera_access_denied')), throwsA(same(pickerDenied)));
     });
 
     test('pas d’appareil photo', () async {
       await expectLater(
-        guardPicker<List<int>>(() => throw const PlatformException(code: 'no_available_camera')),
+        guardPicker<List<int>>(() => throw PlatformException(code: 'no_available_camera')),
         throwsA(isA<ApiException>().having((e) => e.code, 'code', 'PICKER_NO_CAMERA')),
       );
     });
 
     test('sélecteur déjà ouvert (double appui) : rien, sans erreur', () async {
-      expect(await guardPicker<List<int>>(() => throw const PlatformException(code: 'already_active')), isNull);
+      expect(await guardPicker<List<int>>(() => throw PlatformException(code: 'already_active')), isNull);
     });
 
     test('autre erreur (fichier illisible) : message générique, et l’ApiException passe telle quelle', () async {

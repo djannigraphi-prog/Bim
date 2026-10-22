@@ -31,13 +31,13 @@ class _MemoryTokens extends TokenStorage {
 /// Trousseau du téléphone illisible (clé Keystore perdue après une restauration de sauvegarde) : tout lève une erreur.
 class _BrokenTokens extends TokenStorage {
   @override
-  Future<String?> accessToken() async => throw const PlatformException(code: 'Exception', message: 'BadPaddingException');
+  Future<String?> accessToken() async => throw PlatformException(code: 'Exception', message: 'BadPaddingException');
   @override
-  Future<String?> refreshToken() async => throw const PlatformException(code: 'Exception', message: 'BadPaddingException');
+  Future<String?> refreshToken() async => throw PlatformException(code: 'Exception', message: 'BadPaddingException');
   @override
-  Future<void> save({required String accessToken, required String refreshToken}) async => throw const PlatformException(code: 'Exception', message: 'KeyStoreException');
+  Future<void> save({required String accessToken, required String refreshToken}) async => throw PlatformException(code: 'Exception', message: 'KeyStoreException');
   @override
-  Future<void> clear() async => throw const PlatformException(code: 'Exception', message: 'KeyStoreException');
+  Future<void> clear() async => throw PlatformException(code: 'Exception', message: 'KeyStoreException');
 }
 
 /// Serveur simulé : /v1/me répond par l'erreur donnée (ou un profil), /v1/auth/logout réussit.
