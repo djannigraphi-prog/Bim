@@ -1,6 +1,6 @@
 # Lot Marchands — modèle économique, vérification et recommandations : conception
 
-**Version 1 du 28/10/2026.** Document de conception à valider par le fondateur. **Aucune migration exécutée, aucun
+**Version 2 du 28/10/2026**, avec le document « Algorithme de recommandation et de promotion » du fondateur (§7). Document de conception à valider par le fondateur. **Aucune migration exécutée, aucun
 code fonctionnel écrit, aucun prestataire activé, aucune dépense, aucun paiement réel.** Source : cahier des charges du
 fondateur du 28/10/2026 (« modèle économique marchands et système de vérification »), `DECISIONS.md` et le code de
 `main` (commit 58a27fd).
@@ -169,27 +169,56 @@ modifications de tables existantes sont **additives** (colonnes facultatives ou 
 
 ---
 
-## 7. Moteur de recommandation v1 [PROPOSÉ]
+## 7. Moteur de recommandation BimShop [PROPOSÉ]
 
-Module à part (`modules/recommendations`), **fonctions pures** testées sans base de données ; toutes les valeurs
-viennent des réglages `reco.*`, pour ajuster sans redéployer.
+**Référence : document du fondateur « BIM Shop – Algorithme de recommandation et de promotion » (28/10/2026).** Il
+remplace le §5 du cahier des charges pour BimShop. L'accueil aura son propre algorithme, plus tard.
 
-1. **Filtres éliminatoires** : boutique suspendue ; qualité sous `reco.quality_min` ; catégorie SENSIBLE sans audit ni
-   article revu ; hors zone ; rupture de stock ; contenu masqué par la personne.
-2. **Score** = Pertinence × Qualité × Proximité × Fraîcheur × Boost × Équité.
-   - Pertinence : intérêts déclarés + signaux récents avec demi-vie de 7 jours, comparés aux catégories de
-     l'article, de la boutique ou du Live.
-   - Qualité : note bayésienne de la boutique (tirée vers la moyenne générale s'il y a peu d'avis) + taux de réponse
-     − litiges − signalements validés.
-   - Proximité : 1 / (1 + distance_km / 3), distance entre centres de communes.
-   - Fraîcheur : petit bonus pour les contenus récents. Boost : 1,0 ou 1,4. Équité : réduit le boost d'une boutique
-     Premium déjà très exposée cette semaine dans sa catégorie et sa commune.
-3. **Composition des 10** : 3 positions « Partenaire vérifié » au plus, 1 à 2 « Sponsorisé » à places fixes,
-   1 « découverte » pour une nouvelle boutique de bonne qualité, 2 éléments au plus par boutique.
-4. « **Pourquoi je vois ça ?** » sur chaque élément.
+Module à part (`modules/recommendations`) en **fonctions pures** testées sans base de données, une par facteur et par
+règle, appelées par un service qui lit les données. Toutes les valeurs du tableau « Paramètres par défaut » du document
+deviennent des réglages `reco.*` (demi-vie 3 jours, poids des actions, m = 10, seuil 3,5, rayons, V, boost 1,4,
+plancher d'équité 0,5, plafond de 15 Premium par catégorie et commune, modèle de bloc, 3 Premium par bloc, pertinence
+minimale d'une pub 0,3, 3 notifications de Live par jour, 3 affichages sans clic en 3 jours).
 
-Tests unitaires : chaque facteur, chaque filtre, la composition (plafonds, places fixes, découverte, diversité) et des
-cas limites (aucun avis, distance inconnue, personnalisation désactivée).
+**Vérification de l'exemple du document** (salles de sport à Cocody) : avec les formules du document, le calcul donne
+bien B = 0,71, A = 0,42, C = 0,32. Ce cas devient un test unitaire.
+
+### 7.1 Ce que l'algorithme demande et que le code n'a pas
+
+| Besoin de l'algorithme | État actuel | Proposition |
+| --- | --- | --- |
+| **Tags** sur les articles (« tresses », « soins du visage »…) | Une seule catégorie par article | Table `product_tags` + liste de tags gérée dans l'administration ; lien objectifs d'inscription → tags |
+| **Objectifs déclarés** (s'aimer davantage, perdre du poids, prendre soin de sa peau…) | 10 « intérêts » de style (mode, coiffure…) | Nouvelle liste d'objectifs à l'inscription, modifiable dans le profil **[QUESTION Q9]** |
+| **Type d'offre** : livrable, retrait en boutique, service sur place | `kind` = `product` ou `service` seulement | Colonne `offer_mode` sur l'article |
+| **Zone de livraison** du marchand | Communes desservies par les livreurs, pas par boutique | Table `shop_delivery_zones` (communes ou ville entière) |
+| **Position de l'utilisateur** à 1 km près (rayon de 3 km pour les services) | Ville en texte libre, aucune position | Position du téléphone **avec autorisation**, arrondie, jamais conservée en historique ; à défaut, centre de la commune déclarée **[QUESTION Q10]** |
+| **Position exacte de la boutique** | Aucune | Saisie par le marchand, confirmée par la visite |
+| **Note visuelle V** (résolution, flou, éclairage, propreté, esthétique) | Rien | Résolution, flou et exposition calculés par le serveur à l'ajout de la photo (bibliothèque déjà installée) ; propreté et esthétique « type NIMA » : **modèle d'IA à héberger ou service payant [COÛT] [QUESTION Q11]** ; réaction réelle après 200 affichages ; « Coup de cœur BIM » choisi dans l'administration |
+| **Affichages, clics, « Pas intéressé »** | Rien n'est enregistré | Journal des affichages (agrégé), bouton « Pas intéressé » |
+| **Taux de réponse, litiges** (fiabilité) | Messages et incidents existent | Calcul nocturne par boutique |
+| **Popularité** (j'aime + 3 × recommandations, 30 jours) | Données présentes | Rang calculé chaque nuit par catégorie |
+| **Utilisateurs en ligne** (Lives) | Aucune présence | Dernière activité de la session (mise à jour légère) |
+| **Plafond de 15 Premium par catégorie et commune, liste d'attente** | Rien | Contrôle à la souscription, table `premium_waitlist` |
+| **Test sur la moitié des utilisateurs pendant 2 semaines** | Rien | Groupe A / B stable par personne, réglage par groupe |
+| **Indicateurs** (clics, « pas intéressé », Premium vs standard, équité, renouvellements) | Rien | Écran d'indicateurs dans l'administration (P5) |
+
+### 7.2 Différences avec le premier cahier des charges, à confirmer **[QUESTION Q12]**
+
+| Point | Cahier des charges | Algorithme | Proposition |
+| --- | --- | --- | --- |
+| Demi-vie des actions | 7 jours | 3 jours | 3 jours (document le plus récent) |
+| Notifications de Live | Push à l'audience intéressée pour les Premium ; 2 par jour | Push **aux abonnés hors ligne** seulement (tout marchand) ; le Premium passe en priorité dans la carte du haut ; 3 par jour ; coupure par boutique | Algorithme |
+| Catégorie sensible | « Visite obligatoire » pour être recommandé | Badge « Boutique vérifiée BIM » + article revu suffisent | Algorithme ; la mention d'audit reste distincte (§3) |
+| Liste de 10 | 3 Premium max, 1–2 pubs, 1 découverte | Bloc fixe : 5 perso, 2 tendances, 1 pub, 1 nouveauté, 1 découverte, + 2 « Nouveautés à la une » | Algorithme |
+| Campagne pas atteinte | — | « Prolongée ou remboursée en crédit » | Prolongation d'abord ; un crédit publicitaire n'est pas un remboursement en argent, mais à confirmer avec la règle « aucun remboursement dans BIM » (V1-1810-R) |
+
+### 7.3 Tests unitaires prévus
+
+Chaque facteur (P, Q avec note bayésienne, D selon le type d'offre, F, V, Pop, B, E avec plancher), chaque filtre
+éliminatoire (dont « visible en recherche mais jamais recommandé »), la composition d'un bloc (positions, étiquettes,
+3 Premium, 2 par boutique, pas de doublon, sous-catégories non collées, 6 premières cartes avec V ≥ 1,0), les
+« Nouveautés à la une », le démarrage à froid (moins de 20 actions : 40 / 30 / 20 / 10 %), le choix de la publicité
+(pertinence ≥ 0,3, rythme, 3 affichages par personne), les publics d'un Live, et l'exemple des salles de sport.
 
 ---
 
@@ -237,6 +266,10 @@ noire, campagne sponsorisée active. Noms et contenus inventés, chargés seulem
 | Q6 | « Application 100 % gratuite » : le **Premium utilisateur** (2 000 FCFA : Peni IA, gadgets des Lives) est-il maintenu ? |
 | Q7 | Vocabulaire interdit (« garanti », « efficace », « sans risque ») : aussi dans les textes écrits par les marchands ? |
 | Q8 | Canal de paiement des abonnements marchands : Mobile Money hors de l'app, ou achats intégrés des stores (voir §9) ? |
+| Q9 | Liste exacte des **objectifs** proposés à l'inscription (remplace-t-elle les 10 intérêts actuels ?) et des **tags** de départ ? |
+| Q10 | Position de l'utilisateur : position du téléphone (avec autorisation) ou commune déclarée ? Le rayon de 3 km des services n'est fiable qu'avec la position du téléphone. |
+| Q11 | Note esthétique « type NIMA » : héberger un modèle (coût de serveur) ou commencer sans, avec seulement résolution, flou, éclairage et réactions des utilisateurs ? |
+| Q12 | Confirmer que le document « Algorithme » l'emporte sur le cahier des charges pour les différences du §7.2. |
 
 Une fois ces réponses données et le schéma du §5 validé, la phase P1 commence par sa migration, présentée avant
 exécution.
