@@ -3,6 +3,7 @@
 
 - Petite icône de la barre d'état « ic_stat_bim » : le « B » de BIM en blanc sur fond transparent (Android exige une
   icône monochrome ; il la colore lui-même), aux 5 densités d'écran.
+- Petite icône des rappels de Peni « ic_stat_peni » : silhouette blanche de Peni, aux 5 densités.
 - Avatar de Peni affiché dans la notification (« grande icône ») : copies en image des poses existantes, sans aucune
   modification du dessin de Peni (les fichiers SVG de l'app restent la référence).
 
@@ -42,16 +43,42 @@ def small_icon(size: int) -> Image.Image:
     return canvas
 
 
+def peni_silhouette(size: int) -> Image.Image:
+    """Silhouette blanche de Peni (corps, mèche, bras, pieds) sur fond transparent, marge de 2/24 : petite icône des
+    rappels de Peni. Android colore lui-même la silhouette (couleur d'accent de BIM) ; les détails internes (yeux,
+    joues) disparaissent, seule la forme compte."""
+    inner = round(size * 20 / 24)
+    p = render(os.path.join(ASSETS, "peni/peni_happy.svg"), inner * 4)
+    alpha = p.getchannel("A").point(lambda a: 255 if a > 96 else 0)
+    # Le blanc des yeux devient transparent : la silhouette garde son regard et reste reconnaissable.
+    r, g, b, _ = p.split()
+    whites = Image.merge("RGB", (r, g, b)).convert("L").point(lambda v: 255 if v > 225 else 0)
+    alpha = Image.composite(Image.new("L", p.size, 0), alpha, whites)
+    p.putalpha(alpha)
+    p = p.crop(alpha.getbbox())
+    p.thumbnail((inner, inner), Image.LANCZOS)
+    white = Image.new("RGBA", p.size, (255, 255, 255, 0))
+    white.putalpha(p.getchannel("A"))
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    canvas.paste(white, ((size - p.width) // 2, (size - p.height) // 2), white)
+    return canvas
+
+
 def main() -> None:
     for density, size in DENSITIES.items():
         folder = os.path.join(RES, f"drawable-{density}")
         os.makedirs(folder, exist_ok=True)
         small_icon(size).save(os.path.join(folder, "ic_stat_bim.png"), optimize=True)
+        peni_silhouette(size).save(os.path.join(folder, "ic_stat_peni.png"), optimize=True)
     folder = os.path.join(RES, "drawable-nodpi")
     os.makedirs(folder, exist_ok=True)
     for pose in POSES:
         img = render(os.path.join(ASSETS, f"peni/peni_{pose}.svg"), 256)
         img.save(os.path.join(folder, f"peni_notif_{pose}.png"), optimize=True)
+        # Même image pour l'iPhone : jointe à la notification (copiée dans les fichiers de l'app au démarrage).
+        ios_dir = os.path.join(ASSETS, "peni/notif")
+        os.makedirs(ios_dir, exist_ok=True)
+        img.save(os.path.join(ios_dir, f"peni_notif_{pose}.png"), optimize=True)
     print("Icônes de notification générées dans", RES)
 
 

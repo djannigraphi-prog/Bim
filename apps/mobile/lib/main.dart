@@ -37,7 +37,7 @@ void runBim({List<Override> overrides = const [], String? baseUrl}) {
           ),
         ),
         // Notifications programmées sur le téléphone : Android pour l'instant (iOS pas encore compilé).
-        localNotifierProvider.overrideWithValue(Platform.isAndroid ? PluginLocalNotifier() : const NoopLocalNotifier()),
+        localNotifierProvider.overrideWithValue(Platform.isAndroid || Platform.isIOS ? PluginLocalNotifier() : const NoopLocalNotifier()),
         ...overrides,
       ],
       child: const BimApp(),

@@ -1,8 +1,11 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
+
+import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/theme/tokens.dart';
@@ -74,7 +77,7 @@ int reminderNotificationId(String key) {
 
 /// Notifications programmées sur le téléphone. Interface séparée de la bibliothèque pour les tests.
 abstract class LocalNotifier {
-  /// Ce téléphone sait programmer des notifications (Android pour l'instant).
+  /// Ce téléphone sait programmer des notifications (Android et iPhone).
   bool get supported;
 
   /// [onOpen] reçoit la cible quand la personne touche la notification ou « J'y vais ! » (app ouverte ou en arrière-plan).
@@ -136,7 +139,16 @@ class NoopLocalNotifier implements LocalNotifier {
 @pragma('vm:entry-point')
 void onReminderActionInBackground(NotificationResponse response) {}
 
-/// Implémentation Android (flutter_local_notifications), canal « Rappels de Peni », actions « J'y vais ! / Plus tard ».
+/// Implémentation Android et iPhone (flutter_local_notifications), canal « Rappels de Peni », actions
+/// « J'y vais ! / Plus tard ».
+///
+/// Maquette 28 : l'avatar de Peni à gauche, « Peni » en titre, le message à côté.
+/// - Android : notification de type conversation (Peni est l'expéditrice, avec son avatar), petite icône = silhouette
+///   blanche de Peni, couleur d'accent rouge BIM ; grande icône = avatar de Peni (affichée par les anciennes versions
+///   d'Android qui n'ont pas la présentation conversation).
+/// - iPhone : l'icône de l'app s'affiche toujours à gauche (règle d'Apple) ; l'avatar de Peni est joint à la
+///   notification (vignette). L'avatar à gauche demande les « notifications de communication » d'Apple, possibles
+///   seulement avec le compte Apple Developer (droit à signer) : voir docs/NOTIFICATIONS_PENI.md.
 class PluginLocalNotifier implements LocalNotifier {
   PluginLocalNotifier([FlutterLocalNotificationsPlugin? plugin]) : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
@@ -144,18 +156,46 @@ class PluginLocalNotifier implements LocalNotifier {
   bool _launchTaken = false;
 
   @override
-  bool get supported => Platform.isAndroid;
+  bool get supported => Platform.isAndroid || Platform.isIOS;
 
   static const channelId = 'rappels';
   static const actionGo = 'go';
   static const actionLater = 'later';
 
-  /// Petite icône de la barre d'état (« B » de BIM, monochrome) et avatar de Peni (maquette 28), générés par
+  /// Petites icônes de la barre d'état (monochromes, blanches sur fond transparent) : « B » de BIM par défaut,
+  /// silhouette de Peni pour ses rappels ; avatar de Peni (maquette 28). Tous générés par
   /// `scripts/generate-notification-icons.py` à partir des dessins de l'app.
   static const smallIcon = 'ic_stat_bim';
+  static const peniIcon = 'ic_stat_peni';
   static const poses = {'happy', 'think', 'sad'};
+  static const iosCategory = 'peni_reminder';
 
-  static NotificationDetails details(String pose) => NotificationDetails(
+  static String poseOf(String pose) => poses.contains(pose) ? pose : 'happy';
+
+  /// Peni, expéditrice des rappels (avatar selon la pose).
+  static Person peni(String pose) => Person(
+        key: 'peni',
+        name: 'Peni',
+        bot: true,
+        important: true,
+        icon: DrawableResourceAndroidIcon('peni_notif_${poseOf(pose)}'),
+      );
+
+  /// Chemins des avatars copiés dans les fichiers de l'app (iPhone : pièce jointe de la notification).
+  final Map<String, String> _iosAvatars = {};
+
+  NotificationDetails detailsFor(LocalReminder r) => details(r.pose, body: r.body, at: r.fireAt, iosAvatar: _iosAvatars[poseOf(r.pose)]);
+
+  static NotificationDetails details(String pose, {required String body, required DateTime at, String? iosAvatar}) => NotificationDetails(
+        iOS: DarwinNotificationDetails(
+          categoryIdentifier: iosCategory,
+          threadIdentifier: 'peni',
+          presentAlert: true,
+          presentBanner: true,
+          presentList: true,
+          presentSound: true,
+          attachments: iosAvatar == null ? null : [DarwinNotificationAttachment(iosAvatar)],
+        ),
         android: AndroidNotificationDetails(
           channelId,
           'Rappels de Peni',
@@ -163,9 +203,15 @@ class PluginLocalNotifier implements LocalNotifier {
           importance: Importance.high,
           priority: Priority.high,
           category: AndroidNotificationCategory.reminder,
-          icon: smallIcon,
+          icon: peniIcon,
           color: BimColors.red,
-          largeIcon: DrawableResourceAndroidBitmap('peni_notif_${poses.contains(pose) ? pose : 'happy'}'),
+          colorized: false,
+          largeIcon: DrawableResourceAndroidBitmap('peni_notif_${poseOf(pose)}'),
+          styleInformation: MessagingStyleInformation(
+            peni(pose),
+            groupConversation: false,
+            messages: [Message(body, at, peni(pose))],
+          ),
           actions: const [
             AndroidNotificationAction(actionGo, 'J’y vais !', showsUserInterface: true),
             AndroidNotificationAction(actionLater, 'Plus tard'),
@@ -178,7 +224,21 @@ class PluginLocalNotifier implements LocalNotifier {
   @override
   Future<void> init({required void Function(ReminderTarget target) onOpen}) async {
     await _plugin.initialize(
-      settings: const InitializationSettings(android: AndroidInitializationSettings(smallIcon)),
+      settings: InitializationSettings(
+        android: const AndroidInitializationSettings(smallIcon),
+        // iPhone : l'autorisation est demandée par l'écran Rappels (requestPermission), jamais au démarrage.
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+          notificationCategories: [
+            DarwinNotificationCategory(iosCategory, actions: [
+              DarwinNotificationAction.plain(actionGo, 'J’y vais !', options: {DarwinNotificationActionOption.foreground}),
+              DarwinNotificationAction.plain(actionLater, 'Plus tard'),
+            ]),
+          ],
+        ),
+      ),
       onDidReceiveNotificationResponse: (response) {
         if (response.actionId == actionLater) return;
         final target = ReminderTarget.decode(response.payload);
@@ -186,13 +246,41 @@ class PluginLocalNotifier implements LocalNotifier {
       },
       onDidReceiveBackgroundNotificationResponse: onReminderActionInBackground,
     );
+    if (Platform.isIOS) await _copyIosAvatars();
+  }
+
+  /// iPhone : une pièce jointe doit être un fichier ; les avatars sont copiés une fois depuis l'app.
+  Future<void> _copyIosAvatars() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      for (final pose in poses) {
+        final file = File('${dir.path}/peni_notif_$pose.png');
+        if (!await file.exists()) {
+          final data = await rootBundle.load('assets/peni/notif/peni_notif_$pose.png');
+          await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+        }
+        _iosAvatars[pose] = file.path;
+      }
+    } on Exception {
+      _iosAvatars.clear(); // Sans avatar, la notification reste affichée avec l'icône de l'app.
+    }
+  }
+
+  IOSFlutterLocalNotificationsPlugin? get _ios => _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+
+  @override
+  Future<bool> permissionGranted() async {
+    if (Platform.isAndroid) return await _android?.areNotificationsEnabled() ?? false;
+    if (Platform.isIOS) return (await _ios?.checkPermissions())?.isEnabled ?? false;
+    return false;
   }
 
   @override
-  Future<bool> permissionGranted() async => Platform.isAndroid && (await _android?.areNotificationsEnabled() ?? false);
-
-  @override
-  Future<bool> requestPermission() async => Platform.isAndroid && (await _android?.requestNotificationsPermission() ?? false);
+  Future<bool> requestPermission() async {
+    if (Platform.isAndroid) return await _android?.requestNotificationsPermission() ?? false;
+    if (Platform.isIOS) return await _ios?.requestPermissions(alert: true, badge: true, sound: true) ?? false;
+    return false;
+  }
 
   @override
   Future<void> replaceAll(List<LocalReminder> reminders, {ReminderTiming timing = ReminderTiming.inexact}) async {
@@ -207,7 +295,7 @@ class PluginLocalNotifier implements LocalNotifier {
   Future<void> _schedule(LocalReminder r, ReminderTiming timing) => _plugin.zonedSchedule(
         id: r.id,
         scheduledDate: tz.TZDateTime.from(r.fireAt.toUtc(), tz.UTC),
-        notificationDetails: details(r.pose),
+        notificationDetails: detailsFor(r),
         androidScheduleMode: switch (timing) {
           ReminderTiming.inexact => AndroidScheduleMode.inexactAllowWhileIdle,
         },

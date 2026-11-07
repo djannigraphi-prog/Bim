@@ -1,5 +1,6 @@
 import 'package:bim/core/network/api_client.dart';
 import 'package:bim/core/storage/token_storage.dart';
+import 'package:bim/core/theme/tokens.dart';
 import 'package:bim/features/notifications/application/local_notifier.dart';
 import 'package:bim/features/notifications/application/push_token_source.dart';
 import 'package:bim/features/notifications/application/reminder_scheduler.dart';
@@ -149,15 +150,37 @@ void main() {
   });
 
   group('apparence des notifications (maquette 28)', () {
-    test('petite icône BIM, couleur BIM, avatar de Peni selon la pose, actions « J’y vais ! / Plus tard »', () {
-      final android = PluginLocalNotifier.details('sad').android!;
-      expect(android.icon, 'ic_stat_bim');
+    final at = DateTime.utc(2026, 10, 14, 17);
+    test('silhouette de Peni, couleur BIM, avatar de Peni selon la pose, actions « J’y vais ! / Plus tard »', () {
+      final android = PluginLocalNotifier.details('sad', body: 'Encore un effort', at: at).android!;
+      expect(android.icon, 'ic_stat_peni');
+      expect(android.color, BimColors.red);
       expect((android.largeIcon! as DrawableResourceAndroidBitmap).data, 'peni_notif_sad');
       expect(android.actions!.map((a) => a.title), ['J’y vais !', 'Plus tard']);
       expect(android.actions!.first.showsUserInterface, isTrue);
       expect(android.actions!.last.showsUserInterface, isFalse);
       // Pose inconnue : jamais de ressource manquante, avatar joyeux.
-      expect((PluginLocalNotifier.details('inconnue').android!.largeIcon! as DrawableResourceAndroidBitmap).data, 'peni_notif_happy');
+      expect((PluginLocalNotifier.details('inconnue', body: 'x', at: at).android!.largeIcon! as DrawableResourceAndroidBitmap).data,
+          'peni_notif_happy');
+    });
+
+    test('Android : conversation dont Peni est l’expéditrice, avec son avatar (avatar à gauche, comme la maquette)', () {
+      final style = PluginLocalNotifier.details('think', body: 'Ta séance t’attend', at: at).android!.styleInformation!
+          as MessagingStyleInformation;
+      expect(style.person.name, 'Peni');
+      expect((style.person.icon! as DrawableResourceAndroidIcon).data, 'peni_notif_think');
+      expect(style.groupConversation, isFalse);
+      expect(style.messages!.single.text, 'Ta séance t’attend');
+      expect(style.messages!.single.timestamp, at);
+      expect(style.messages!.single.person!.name, 'Peni');
+    });
+
+    test('iPhone : catégorie avec les deux actions, avatar de Peni joint quand il est disponible', () {
+      final withAvatar = PluginLocalNotifier.details('happy', body: 'x', at: at, iosAvatar: '/app/peni_notif_happy.png').iOS!;
+      expect(withAvatar.categoryIdentifier, PluginLocalNotifier.iosCategory);
+      expect(withAvatar.attachments!.single.filePath, '/app/peni_notif_happy.png');
+      // Sans avatar copié : notification affichée quand même, avec l'icône de l'app.
+      expect(PluginLocalNotifier.details('happy', body: 'x', at: at).iOS!.attachments, isNull);
     });
   });
 

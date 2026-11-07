@@ -68,4 +68,5 @@ flutter:
   assets:
     - assets/brand/
     - assets/peni/
+    - assets/peni/notif/
     - assets/gifts/
