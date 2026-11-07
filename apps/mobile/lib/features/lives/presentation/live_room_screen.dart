@@ -311,7 +311,7 @@ class _TopBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(6)),
-                child: const Text('EN DIRECT', style: TextStyle(color: BimColors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                child: const Text('EN DIRECT', style: TextStyle(color: BimColors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
               ),
             const SizedBox(width: BimSpacing.sm),
             Expanded(
@@ -319,7 +319,7 @@ class _TopBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(live.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.white, fontWeight: FontWeight.w700)),
-                  Text(live.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.grey200, fontSize: 12)),
+                  Text(live.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.grey200, fontSize: 11.5)),
                 ],
               ),
             ),

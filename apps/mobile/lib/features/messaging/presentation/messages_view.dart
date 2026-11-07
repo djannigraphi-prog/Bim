@@ -332,7 +332,7 @@ class _RoleBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(color: fg.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(BimRadius.chip)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 13, color: fg), const SizedBox(width: 3), Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: fg))]),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 13, color: fg), const SizedBox(width: 3), Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg))]),
       ),
     );
   }

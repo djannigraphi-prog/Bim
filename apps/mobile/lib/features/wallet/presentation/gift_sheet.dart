@@ -437,7 +437,7 @@ class _PackTile extends StatelessWidget {
                   key: const ValueKey('pack-popular'),
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(BimRadius.chip)),
-                  child: const Text('Populaire', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                  child: const Text('Populaire', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
                 ),
               ),
             ),

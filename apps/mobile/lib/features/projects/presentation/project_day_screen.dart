@@ -200,7 +200,7 @@ class _DayBody extends StatelessWidget {
                     Text(
                       message,
                       key: ValueKey('peni-${encouragement?.key ?? 'local'}'),
-                      style: const TextStyle(color: BimColors.black, fontSize: 15, fontWeight: FontWeight.w600),
+                      style: const TextStyle(color: BimColors.black, fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                     if (plan.tipText != null) ...[
                       const SizedBox(height: BimSpacing.sm),
@@ -209,10 +209,10 @@ class _DayBody extends StatelessWidget {
                           const TextSpan(text: 'Habitude du jour : ', style: TextStyle(fontWeight: FontWeight.w800)),
                           TextSpan(text: plan.tipText),
                         ],),
-                        style: const TextStyle(color: BimColors.black, fontSize: 15),
+                        style: const TextStyle(color: BimColors.black, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
-                      Text('Conseil d’un programme validé par ${plan.tipValidatedBy}', style: const TextStyle(color: BimColors.grey600, fontSize: 12)),
+                      Text('Conseil d’un programme validé par ${plan.tipValidatedBy}', style: const TextStyle(color: BimColors.grey600, fontSize: 11.5)),
                     ],
                   ],
                 ),
@@ -379,7 +379,7 @@ class _FooterButton extends StatelessWidget {
               if (label != null) ...[
                 const SizedBox(width: BimSpacing.sm),
                 Flexible(
-                  child: Text(label!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 16)),
+                  child: Text(label!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 14)),
                 ),
               ],
             ],

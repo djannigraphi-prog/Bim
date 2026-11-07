@@ -38,7 +38,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Text(
               'Beauté · Image · Motivation',
               key: const ValueKey('splash-motto'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: BimColors.grey600, fontWeight: FontWeight.w400, fontSize: 15),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: BimColors.grey600, fontWeight: FontWeight.w400, fontSize: 14),
             ),
             const Spacer(),
             if (unreachable) ...[
@@ -69,7 +69,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               const SizedBox(height: BimSpacing.lg),
             ],
             // Signature de l'éditeur, comme « from Meta » : écriture fine et grise, logo réduit.
-            const Text('from', key: ValueKey('splash-from'), style: TextStyle(color: BimColors.grey400, fontWeight: FontWeight.w300, fontSize: 13)),
+            const Text('from', key: ValueKey('splash-from'), style: TextStyle(color: BimColors.grey400, fontWeight: FontWeight.w300, fontSize: 12.5)),
             const SizedBox(height: 6),
             Row(
               key: const ValueKey('splash-publisher'),
@@ -77,7 +77,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               children: [
                 Opacity(opacity: 0.85, child: Image.asset('assets/brand/generation_hybride.png', width: 19, height: 19, semanticLabel: 'Logo Generation Hybride')),
                 const SizedBox(width: 7),
-                const Text('Generation Hybride', style: TextStyle(color: BimColors.grey600, fontWeight: FontWeight.w400, fontSize: 16, letterSpacing: 0.2)),
+                const Text('Generation Hybride', style: TextStyle(color: BimColors.grey600, fontWeight: FontWeight.w400, fontSize: 14, letterSpacing: 0.2)),
               ],
             ),
             const SizedBox(height: BimSpacing.xl),

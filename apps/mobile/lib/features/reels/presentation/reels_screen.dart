@@ -204,7 +204,7 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
               child: Row(
                 children: [
                   IconButton(tooltip: 'Retour', icon: const Icon(Icons.arrow_back_ios_new_rounded, color: BimColors.white), onPressed: () => context.pop()),
-                  const Text('Reels', style: TextStyle(color: BimColors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  const Text('Reels', style: TextStyle(color: BimColors.white, fontSize: 17, fontWeight: FontWeight.w800)),
                   const Spacer(),
                   IconButton(
                     key: const ValueKey('reel-new'),
@@ -267,7 +267,7 @@ class _ReelOverlay extends StatelessWidget {
                 ),
                 if ((reel.caption ?? '').isNotEmpty)
                   Text(reel.caption!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.white, shadows: shadow)),
-                Text('${compactCount(reel.viewCount)} vues', key: ValueKey('reel-views-${reel.id}'), style: const TextStyle(color: BimColors.grey200, fontSize: 12, shadows: shadow)),
+                Text('${compactCount(reel.viewCount)} vues', key: ValueKey('reel-views-${reel.id}'), style: const TextStyle(color: BimColors.grey200, fontSize: 11.5, shadows: shadow)),
               ],
             ),
           ),

@@ -200,7 +200,7 @@ class _PauseSheetState extends State<_PauseSheet> {
           children: [
             const Center(child: Peni(pose: PeniPose.think, size: 88)),
             const SizedBox(height: BimSpacing.md),
-            Text('Mettre ton programme en pause\u00A0?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            Text('Mettre ton programme en pause\u00A0?', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
             Text('«\u00A0${widget.title}\u00A0»', textAlign: TextAlign.center, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: BimSpacing.md),
             Container(
@@ -220,7 +220,7 @@ class _PauseSheetState extends State<_PauseSheet> {
                               'et sa date de fin est décalée d’autant. Tes progrès et les tâches déjà accomplies sont conservés.',
                         ),
                       ],),
-                      style: TextStyle(color: BimColors.black, fontSize: 15),
+                      style: TextStyle(color: BimColors.black, fontSize: 14),
                     ),
                   ),
                 ],

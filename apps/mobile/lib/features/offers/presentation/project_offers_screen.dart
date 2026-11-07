@@ -47,7 +47,7 @@ class ProjectOffersScreen extends ConsumerWidget {
             children: [
               const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
               const SizedBox(height: BimSpacing.md),
-              Text('Offres pour ton projet', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+              Text('Offres pour ton projet', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
               const SizedBox(height: BimSpacing.xs),
               Text('Les boutiques voient ton projet sans ton nom ni ton profil. Tu restes libre de refuser.', style: theme.textTheme.bodyMedium),
               const SizedBox(height: BimSpacing.md),

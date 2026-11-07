@@ -119,8 +119,8 @@ class TodayCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 12.5)),
-                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                      Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 12)),
+                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: BimColors.white, fontSize: 14, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
@@ -128,7 +128,7 @@ class TodayCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(BimRadius.button)),
-                  child: const Text('Ma journée', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                  child: const Text('Ma journée', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
                 ),
               ],
             ),
@@ -150,11 +150,11 @@ class TodayCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 14)),
+                    Text('Aujourd’hui · Jour ${project.currentDay}', style: const TextStyle(color: BimColors.grey400, fontSize: 13)),
                     const SizedBox(height: 2),
                     Text(
                       title,
-                      style: const TextStyle(color: BimColors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                      style: const TextStyle(color: BimColors.white, fontSize: 15, fontWeight: FontWeight.w700),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -164,7 +164,7 @@ class TodayCard extends StatelessWidget {
                           : project.streak > 0
                               ? '${project.title} · ${project.streak} jour${project.streak > 1 ? 's' : ''} d’affilée'
                               : 'N’abandonne pas, on y va ensemble !',
-                      style: const TextStyle(color: BimColors.grey400, fontSize: 14),
+                      style: const TextStyle(color: BimColors.grey400, fontSize: 13),
                     ),
                   ],
                 ),

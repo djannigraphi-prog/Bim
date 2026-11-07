@@ -21,7 +21,7 @@ class BimNavBar extends StatelessWidget {
   /// Pastille rouge par onglet (messages non lus).
   final Map<int, int> badges;
 
-  static const height = 58.0;
+  static const height = 54.0;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +41,7 @@ class BimNavBar extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: radius,
-            boxShadow: [BoxShadow(color: dark ? const Color(0x59000000) : const Color(0x1A101116), blurRadius: 28, offset: const Offset(0, 8))],
+            boxShadow: [BoxShadow(color: dark ? const Color(0x59000000) : const Color(0x1A101116), blurRadius: 20, offset: const Offset(0, 6))],
           ),
           child: ClipRRect(
             borderRadius: radius,
@@ -52,7 +52,7 @@ class BimNavBar extends StatelessWidget {
                 key: const ValueKey('bim-nav'),
                 height: height,
                 padding: const EdgeInsets.symmetric(horizontal: 7),
-                decoration: BoxDecoration(color: bar, borderRadius: radius, border: Border.all(color: border)),
+                decoration: BoxDecoration(color: bar, borderRadius: radius, border: Border.all(color: border, width: BimStroke.hairline)),
                 // Petit écran (320 px) : les pastilles se resserrent au lieu de déborder.
                 child: LayoutBuilder(
                   builder: (context, box) {
@@ -69,9 +69,9 @@ class BimNavBar extends StatelessWidget {
                               onTap: () => onTap(i),
                               child: Container(
                                 width: 42,
-                                height: 42,
+                                height: 38,
                                 decoration: const BoxDecoration(color: BimColors.red, shape: BoxShape.circle),
-                                child: Icon(items[i].icon, size: 24, color: BimColors.white),
+                                child: Icon(items[i].icon, size: 21, color: BimColors.white),
                               ),
                             )
                           : _NavButton(
@@ -82,15 +82,15 @@ class BimNavBar extends StatelessWidget {
                               child: AnimatedContainer(
                                 duration: BimDurations.fast,
                                 width: itemWidth,
-                                height: 42,
-                                decoration: BoxDecoration(color: i == current ? activeBg : Colors.transparent, borderRadius: BorderRadius.circular(21)),
+                                height: 38,
+                                decoration: BoxDecoration(color: i == current ? activeBg : Colors.transparent, borderRadius: BorderRadius.circular(19)),
                                 child: Badge(
                                   isLabelVisible: (badges[i] ?? 0) > 0,
                                   label: Text((badges[i] ?? 0) > 99 ? '99+' : '${badges[i] ?? 0}'),
                                   backgroundColor: BimColors.red,
                                   alignment: const AlignmentDirectional(0.55, -0.75),
                                   child: Center(
-                                    child: Icon(i == current ? items[i].active : items[i].icon, size: 24, color: i == current ? activeColor : icon),
+                                    child: Icon(i == current ? items[i].active : items[i].icon, size: 21, color: i == current ? activeColor : icon),
                                   ),
                                 ),
                               ),

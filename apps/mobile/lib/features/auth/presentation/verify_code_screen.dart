@@ -123,7 +123,7 @@ class _VerifyCodeScreenState extends ConsumerState<VerifyCodeScreen> {
               maxLength: 6,
               autofillHints: const [AutofillHints.oneTimeCode],
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: 12),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 12),
               decoration: InputDecoration(counterText: '', hintText: '••••••', errorText: _error, errorMaxLines: 3),
               onChanged: (v) {
                 if (v.length == 6 && !_loading) _verify();

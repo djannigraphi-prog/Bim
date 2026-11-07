@@ -36,7 +36,7 @@ void main() {
     expect(find.byTooltip('BimShop'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
     // Barre fine : 58 px de haut.
-    expect(tester.getSize(find.byKey(const ValueKey('bim-nav'))).height, 58);
+    expect(tester.getSize(find.byKey(const ValueKey('bim-nav'))).height, 54);
     // Onglet actif : icône pleine.
     expect(find.byIcon(Icons.home_rounded), findsOneWidget);
     expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsOneWidget);

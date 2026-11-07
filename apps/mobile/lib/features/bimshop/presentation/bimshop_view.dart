@@ -100,7 +100,7 @@ class _BimShopViewState extends ConsumerState<BimShopView> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  Expanded(child: Text('BimShop', style: theme.textTheme.headlineLarge?.copyWith(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5))),
+                  Expanded(child: Text('BimShop', style: theme.textTheme.headlineLarge?.copyWith(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5))),
                   IconButton(
                     key: const ValueKey('bimshop-orders'),
                     tooltip: 'Mes commandes',
@@ -263,7 +263,7 @@ class _Pill extends StatelessWidget {
             onTap: onTap,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Center(child: Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: selected ? scheme.surface : scheme.onSurface))),
+              child: Center(child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: selected ? scheme.surface : scheme.onSurface))),
             ),
           ),
         ),

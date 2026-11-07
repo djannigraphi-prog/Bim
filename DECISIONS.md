@@ -765,3 +765,14 @@ Le fondateur conserve les écrans et champs ajoutés pour la sécurité et l'exp
 
 ### D-APP-01 — Identifiant de l'application · provisoire (fondateur, 14/10/2026)
 Identifiant Android `ci.bim.app` (et futur identifiant iOS identique), utilisé provisoirement. **Non définitif avant la publication** : une fois l'app publiée, il ne pourra plus changer. Nom affiché : « BIM ». Signature de production non configurée (clé à conserver hors du dépôt).
+
+### D-UI-03 — Affinement de l'interface (07/11/2026)
+
+Demande du fondateur, d'après la proposition visuelle validée (BimShop, Lives, Messages, Accueil, clair et sombre) :
+textes et formes plus petits pour ne pas encombrer l'écran, formes affinées (messages, notifications, boutons),
+fond sombre gris mat et non noir. Appliqué dans les jetons et le thème (`tokens.dart`, `app_theme.dart`) : échelle
+de texte réduite (courant 14, secondaire 13, titres d'écran 22), rayons réduits (cartes 16, champs et puces 12,
+feuilles 22), traits fins de 0,8 (`BimStroke.hairline`), boutons de 36 px (principal 42), fond clair `#F6F6F8`
+avec cartes blanches, champs gris léger, barre de navigation de 54 px. Les tailles de texte écrites directement dans
+les écrans (88) sont réduites dans la même proportion. **Non vérifié sur téléphone** : contrôle visuel écran par
+écran à faire sur la version compilée par la CI.

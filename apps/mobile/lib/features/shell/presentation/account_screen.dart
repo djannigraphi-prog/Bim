@@ -51,7 +51,7 @@ class AccountScreen extends ConsumerWidget {
                 alignment: Alignment.center,
                 children: [
                   const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
-                  Text('Paramètres', style: theme.textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text('Paramètres', style: theme.textTheme.titleMedium?.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
@@ -201,7 +201,7 @@ class _ThemeSwitch extends StatelessWidget {
               children: [
                 Icon(icon, size: 16, color: on ? scheme.onSurface : scheme.onSurfaceVariant),
                 const SizedBox(width: 4),
-                Text(label, style: TextStyle(fontSize: 13, fontWeight: on ? FontWeight.w600 : FontWeight.w500, color: on ? scheme.onSurface : scheme.onSurfaceVariant)),
+                Text(label, style: TextStyle(fontSize: 12.5, fontWeight: on ? FontWeight.w600 : FontWeight.w500, color: on ? scheme.onSurface : scheme.onSurfaceVariant)),
               ],
             ),
           ),

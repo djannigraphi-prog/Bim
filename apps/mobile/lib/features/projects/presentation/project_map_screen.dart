@@ -173,8 +173,8 @@ class _Map extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('AUJOURD’HUI · ${s.nextTask!.timeOfDay}', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w800, fontSize: 12)),
-                      Text(s.nextTask!.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      Text('AUJOURD’HUI · ${s.nextTask!.timeOfDay}', style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w800, fontSize: 11.5)),
+                      Text(s.nextTask!.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       if (enc != null) ...[
                         const SizedBox(height: BimSpacing.xs),
                         Text(enc.text, key: ValueKey('peni-${enc.key}'), style: theme.textTheme.bodyMedium),
@@ -554,7 +554,7 @@ class _DayNode extends StatelessWidget {
               child: child,
             ),
             const SizedBox(height: 4),
-            Text(isToday ? '$label · aujourd’hui' : label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(isToday ? '$label · aujourd’hui' : label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
           ],
         ),
       ),

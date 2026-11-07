@@ -47,12 +47,18 @@ abstract final class BimSpacing {
   static const screen = 20.0;
 }
 
+/// Rayons affinés (07/11/2026, proposition validée par le fondateur) : formes plus fines, moins arrondies.
 abstract final class BimRadius {
-  static const field = 16.0;
-  static const button = 18.0;
-  static const card = 20.0;
-  static const chip = 14.0;
-  static const sheet = 28.0;
+  static const field = 12.0;
+  static const button = 14.0;
+  static const card = 16.0;
+  static const chip = 12.0;
+  static const sheet = 22.0;
+}
+
+/// Traits fins (07/11/2026) : contours des cartes, champs, boutons et barres.
+abstract final class BimStroke {
+  static const hairline = 0.8;
 }
 
 abstract final class BimDurations {

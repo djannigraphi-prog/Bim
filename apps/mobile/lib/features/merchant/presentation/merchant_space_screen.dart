@@ -188,7 +188,7 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                   children: [
                     Icon(Icons.storefront, color: BimColors.red),
                     SizedBox(height: 2),
-                    Text('Boutique', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: BimColors.red)),
+                    Text('Boutique', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: BimColors.red)),
                   ],
                 ),
               ),
@@ -212,7 +212,7 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                         child: Icon(Icons.chat_bubble_outline_rounded, color: scheme.onSurface),
                       ),
                       const SizedBox(height: 2),
-                      Text('Messages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface)),
+                      Text('Messages', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: scheme.onSurface)),
                     ],
                   ),
                 ),
@@ -248,7 +248,7 @@ class _MerchantSpaceScreenState extends ConsumerState<MerchantSpaceScreen> {
                     children: [
                       Icon(Icons.swap_horiz, color: scheme.onSurface),
                       const SizedBox(height: 2),
-                      Text('Mon profil', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurface)),
+                      Text('Mon profil', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: scheme.onSurface)),
                     ],
                   ),
                 ),
@@ -297,7 +297,7 @@ class _Header extends StatelessWidget {
                 children: [
                   const Icon(Icons.circle, size: 9, color: BimColors.success),
                   const SizedBox(width: 5),
-                  const Text('Boutique ouverte', key: ValueKey('shop-open'), style: TextStyle(color: BimColors.success, fontWeight: FontWeight.w600, fontSize: 13)),
+                  const Text('Boutique ouverte', key: ValueKey('shop-open'), style: TextStyle(color: BimColors.success, fontWeight: FontWeight.w600, fontSize: 12.5)),
                   if (place.isNotEmpty) Flexible(child: Text(' · $place', overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall)),
                 ],
               ),
@@ -323,7 +323,7 @@ class _Stat extends StatelessWidget {
       decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(BimRadius.card)),
       child: Column(
         children: [
-          Text('$value', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          Text('$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
@@ -358,7 +358,7 @@ class _Action extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 // Libellé jamais coupé (« Demandes » tenait sur deux lignes).
-                FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5))),
               ],
             ),
           ),
@@ -437,7 +437,7 @@ class _ProductTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                     if (p.reference.isNotEmpty) Text('Réf. ${p.reference}', style: theme.textTheme.bodySmall),
                     const SizedBox(height: 2),
                     Wrap(

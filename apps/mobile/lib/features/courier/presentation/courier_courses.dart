@@ -88,7 +88,7 @@ class _CourierWorkSectionState extends ConsumerState<CourierWorkSection> {
                             deliveryModeLabel(m.mode),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700, fontSize: 12),
+                            style: const TextStyle(color: BimColors.red, fontWeight: FontWeight.w700, fontSize: 11.5),
                           ),
                         ),
                       ),

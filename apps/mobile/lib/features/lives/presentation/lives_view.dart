@@ -93,7 +93,7 @@ class _LiveTile extends StatelessWidget {
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: BimColors.red, borderRadius: BorderRadius.circular(6)),
-                child: const Text('EN DIRECT', style: TextStyle(color: BimColors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                child: const Text('EN DIRECT', style: TextStyle(color: BimColors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
               )
             : null,
         onTap: () => context.push('/lives/${live.id}'),

@@ -217,7 +217,7 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: Text(p.title, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24))),
+                        Expanded(child: Text(p.title, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20))),
                         // Maquette 34 : remise en pourcentage.
                         if (p.compareAtFcfa != null)
                           Container(
@@ -235,7 +235,7 @@ class _ShopProductScreenState extends ConsumerState<ShopProductScreen> {
                       spacing: BimSpacing.sm,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(formatPriceF(p.priceFcfa), key: const ValueKey('product-price'), style: theme.textTheme.headlineMedium?.copyWith(fontSize: 28, fontWeight: FontWeight.w800)),
+                        Text(formatPriceF(p.priceFcfa), key: const ValueKey('product-price'), style: theme.textTheme.headlineMedium?.copyWith(fontSize: 22, fontWeight: FontWeight.w800)),
                         if (p.compareAtFcfa != null) Text(formatPriceF(p.compareAtFcfa!), style: theme.textTheme.bodyLarge?.copyWith(decoration: TextDecoration.lineThrough, color: scheme.onSurfaceVariant)),
                       ],
                     ),

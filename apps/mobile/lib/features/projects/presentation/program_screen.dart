@@ -98,7 +98,7 @@ class _Program extends ConsumerWidget {
                             TextSpan(text: '${s.durationDays} jours pour « ${s.title} ». Je serai là chaque jour.'),
                           ],
                         ),
-                        style: const TextStyle(color: BimColors.black, fontSize: 15),
+                        style: const TextStyle(color: BimColors.black, fontSize: 14),
                       ),
                     ),
                   ),

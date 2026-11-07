@@ -272,7 +272,7 @@ class _PremiumBanner extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Passe Premium', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700)),
-                      Text('Reçois des pièces, sans publicité', style: TextStyle(color: BimColors.grey400, fontSize: 13)),
+                      Text('Reçois des pièces, sans publicité', style: TextStyle(color: BimColors.grey400, fontSize: 12.5)),
                     ],
                   ),
                 ),

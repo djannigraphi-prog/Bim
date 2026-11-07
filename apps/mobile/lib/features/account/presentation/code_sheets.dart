@@ -99,7 +99,7 @@ class _CodeSheetState extends State<_CodeSheet> {
             maxLength: 6,
             autofillHints: const [AutofillHints.oneTimeCode],
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 10),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 10),
             decoration: InputDecoration(counterText: '', hintText: '••••••', errorText: _error, errorMaxLines: 3),
             onChanged: (v) {
               if (v.length == 6) _go();
