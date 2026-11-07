@@ -169,7 +169,7 @@ class _InterestChip extends StatelessWidget {
               const SizedBox(width: BimSpacing.sm),
               Text(
                 interest.label,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? BimColors.white : scheme.onSurface),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: selected ? BimColors.white : scheme.onSurface),
               ),
             ],
           ),
@@ -250,7 +250,7 @@ class _PeniBanner extends StatelessWidget {
                     const TextSpan(text: 'Ils serviront à personnaliser ton fil « Pour toi ».'),
                   ],
                 ),
-                style: const TextStyle(color: BimColors.black, fontSize: 15),
+                style: const TextStyle(color: BimColors.black, fontSize: 14),
               ),
             ),
           ],

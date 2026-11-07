@@ -110,7 +110,7 @@ class _PeniTaskSheetState extends ConsumerState<PeniTaskSheet> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(BimSpacing.lg),
                           decoration: BoxDecoration(color: BimColors.warningBg, borderRadius: BorderRadius.circular(BimRadius.card)),
-                          child: Text(s.answer, key: const ValueKey('peni-explain-answer'), style: const TextStyle(color: BimColors.black, fontSize: 15)),
+                          child: Text(s.answer, key: const ValueKey('peni-explain-answer'), style: const TextStyle(color: BimColors.black, fontSize: 14)),
                         ),
                     ],
                   ),

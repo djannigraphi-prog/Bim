@@ -192,7 +192,7 @@ class _VoiceMessageViewState extends State<VoiceMessageView> {
             ),
           ),
           const SizedBox(width: BimSpacing.sm),
-          Text(formatVoiceDuration(playing || pos > Duration.zero ? pos : total), style: TextStyle(color: widget.color, fontSize: 13)),
+          Text(formatVoiceDuration(playing || pos > Duration.zero ? pos : total), style: TextStyle(color: widget.color, fontSize: 12.5)),
         ],
       ),
     );

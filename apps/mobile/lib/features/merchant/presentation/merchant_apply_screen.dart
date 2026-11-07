@@ -67,7 +67,7 @@ class _Message extends StatelessWidget {
         const SizedBox(height: BimSpacing.xxl),
         Peni(pose: pose, size: 120),
         const SizedBox(height: BimSpacing.lg),
-        Text(title, textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+        Text(title, textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
         const SizedBox(height: BimSpacing.sm),
         Text(text, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
         if (action != null) ...[const SizedBox(height: BimSpacing.xl), action!],
@@ -131,7 +131,7 @@ class _ShopFormState extends ConsumerState<_ShopForm> {
       children: [
         const StepHeader(step: 1, total: 2, title: 'Nouvelle boutique'),
         const SizedBox(height: BimSpacing.lg),
-        Text('Présente ta boutique', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+        Text('Présente ta boutique', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
         const SizedBox(height: BimSpacing.xs),
         Text('Tu pourras modifier ces informations plus tard.', style: theme.textTheme.bodyMedium),
         const SizedBox(height: BimSpacing.lg),
@@ -287,7 +287,7 @@ class _ChecklistState extends ConsumerState<_Checklist> {
           children: [
             const StepHeader(step: 2, total: 2, title: 'Vérification'),
             const SizedBox(height: BimSpacing.lg),
-            Text('Sécurise ta boutique', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+            Text('Sécurise ta boutique', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
             const SizedBox(height: BimSpacing.xs),
             Text('« ${a.shopName} ». Ces informations restent privées. Elles permettent à BIM d’identifier chaque marchand.', style: theme.textTheme.bodyMedium),
             if (a.status == 'rejected' && a.rejectionReason != null) ...[
@@ -405,7 +405,7 @@ class _Step extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                      Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                       Text(subtitle, style: Theme.of(context).textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
                   ),
@@ -503,7 +503,7 @@ class _Pending extends StatelessWidget {
         const SizedBox(height: BimSpacing.xl),
         const Peni(pose: PeniPose.think, size: 130),
         const SizedBox(height: BimSpacing.lg),
-        Text('L’équipe BIM vérifie tes infos…', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+        Text('L’équipe BIM vérifie tes infos…', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
         const SizedBox(height: BimSpacing.sm),
         Text(
           '« ${application.shopName} » sera ouverte dès la validation. Tu recevras une notification.',

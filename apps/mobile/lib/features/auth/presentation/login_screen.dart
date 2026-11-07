@@ -194,7 +194,7 @@ class _SocialButton extends StatelessWidget {
           ),
           child: icon != null
               ? Icon(icon, size: 28, color: color ?? scheme.onSurface)
-              : Text(text!, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF4285F4))),
+              : Text(text!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF4285F4))),
         ),
       ),
     );

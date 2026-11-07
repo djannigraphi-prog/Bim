@@ -419,7 +419,7 @@ class _SpaceTile extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(s.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                       Text('$kind$status', style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),

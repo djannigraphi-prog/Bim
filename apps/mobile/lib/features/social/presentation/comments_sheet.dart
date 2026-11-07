@@ -335,7 +335,7 @@ class _CommentTile extends StatelessWidget {
                   children: [
                     TextButton(
                       onPressed: onReply,
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36), foregroundColor: theme.colorScheme.onSurfaceVariant, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36), foregroundColor: theme.colorScheme.onSurfaceVariant, textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                       child: const Text('Répondre'),
                     ),
                     const SizedBox(width: BimSpacing.md),

@@ -36,7 +36,7 @@ void main() {
     expect(find.byTooltip('BimShop'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
     // Barre fine : 58 px de haut.
-    expect(tester.getSize(find.byKey(const ValueKey('bim-nav'))).height, 58);
+    expect(tester.getSize(find.byKey(const ValueKey('bim-nav'))).height, 54);
     // Onglet actif : icône pleine.
     expect(find.byIcon(Icons.home_rounded), findsOneWidget);
     expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsOneWidget);
@@ -54,5 +54,13 @@ void main() {
     final box = tester.widget<Container>(find.byKey(const ValueKey('bim-nav'))).decoration! as BoxDecoration;
     expect(box.color!.a, lessThan(0.7));
     expect(find.byIcon(Icons.shopping_bag_rounded), findsOneWidget);
+  });
+
+  testWidgets('mode jour : barre transparente effet vitre, bouton rouge rond de 40', (tester) async {
+    await _pump(tester, BimTheme.light(), current: 0);
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    final box = tester.widget<Container>(find.byKey(const ValueKey('bim-nav'))).decoration! as BoxDecoration;
+    expect(box.color!.a, lessThan(0.8));
+    expect(tester.getSize(find.byKey(const ValueKey('nav-2'))), const Size(40, 40));
   });
 }

@@ -85,7 +85,7 @@ class PhotoTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(color: red ? BimColors.red : BimColors.black.withValues(alpha: 0.72), borderRadius: BorderRadius.circular(10)),
-        child: Text(text, style: const TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+        child: Text(text, style: const TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
       );
 }
 
@@ -239,7 +239,7 @@ class BimBadge extends StatelessWidget {
           children: [
             Icon(Icons.auto_awesome, size: 14, color: BimColors.white),
             SizedBox(width: 4),
-            Text('J’ai fait mon BIM', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+            Text('J’ai fait mon BIM', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ],
         ),
       );

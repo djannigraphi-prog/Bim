@@ -112,7 +112,7 @@ class OptionalBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: BimSpacing.sm, vertical: 2),
       decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(6)),
-      child: Text('Facultatif', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+      child: Text('Facultatif', style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
     );
   }
 }

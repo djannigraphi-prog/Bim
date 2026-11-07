@@ -311,7 +311,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     for (final (i, e) in messageReactions.indexed)
                       ChoiceChip(
                         key: ValueKey('reaction-$i'),
-                        label: Text(e, style: const TextStyle(fontSize: 22)),
+                        label: Text(e, style: const TextStyle(fontSize: 18)),
                         selected: m.myReaction == e,
                         onSelected: (_) => Navigator.pop(ctx, 'react:$e'),
                       ),
@@ -631,7 +631,7 @@ class _Bubble extends StatelessWidget {
                   ? const SizedBox(width: 180, height: 180, child: Icon(Icons.image_outlined))
                   : Image.network(m.photoUrl!, width: 220, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
             )
-          : Text(m.text ?? '', style: TextStyle(color: fg, fontSize: 16)),
+          : Text(m.text ?? '', style: TextStyle(color: fg, fontSize: 14)),
     };
     final q = m.visible ? m.replyTo : null;
     return Align(
@@ -675,12 +675,12 @@ class _Bubble extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(q.mine ? 'Toi' : otherName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12)),
+                              Text(q.mine ? 'Toi' : otherName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 11.5)),
                               Text(
                                 q.preview,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: fg, fontSize: 13, fontStyle: q.status == 'published' ? FontStyle.normal : FontStyle.italic),
+                                style: TextStyle(color: fg, fontSize: 12.5, fontStyle: q.status == 'published' ? FontStyle.normal : FontStyle.italic),
                               ),
                             ],
                           ),
@@ -703,7 +703,7 @@ class _Bubble extends StatelessWidget {
                       color: r.emoji == m.myReaction ? BimColors.redSoft : scheme.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(BimRadius.chip),
                     ),
-                    child: Text(r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji, style: const TextStyle(fontSize: 13)),
+                    child: Text(r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji, style: const TextStyle(fontSize: 12.5)),
                   ),
               ],
             ),
@@ -728,7 +728,7 @@ Widget _withTime(Widget content, ChatMessage m, Color fg) {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(clockFr(m.createdAt), key: ValueKey('time-${m.id}'), style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 11)),
+            Text(clockFr(m.createdAt), key: ValueKey('time-${m.id}'), style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 10.5)),
             if (m.mine) ...[
               const SizedBox(width: 3),
               Icon(Icons.done_all_rounded, size: 14, color: (m.read ?? false) ? const Color(0xFF4FC3F7) : fg.withValues(alpha: 0.6)),
@@ -897,7 +897,7 @@ class _SharedProductView extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(c.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
-            Text('${formatPriceF(c.priceFcfa)} · ${c.shop.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 13)),
+            Text('${formatPriceF(c.priceFcfa)} · ${c.shop.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 12.5)),
           ],
         ),
       ),

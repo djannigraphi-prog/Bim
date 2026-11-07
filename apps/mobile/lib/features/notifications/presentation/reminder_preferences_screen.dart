@@ -225,7 +225,7 @@ class _ReminderPreferencesScreenState extends ConsumerState<ReminderPreferencesS
                 child: Text(
                   'Les rappels ne sont pas encore en service\u00a0: aucune notification n’est envoyée pour l’instant. '
                   'Tes choix sont enregistrés et s’appliqueront dès leur ouverture.',
-                  style: TextStyle(color: BimColors.black, fontSize: 14, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: BimColors.black, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ],

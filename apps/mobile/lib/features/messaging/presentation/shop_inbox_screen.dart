@@ -97,7 +97,7 @@ class _ShopInboxScreenState extends ConsumerState<ShopInboxScreen> {
                 children: [
                   const BimBackButton(),
                   const SizedBox(width: BimSpacing.sm),
-                  Expanded(child: Text('Messages', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24))),
+                  Expanded(child: Text('Messages', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20))),
                   IconButton(key: const ValueKey('quick-replies-manage'), tooltip: 'Réponses rapides', icon: const Icon(Icons.bolt_outlined), onPressed: _quickReplies),
                 ],
               ),
@@ -182,7 +182,7 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(BimRadius.chip)),
-        child: Text(text, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+        child: Text(text, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w700)),
       );
 }
 

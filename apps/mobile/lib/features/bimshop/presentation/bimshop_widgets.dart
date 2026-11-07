@@ -153,13 +153,13 @@ class _ShopCardTileState extends ConsumerState<ShopCardTile> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w500)),
+                  Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Wrap(
                     spacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.end,
                     children: [
-                      Text(formatPriceF(c.priceFcfa), style: theme.textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(formatPriceF(c.priceFcfa), style: theme.textTheme.titleMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
                       if (c.compareAtFcfa != null)
                         Text(
                           formatPriceF(c.compareAtFcfa!),
@@ -237,7 +237,7 @@ class _CountsPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(color: BimColors.black, fontWeight: FontWeight.w600, fontSize: 14);
+    const style = TextStyle(color: BimColors.black, fontWeight: FontWeight.w600, fontSize: 13);
     Widget item(IconData icon, Color color, int n, String key, String label) => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Semantics(
@@ -370,7 +370,7 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: BimSpacing.sm, vertical: 3),
         decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(BimRadius.chip)),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5)),
       );
 }
 

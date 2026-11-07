@@ -246,7 +246,7 @@ class _Tile extends StatelessWidget {
               CircleAvatar(
                 radius: 26,
                 backgroundColor: peni ? BimColors.white : BimColors.red,
-                child: peni ? const Peni(size: 40) : const Text('B', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                child: peni ? const Peni(size: 40) : const Text('B', style: TextStyle(color: BimColors.white, fontWeight: FontWeight.w900, fontSize: 18)),
               ),
               const SizedBox(width: BimSpacing.md),
               Expanded(

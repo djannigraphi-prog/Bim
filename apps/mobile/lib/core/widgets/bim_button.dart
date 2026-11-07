@@ -40,7 +40,7 @@ class BimButton extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         // Maquette du 19/10/2026 : boutons fins, en pilule (46 px, toujours assez grands pour le doigt).
-        height: 46,
+        height: 42,
         child: FilledButton(
           onPressed: enabled ? onPressed : null,
           style: FilledButton.styleFrom(
@@ -50,7 +50,7 @@ class BimButton extends StatelessWidget {
             disabledForegroundColor: variant == BimButtonVariant.primary ? BimColors.white : fg.withValues(alpha: 0.6),
             side: side,
             shape: const StadiumBorder(),
-            textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 15),
+            textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 13.5),
           ),
           child: AnimatedSwitcher(
             duration: BimDurations.fast,
@@ -58,14 +58,14 @@ class BimButton extends StatelessWidget {
                 ? SizedBox(
                     key: const ValueKey('loading'),
                     width: 22,
-                    height: 22,
+                    height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2.5, color: fg),
                   )
                 : Row(
                     key: const ValueKey('label'),
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: BimSpacing.sm)],
+                      if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: BimSpacing.sm)],
                       // Sur un petit écran (320 dp), un libellé trop long est réduit plutôt que coupé (« Publier « J'ai fait mon BI… »).
                       Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1))),
                     ],

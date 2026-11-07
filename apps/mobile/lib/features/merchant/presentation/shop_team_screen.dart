@@ -78,7 +78,7 @@ class _ShopTeamScreenState extends ConsumerState<ShopTeamScreen> {
               children: [
                 const BimBackButton(),
                 const SizedBox(width: BimSpacing.sm),
-                Expanded(child: Text('Équipe', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24))),
+                Expanded(child: Text('Équipe', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20))),
               ],
             ),
             const SizedBox(height: BimSpacing.sm),

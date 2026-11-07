@@ -193,7 +193,7 @@ class ChoiceChipBim extends StatelessWidget {
               Flexible(
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: selected ? onFill : scheme.onSurface),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: selected ? onFill : scheme.onSurface),
                 ),
               ),
             ],

@@ -400,7 +400,7 @@ class _ModeCard extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(color: BimColors.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-                                child: Text(badge!, style: const TextStyle(color: BimColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
+                                child: Text(badge!, style: const TextStyle(color: BimColors.success, fontWeight: FontWeight.w700, fontSize: 12.5)),
                               ),
                           ],
                         ),
@@ -454,7 +454,7 @@ class _BudgetButton extends StatelessWidget {
               Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: selected ? scheme.surface : scheme.onSurface)),
               if (hint.isNotEmpty)
                 FittedBox(
-                  child: Text(hint, style: TextStyle(fontSize: 12, color: selected ? scheme.surface : scheme.onSurfaceVariant)),
+                  child: Text(hint, style: TextStyle(fontSize: 11.5, color: selected ? scheme.surface : scheme.onSurfaceVariant)),
                 ),
             ],
           ),
@@ -584,7 +584,7 @@ class _CategoryTile extends StatelessWidget {
               const Spacer(),
               Text(
                 category.label,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -669,7 +669,7 @@ class _GoalStepState extends State<_GoalStep> {
                     Expanded(child: Text('Combien de ${goal!.quantityUnit} ?', style: theme.textTheme.titleMedium)),
                     Text(
                       '${goal.code.contains('perte') ? '−' : '+'}${d.targetQuantity ?? goal.quantityMin} ${goal.quantityUnit}',
-                      style: const TextStyle(color: BimColors.red, fontSize: 22, fontWeight: FontWeight.w800),
+                      style: const TextStyle(color: BimColors.red, fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),
@@ -994,7 +994,7 @@ class _Segmented extends StatelessWidget {
                         text,
                         maxLines: 1,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: selected == code ? FontWeight.w700 : FontWeight.w500,
                           color: selected == code ? scheme.onSurface : scheme.onSurfaceVariant,
                         ),
@@ -1051,7 +1051,7 @@ class _CountPicker extends StatelessWidget {
                     child: ExcludeSemantics(
                       child: Text(
                         '$n',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: selected == n ? scheme.surface : scheme.onSurface),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: selected == n ? scheme.surface : scheme.onSurface),
                       ),
                     ),
                   ),

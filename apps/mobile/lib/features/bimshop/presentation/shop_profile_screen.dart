@@ -136,7 +136,7 @@ class _ShopProfileScreenState extends ConsumerState<ShopProfileScreen> {
                       children: [
                         Row(
                           children: [
-                            Flexible(child: Text(s.shop.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 22))),
+                            Flexible(child: Text(s.shop.name, overflow: TextOverflow.ellipsis, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 18))),
                             if (s.shop.certified) const Padding(padding: EdgeInsets.only(left: 4), child: CertifiedBadge(size: 20)),
                           ],
                         ),

@@ -36,7 +36,7 @@ class ShopRequestsScreen extends ConsumerWidget {
               children: [
                 const Align(alignment: Alignment.centerLeft, child: BimBackButton()),
                 const SizedBox(height: BimSpacing.md),
-                Text('Demandes de projet', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24)),
+                Text('Demandes de projet', style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
                 const SizedBox(height: BimSpacing.xs),
                 Text('Des personnes de ta rubrique acceptent les offres. Tu ne vois ni leur nom ni leur profil : propose-leur ce qui peut les aider.', style: theme.textTheme.bodyMedium),
                 const SizedBox(height: BimSpacing.lg),
@@ -66,7 +66,7 @@ class ShopRequestsScreen extends ConsumerWidget {
                             style: theme.textTheme.bodySmall,
                           ),
                           const SizedBox(height: 2),
-                          Text(q.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                          Text(q.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                           Text('${q.goal ?? 'Objectif personnel'} · ${q.durationDays} jours', style: theme.textTheme.bodyMedium),
                           const SizedBox(height: BimSpacing.md),
                           if (q.offerStatus == null)

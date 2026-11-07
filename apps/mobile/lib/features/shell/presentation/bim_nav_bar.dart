@@ -21,13 +21,13 @@ class BimNavBar extends StatelessWidget {
   /// Pastille rouge par onglet (messages non lus).
   final Map<int, int> badges;
 
-  static const height = 58.0;
+  static const height = 54.0;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    // Jour : blanc presque opaque, sans flou ; nuit seulement : transparente, effet vitre (demande du fondateur).
-    final bar = dark ? const Color(0x853A3A3E) : const Color(0xF5FFFFFF);
+    // Effet vitre jour et nuit (demande du fondateur, 07/11/2026) : barre transparente, contenu flouté derrière.
+    final bar = dark ? const Color(0x853A3A3E) : const Color(0xB8FFFFFF);
     final border = dark ? const Color(0x1AFFFFFF) : const Color(0x0F101116);
     final icon = dark ? const Color(0xFFE6E6EA) : BimColors.grey800;
     final activeColor = dark ? const Color(0xFFFF4D6A) : BimColors.red;
@@ -41,22 +41,22 @@ class BimNavBar extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: radius,
-            boxShadow: [BoxShadow(color: dark ? const Color(0x59000000) : const Color(0x1A101116), blurRadius: 28, offset: const Offset(0, 8))],
+            boxShadow: [BoxShadow(color: dark ? const Color(0x59000000) : const Color(0x1A101116), blurRadius: 20, offset: const Offset(0, 6))],
           ),
           child: ClipRRect(
             borderRadius: radius,
             child: BackdropFilter(
-              enabled: dark,
+              enabled: true,
               filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: Container(
                 key: const ValueKey('bim-nav'),
                 height: height,
                 padding: const EdgeInsets.symmetric(horizontal: 7),
-                decoration: BoxDecoration(color: bar, borderRadius: radius, border: Border.all(color: border)),
+                decoration: BoxDecoration(color: bar, borderRadius: radius, border: Border.all(color: border, width: BimStroke.hairline)),
                 // Petit écran (320 px) : les pastilles se resserrent au lieu de déborder.
                 child: LayoutBuilder(
                   builder: (context, box) {
-                    final itemWidth = ((box.maxWidth - 42) / (items.length - 1)).clamp(36.0, 58.0);
+                    final itemWidth = ((box.maxWidth - 40) / (items.length - 1)).clamp(36.0, 58.0);
                     return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -68,10 +68,11 @@ class BimNavBar extends StatelessWidget {
                               selected: false,
                               onTap: () => onTap(i),
                               child: Container(
-                                width: 42,
-                                height: 42,
+                                // Bouton rouge rond et discret (proposition : 3/4 de la hauteur de la barre).
+                                width: 40,
+                                height: 40,
                                 decoration: const BoxDecoration(color: BimColors.red, shape: BoxShape.circle),
-                                child: Icon(items[i].icon, size: 24, color: BimColors.white),
+                                child: Icon(items[i].icon, size: 20, color: BimColors.white),
                               ),
                             )
                           : _NavButton(
@@ -82,15 +83,15 @@ class BimNavBar extends StatelessWidget {
                               child: AnimatedContainer(
                                 duration: BimDurations.fast,
                                 width: itemWidth,
-                                height: 42,
-                                decoration: BoxDecoration(color: i == current ? activeBg : Colors.transparent, borderRadius: BorderRadius.circular(21)),
+                                height: 38,
+                                decoration: BoxDecoration(color: i == current ? activeBg : Colors.transparent, borderRadius: BorderRadius.circular(19)),
                                 child: Badge(
                                   isLabelVisible: (badges[i] ?? 0) > 0,
                                   label: Text((badges[i] ?? 0) > 99 ? '99+' : '${badges[i] ?? 0}'),
                                   backgroundColor: BimColors.red,
                                   alignment: const AlignmentDirectional(0.55, -0.75),
                                   child: Center(
-                                    child: Icon(i == current ? items[i].active : items[i].icon, size: 24, color: i == current ? activeColor : icon),
+                                    child: Icon(i == current ? items[i].active : items[i].icon, size: 21, color: i == current ? activeColor : icon),
                                   ),
                                 ),
                               ),

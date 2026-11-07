@@ -51,7 +51,7 @@ class StepHeader extends StatelessWidget {
               child: Text(
                 title ?? 'Étape $step sur $total',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 17, color: scheme.onSurfaceVariant),
+                style: TextStyle(fontSize: 15, color: scheme.onSurfaceVariant),
               ),
             ),
             trailing ?? const SizedBox(width: kBimMinTouch),

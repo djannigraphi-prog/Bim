@@ -234,7 +234,7 @@ class _ComposerRow extends ConsumerWidget {
                 else
                   const SizedBox(width: 36),
                 const SizedBox(width: BimSpacing.md),
-                Expanded(child: Text('Partage un Bim…', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16))),
+                Expanded(child: Text('Partage un Bim…', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 14))),
                 Icon(Icons.image_outlined, color: scheme.onSurfaceVariant),
                 const SizedBox(width: BimSpacing.sm),
                 Container(
