@@ -26,8 +26,8 @@ class BimNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    // Jour : blanc presque opaque, sans flou ; nuit seulement : transparente, effet vitre (demande du fondateur).
-    final bar = dark ? const Color(0x853A3A3E) : const Color(0xF5FFFFFF);
+    // Effet vitre jour et nuit (demande du fondateur, 07/11/2026) : barre transparente, contenu flouté derrière.
+    final bar = dark ? const Color(0x853A3A3E) : const Color(0xB8FFFFFF);
     final border = dark ? const Color(0x1AFFFFFF) : const Color(0x0F101116);
     final icon = dark ? const Color(0xFFE6E6EA) : BimColors.grey800;
     final activeColor = dark ? const Color(0xFFFF4D6A) : BimColors.red;
@@ -46,7 +46,7 @@ class BimNavBar extends StatelessWidget {
           child: ClipRRect(
             borderRadius: radius,
             child: BackdropFilter(
-              enabled: dark,
+              enabled: true,
               filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: Container(
                 key: const ValueKey('bim-nav'),
@@ -56,7 +56,7 @@ class BimNavBar extends StatelessWidget {
                 // Petit écran (320 px) : les pastilles se resserrent au lieu de déborder.
                 child: LayoutBuilder(
                   builder: (context, box) {
-                    final itemWidth = ((box.maxWidth - 42) / (items.length - 1)).clamp(36.0, 58.0);
+                    final itemWidth = ((box.maxWidth - 40) / (items.length - 1)).clamp(36.0, 58.0);
                     return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -68,10 +68,11 @@ class BimNavBar extends StatelessWidget {
                               selected: false,
                               onTap: () => onTap(i),
                               child: Container(
-                                width: 42,
-                                height: 38,
+                                // Bouton rouge rond et discret (proposition : 3/4 de la hauteur de la barre).
+                                width: 40,
+                                height: 40,
                                 decoration: const BoxDecoration(color: BimColors.red, shape: BoxShape.circle),
-                                child: Icon(items[i].icon, size: 21, color: BimColors.white),
+                                child: Icon(items[i].icon, size: 20, color: BimColors.white),
                               ),
                             )
                           : _NavButton(

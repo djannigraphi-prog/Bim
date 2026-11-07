@@ -55,4 +55,12 @@ void main() {
     expect(box.color!.a, lessThan(0.7));
     expect(find.byIcon(Icons.shopping_bag_rounded), findsOneWidget);
   });
+
+  testWidgets('mode jour : barre transparente effet vitre, bouton rouge rond de 40', (tester) async {
+    await _pump(tester, BimTheme.light(), current: 0);
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    final box = tester.widget<Container>(find.byKey(const ValueKey('bim-nav'))).decoration! as BoxDecoration;
+    expect(box.color!.a, lessThan(0.8));
+    expect(tester.getSize(find.byKey(const ValueKey('nav-2'))), const Size(40, 40));
+  });
 }
